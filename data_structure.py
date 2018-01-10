@@ -2,7 +2,8 @@ import Grid as bGrid
 
 
 class BoltzmannPDE:
-    """Main class, encapsulating User Interface, Simulation and Animation.
+    """Main class, encapsulating User Interface.
+    Initializes Simulation Problems and provides a framework to animate results.
 
     Attributes:
         number_frames (int): Total number of frames to be animated.
@@ -86,6 +87,28 @@ class BoltzmannPDE:
                               n=number_of_velocities,
                               shape=shape)
         self.single_grid_for_all_specimen = single_grid_for_all_specimen
+
+    def print(self):
+        print("Time Grid:")
+        if self.__t.isInitialized:
+            # noinspection PyArgumentList
+            self.__t.print()
+        else:
+            print("Not Initialized\n")
+        print("Positional Grid:")
+        if self.__p.isInitialized:
+            # noinspection PyArgumentList
+            self.__p.print()
+        else:
+            print("Not Initialized\n")
+        print("Velocity Grid:")
+        if self.__v.isInitialized:
+            # noinspection PyArgumentList
+            self.__v.print()
+        else:
+            print("Not Initialized\n")
+        print("Specimen:")
+        self.__s.print()
 
     # Combined PSV-Grid, for Calculations
     # sv_index = b_init.get_index_array_of_species(v_dim,
@@ -179,5 +202,6 @@ class BoltzmannPDE:
     # # TODO change this into an assert, that checks for numerical stability
     # DT = 0.25 * DX / MAX_V  # step size in T
 
-test = BoltzmannPDE(10, 10, 10)
-test.initialize_position_grid(2, [[1, 2], [4, 5]])
+# test = BoltzmannPDE(10, 10, 10)
+# test.initialize_position_grid(2, [[1, 2], [4, 5]], d=0.1)
+# test.print()

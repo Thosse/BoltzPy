@@ -35,6 +35,15 @@ class Grid:
     isInitialized = False
     isConstructed = False
 
+    def __calculate_number(self):
+        if self.shape is 'rectangular':
+            # Calculate number of grid points per dimension and total number
+            _length = self.boundaries[:, 1] - self.boundaries[:, 0]
+            _n_dim = np.array(np.ceil(_length / self.d) + 1,
+                              dtype=int)
+            self.n = _n_dim.prod()
+            # TODO readjust self.d
+
     def __init__(self, dim, boundaries, d=None, n=None, shape='rectangular'):
         # check submitted dimensionality
         assert type(dim) is int
@@ -69,20 +78,22 @@ class Grid:
         self.shape = shape
         self.boundaries = np.zeros((3, 2), dtype=float)
         self.boundaries[0:dim, :] = np.array(boundaries)
-        self.d = d
-        self.n = n
+        if d is not None and n is None:
+            self.d = d
+            self.__calculate_number()
+        else:
+            assert False, "This is to be done!"
+            # self.d = d
+            # self.n = n
 
     def __make_rectangular_grid(self):
-        # TODO implement for other cases
-        assert self.d is not None and self.n is None, \
-            "TODO implement for other cases"
         assert self.shape == 'rectangular'
-
         # Calculate number of grid points per dimension and total number
         _length = self.boundaries[:, 1] - self.boundaries[:, 0]
         _n_dim = np.array(np.ceil(_length / self.d) + 1,
                           dtype=int)
         _grid_dimension = (_n_dim.prod(), self.dim)
+        self.n = _n_dim.prod()
 
         # Create list of 1D grids for each dimension
         _list_of_1D_grids = [np.linspace(self.boundaries[i_d, 0],
@@ -108,12 +119,22 @@ class Grid:
         if self.shape is 'rectangular':
             return self.__make_rectangular_grid()
 
+    def print(self):
+        print("Dimension = {}".format(self.dim))
+        print("Boundaries = {}".format(self.boundaries))
+        print("Number of Grid Points = {}".format(self.n))
+        print("Step Size = {}".format(self.d))
+        print("Shape = {}".format(self.shape))
+        print("Grid was initialized = {}".format(self.isInitialized))
+        print("Grid was Constructed = {}".format(self.isConstructed))
+        print("")
+
 
 #############################################################################
 #                           Species-Class                                   #
 #############################################################################
 class Species:
-    """A simple class for Positional-, Time- or Velocity-Grids.
+    """A simple class encapsulating data about species to be simulated.
 
     Attributes:
         n (int):
@@ -123,7 +144,7 @@ class Species:
             Array of shape=(self.n,) and dtype=int.
         alpha (:obj:'np.ndarray'):
             Describes Probabilities of collision between 2 specimen..
-            Array of shape=(self.n,) and dtype=int.
+            Array of shape=(self.n, self.n) and dtype=float.
         names (:obj:'np.ndarray'):
             = np.zeros(shape=(0,), dtype=str)
         colors (:obj:'np.ndarray'):
@@ -180,10 +201,13 @@ class Species:
         self.names.append(name)
         self.colors.append(color)
 
-
-#############################################################################
-#                           Species-Velocity Grid                           #
-#############################################################################
+    def print(self):
+        print("Number of Specimen = {}".format(self.n))
+        print("Masses of Specimen = {}".format(self.mass))
+        print("Collision-Factor-Matrix = {}".format(self.alpha))
+        print("Names of Specimen = {}".format(self.names))
+        print("Colors of Specimen = {}".format(self.colors))
+        print("")
 
 # class PSVGrid:
 #
