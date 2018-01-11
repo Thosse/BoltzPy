@@ -49,6 +49,7 @@ class Grid:
             # for i_d in range(dim):
             #     if _l[i_d] - (_n_dim[i_d] - 1) * self.d < 1E-7:
             # # Todo Solve rounding issue 0.4-0.3 = 0.100000002
+            # Adjust boundaries if small error to multiples of d
             _n_dim = np.array(np.ceil(_l / self.d) + 1, dtype=int)
             # TODO readjust self.d, if necessary? How?
             return int(_n_dim.prod())
@@ -75,12 +76,33 @@ class Grid:
         # Todo make tis assertion work
         # assert type(self.fType) in Grid.DATA_TYPES
 
-    def initialize_without_n(self, dim, boundaries, d, shape):
+    def __initialize_without_n(self, dim, boundaries, d, shape):
         self.dim = dim
         self.boundaries[0:dim, :] = np.array(boundaries, dtype=self.fType)
         self.d = self.fType(d)
         self.shape = shape
         self.n = self.__compute_n()
+
+    def initialize(self,
+                   dim,
+                   boundaries,
+                   d,
+                   n,
+                   shape):
+        # Case Switches, 3 possible cases
+        sw_b = boundaries is not None
+        sw_d = d is not None
+        sw_n = n is not None
+        # Total number not defined
+        if sw_b and sw_d and not sw_n:
+            self.__initialize_without_n(dim,
+                                        boundaries,
+                                        d,
+                                        shape)
+        else:
+            print('Exactly 2 of [Boundaries, Step Size, Total Number]'
+                  'must be submitted')
+            assert False
 
     def __make_rectangular_grid(self):
         assert self.shape == 'rectangular'

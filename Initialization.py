@@ -14,56 +14,66 @@ class Initialization:
             Contains all Positional Space Parameters
         __v (:obj:Grid):
             Contains all Velocity Space Parameters
+        __fType (Type):
+            Decides Data Type for Grids
     """
-    def __init__(self):
+    def __init__(self, f_type=float):
         self.__s = bSp.Species()
-        self.__p = bG.Grid()
-        self.__t = bG.Grid()
-        self.__v = bG.Grid()
+        self.__p = bG.Grid(f_type)
+        self.__t = bG.Grid(f_type)
+        self.__v = bG.Grid(f_type)
+        self.__fType = f_type
 
     def time(self,
-             max_time,
+             max_time=None,
              step_size=None,
              number_time_steps=None):
-        self.__t = bGrid.Grid(1,
-                              [0.0, max_time],
-                              d=step_size,
-                              n=number_time_steps,
-                              shape='rectangular')
+        if max_time is None:
+            self.__t.initialize(dim=1,
+                                boundaries=None,
+                                d=step_size,
+                                n=number_time_steps,
+                                shape='rectangular')
+        else:
+            self.__t.initialize(dim=1,
+                                boundaries=[0.0, max_time],
+                                d=step_size,
+                                n=number_time_steps,
+                                shape='rectangular')
 
     def position_space(self,
                        dimension,
-                       boundaries,
+                       boundaries=None,
                        step_size=None,
                        total_grid_points=None,
                        shape='rectangular'):
-        self.__p = bGrid.Grid(dimension,
-                              boundaries,
-                              d=step_size,
-                              n=total_grid_points,
-                              shape=shape)
+        self.__p.initialize(dim=dimension,
+                            boundaries=boundaries,
+                            d=step_size,
+                            n=total_grid_points,
+                            shape=shape)
 
     def velocity_space(self,
                        dimension,
-                       max_v,
+                       max_v=None,
                        step_size=None,
                        total_grid_points=None,
                        offset=None,
                        shape='rectangular'):
         if offset is None:
             offset = [0.0]*dimension
-
         assert type(offset) is list
+        assert len(offset) == dimension
         assert type(max_v) in [float, int] and max_v > 0
-        assert type(single_grid_for_all_specimen) is bool
 
+        assert max_v is not None, "This is not specified so far"
         boundaries = [[-max_v + offset[i_d], max_v + offset[i_d]]
                       for i_d in range(dimension)]
-        self.__v = bGrid.Grid(dimension,
-                              boundaries,
-                              d=step_size,
-                              n=total_grid_points,
-                              shape=shape)
+        self.__v.initialize(dimension,
+                            boundaries,
+                            d=step_size,
+                            n=total_grid_points,
+                            shape=shape)
 
     def add_specimen(self,
                      mass=1,

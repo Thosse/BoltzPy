@@ -1,7 +1,8 @@
 import Initialization as bI
-#import Setup as bS
-#import Calculation as bC
-#import Animation as bA
+# import Setup as bS
+# import Calculation as bC
+# import Animation as bA
+
 
 class BoltzmannPDE:
     """Main class, Encapsulates all Functionalities
@@ -19,8 +20,9 @@ class BoltzmannPDE:
     def __init__(self,
                  use_gpu=False,
                  use_single_grid=False):
-        self.flag_GPU = use_gpu
-        self.single_v_grid = use_single_grid
+        self.__flag_GPU = use_gpu
+        self.__single_v_grid = use_single_grid
+        # Todo set fType depending on use_gpu, and submit to initialize
         self.initialize = bI.Initialization()
 
     def print(self):
