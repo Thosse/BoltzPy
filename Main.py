@@ -1,6 +1,8 @@
 # Desired Command / Road Map
+import BoltzmannPDE as bB
 
-# x = BoltzmannPDE()
+x = bB.BoltzmannPDE()
+x.initialize.print()
 # x.init.time()
 # x.init.species()
 # x.init.position()
@@ -10,7 +12,7 @@
 # x.setup()
 # x.setup.print() - prints grids as plot
 #
-# x.calc()
+# x.calc(animated_Moments)
 #
 # x.animate()
 #
