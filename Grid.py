@@ -40,7 +40,7 @@ class Grid:
         self.shape = 'NOT INITIALIZED'
         self.fType = data_type
 
-    def __compute_n(self):
+    def __compute_n_dim(self):
         assert self.d is not 0.0
         assert not np.array_equal(self.b,
                                   np.zeros((3, 2), dtype=self.fType))
@@ -50,10 +50,13 @@ class Grid:
             _l = self.b[:, 1] - self.b[:, 0]
             _n_dim = [bU.get_close_int(i/self.d) + 1 for i in _l]
             _n_dim = np.array(_n_dim)
-            return int(_n_dim.prod())
+            return _n_dim
         else:
             print("ERROR - Unspecified Grid Shape")
             assert False
+
+    def __compute_n(self):
+        return int(self.__compute_n_dim().prod())
 
     def check_integrity(self):
         assert type(self.dim) is int
@@ -61,8 +64,6 @@ class Grid:
         assert type(self.b) is np.ndarray
         assert self.b.dtype == self.fType
         assert self.b.shape == (3, 2)
-        # Todo assert boundaries have positive width, or are both 0,
-        # Todo depending on dim
         for i_d in [0, 1, 2]:
             if i_d < self.dim:
                 assert self.b[i_d, 1] - self.b[i_d, 0] > 0
@@ -73,13 +74,15 @@ class Grid:
         assert type(self.n) is int
         assert self.n >= 2
         assert self.shape in Grid.GRID_SHAPES
-        #  Todo assert that boundaries, d and n match (dep. on shape)
-        assert self.n is self.__compute_n()
         assert type(self.fType) in [type, np.dtype]
-        # Todo make tis assertion work
+        # Todo make this assertion work
         # assert type(self.fType) in Grid.DATA_TYPES
+        assert self.n is self.__compute_n()
+        if self.shape is 'rectangular':
+            width = self.b[:, 1] - self.b[:, 0]
+            assert (self.__compute_n_dim() * self.d == width).all
 
-    def initialize_without_n(self, dim, b, d, shape):
+    def __initialize_without_n(self, dim, b, d, shape):
         self.dim = dim
         self.b[0:dim, :] = np.array(b, dtype=self.fType)
         self.d = self.fType(d)
@@ -102,9 +105,17 @@ class Grid:
                                         b,
                                         d,
                                         shape)
+        elif b_def and n_def and not d_def:
+            # Todo
+            print('This remains to be implemented')
+            assert False
+        elif n_def and d_def and not b_def:
+            # Todo
+            print('This remains to be implemented')
+            assert False
         else:
-            print('Exactly 2 of [Boundaries, Step Size, Total Number]'
-                  'must be submitted')
+            print('EXACTLY 2 of [Boundaries, Step Size, Total Number]'
+                  'must be submitted. No more, No less')
             assert False
 
     def __make_rectangular_grid(self):
@@ -150,15 +161,3 @@ class Grid:
         print("Shape = {}".format(self.shape))
         print("Data Type = {}".format(self.fType))
         print("")
-
-t = Grid()
-# # # Todo right Number?
-t.initialize_without_n(3,
-                       [[0.0, 2.0], [0.3, 0.4], [0.0, 1.0]],
-                       0.1,
-                       'rectangular')
-t.initialize_without_n(1, [[0.3, 0.4]], 0.1, 'rectangular')
-t.check_integrity()
-# t.initialize_without_n(2, [[0, 1], [0, 1]], 0.1, 'rectangular')
-
-t.print()

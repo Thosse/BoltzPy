@@ -29,17 +29,14 @@ class Initialization:
              step_size=None,
              number_time_steps=None):
         if max_time is None:
-            self.__t.initialize(dim=1,
-                                b=None,
-                                d=step_size,
-                                n=number_time_steps,
-                                shape='rectangular')
+            boundaries = None
         else:
-            self.__t.initialize(dim=1,
-                                boundaries=[0.0, max_time],
-                                d=step_size,
-                                n=number_time_steps,
-                                shape='rectangular')
+            boundaries = [0.0, max_time]
+        self.__t.initialize(dim=1,
+                            b=boundaries,
+                            d=step_size,
+                            n=number_time_steps,
+                            shape='rectangular')
 
     def position_space(self,
                        dimension,
@@ -66,14 +63,20 @@ class Initialization:
         assert len(offset) == dimension
         assert type(max_v) in [float, int] and max_v > 0
 
-        assert max_v is not None, "This is not specified so far"
-        b = [[-max_v + offset[i_d], max_v + offset[i_d]]
-             for i_d in range(dimension)]
+        # assert max_v is not None, "This is not specified so far"
+        # b = [[-max_v + offset[i_d], max_v + offset[i_d]]
+        #      for i_d in range(dimension)]
+        if max_v is None:
+            b = None
+        else:
+            b = [-max_v, max_v]
         self.__v.initialize(dimension,
                             b,
                             d=step_size,
                             n=total_grid_points,
                             shape=shape)
+        offset = np.array(offset)
+        self.b += offset
 
     def add_specimen(self,
                      mass=1,
