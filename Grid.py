@@ -1,6 +1,8 @@
 import numpy as np
 import math
 
+import Utilities as bU
+
 
 #############################################################################
 #                 Creation of Space and Velocity Grids/Arrays               #
@@ -10,8 +12,8 @@ class Grid:
 
     Attributes:
         dim (int):
-            Grid dimensionality
-        boundaries (:obj:'np.ndarray'):
+            Grid dimensionality.
+        b (:obj:'np.ndarray'):
             Describes (physical) size and position of the grid.
             Array of shape=(3,) and dtype=float
         d (float):
@@ -20,7 +22,7 @@ class Grid:
             Denotes the total number of grid points.
         shape (str):
             Shape of Grid can only be rectangular so far
-        ftype (type or np.dtype):
+        fType (type or np.dtype):
             Determines data type of floats.
     """
     # Todo Add unit tests
@@ -32,7 +34,7 @@ class Grid:
 
     def __init__(self, data_type=float):
         self.dim = 0
-        self.boundaries = np.zeros((3, 2), dtype=data_type)
+        self.b = np.zeros((3, 2), dtype=data_type)
         self.d = 0.0
         self.n = 0
         self.shape = 'NOT INITIALIZED'
@@ -40,18 +42,14 @@ class Grid:
 
     def __compute_n(self):
         assert self.d is not 0.0
-        assert not np.array_equal(self.boundaries,
+        assert not np.array_equal(self.b,
                                   np.zeros((3, 2), dtype=self.fType))
         if self.shape is 'rectangular':
             # Calculate number of grid points per dimension and total number
-            _l = self.boundaries[:, 1] - self.boundaries[:, 0]
-            # _n_dim = np.array(floor(_l / self.d) + 1, dtype=self.fType)
-            # for i_d in range(dim):
-            #     if _l[i_d] - (_n_dim[i_d] - 1) * self.d < 1E-7:
-            # # Todo Solve rounding issue 0.4-0.3 = 0.100000002
-            # Adjust boundaries if small error to multiples of d
-            _n_dim = np.array(np.ceil(_l / self.d) + 1, dtype=int)
-            # TODO readjust self.d, if necessary? How?
+            # Todo Catch Error, if boundaries and d don't match
+            _l = self.b[:, 1] - self.b[:, 0]
+            _n_dim = [bU.get_close_int(i/self.d) + 1 for i in _l]
+            _n_dim = np.array(_n_dim)
             return int(_n_dim.prod())
         else:
             print("ERROR - Unspecified Grid Shape")
@@ -60,11 +58,16 @@ class Grid:
     def check_integrity(self):
         assert type(self.dim) is int
         assert self.dim in [1, 2, 3]
-        assert type(self.boundaries) is np.ndarray
-        assert self.boundaries.dtype == self.fType
-        assert self.boundaries.shape == (3, 2)
+        assert type(self.b) is np.ndarray
+        assert self.b.dtype == self.fType
+        assert self.b.shape == (3, 2)
         # Todo assert boundaries have positive width, or are both 0,
         # Todo depending on dim
+        for i_d in [0, 1, 2]:
+            if i_d < self.dim:
+                assert self.b[i_d, 1] - self.b[i_d, 0] > 0
+            if i_d >= self.dim:
+                assert (self.b[i_d, :] == 0.0).all
         assert type(self.d) is self.fType
         assert self.d > 0
         assert type(self.n) is int
@@ -76,27 +79,27 @@ class Grid:
         # Todo make tis assertion work
         # assert type(self.fType) in Grid.DATA_TYPES
 
-    def __initialize_without_n(self, dim, boundaries, d, shape):
+    def initialize_without_n(self, dim, b, d, shape):
         self.dim = dim
-        self.boundaries[0:dim, :] = np.array(boundaries, dtype=self.fType)
+        self.b[0:dim, :] = np.array(b, dtype=self.fType)
         self.d = self.fType(d)
         self.shape = shape
         self.n = self.__compute_n()
 
     def initialize(self,
                    dim,
-                   boundaries,
+                   b,
                    d,
                    n,
                    shape):
-        # Case Switches, 3 possible cases
-        sw_b = boundaries is not None
-        sw_d = d is not None
-        sw_n = n is not None
+        # Switch variables, 3 possible cases
+        b_def = b is not None
+        d_def = d is not None
+        n_def = n is not None
         # Total number not defined
-        if sw_b and sw_d and not sw_n:
+        if b_def and d_def and not n_def:
             self.__initialize_without_n(dim,
-                                        boundaries,
+                                        b,
                                         d,
                                         shape)
         else:
@@ -108,14 +111,14 @@ class Grid:
         assert self.shape == 'rectangular'
         # Todo Remove redundance (__compute_n)
         # Calculate number of grid points per dimension and total number
-        _length = self.boundaries[:, 1] - self.boundaries[:, 0]
+        _length = self.b[:, 1] - self.b[:, 0]
         _n_dim = np.array(np.ceil(_length / self.d) + 1,
                           dtype=int)
         _grid_dimension = (self.n, self.dim)
         # Todo Till here
         # Create list of 1D grids for each dimension
-        _list_of_1D_grids = [np.linspace(self.boundaries[i_d, 0],
-                                         self.boundaries[i_d, 1],
+        _list_of_1D_grids = [np.linspace(self.b[i_d, 0],
+                                         self.b[i_d, 1],
                                          _n_dim[i_d])
                              for i_d in range(self.dim)]
         # Create mesh grid from 1D grids
@@ -141,21 +144,21 @@ class Grid:
 
     def print(self):
         print("Dimension = {}".format(self.dim))
-        print("Boundaries = \n{}".format(self.boundaries))
+        print("Boundaries = \n{}".format(self.b))
         print("Number of Grid Points = {}".format(self.n))
         print("Step Size = {}".format(self.d))
         print("Shape = {}".format(self.shape))
         print("Data Type = {}".format(self.fType))
         print("")
 
-# t = Grid()
-# # Todo right Number?
-# t.initialize_without_n(3,
-#                        [[0.0, 2.0], [0.3, 0.4], [0.0, 1.0]],
-#                        0.1,
-#                        'rectangular')
-# t.initialize_without_n(1, [[0.3, 0.4]], 0.1, 'rectangular')
-# t.check_integrity()
-# # t.initialize_without_n(2, [[0, 1], [0, 1]], 0.1, 'rectangular')
-#
-# t.print()
+t = Grid()
+# # # Todo right Number?
+t.initialize_without_n(3,
+                       [[0.0, 2.0], [0.3, 0.4], [0.0, 1.0]],
+                       0.1,
+                       'rectangular')
+t.initialize_without_n(1, [[0.3, 0.4]], 0.1, 'rectangular')
+t.check_integrity()
+# t.initialize_without_n(2, [[0, 1], [0, 1]], 0.1, 'rectangular')
+
+t.print()

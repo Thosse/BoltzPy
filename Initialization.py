@@ -30,7 +30,7 @@ class Initialization:
              number_time_steps=None):
         if max_time is None:
             self.__t.initialize(dim=1,
-                                boundaries=None,
+                                b=None,
                                 d=step_size,
                                 n=number_time_steps,
                                 shape='rectangular')
@@ -48,7 +48,7 @@ class Initialization:
                        total_grid_points=None,
                        shape='rectangular'):
         self.__p.initialize(dim=dimension,
-                            boundaries=boundaries,
+                            b=boundaries,
                             d=step_size,
                             n=total_grid_points,
                             shape=shape)
@@ -67,10 +67,10 @@ class Initialization:
         assert type(max_v) in [float, int] and max_v > 0
 
         assert max_v is not None, "This is not specified so far"
-        boundaries = [[-max_v + offset[i_d], max_v + offset[i_d]]
-                      for i_d in range(dimension)]
+        b = [[-max_v + offset[i_d], max_v + offset[i_d]]
+             for i_d in range(dimension)]
         self.__v.initialize(dimension,
-                            boundaries,
+                            b,
                             d=step_size,
                             n=total_grid_points,
                             shape=shape)
