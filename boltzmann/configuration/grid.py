@@ -1,7 +1,23 @@
 import numpy as np
 import math
 
-import Utilities as bU
+
+def np_gcd(array_of_ints):
+    assert array_of_ints.dtype == np.int32
+    gcd = array_of_ints[0]
+    for new_number in array_of_ints[1:]:
+        gcd = math.gcd(gcd, new_number)
+    return gcd
+
+
+def get_close_int(real_number, precision=1e-6):
+    close_int = int(math.floor(real_number))
+    if math.fabs(close_int - real_number) < precision:
+        return close_int
+    elif math.fabs(close_int+1 - real_number) < precision:
+        return close_int + 1
+    else:
+        assert False, "Number {} is not close to an integer".format(real_number)
 
 
 #############################################################################
@@ -14,16 +30,22 @@ class Grid:
         dim (int):
             Grid dimensionality.
         b (:obj:'np.ndarray'):
-            Describes (physical) size and position of the grid.
-            Array of shape=(3,) and dtype=float
+            Denotes [minimum, maximum] physical values in the grid.
+            Array of shape=(3,2) and dtype=float
         d (float):
             Step size of the grid.
+            If the grid is not uniform this is set to 0.0
         n (int):
             Denotes the total number of grid points.
         shape (str):
             Shape of Grid can only be rectangular so far
+        isUniform (bool):
+            True if Grid is uniform.
         fType (type or np.dtype):
             Determines data type of floats.
+        grid (np.ndarray):
+            Describes physical Parameters of each grid point.
+            Array of shape=(n, dim) and dtype=fType
     """
     # Todo Add unit tests
     # Todo Add "check for consistency" method
@@ -38,7 +60,9 @@ class Grid:
         self.d = 0.0
         self.n = 0
         self.shape = 'NOT INITIALIZED'
+        self.isUniform = None
         self.fType = data_type
+        self.grid = None
 
     def __compute_n_dim(self):
         assert self.d is not 0.0
@@ -48,7 +72,7 @@ class Grid:
             # Calculate number of grid points per dimension and total number
             # Todo Catch Error, if boundaries and d don't match
             _l = self.b[:, 1] - self.b[:, 0]
-            _n_dim = [bU.get_close_int(i/self.d) + 1 for i in _l]
+            _n_dim = [get_close_int(i/self.d) + 1 for i in _l]
             _n_dim = np.array(_n_dim)
             return _n_dim
         else:
@@ -68,7 +92,7 @@ class Grid:
             if i_d < self.dim:
                 assert self.b[i_d, 1] - self.b[i_d, 0] > 0
             if i_d >= self.dim:
-                assert (self.b[i_d, :] == 0.0).all
+                assert (self.b[i_d, :] is 0.0).all
         assert type(self.d) is self.fType
         assert self.d > 0
         assert type(self.n) is int
@@ -120,13 +144,8 @@ class Grid:
 
     def __make_rectangular_grid(self):
         assert self.shape == 'rectangular'
-        # Todo Remove redundance (__compute_n)
-        # Calculate number of grid points per dimension and total number
-        _length = self.b[:, 1] - self.b[:, 0]
-        _n_dim = np.array(np.ceil(_length / self.d) + 1,
-                          dtype=int)
+        _n_dim = self.__compute_n_dim()
         _grid_dimension = (self.n, self.dim)
-        # Todo Till here
         # Create list of 1D grids for each dimension
         _list_of_1D_grids = [np.linspace(self.b[i_d, 0],
                                          self.b[i_d, 1],
@@ -143,7 +162,6 @@ class Grid:
         elif self.dim is not 1:
             print("Error")
         grid = grid.reshape(_grid_dimension)
-        self.isConstructed = True
         return grid
 
     def make_grid(self):
@@ -159,5 +177,7 @@ class Grid:
         print("Number of Grid Points = {}".format(self.n))
         print("Step Size = {}".format(self.d))
         print("Shape = {}".format(self.shape))
+        print("Grid is Uniform? - {}".format(self.isUniform))
         print("Data Type = {}".format(self.fType))
+        print("Physical Grid:\n{}".format(self.grid))
         print("")

@@ -1,13 +1,12 @@
 import numpy as np
 
 
-#############################################################################
-#                           Species-Class                                   #
-#############################################################################
 class Species:
     """A simple class encapsulating data about species to be simulated.
 
     Attributes:
+    -----------
+
         n (int):
             Denotes total number of specimen.
         mass (:obj:'np.ndarray'):
@@ -17,9 +16,13 @@ class Species:
             Describes Probabilities of collision between 2 specimen..
             Array of shape=(self.n, self.n) and dtype=float.
         names (:obj:'np.ndarray'):
-            = np.zeros(shape=(0,), dtype=str)
+            Denotes Names of Specimen.
+            Used in Animation
+            Array of shape=(self.n,) and dtype=str.
         colors (:obj:'np.ndarray'):
-            = np.zeros(shape=(0,), dtype=str)
+            Denotes Color of Specimen.
+            Used in Animation
+            Array of shape=(self.n,) and dtype=str.
     """
     COLOR_LIST = ['blue',       'red',      'green',
                   'yellow',     'black',    'brown',
