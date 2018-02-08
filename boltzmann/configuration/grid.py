@@ -24,136 +24,116 @@ def get_close_int(real_number, precision=1e-6):
 #                 Creation of Space and Velocity Grids/Arrays               #
 #############################################################################
 class Grid:
-    """A simple class for Positional-, Time- or Velocity-Grids.
+    """Basic class for Positional-, Time- or Velocity-Grids.
 
-    Attributes:
-        dim (int):
-            Grid dimensionality.
-        b (:obj:'np.ndarray'):
-            Denotes [minimum, maximum] physical values in the grid.
-            Array of shape=(3,2) and dtype=float
-        d (float):
-            Step size of the grid.
-            If the grid is not uniform this is set to 0.0
-        n (int):
-            Denotes the total number of grid points.
-        shape (str):
-            Shape of Grid can only be rectangular so far
-        isUniform (bool):
-            True if Grid is uniform.
-        fType (type or np.dtype):
-            Determines data type of floats.
-        grid (np.ndarray):
-            Describes physical Parameters of each grid point.
-            Array of shape=(n, dim) and dtype=fType
+    .. todo::
+        - Todo Add unit tests
+        - Todo Add "check for consistency" method
+        - Todo Add Circular shape
+        - add rotation of grid (useful for velocities)
+        - Enable non-uniform grids?
+        - Todo Add adaptive Grids
+
+    Attributes
+    ----------
+    dim : int
+        Grid dimensionality.
+    b : :obj:'np.ndarray'
+        Denotes [minimum, maximum] physical values in the grid.
+        Array of shape==(dim,2) and dtype=float
+    d : fType
+        Step size of the grid.
+    n : np.ndarray(int)
+        n[0:dim] denotes the number of grid points per dimension.
+        n[-1] denotes the total number of grid points.
+        Array of shape==(dim+1,)
+    shape : str
+        Shape of Grid can only be rectangular so far
+    fType : np.dtype
+        Determines data type of floats.
+    iType : np.dtype
+        Determines data type of integers.
+
     """
-    # Todo Add unit tests
-    # Todo Add "check for consistency" method
-    # Todo Add Circular shape
-    # Todo Add adaptive Grids
     GRID_SHAPES = ['rectangular']
     DATA_TYPES = [np.float16, np.float32, np.float64]
 
-    def __init__(self, data_type=float):
-        self.dim = 0
-        self.b = np.zeros((3, 2), dtype=data_type)
-        self.d = 0.0
-        self.n = 0
-        self.shape = 'NOT INITIALIZED'
-        self.isUniform = None
-        self.fType = data_type
-        self.grid = None
-
-    def __compute_n_dim(self):
-        assert self.d is not 0.0
-        assert not np.array_equal(self.b,
-                                  np.zeros((3, 2), dtype=self.fType))
+    def __init__(self,
+                 dimension,
+                 boundaries,
+                 delta,
+                 shape='rectangular',
+                 float_data_type=np.float32,
+                 integer_data_type=np.int32):
+        self.dim = dimension
+        self.b = np.array(boundaries, dtype=float_data_type)
+        self.d = float_data_type(delta)
+        self.shape = shape
+        self.fType = float_data_type
+        self.iType = integer_data_type
+        # Todo: do this without empty __init__s
+        self.n = np.zeros(shape=(self.dim+1,), dtype=self.iType)
         if self.shape is 'rectangular':
-            # Calculate number of grid points per dimension and total number
-            # Todo Catch Error, if boundaries and d don't match
-            _l = self.b[:, 1] - self.b[:, 0]
-            _n_dim = [get_close_int(i/self.d) + 1 for i in _l]
-            _n_dim = np.array(_n_dim)
-            return _n_dim
+            self.n = self.__compute_n()
+            # Todo: Update boundaries to new value n*d?
+            Grid.check_integrity(self)
         else:
-            print("ERROR - Unspecified Grid Shape")
-            assert False
+            print('Empty initialization of Grid')
 
     def __compute_n(self):
-        return int(self.__compute_n_dim().prod())
+        assert self.d > 0
+        _l = self.b[:, 1] - self.b[:, 0]
+        _zero = np.zeros((self.dim,), dtype=self.fType)
+        assert all(_l > _zero)
+        n = np.zeros((self.dim+1,), dtype=self.iType)
+        # Calculate number of grid points per dimension
+        # Todo Catch Error, if boundaries and d don't match
+        n[0:self.dim] = [get_close_int(i/self.d) + 1 for i in _l]
+        # calculate total number of grid points
+        if self.shape is 'rectangular':
+            n[-1] = n[0:self.dim].prod()
+        else:
+            # Todo proper exception throwing
+            print('ERROR')
+            assert False
+        return n
 
     def check_integrity(self):
         assert type(self.dim) is int
         assert self.dim in [1, 2, 3]
         assert type(self.b) is np.ndarray
         assert self.b.dtype == self.fType
-        assert self.b.shape == (3, 2)
-        for i_d in [0, 1, 2]:
-            if i_d < self.dim:
-                assert self.b[i_d, 1] - self.b[i_d, 0] > 0
-            if i_d >= self.dim:
-                assert (self.b[i_d, :] is 0.0).all
+        assert self.b.shape == (self.dim, 2)
+        for i_d in range(self.dim):
+            assert self.b[i_d, 1] - self.b[i_d, 0] > 0
         assert type(self.d) is self.fType
         assert self.d > 0
-        assert type(self.n) is int
-        assert self.n >= 2
+        assert type(self.n) is np.ndarray
+        assert self.n.dtype == self.iType
+        assert (self.n >= 2).all
         assert self.shape in Grid.GRID_SHAPES
-        assert type(self.fType) in [type, np.dtype]
+        assert type(self.fType) == type
         # Todo make this assertion work
         # assert type(self.fType) in Grid.DATA_TYPES
-        assert self.n is self.__compute_n()
+        assert (self.n == self.__compute_n()).all
         if self.shape is 'rectangular':
-            width = self.b[:, 1] - self.b[:, 0]
-            assert (self.__compute_n_dim() * self.d == width).all
-
-    def __initialize_without_n(self, dim, b, d, shape):
-        self.dim = dim
-        self.b[0:dim, :] = np.array(b, dtype=self.fType)
-        self.d = self.fType(d)
-        self.shape = shape
-        self.n = self.__compute_n()
-
-    def initialize(self,
-                   dim,
-                   b,
-                   d,
-                   n,
-                   shape):
-        # Switch variables, 3 possible cases
-        b_def = b is not None
-        d_def = d is not None
-        n_def = n is not None
-        # Total number not defined
-        if b_def and d_def and not n_def:
-            self.__initialize_without_n(dim,
-                                        b,
-                                        d,
-                                        shape)
-        elif b_def and n_def and not d_def:
-            # Todo
-            print('This remains to be implemented')
-            assert False
-        elif n_def and d_def and not b_def:
-            # Todo
-            print('This remains to be implemented')
-            assert False
-        else:
-            print('EXACTLY 2 of [Boundaries, Step Size, Total Number]'
-                  'must be submitted. No more, No less')
-            assert False
+            assert self.n[0:self.dim].prod() == self.n[-1]
+            _width1 = self.b[:, 1] - self.b[:, 0]
+            _width2 = (self.n[0:self.dim] - np.ones((self.dim,))) * self.d
+            np.testing.assert_almost_equal(_width1, _width2)
 
     def __make_rectangular_grid(self):
         assert self.shape == 'rectangular'
-        _n_dim = self.__compute_n_dim()
-        _grid_dimension = (self.n, self.dim)
+        _grid_size = (self.n[-1], self.dim)
         # Create list of 1D grids for each dimension
         _list_of_1D_grids = [np.linspace(self.b[i_d, 0],
                                          self.b[i_d, 1],
-                                         _n_dim[i_d])
+                                         self.n[i_d])
                              for i_d in range(self.dim)]
         # Create mesh grid from 1D grids
-        _mesh_list = np.meshgrid(*_list_of_1D_grids)    # *[a,b,c] = a,b,c
-        grid = np.array(_mesh_list)
+        # Note that *[a,b,c] == a,b,c
+        _mesh_list = np.meshgrid(*_list_of_1D_grids)
+        grid = np.array(_mesh_list, dtype=self.fType)
         # bring meshgrid into desired order/structure
         if self.dim is 2:
             grid = np.array(grid.transpose((2, 1, 0)))
@@ -161,7 +141,8 @@ class Grid:
             grid = np.array(grid.transpose((2, 1, 3, 0)))
         elif self.dim is not 1:
             print("Error")
-        grid = grid.reshape(_grid_dimension)
+            assert False
+        grid = grid.reshape(_grid_size)
         return grid
 
     def make_grid(self):
@@ -174,10 +155,10 @@ class Grid:
     def print(self):
         print("Dimension = {}".format(self.dim))
         print("Boundaries = \n{}".format(self.b))
-        print("Number of Grid Points = {}".format(self.n))
+        print("Number of Total Grid Points = {}".format(self.n[-1]))
+        print("Grid Points per Dimension = {}".format(self.n[0:self.dim]))
         print("Step Size = {}".format(self.d))
         print("Shape = {}".format(self.shape))
-        print("Grid is Uniform? - {}".format(self.isUniform))
-        print("Data Type = {}".format(self.fType))
-        print("Physical Grid:\n{}".format(self.grid))
+        print("Float Data Type = {}".format(self.fType))
+        print("Integer Data Type = {}".format(self.iType))
         print("")
