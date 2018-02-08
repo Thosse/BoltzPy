@@ -3,53 +3,53 @@ import boltzmann.configuration.configuration as b_cnf
 # import boltzmann.configuration.calculation as b_clc
 # import boltzmann.configuration.animation as b_ani
 
-# import Setup as bS
-# import Calculation as bC
-# import Animation as bA
-
 
 class BoltzmannPDE:
     r"""
-    Main class, is divided into four autonomic parts:
+    Main class, is divided into four autonomous parts:
 
-    **Configuration**
+    *Configuration*
         * based solely on User Input
         * sets the Specimen-Parameters
         * generates the physical grids of T-Space, P-Space, and SV-Space.
 
-    **Initialization**
+    *Initialization*
         * based on physical grids and User Input
         * generates PSV-Grid
-        * initializes V-distribution and sets flags for each P-Grid point (inner point/boundary point).
+        * initializes V-distribution and sets flags for each P-Grid point
+          (inner point/boundary point).
         * Generates collision-list and collision-weights
         * saves/loads conf-file to/from HDD
+          (each init-operation adds an element to an instruction-vector)
+          -> save/load-module
 
-    **Calculation**
+    *Calculation*
         * acts alternately on the PSV-Grid and a copy of it
         * contains several implementations for transport and collision steps
         * during calculations intermediate results are processed and written to HDD.
 
-    **Animation**
+    *Animation*
         * reads the stored results on the HDD
         * generates animations of specified variables
 
+    .. todo::
+        - Remove classes from submodules -> replace by functions
+        - Where to specify integration order?
+        - Create separate module to save/load conf-files
+
     Attributes
     ----------
-        __use_gpu : bool
-            Decides computation device (GPU/CPU)
-        __use_single_v_grid : bool
-            Use equal velocity grids for all specimen (yes/no)
-        configure : :obj:Configuration
-            Framework for basic setup of:
-                Time-Grid,
-                Position-Space-Grid,
-                Velocity-Space-Grid,
-                Specimen parameters.
-            Creates data structures on which all other modules operate.
+    __use_gpu : bool
+        Decides computation device (GPU/CPU)
+    __use_single_v_grid : bool
+        Use equal velocity grids for all specimen (yes/no)
+    config : :obj:Configuration
+        Handles basic setup of:
+            * Specimen parameters,
+            * Time-Grid,
+            * Position-Space-Grid,
+            * Velocity-Space-Grid.
 
-    To Do
-    -----
-        * Where to specify integration order?
     """
     def __init__(self,
                  use_gpu=False,
