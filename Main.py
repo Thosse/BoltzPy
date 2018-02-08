@@ -1,28 +1,28 @@
 # Desired Command / Road Map
 import boltzmann as bP
 
-x = bP.BoltzmannPDE()
-x.config.add_specimen()
-x.config.add_specimen(mass=2, name='Bernd')
+B = bP.BoltzmannPDE()
+B.add_specimen()
+B.add_specimen(mass=2, name='Bernd')
 
-x.config.set_t(5, 1)
-x.config.set_p(3, [[0, 5], [0.0, 0.1], [0.0, 9.9]], step_size=0.1)
-x.config.set_v(2, 2.0, 0.1)
-x.print()
-# x.config.setup()
+B.setup_time(5, 1)
+B.config.setup_pSpace(3, [[0, 5], [0.0, 0.1], [0.0, 9.9]], step_size=0.1)
+B.config.setup_vSpace(2, 2.0, 0.1)
+B.print()
+B.run_configuration()
 
-# x.init.
+# B.init.
 #     # Make PSV Grid
 #     # Initialize PSV Grid based on RHO, DRIFT AND TEMP
 #
-# x.initialize.print()
+# B.initialize.print()
 
 #
-# x.setup()
-# x.setup.print() - prints grids as plot
+# B.setup()
+# B.setup.print() - prints grids as plot
 #
-# x.calc(animated_Moments)
+# B.calc(animated_Moments)
 #
-# x.animate()
+# B.animate()
 #
-# x.save_animation()
+# B.save_animation()
