@@ -1,15 +1,20 @@
 r"""
-initialization Submodule
+Initialization Submodule
 ========================
+The Initialization class provides a framework to set up the
 
-This module incorporates the Initialization class, which is contains all functionalities to initialize the Position-Specimen-Velocity-Multigrid.
+* initial states of inner points.
+* boundary points and conditions
+  (Input/output points with time conditions on v, rho,..;
+  boundary point with specified reflections)
+
+of the PSV-Grid.
 
 Classes
 -------
 
-Here we list the classes in the submodule for easy referencing and access.
-
  * :py:class:`boltzmann.initialization.Initialization`
+
 """
 
 from .initialization import Initialization

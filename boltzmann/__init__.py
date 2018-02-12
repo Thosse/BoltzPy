@@ -57,4 +57,3 @@ import boltzmann.configuration
 import boltzmann.initialization
 import boltzmann.calculation
 import boltzmann.animation
-

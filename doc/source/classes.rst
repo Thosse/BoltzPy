@@ -19,8 +19,6 @@ The Boltzmann module
 The Configuration submodule
 ---------------------------
 
-.. autoclass:: boltzmann.configuration.Configuration
-    :members:
 .. autoclass:: boltzmann.configuration.Grid
     :members:
 .. autoclass:: boltzmann.configuration.Species
