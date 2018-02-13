@@ -45,6 +45,7 @@ class BoltzmannPDE:
         - Remove Configuration from submodules -> replace by functions
         - Possibly move other submodules into functions as well
         - Add Offset parameter for setup velocity method
+        - Add Plot-function of grids
         - time steps apply to calculation or animation?
         - Where to specify integration order?
         - Create separate module to save/load conf-files
@@ -158,6 +159,7 @@ class BoltzmannPDE:
                              max_v):
         step_size = 2*max_v/(grid_points_x_axis-1)
         number_of_points_per_dimension = [grid_points_x_axis] * dimension
+        # Offset is chosen s.t. the grid is centered around zero
         offset = [-max_v] * dimension
         _v = b_grd.Grid(dimension,
                         number_of_points_per_dimension,
@@ -171,30 +173,27 @@ class BoltzmannPDE:
         self.svG = self.sv.make_grid()
         return
 
-    # B.config.setup_vSpace(2, 2.0, 0.1)
-    # B.print()
-    # B.run_configuration()
+    def run_configuration(self):
+        print('TODO')
 
     def check_configuration(self):
         self.s.check_integrity()
         assert self.s.mass.dtype == self.iType
         assert self.s.alpha.dtype == self.fType
         self.t.check_integrity()
-        assert self.s.mass.dtype == self.iType
-        assert self.s.alpha.dtype == self.fType
+        assert self.t.iType == self.iType
+        assert self.t.fType == self.fType
         assert self.tG.shape is (self.t.n,)
         self.p.check_integrity()
-        assert self.tG.shape is (self.t.n,)
-        # for v_i in self.v:
-        #     v_i.check_integrity()
-        #     assert v_i.fType == self.fType
-        #     assert v_i.iType == self.iType
+        assert self.p.iType == self.iType
+        assert self.p.fType == self.fType
+        assert self.pG.shape is (self.p.n, self.p.dim)
+        self.sv.check_integrity()
         assert self.sv.dim >= self.p.dim
+        assert self.sv.iType == self.iType
+        assert self.sv.fType == self.fType
         return
 
-    #####################################
-    #           Initialization          #
-    #####################################
     def print(self,
               physical_grids=False):
         print('========CONFIGURATION========')
@@ -223,9 +222,13 @@ class BoltzmannPDE:
             for _s in range(self.s.n):
                 print('Physical V-Space Grid of Specimen_{}:'.format(_s))
                 beg = self.sv.index[_s]
-                end = self.sv.index[_s+1]
+                end = self.sv.index[_s + 1]
                 print(self.svG[beg:end])
         print("Float Data Type    = {}".format(self.fType))
         print("Integer Data Type  = {}".format(self.iType))
         print("flag_gpu  = {}".format(self.flag_gpu))
         print("flag_single_v_grid  = {}".format(self.flag_single_v_grid))
+
+    #####################################
+    #           Initialization          #
+    #####################################

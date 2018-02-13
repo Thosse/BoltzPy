@@ -18,9 +18,10 @@ class SVGrid:
     """Class of the concatenated Velocity Grid of all Specimen.
 
     .. todo::
+        - Ask Hans, should the Grid always contain the center/zero?
         - Todo Add unit tests
         - should this be inheriting from Grid?
-        - n[0:dim] should all be equal values. Reduce this?
+        - self.n[0:dim] should all be equal values. Reduce this?
 
     Attributes
     ----------
@@ -57,6 +58,7 @@ class SVGrid:
     def __init__(self,
                  species,
                  velocity_grid,
+                 grid_contains_center=True,
                  check_integrity=True):
         assert type(species) is b_spc.Species
         assert type(velocity_grid) is b_grd.Grid
@@ -64,34 +66,50 @@ class SVGrid:
         self.iType = velocity_grid.iType
         self.dim = velocity_grid.dim
         self.shape = velocity_grid.shape
-
         b = velocity_grid.b
-        gcd = np_gcd(species.mass)
-        # Todo the conversion is unnecessary, only for PyCharm
-        m = np.array(species.mass // gcd)
+        m = species.mass
         m_min = np.amin(m)
-        # The lightest specimen have the sparsest grid
+
+        # step size and mass are inversely proportional
+        # The lighter specimen are less inert and move further
+        # => d[i]/d[j] = m[j]/m[i]
         self.d = velocity_grid.d * m_min/m
         self.d = np.array(self.d, dtype=self.fType)
 
+        # The number of grid points is inversely proportional to the step size
+        # n ~ (b[1]-b[0]) / d + 1
+        # The area spanned by the boundaries is never increased
+        # If necessary, the area only decreases
+        # => n is always rounded down
+        # Todo is that the right approach?
         self.n = np.zeros((species.n, self.dim+1), dtype=self.iType)
         for _s in range(species.n):
             self.n[_s, 0:self.dim] = (b[:, 1] - b[:, 0]) / self.d[_s] + 1
+            # The center can be forced to be a grid point,
+            # by allowing only uneven numbers per dimension
+            if grid_contains_center:
+                for _d in range(0, self.dim):
+                    if self.n[_s, _d] % 2 == 0:
+                        self.n[_s, _d] -= 1
             self.n[_s, -1] = self.n[_s, 0:self.dim].prod()
 
+        # index[i] = n[0] + ... n[i-1]
         self.index = np.zeros((species.n+1,), dtype=self.iType)
         for _s in range(species.n):
             self.index[_s+1] = self.index[_s] + self.n[_s, -1]
 
+        # The area spanned by the boundaries is never increased
+        # If necessary, the area only decreases
         self.b = np.zeros(shape=(species.n, self.dim, 2),
                           dtype=self.fType)
         for _s in range(species.n):
             prev_w = b[:, 1] - b[:, 0]
             curr_w = (self.n[_s, 0:self.dim] - np.ones(self.dim)) * self.d[_s]
-            diff = prev_w - curr_w
-            assert all(diff >= 0)
-            self.b[_s, :, 0] = b[:, 0] + diff/2
-            self.b[_s, :, 1] = b[:, 1] - diff/2
+            diff = 0.5 * (prev_w - curr_w)
+            assert all(diff >= -1e-7), "Increase of Boundaries:\n" \
+                                       "{}".format(diff)
+            self.b[_s, :, 0] = b[:, 0] + diff
+            self.b[_s, :, 1] = b[:, 1] - diff
 
         if check_integrity:
             self.check_integrity()
