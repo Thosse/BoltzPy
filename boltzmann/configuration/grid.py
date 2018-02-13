@@ -37,6 +37,10 @@ class Grid:
         n[0:dim] denotes the number of grid points per dimension.
         n[-1] denotes the total number of grid points.
         Array of shape=(dim+1,) and dType=iType.
+    G : np.ndarray
+        The physical grid.
+        G[i] denotes the physical coordinates of the i-th grid point.
+        Array of shape(n[-1], dim) and dtype=fType.
     shape : str
         Shape of Grid, can only be rectangular so far.
     offset : np.ndarray(fType)
@@ -59,7 +63,8 @@ class Grid:
                  float_data_type=np.float32,
                  integer_data_type=np.int32,
                  offset=None,
-                 check_integrity=True):
+                 check_integrity=True,
+                 create_grid=True):
         self.fType = float_data_type
         self.iType = integer_data_type
         self.dim = dimension
@@ -86,6 +91,10 @@ class Grid:
         self.b[:, 0] = self.offset
         self.b[:, 1] = [self.offset[i] + (self.n[i]-1)*self.d
                         for i in range(self.dim)]
+        if create_grid:
+            self.G = self.make_grid()
+        else:
+            self.G = np.zeros((0,), dtype=self.fType)
         if check_integrity:
             self.check_integrity()
 
@@ -109,6 +118,9 @@ class Grid:
         np.testing.assert_almost_equal(_width1, _width2)
         if self.shape is 'rectangular':
             assert self.n[0:self.dim].prod() == self.n[-1]
+        assert self.G.dtype == self.fType
+        assert self.G.shape == (self.n[-1], self.dim)
+        # Todo check boundaries
         return
 
     def __make_rectangular_grid(self):
@@ -141,7 +153,8 @@ class Grid:
             print("ERROR - Unspecified Grid Shape")
             assert False
 
-    def print(self):
+    def print(self,
+              physical_grids=False):
         print("Dimension = {}".format(self.dim))
         print("Boundaries = \n{}".format(self.b))
         print("Number of Total Grid Points = {}".format(self.n[-1]))
@@ -151,6 +164,10 @@ class Grid:
         print("Shape = {}".format(self.shape))
         print("Float Data Type = {}".format(self.fType))
         print("Integer Data Type = {}".format(self.iType))
+        if physical_grids:
+            print('Physical Grid:')
+            print(self.G)
+        print('')
 
     # def __compute_n(self):
     #     assert self.d > 0

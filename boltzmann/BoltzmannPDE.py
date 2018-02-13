@@ -56,21 +56,12 @@ class BoltzmannPDE:
         Contains all data about the simulated specimen.
     t : Grid
         Contains all data about simulation time and time step size.
-    tG : np.ndarray
-        Physical Time-Grid.
-        Array of shape=(t.n[-1],) and dtype=fType.
     p : Grid
         Contains all data about Position-Space.
-    pG : np.ndarray
-        Physical Grid of Position-Space.
-        Array of shape=(p.n[-1], p.dim) and dtype=fType.
     sv : SVGrid
         Contains all data about the Velocity-Space of each Specimen.
         V-Spaces of different Specimen differ only in the step size
         and number of grid points.
-    svG : np.ndarray
-        Concatenated Physical Grids of the Velocity-Spaces of all Specimen.
-        Array of dtype=fType.
     psv : PSVGrid
     fType : np.dtype
         Determines data type of floats.
@@ -95,21 +86,21 @@ class BoltzmannPDE:
                             [],
                             0.0,
                             shape='not_initialized',
-                            check_integrity=False)
-        self.tG = np.zeros((0,), dtype=self.fType)
+                            check_integrity=False,
+                            create_grid=False)
         self.p = b_grd.Grid(0,
                             [],
                             0.0,
                             shape='not_initialized',
-                            check_integrity=False)
-        self.pG = np.zeros((0,), dtype=self.fType)
+                            check_integrity=False,
+                            create_grid=False)
         # Todo dummy_ is only a temporary fix
         dummy_species = b_spc.Species()
         dummy_species.add_specimen()
         self.sv = b_svg.SVGrid(dummy_species,
                                self.p,
-                               check_integrity=False)
-        self.svG = np.zeros((0,), dtype=self.fType)
+                               check_integrity=False,
+                               create_grid=False)
         # self.psv = b_psv.PSVGrid()
         return
 
@@ -136,7 +127,7 @@ class BoltzmannPDE:
                             shape='rectangular',
                             float_data_type=self.fType,
                             integer_data_type=self.iType)
-        self.tG = self.t.make_grid().reshape((self.t.n[-1],))
+        self.t.G = self.t.G.reshape((self.t.n[-1],))
         return
 
     def setup_position_space(self,
@@ -149,7 +140,6 @@ class BoltzmannPDE:
                             'rectangular',
                             self.fType,
                             self.iType)
-        self.pG = self.p.make_grid()
         return
 
     # Todo make parameters more intuitive, compared to other grids
@@ -170,7 +160,6 @@ class BoltzmannPDE:
                         offset=offset)
         self.sv = b_svg.SVGrid(self.s,
                                _v)
-        self.svG = self.sv.make_grid()
         return
 
     def run_configuration(self):
@@ -183,11 +172,9 @@ class BoltzmannPDE:
         self.t.check_integrity()
         assert self.t.iType == self.iType
         assert self.t.fType == self.fType
-        assert self.tG.shape is (self.t.n,)
         self.p.check_integrity()
         assert self.p.iType == self.iType
         assert self.p.fType == self.fType
-        assert self.pG.shape is (self.p.n, self.p.dim)
         self.sv.check_integrity()
         assert self.sv.dim >= self.p.dim
         assert self.sv.iType == self.iType
@@ -203,27 +190,15 @@ class BoltzmannPDE:
         print('')
         print('Time Data:')
         print('----------')
-        self.t.print()
-        if physical_grids:
-            print('Physical Time Grid:')
-            print(self.tG)
-        print('')
+        self.t.print(physical_grids)
         print('Position-Space Data:')
         print('--------------------')
-        self.p.print()
-        if physical_grids:
-            print('Physical P-Space Grid:')
-            print(self.pG)
-        print('')
+        self.p.print(physical_grids)
         print('Velocity-Space Data:')
         print('--------------------')
-        self.sv.print()
-        if physical_grids:
-            for _s in range(self.s.n):
-                print('Physical V-Space Grid of Specimen_{}:'.format(_s))
-                beg = self.sv.index[_s]
-                end = self.sv.index[_s + 1]
-                print(self.svG[beg:end])
+        self.sv.print(physical_grids)
+        print('Flags and Types:')
+        print('----------------')
         print("Float Data Type    = {}".format(self.fType))
         print("Integer Data Type  = {}".format(self.iType))
         print("flag_gpu  = {}".format(self.flag_gpu))

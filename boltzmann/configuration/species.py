@@ -98,7 +98,7 @@ class Species:
 
     def print(self):
         print("Number of Specimen = {}".format(self.n))
+        print("Names of Specimen  = {}".format(self.names))
         print("Masses of Specimen = {}".format(self.mass))
         print("Collision-Factor-Matrix = \n{}".format(self.alpha))
-        print("Names of Specimen  = {}".format(self.names))
         print("Colors of Specimen = {}".format(self.colors))

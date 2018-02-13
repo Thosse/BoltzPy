@@ -43,6 +43,13 @@ class SVGrid:
         index[i] denotes the beginning of the i-th velocity grid.
         By Definition index[0] is 0 and index[-1] is n[:,-1].sum().
         Array of shape=(s.n+1) and dType=iType.
+    G : np.ndarray
+        The physical Velocity grids of all specimen, concatenated.
+        G[index[i]:index[i+1]] is the Velocity Grid of specimen i.
+        G[j] denotes the physical coordinates of the j-th grid point.
+        Note that some V-Grid-points occur several times,
+        for different specimen.
+        Array of shape(index[-1], dim) and dtype=fType.
     shape : str
         Shape of all Grids. Applies to all Specimen.
         Can only be rectangular so far.
@@ -59,7 +66,8 @@ class SVGrid:
                  species,
                  velocity_grid,
                  grid_contains_center=True,
-                 check_integrity=True):
+                 check_integrity=True,
+                 create_grid=True):
         assert type(species) is b_spc.Species
         assert type(velocity_grid) is b_grd.Grid
         self.fType = velocity_grid.fType
@@ -81,7 +89,7 @@ class SVGrid:
         # The area spanned by the boundaries is never increased
         # If necessary, the area only decreases
         # => n is always rounded down
-        # Todo is that the right approach?
+        # Todo is reducing the area of b the right approach?
         self.n = np.zeros((species.n, self.dim+1), dtype=self.iType)
         for _s in range(species.n):
             self.n[_s, 0:self.dim] = (b[:, 1] - b[:, 0]) / self.d[_s] + 1
@@ -110,7 +118,10 @@ class SVGrid:
                                        "{}".format(diff)
             self.b[_s, :, 0] = b[:, 0] + diff
             self.b[_s, :, 1] = b[:, 1] - diff
-
+        if create_grid:
+            self.G = self.make_grid()
+        else:
+            self.G = np.zeros((0,), dtype=self.fType)
         if check_integrity:
             self.check_integrity()
         return
@@ -161,9 +172,13 @@ class SVGrid:
         if self.shape is 'rectangular':
             for _s in range(s_n):
                 assert self.n[_s, 0:self.dim].prod() == self.n[_s, -1]
+        assert self.G.dtype == self.fType
+        assert self.G.shape == (self.index[-1], self.dim)
+        # Todo check boundaries
         return
 
-    def print(self):
+    def print(self,
+              physical_grid=False):
         print("Dimension = {}".format(self.dim))
         print("Shape = {}".format(self.shape))
         print("Float Data Type = {}".format(self.fType))
@@ -177,4 +192,9 @@ class SVGrid:
             print("Grid Points per Dimension = "
                   "{}".format(self.n[_s, 0:self.dim]))
             print("Step Size = {}".format(self.d[_s]))
+            if physical_grid:
+                print('Physical Grid :')
+                beg = self.index[_s]
+                end = self.index[_s + 1]
+                print(self.G[beg:end])
             print('')
