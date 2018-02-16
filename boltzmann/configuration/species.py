@@ -10,7 +10,7 @@ class Species:
         Denotes total number of specimen.
     mass : np.ndarray
         Describes relative (not physical!) mass of each specimen.
-        Array of shape (n,) and dtype int.
+        Array of shape (n,) and integer data type.
     alpha : np.ndarray
         Describes Probabilities of collision between 2 specimen..
         Array of shape=(n, n) and dtype float.

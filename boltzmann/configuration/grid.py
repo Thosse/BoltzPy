@@ -1,15 +1,4 @@
 import numpy as np
-import math
-
-
-def get_close_int(real_number, precision=1e-6):
-    close_int = int(math.floor(real_number))
-    if math.fabs(close_int - real_number) < precision:
-        return close_int
-    elif math.fabs(close_int+1 - real_number) < precision:
-        return close_int + 1
-    else:
-        assert False, "Number {} is not close to an integer".format(real_number)
 
 
 class Grid:

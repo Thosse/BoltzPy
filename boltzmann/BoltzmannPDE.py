@@ -2,6 +2,7 @@
 import boltzmann.configuration.species as b_spc
 import boltzmann.configuration.grid as b_grd
 import boltzmann.configuration.svgrid as b_svg
+import boltzmann.configuration.collisions as b_col
 # import boltzmann.configuration.initialization as b_ini
 # import boltzmann.configuration.calculation as b_clc
 # import boltzmann.configuration.animation as b_ani
@@ -17,10 +18,10 @@ class BoltzmannPDE:
     *Configuration*
         * based solely on User Input
         * sets the Specimen-Parameters
-        * generates the physical grids of T-Space, P-Space
-        * generates physical grid of SV-Space
+        * generates the Time and Position-Space grids
+        * generates Velocity-Space grids
           (Combined Velocity Grid for each Specimen)
-        * Generates collision-list and collision-weights
+        * generates Collisions (list and weights)
 
     *Initialization*
         * based on physical grids and User Input
@@ -42,11 +43,14 @@ class BoltzmannPDE:
         * generates animations of specified variables
 
     .. todo::
-        - Remove Configuration from submodules -> replace by functions
-        - Possibly move other submodules into functions as well
+        - implement slimmer __init__
+        - Remove Configuration from submodules -> replace by specific classes
+        - Possibly move other submodules into classes as well
         - Add Offset parameter for setup velocity method
         - Add Plot-function of grids
         - time steps apply to calculation or animation?
+        - add CUDA Support (PyTorch)
+        - Add File with general constants (e.g. data Types)
         - Where to specify integration order?
         - Create separate module to save/load conf-files
 
@@ -60,8 +64,10 @@ class BoltzmannPDE:
         Contains all data about Position-Space.
     sv : SVGrid
         Contains all data about the Velocity-Space of each Specimen.
-        V-Spaces of different Specimen differ only in the step size
-        and number of grid points.
+        V-Spaces of distinct Specimen differ in step size
+        and number of grid points. Boundaries can alsp differ slightly.
+    cols : Collisions
+        Describes the collisions on the SV-Grid.
     psv : PSVGrid
     fType : np.dtype
         Determines data type of floats.
@@ -80,7 +86,8 @@ class BoltzmannPDE:
         # Todo choose type accordingly
         self.fType = np.float32
         self.iType = np.int32
-        # Empty Initialization here, is filled seperately
+        # Empty Initialization here
+        # custom classes are set up separately
         self.s = b_spc.Species()
         self.t = b_grd.Grid(0,
                             [],
@@ -101,6 +108,8 @@ class BoltzmannPDE:
                                self.p,
                                check_integrity=False,
                                create_grid=False)
+        self.cols = b_col.Collisions(self.fType,
+                                     self.iType)
         # self.psv = b_psv.PSVGrid()
         return
 
@@ -162,8 +171,11 @@ class BoltzmannPDE:
                                _v)
         return
 
-    def run_configuration(self):
-        print('TODO')
+    def setup_collisions(self, selection_scheme):
+        self.cols.generate_collisions(self.s,
+                                      self.sv,
+                                      selection_scheme)
+        return
 
     def check_configuration(self):
         self.s.check_integrity()

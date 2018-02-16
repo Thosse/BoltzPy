@@ -20,7 +20,10 @@ class SVGrid:
     .. todo::
         - Ask Hans, should the Grid always contain the center/zero?
         - Todo Add unit tests
-        - should this be inheriting from Grid?
+        - replace n with index_skips?
+        - is it useful to implement different construction schemes?
+          (grid boundaries/step_size can be chosen to fit in grids,
+          based on the least common multiple,...)
         - self.n[0:dim] should all be equal values. Reduce this?
 
     Attributes
@@ -145,6 +148,22 @@ class SVGrid:
             sv_grid[self.index[_s]:self.index[_s+1], :] = _grid[:]
         return sv_grid
 
+    #####################################
+    #               Indexing            #
+    #####################################
+    def get_local_flat_index(self,
+                             i_species,
+                             i_vec):
+        i_flat = 0
+        for _d in range(self.dim):
+            n_loc = self.n[i_species, _d]
+            i_flat *= n_loc
+            i_flat += i_vec[_d] # + n_loc // 2
+        return i_flat
+
+    #####################################
+    #           Verification            #
+    #####################################
     def check_integrity(self):
         assert type(self.dim) is int
         assert self.dim in [1, 2, 3]
@@ -162,6 +181,7 @@ class SVGrid:
         assert self.n.shape == (s_n, self.dim+1)
         assert self.n.dtype == self.iType
         assert (self.n >= 2).all
+        # Todo assert index
         assert self.shape in b_grd.Grid.GRID_SHAPES
         assert type(self.fType) == type
         for _s in range(s_n):
@@ -180,6 +200,7 @@ class SVGrid:
     def print(self,
               physical_grid=False):
         print("Dimension = {}".format(self.dim))
+        print("Index-Array = {}".format(self.index))
         print("Shape = {}".format(self.shape))
         print("Float Data Type = {}".format(self.fType))
         print("Integer Data Type = {}".format(self.iType))
