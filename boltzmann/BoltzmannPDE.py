@@ -172,9 +172,10 @@ class BoltzmannPDE:
         return
 
     def setup_collisions(self, selection_scheme):
+        assert selection_scheme in b_col.Collisions.SELECTION_SCHEMES
+        self.cols.scheme = selection_scheme
         self.cols.generate_collisions(self.s,
-                                      self.sv,
-                                      selection_scheme)
+                                      self.sv)
         return
 
     def check_configuration(self):

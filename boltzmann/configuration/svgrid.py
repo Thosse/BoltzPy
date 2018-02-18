@@ -158,7 +158,7 @@ class SVGrid:
         for _d in range(self.dim):
             n_loc = self.n[i_species, _d]
             i_flat *= n_loc
-            i_flat += i_vec[_d] # + n_loc // 2
+            i_flat += i_vec[_d]
         return i_flat
 
     #####################################
@@ -181,7 +181,9 @@ class SVGrid:
         assert self.n.shape == (s_n, self.dim+1)
         assert self.n.dtype == self.iType
         assert (self.n >= 2).all
-        # Todo assert index
+        assert self.index.shape == (s_n+1,)
+        assert np.array_equal(self.index[0:-1] + self.n[:, -1],
+                              self.index[1:])
         assert self.shape in b_grd.Grid.GRID_SHAPES
         assert type(self.fType) == type
         for _s in range(s_n):
@@ -209,7 +211,8 @@ class SVGrid:
             print('Specimen_{}'.format(_s))
             print("Boundaries =")
             print(self.b[_s])
-            print("Number of Total Grid Points = {}".format(self.n[_s, -1]))
+            print("Number of Total Grid Points = "
+                  "{}".format(self.n[_s, -1]))
             print("Grid Points per Dimension = "
                   "{}".format(self.n[_s, 0:self.dim]))
             print("Step Size = {}".format(self.d[_s]))

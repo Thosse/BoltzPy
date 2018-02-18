@@ -61,12 +61,11 @@ class Collisions:
 
     def generate_collisions(self,
                             species,
-                            sv_grid,
-                            selection_scheme):
-        assert selection_scheme in Collisions.SELECTION_SCHEMES
+                            sv_grid):
+        assert self.scheme in Collisions.SELECTION_SCHEMES
         assert type(species) is b_spc.Species
         assert type(sv_grid) is b_svg.SVGrid
-        if selection_scheme is 'complete':
+        if self.scheme is 'complete':
             self._generate_collisions_complete(species, sv_grid)
         else:
             print('ERROR - Unspecified Collision Scheme')
@@ -77,9 +76,12 @@ class Collisions:
     def _generate_collisions_complete(self,
                                       species,
                                       sv_grid):
+        assert self.scheme is 'complete'
         tmp_time = time()
         i_arr = []
         weight = []
+        # Error margin for boundary checks
+        err = np.amin(sv_grid.d) / 1000
 
         # Each collision is an array of 4 indices, ordered as:
         # (v_pre_0, v_post_0, v_pre_1, v_post_1)
@@ -123,29 +125,29 @@ class Collisions:
                         # iterate through pre-collision velocities of s[1]
                         # noinspection PyAssignmentToLoopOrWithParameter
                         for v[1, 0] in range(slc[1, 0], slc[1, 1]):
-                            pv[1, 0] = sv_grid.G[v[1, 0]]
-                            pv[1, 1] = pv[1, 0] + dv[1]
                             # Ignore (a,b,b,a)-Collisions (no effect)
                             if v[0, 1] == v[1, 0]:
                                 continue
+                            pv[1, 0] = sv_grid.G[v[1, 0]]
+                            pv[1, 1] = pv[1, 0] + dv[1]
                             # Ignore (a,X,a,X)-Collisions (no effect)
                             if np.allclose(pv[0, 0], pv[1, 0]):
                                 continue
                             # check if v[1, 1] is in grid boundaries
-                            if np.less(pv[1, 1],
-                                       sv_grid.b[s[1], :, 0]).any():
+                            _lower_bound = sv_grid.b[s[1], :, 0]-err
+                            if np.less(pv[1, 1], _lower_bound).any():
                                 continue
-                            if np.greater(pv[1, 1],
-                                          sv_grid.b[s[1], :, 1]).any():
+                            _upper_bound = sv_grid.b[s[1], :, 1]+err
+                            if np.greater(pv[1, 1], _upper_bound).any():
                                 continue
                             # check energy conservation
-                            # noinspection PyTypeChecker
-                            pre_energy = np.sum(m[0]*(pv[0, 0]**2)
-                                                + m[1]*(pv[1, 0]**2))
-                            # noinspection PyTypeChecker
-                            post_energy = np.sum(m[0]*(pv[0, 1]**2)
-                                                 + m[1]*(pv[1, 1]**2))
-                            if pre_energy != post_energy:
+                            pre_energy = np.array(m[0]*(pv[0, 0]**2)
+                                                  + m[1]*(pv[1, 0]**2))
+                            pre_energy = pre_energy.sum()
+                            post_energy = np.array(m[0]*(pv[0, 1]**2)
+                                                   + m[1]*(pv[1, 1]**2))
+                            post_energy = post_energy.sum()
+                            if not np.allclose(pre_energy, post_energy):
                                 continue
                             # check if pv[1, 1] is grid point
                             _v11 = (pv[1, 1] - sv_grid.b[s[1], :, 0])/d1
@@ -157,6 +159,6 @@ class Collisions:
                             weight.append(1)
         print("Time taken =  {}".format(time()-tmp_time))
         assert len(i_arr) == len(weight)
-        self.index = np.array(i_arr, dtype=sv_grid.iType)
+        self.i_arr = np.array(i_arr, dtype=sv_grid.iType)
         self.weight = np.array(weight, dtype=sv_grid.fType)
-        self.n = len(i_arr)
+        self.n = self.i_arr.shape[0]
