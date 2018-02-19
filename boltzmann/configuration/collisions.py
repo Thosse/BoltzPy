@@ -1,5 +1,5 @@
-import boltzmann.configuration.species as b_spc
-import boltzmann.configuration.svgrid as b_svg
+from . import species as b_spc
+from . import svgrid as b_svg
 
 import numpy as np
 import math
@@ -24,15 +24,29 @@ def get_close_int(float_array, precision=1e-6, dtype=int):
 
 
 class Collisions:
-    """Simple structure, that encapsulates collision data
+    """
+    Simple structure, that encapsulates collision data
 
-    - idea: are index-differences v0->v2 == v_3->v1 ?
-    - count collisions for each pair of specimen
-    - can both the transport and the collisions be implemented
-      as interpolations?
-    - How to sort the arrays for maximum efficiency?
-    - check integrity (non neg weights,
-      no multiple occurrences, physical correctness)
+    .. todo::
+        - **Add Stefans Generation-Scheme**
+        - idea: are index-differences v01-v00==-v_11+v10 (vectorwise?)
+        - can both the transport and the collisions
+          be implemented as interpolations? -> GPU Speed-Up
+        - How to sort the arrays for maximum efficiency?
+        - check integrity (non neg weights,
+          no multiple occurrences, physical correctness)
+        - count collisions for each pair of specimen?
+        - calculate index difference instead of dpv[0]
+          -> maybe Problematic, for different construction schemes
+          e.g. Hans grid-idea (one v-grid rotated 45°),
+          rotated grids need to be tested, but should be fine
+          => Implement as optimized collision generation
+        - only for implemented index_difference:
+          choose v[2] out of smaller grid
+          which only contains possible values
+        - Check if its faster to switch v[0, 1] and v[1, 0]?
+        - @generate: replace for loops by numpy.apply_along_axis
+          (this probably needs several additional functions)
 
     Attributes
     ----------
@@ -72,12 +86,11 @@ class Collisions:
             assert False
         return
 
-    # Todo needs speed up -> vectorize / parallelize
     def _generate_collisions_complete(self,
                                       species,
                                       sv_grid):
         assert self.scheme is 'complete'
-        tmp_time = time()
+        gen_col_time = time()
         i_arr = []
         weight = []
         # Error margin for boundary checks
@@ -89,7 +102,8 @@ class Collisions:
         # physical velocities, indexed by v
         # (pv_pre_0, pv_post_0, pv_pre_1, pv_post_1)
         pv = np.zeros((2, 2, sv_grid.dim), dtype=sv_grid.fType)
-        dv = np.zeros((2, sv_grid.dim), dtype=sv_grid.fType)
+        # physical difference in velocities
+        dpv = np.zeros((2, sv_grid.dim), dtype=sv_grid.fType)
 
         # For each colliding specimen we keep track of
         # specimen-indices
@@ -98,12 +112,7 @@ class Collisions:
         m = np.zeros((2,), dtype=sv_grid.iType)
         # the slices in the sv_grid, slc[spc, :] = [start, end+1]
         slc = np.zeros((2, 2), dtype=sv_grid.iType)
-        # physical difference in velocities
-        # Todo calculate index difference instead of dv[0]
-        # Todo even index_difference choose v[2] out of smaller grid
-        # Todo which only contains possible values
 
-        # Todo possibly faster if switching v[0, 1] and v[1, 0]
         for s[0] in range(species.n):
             slc[0] = sv_grid.index[s[0]:s[0]+2]
             m[0] = species.mass[s[0]]
@@ -120,8 +129,8 @@ class Collisions:
                     # noinspection PyAssignmentToLoopOrWithParameter
                     for v[0, 1] in range(v[0, 0]+1, slc[0, 1]):
                         pv[0, 1] = sv_grid.G[v[0, 1]]
-                        dv[0] = pv[0, 1] - pv[0, 0]
-                        dv[1] = -m[0] / m[1] * dv[0]
+                        dpv[0] = pv[0, 1] - pv[0, 0]
+                        dpv[1] = -m[0] / m[1] * dpv[0]
                         # iterate through pre-collision velocities of s[1]
                         # noinspection PyAssignmentToLoopOrWithParameter
                         for v[1, 0] in range(slc[1, 0], slc[1, 1]):
@@ -129,7 +138,7 @@ class Collisions:
                             if v[0, 1] == v[1, 0]:
                                 continue
                             pv[1, 0] = sv_grid.G[v[1, 0]]
-                            pv[1, 1] = pv[1, 0] + dv[1]
+                            pv[1, 1] = pv[1, 0] + dpv[1]
                             # Ignore (a,X,a,X)-Collisions (no effect)
                             if np.allclose(pv[0, 0], pv[1, 0]):
                                 continue
@@ -157,8 +166,12 @@ class Collisions:
                             v[1, 1] = slc[1, 0] + _v11
                             i_arr.append(v.flatten())
                             weight.append(1)
-        print("Time taken =  {}".format(time()-tmp_time))
         assert len(i_arr) == len(weight)
         self.i_arr = np.array(i_arr, dtype=sv_grid.iType)
         self.weight = np.array(weight, dtype=sv_grid.fType)
         self.n = self.i_arr.shape[0]
+        print("Generation of Collision list - Done\n"
+              "Total Number of Collisions = {}\n"
+              "Time taken =  {} seconds"
+              "".format(self.n, round(time() - gen_col_time, 3)))
+        return

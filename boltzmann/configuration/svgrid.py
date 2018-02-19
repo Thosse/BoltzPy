@@ -1,8 +1,8 @@
 import numpy as np
 import math
 
-import boltzmann.configuration.species as b_spc
-import boltzmann.configuration.grid as b_grd
+from . import species as b_spc
+from . import grid as b_grd
 
 
 def np_gcd(array_of_ints):
@@ -18,6 +18,8 @@ class SVGrid:
     """Class of the concatenated Velocity Grid of all Specimen.
 
     .. todo::
+        - Use int-grids (multiples of d) for physical grid?
+          Maybe only for calculation?
         - Ask Hans, should the Grid always contain the center/zero?
         - Todo Add unit tests
         - replace n with index_skips?

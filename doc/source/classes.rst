@@ -23,6 +23,10 @@ The Configuration submodule
     :members:
 .. autoclass:: boltzmann.configuration.Species
     :members:
+.. autoclass:: boltzmann.configuration.SVGrid
+    :members:
+.. autoclass:: boltzmann.configuration.Collisions
+    :members:
 
 
 

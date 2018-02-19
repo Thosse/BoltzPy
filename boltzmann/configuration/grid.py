@@ -5,6 +5,8 @@ class Grid:
     """Basic class for Positional-, and Time-Grids.
 
     .. todo::
+        - Use int-grids (multiples of d) for physical grid?
+          Maybe only for calculation?
         - Check offset for correctness and sanity,
           and find better solution for sv-grids, if possible
         - Todo Add unit tests

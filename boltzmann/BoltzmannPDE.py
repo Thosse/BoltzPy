@@ -43,6 +43,7 @@ class BoltzmannPDE:
         * generates animations of specified variables
 
     .. todo::
+        - read into numpys ufunc -> Speedup
         - implement slimmer __init__
         - Remove Configuration from submodules -> replace by specific classes
         - Possibly move other submodules into classes as well
@@ -53,6 +54,8 @@ class BoltzmannPDE:
         - Add File with general constants (e.g. data Types)
         - Where to specify integration order?
         - Create separate module to save/load conf-files
+        - how to make links in attributes to different classes
+          and their attributes
 
     Attributes
     ----------
