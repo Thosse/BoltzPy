@@ -4,7 +4,10 @@ import numpy as np
 class Calculation:
     """
     Manages calculation process based on minimal set of parameters.
-    Readability will be sacrificed for performance!
+    This class focuses purely on performance
+    and readily sacrifices readability.
+    For equivalent, more understandable, but less performant Code
+    see the CalculationTest Class!
 
     ..todo::
         - fix documentation of cols (new line for each v_pre and v_post)
@@ -27,10 +30,12 @@ class Calculation:
         c_arr[i_c, :] is an array of 4 indices of the SVGrid,
         which describe a single collision i_c.
         The ordering is as follows:
+
             | c_arr[_, 0] = v_pre_collision of Specimen 1
             | c_arr[_, 1] = v_post_collision of Specimen 1
             | c_arr[_, 2] = v_pre_collision of Specimen 2
             | c_arr[_, 3] = v_post_collision of Specimen 2
+
     c_w : np.ndarray(float)
         c_w[i_c] denotes the weight for c_arr[i_c, :]
         in the collision step.
@@ -42,6 +47,12 @@ class Calculation:
     c_w : np.ndarray(float)
         c_w[i_c] denotes the weight for c_arr[i_c, :]
         in the collision step
+    p_flag : np.ndarray(int)
+        Let i_p be an index of P-Space, then
+        p_flag[i_p] describes whether
+        i_p is an inner point, boundary point, or input/output point.
+        This controls the behaviour of the calculation in this point.
+        For each value in p_flag a custom sub-function is generated.
     """
     def __init__(self):
         self.data = np.zeros((0,), dtype=float)
