@@ -43,6 +43,9 @@ class BoltzmannPDE:
         * generates animations of specified variables
 
     .. todo::
+        - sphinx: use scipy theme instead of haiku
+        - sphinx: bullet list in Attributes?
+        - add empty __init__s for all classes
         - read into numpys ufunc -> Speedup
         - implement slimmer __init__
         - Remove Configuration from submodules -> replace by specific classes
@@ -56,6 +59,9 @@ class BoltzmannPDE:
         - Create separate module to save/load conf-files
         - how to make links in attributes to different classes
           and their attributes
+        - link configuration and initialization somehow.
+          adding a new species, or changing P.dim,
+          should delete the current Initialization
 
     Attributes
     ----------
@@ -68,10 +74,9 @@ class BoltzmannPDE:
     sv : SVGrid
         Contains all data about the Velocity-Space of each Specimen.
         V-Spaces of distinct Specimen differ in step size
-        and number of grid points. Boundaries can alsp differ slightly.
+        and number of grid points. Boundaries can also differ slightly.
     cols : Collisions
         Describes the collisions on the SV-Grid.
-    psv : PSVGrid
     fType : np.dtype
         Determines data type of floats.
     iType : np.dtype
