@@ -26,6 +26,12 @@ class Calculation:
         or swapped (data, results = results, data).
         Array of shape=(p.n[-1], sv.index[-1])
         and dtype=float.
+    p_flag : np.ndarray(int)
+        Let i_p be an index of P-Space, then
+        p_flag[i_p] describes whether
+        i_p is an inner point, boundary point, or input/output point.
+        This controls the behaviour of the calculation in this point.
+        For each value in p_flag a custom sub-function is generated.
     c_arr : np.ndarray(int)
         c_arr[i_c, :] is an array of 4 indices of the SVGrid,
         which describe a single collision i_c.
@@ -47,16 +53,11 @@ class Calculation:
     c_w : np.ndarray(float)
         c_w[i_c] denotes the weight for c_arr[i_c, :]
         in the collision step
-    p_flag : np.ndarray(int)
-        Let i_p be an index of P-Space, then
-        p_flag[i_p] describes whether
-        i_p is an inner point, boundary point, or input/output point.
-        This controls the behaviour of the calculation in this point.
-        For each value in p_flag a custom sub-function is generated.
     """
     def __init__(self):
         self.data = np.zeros((0,), dtype=float)
         self.result = np.zeros((0,), dtype=float)
+        self.p_flag = np.zeros((0,), dtype=int)
         self.c_arr = np.zeros((0, 4), dtype=int)
         self.c_w = np.zeros((0,), dtype=float)
         self.t_arr = np.zeros((0,), dtype=int)

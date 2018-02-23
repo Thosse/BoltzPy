@@ -1,8 +1,8 @@
 import numpy as np
 import math
 
-from . import species as b_spc
-from . import grid as b_grd
+from boltzmann.configuration import species as b_spc
+from boltzmann.configuration import grid as b_grd
 
 
 def np_gcd(array_of_ints):

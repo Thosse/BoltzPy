@@ -1,5 +1,5 @@
-from . import species as b_spc
-from . import svgrid as b_svg
+from boltzmann.configuration import species as b_spc
+from boltzmann.configuration import svgrid as b_svg
 
 import numpy as np
 import math

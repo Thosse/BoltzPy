@@ -8,11 +8,13 @@ import numpy as np
 
 class BoltzmannPDE(b_cnf.Configuration,
                    b_ini.Initialization):
-    r"""
-    Main class, its functionalities can be divided
-    into four parts:
+    r"""Main Simulation Class, that
+    inherits all functionalities from multiple Subclasses.
 
-    *Configuration*
+    Each Attribute or Method
+    is inherited from one of the following Subclasses:
+
+    :class:`~boltzmann.configuration.Configuration`
         * based solely on User Input
         * sets the Specimen-Parameters
         * configures and generates the Time and Position-Space grids
@@ -20,7 +22,7 @@ class BoltzmannPDE(b_cnf.Configuration,
           (Combined Velocity Grid for each Specimen)
         * generates Collisions (list and weights)
 
-    *Initialization*
+    :class:`~boltzmann.initialization.Initialization`
         * based on physical grids and User Input
         * initializes V-distribution in PSV Grid
         * sets flags for each P-Grid point (inner point/boundary point).
@@ -42,14 +44,8 @@ class BoltzmannPDE(b_cnf.Configuration,
     .. todo::
 
         - read into numpys ufunc -> Speedup
-        - Remove Configuration from submodules -> replace by specific classes
-        - Possibly move other submodules into classes as well
-        - Add Offset parameter for setup velocity method
-        - Add Plotting-function to grids
         - time steps apply to calculation or animation?
         - add CUDA Support (PyTorch)
-        - Add File with general constants (e.g. data Types)
-        - Where to specify integration order?
         - Create separate module to save/load conf-files
         - link configuration and initialization somehow.
           adding a new species, or changing P.dim,

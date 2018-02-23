@@ -1,7 +1,7 @@
-from . import species as b_spc
-from . import grid as b_grd
-from . import svgrid as b_svg
-from . import collisions as b_col
+from boltzmann.configuration import species as b_spc
+from boltzmann.configuration import grid as b_grd
+from boltzmann.configuration import svgrid as b_svg
+from boltzmann.configuration import collisions as b_col
 
 
 import numpy as np
@@ -22,10 +22,8 @@ class Configuration:
         - link Species and SVGrid somehow
           -> adding Species, after setting up SVGrid
           should delete SVGrid or at least update it
-        - add empty __init__s for all classes
         - Add Offset parameter for setup velocity method
         - Add Plotting-function to grids
-        - Add File with general constants (e.g. data Types)
         - Where to specify integration order?
 
     Attributes
