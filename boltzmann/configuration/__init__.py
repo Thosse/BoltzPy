@@ -8,8 +8,13 @@ The Configuration submodule provides the following functionalities:
 * Generate the Collisions, based on the Velocity-Space-Grids (SV-Grids)
 
 
-Classes
--------
+Configuration Class
+-------------------
+
+ * :py:class:`boltzmann.configuration.Configuration`
+ 
+Subclasses
+----------
 
  * :py:class:`boltzmann.configuration.Species`
  * :py:class:`boltzmann.configuration.Grid`
@@ -18,7 +23,7 @@ Classes
 
 """
 
-
+from .configuration import Configuration
 from .species import Species
 from .grid import Grid
 from .svgrid import SVGrid

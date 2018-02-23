@@ -29,7 +29,7 @@ class Collisions:
 
     .. todo::
         - **Add Stefans Generation-Scheme**
-        - idea: are index-differences v01-v00==-v_11+v10 (vectorwise?)
+        - idea: are index-differences v01-v00==-v_11+v10 (vector-wise?)
         - can both the transport and the collisions
           be implemented as interpolations? -> GPU Speed-Up
         - How to sort the arrays for maximum efficiency?
@@ -65,11 +65,9 @@ class Collisions:
        """
     SELECTION_SCHEMES = ['complete']
 
-    def __init__(self,
-                 float_type,
-                 int_type):
-        self.i_arr = np.array([], dtype=int_type)
-        self.weight = np.array([], dtype=float_type)
+    def __init__(self):
+        self.i_arr = np.array([], dtype=int)
+        self.weight = np.array([], dtype=float)
         self.n = 0
         self.scheme = 'not_initialized'
 
@@ -98,20 +96,20 @@ class Collisions:
 
         # Each collision is an array of 4 indices, ordered as:
         # (v_pre_0, v_post_0, v_pre_1, v_post_1)
-        v = np.zeros((2, 2), dtype=sv_grid.iType)
+        v = np.zeros((2, 2), dtype=int)
         # physical velocities, indexed by v
         # (pv_pre_0, pv_post_0, pv_pre_1, pv_post_1)
-        pv = np.zeros((2, 2, sv_grid.dim), dtype=sv_grid.fType)
+        pv = np.zeros((2, 2, sv_grid.dim), dtype=float)
         # physical difference in velocities
-        dpv = np.zeros((2, sv_grid.dim), dtype=sv_grid.fType)
+        dpv = np.zeros((2, sv_grid.dim), dtype=float)
 
         # For each colliding specimen we keep track of
         # specimen-indices
-        s = np.zeros((2,), dtype=sv_grid.iType)
+        s = np.zeros((2,), dtype=int)
         # masses
-        m = np.zeros((2,), dtype=sv_grid.iType)
+        m = np.zeros((2,), dtype=int)
         # the slices in the sv_grid, slc[spc, :] = [start, end+1]
-        slc = np.zeros((2, 2), dtype=sv_grid.iType)
+        slc = np.zeros((2, 2), dtype=int)
 
         for s[0] in range(species.n):
             slc[0] = sv_grid.index[s[0]:s[0]+2]
@@ -167,8 +165,8 @@ class Collisions:
                             i_arr.append(v.flatten())
                             weight.append(1)
         assert len(i_arr) == len(weight)
-        self.i_arr = np.array(i_arr, dtype=sv_grid.iType)
-        self.weight = np.array(weight, dtype=sv_grid.fType)
+        self.i_arr = np.array(i_arr, dtype=int)
+        self.weight = np.array(weight, dtype=float)
         self.n = self.i_arr.shape[0]
         print("Generation of Collision list - Done\n"
               "Total Number of Collisions = {}\n"

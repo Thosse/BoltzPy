@@ -28,12 +28,10 @@ class Species:
                   'yellow',     'black',    'brown',
                   'orange',     'pink',     'gray']
 
-    def __init__(self,
-                 float_data_type=np.float32,
-                 integer_data_type=np.int32):
+    def __init__(self):
         self.n = 0
-        self.mass = np.zeros(shape=(0,), dtype=integer_data_type)
-        self.alpha = np.zeros(shape=(0, 0), dtype=float_data_type)
+        self.mass = np.zeros(shape=(0,), dtype=int)
+        self.alpha = np.zeros(shape=(0, 0), dtype=float)
         self.names = []
         self.colors = []
         self.check_integrity()
@@ -73,7 +71,7 @@ class Species:
         self.mass[-1] = mass
         # Add a row and a column to alpha
         _alpha = np.zeros(shape=(self.n, self.n),
-                          dtype=self.alpha.dtype)
+                          dtype=float)
         _alpha[0:-1, 0:-1] = self.alpha
         self.alpha = _alpha
         self.alpha[-1, :] = np.array(alpha_list)
