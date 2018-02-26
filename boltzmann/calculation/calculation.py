@@ -30,7 +30,8 @@ class Calculation:
         Let i_p be an index of P-Space, then
         p_flag[i_p] describes whether
         i_p is an inner point, boundary point, or input/output point.
-        This controls the behaviour of the calculation in this point.
+        This controls the behaviour of this P-Grid point
+        during calculation.
         For each value in p_flag a custom sub-function is generated.
     c_arr : np.ndarray(int)
         c_arr[i_c, :] is an array of 4 indices of the SVGrid,

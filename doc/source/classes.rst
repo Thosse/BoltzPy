@@ -37,9 +37,7 @@ The Initialization submodule
 
 .. autoclass:: boltzmann.initialization.Initialization
     :members:
-.. autoclass:: boltzmann.initialization.InnerPointRule
-    :members:
-.. autoclass:: boltzmann.initialization.Instruction
+.. autoclass:: boltzmann.initialization.Rule
     :members:
 
 

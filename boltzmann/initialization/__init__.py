@@ -14,11 +14,9 @@ Classes
 -------
 
  * :py:class:`boltzmann.initialization.Initialization`
- * :py:class:`boltzmann.initialization.Instruction`
- * :py:class:`boltzmann.initialization.InnerPointRule`
+ * :py:class:`boltzmann.initialization.Rule`
 
 """
 
 from .initialization import Initialization
-from .initialization import Instruction
-from .initialization import InnerPointRule
+from .rule import Rule

@@ -1,7 +1,7 @@
-from boltzmann.configuration import species as b_spc
-from boltzmann.configuration import grid as b_grd
-from boltzmann.configuration import svgrid as b_svg
-from boltzmann.configuration import collisions as b_col
+from . import species as b_spc
+from . import grid as b_grd
+from . import svgrid as b_svg
+from . import collisions as b_col
 
 
 import numpy as np
@@ -22,6 +22,7 @@ class Configuration:
         - link Species and SVGrid somehow
           -> adding Species, after setting up SVGrid
           should delete SVGrid or at least update it
+        - add empty __init__s for all classes
         - Add Offset parameter for setup velocity method
         - Add Plotting-function to grids
         - Where to specify integration order?
@@ -114,7 +115,7 @@ class Configuration:
                                       self.sv)
         return
 
-    def check_configuration(self):
+    def check_integrity(self):
         self.s.check_integrity()
         assert self.s.mass.dtype == np.float64
         assert self.s.alpha.dtype == np.float64
@@ -131,8 +132,8 @@ class Configuration:
         # Todo Assert Collisions
         return
 
-    def print_configuration(self,
-                            physical_grids=False):
+    def print(self,
+              physical_grids=False):
         print('========CONFIGURATION========')
         print('Specimen:')
         print('---------')

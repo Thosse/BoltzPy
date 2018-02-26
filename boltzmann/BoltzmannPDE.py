@@ -6,8 +6,7 @@ import boltzmann.initialization.initialization as b_ini
 import numpy as np
 
 
-class BoltzmannPDE(b_cnf.Configuration,
-                   b_ini.Initialization):
+class BoltzmannPDE:
     r"""Main Simulation Class, that
     inherits all functionalities from multiple Subclasses.
 
@@ -43,6 +42,9 @@ class BoltzmannPDE(b_cnf.Configuration,
 
     .. todo::
 
+        - Instead of inheritance
+          -> Put Configuration, Init... into Attribute
+          => Gives Namespaces and more readability
         - read into numpys ufunc -> Speedup
         - time steps apply to calculation or animation?
         - add CUDA Support (PyTorch)
@@ -54,6 +56,17 @@ class BoltzmannPDE(b_cnf.Configuration,
         - sphinx: bullet list in Attributes?
         - sphinx: how to make links in class attributes
           to other  classes and their attributes
+
+    Attributes
+    ----------
+    config : :class:`~boltzmann.configuration.Configuration`
+    init : :class:`~boltzmann.initialization.Initialization`
     """
     def __init__(self):
-        b_cnf.Configuration.__init__(self)
+        self.config = b_cnf.Configuration()
+        self.init = b_ini.Initialization()
+
+    def begin_initialization(self):
+        self.init = b_ini.Initialization(self.config.s,
+                                         self.config.p,
+                                         self.config.sv)
