@@ -3,8 +3,6 @@ import boltzmann.initialization.initialization as b_ini
 # import boltzmann.configuration.calculation as b_clc
 # import boltzmann.configuration.animation as b_ani
 
-import numpy as np
-
 
 class BoltzmannPDE:
     r"""Main Simulation Class, that
@@ -64,9 +62,7 @@ class BoltzmannPDE:
     """
     def __init__(self):
         self.config = b_cnf.Configuration()
-        self.init = b_ini.Initialization()
+        self.init = b_ini.Initialization(self.config)
 
     def begin_initialization(self):
-        self.init = b_ini.Initialization(self.config.s,
-                                         self.config.p,
-                                         self.config.sv)
+        self.init = b_ini.Initialization(self.config)

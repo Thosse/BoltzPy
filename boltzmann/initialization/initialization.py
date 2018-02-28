@@ -1,9 +1,8 @@
-from boltzmann.configuration import species as b_spc
-from boltzmann.configuration import grid as b_grd
-from boltzmann.configuration import svgrid as b_svg
+from boltzmann.configuration import configuration as b_cnf
 from boltzmann.initialization import rule as b_rul
 
 import numpy as np
+import math
 
 
 class Initialization:
@@ -19,18 +18,19 @@ class Initialization:
       for :class:`~boltzmann.calculation.Calculation`.
 
     .. todo::
-        - Guarantee the Order of Initialization.rules (inner points first)
-          Check if order needs to be changed, when adding new rule
-          -> change values in p_flag.
+        - Figure out nice way to implement boundary points
+        - speed up init of psv grid <- ufunc's
         - @apply_rule: implement different 'shapes' to apply rules
           (e.g. a line with specified width,
           a ball with specified radius/diameter, ..).
-        - @apply_rule: current mode (cuboid)
-          -> switch between convex hull and span?
-        - Figure out nice way to implement boundary points
+          Switch between convex hull and span?
         - sphinx: link PSV-Grid to Calculation.data
           and p_flag to Calculation.p_flag
           in Initialization-Docstring
+
+    Parameters
+    ----------
+    config : :class:`~boltzmann.configuration.Configuration`
 
     Attributes
     ----------
@@ -91,20 +91,12 @@ class Initialization:
                             'Time_Variant_IO_Point']
 
     def __init__(self,
-                 species=b_spc.Species(),
-                 p_grid=b_grd.Grid(),
-                 sv_grid=b_svg.SVGrid):
-        # Todo Check if the links are really necessary
-        # Todo check if init or RuleArray needs those instances?
-        self._s = species
-        self._p = p_grid
-        self._sv = sv_grid
-        # Todo this needs to be an array of Rule Instances/Objects
-        # Todo check if it actually does what it's supposed to
+                 config=b_cnf.Configuration()):
+        self.config = config
         self.rules = np.empty(shape=(0,), dtype=b_rul.Rule)
         self.block_index = np.zeros(shape=(5,),
                                     dtype=int)
-        p_shape = tuple(self._p.n[0:-1])
+        p_shape = tuple(self.config.p.n[0:-1])
         self.p_flag = np.full(shape=p_shape,
                               fill_value=-1,
                               dtype=int)
@@ -162,15 +154,12 @@ class Initialization:
                   ''.format(category))
             assert False
 
-        position = self.block_index[category]
+        position = self.block_index[category+1]
         # Insert new rule into rules-array
         self.rules = np.insert(self.rules,
                                position,
                                [new_rule])
         # Adjust p_flag entries
-        # TODO this is untested
-        # TODO Check if this is done correctly, especially if rules are added
-        # TODO that change the order
         for _val in np.nditer(self.p_flag,
                               op_flags=['readwrite']):
             if _val >= position:
@@ -182,20 +171,114 @@ class Initialization:
                 _val += 1
         return
 
+    def apply_rule(self,
+                   index_rule,
+                   p_min,
+                   p_max):
+        """Applies an initialization rule from
+        :attr:`~Initialization.rules`
+        on the P-Grid.
+
+        This methods changes the :attr:`p_flag` entry
+        of the specified P-Grid points to the value of rule.
+        This sets both their initial state and behaviour during
+        :class:`~boltzmann.calculation.Calculation`
+        to the ones specified in the respective
+        :attr:`~Initialization.rules`.
+        Note that the rule is applied on all P-Grid points p, such that
+        p_min[i_p] <= p[i_p] <= p_max[i_p]
+        Indices are in vector form (indexing a non-flattened P-Grid).
+
+        Parameters
+        ----------
+        index_rule : int
+            Index of the to be applied rule in
+            :attr:`rules`.
+        p_min, p_max :  array_like(int)
+            Indices of the boundary points.
+            Mark the area where to apply the rule.
+
+        """
+        assert 0 <= index_rule < self.block_index[-1]
+        dim = len(self.p_flag.shape)
+        p_min = np.array(p_min)
+        p_max = np.array(p_max)
+        assert p_min.shape == (dim,)
+        assert p_max.shape == (dim,)
+        assert p_min.dtype == int
+        assert p_max.dtype == int
+
+        if dim is 1:
+            self.p_flag[p_min:p_max+1] = index_rule
+        elif dim is 2:
+            self.p_flag[p_min[0]:p_max[0]+1,
+                        p_min[1]:p_max[1]+1] = index_rule
+        elif dim is 3:
+            self.p_flag[p_min[0]:p_max[0]+1,
+                        p_min[1]:p_max[1]+1,
+                        p_min[2]:p_max[2]+1] = index_rule
+        return
+
+    def create_psv_grid(self):
+        """Generates the initialized PSV-Grid
+        (:attr:`~boltzmann.calculation.Calculation.data`,
+        :attr:`~boltzmann.calculation.Calculation.result`).
+
+        Returns
+        -------
+        psv : np.ndarray(float)
+            The initialized PSV-Grid.
+            Array of shape=
+            :attr:`~boltzmann.configuration.Configuration.p`.G.shape
+            +
+            :attr:`~boltzmann.configuration.Configuration.sv`.G.shape
+            and dtype=float.
+        """
+        shape = tuple(self.config.p.n[0:-1]) + (self.config.sv.index[-1],)
+        # Todo Find nicer way to iterate over whole P-Space
+        tmp_shape = (self.config.p.n[-1], self.config.sv.index[-1])
+        p_flat = self.p_flag.flatten()
+        psv = np.zeros(shape=tmp_shape, dtype=float)
+        assert p_flat.shape == (psv.shape[0],)
+        # set Velocity Grids for all specimen
+        for i_p in range(p_flat.size):
+            # get active rule
+            r = self.rules[p_flat[i_p]]
+            for i_s in range(self.config.s.n):
+                rho = r.rho[i_s]
+                temp = r.temp[i_s]
+                begin = self.config.sv.index[i_s]
+                end = self.config.sv.index[i_s+1]
+                v_grid = self.config.sv.G[begin:end]
+                for (i_v, v) in enumerate(v_grid[:, :]):
+                    # Todo np.array(v) only for PyCharm Warning - Check out
+                    diff_v = np.sum((np.array(v) - r.drift[i_s])**2)
+                    psv[i_p, begin + i_v] = rho * math.exp(-0.5*(diff_v/temp))
+                # Adjust initialized values, to match configurations
+                # Todo read into Rjasanovs script and do this correctly
+                # Todo THIS IS CURRENTLY WRONG! ONLY TEMPORARY FIX
+                adj = psv[i_p, begin:end].sum()
+                psv[i_p, begin:end] *= rho/adj
+        psv = psv.reshape(shape)
+        return psv
+
     def check_integrity(self):
         assert self.rules.dtype == b_rul.Rule
         for (i_r, r) in enumerate(self.rules):
             r.check_integrity()
-            assert r.cat
+            assert i_r >= self.block_index[r.cat]
+            assert i_r < self.block_index[r.cat+1]
+        assert self.rules.shape == (self.block_index[-1],)
         length = len(Initialization.SPECIFIED_CATEGORIES)
         # A change of this length needs several changes in this module
         # and its submodules
         assert len(Initialization.SPECIFIED_CATEGORIES) is 4
         assert self.block_index.shape == (length+1,)
-        # Todo assert shape of p_flag
-        # p_shape == tuple(self._p.n[0:-1])
+        assert self.p_flag.shape == self.config.p.shape
+        assert self.p_flag.dtype == int
         assert np.min(self.p_flag) >= 0, 'Uninitialized P-Grid points'
         assert np.max(self.p_flag) <= self.block_index[-1], 'Undefined Rule'
+        return
 
     def print(self,
               physical_grid=False):
@@ -207,81 +290,13 @@ class Initialization:
 
         for i_c in range(4):
             print('Rules: {}'
-                  ''.format(Initialization.SPECIFIED_CATEGORIES[i_c]))
+                  ''.format(Initialization.SPECIFIED_CATEGORIES[i_c]+'s'))
             str_len = len(Initialization.SPECIFIED_CATEGORIES[i_c]) + 7
             print('-'*str_len)
             for r in self.rules[self.block_index[i_c]:
                                 self.block_index[i_c+1]]:
-                r.print()
+                r.print(Initialization.SPECIFIED_CATEGORIES)
         if physical_grid:
             print('Flag-Grid of P-Space:')
             print(self.p_flag)
-
-    # def apply_init_rule(self,
-    #                     rule,
-    #                     p_min,
-    #                     p_max,
-    #                     p_flag):
-    #     """Applies an (already defined) initialization rule on the P-Grid.
-    #
-    #     This methods changes the :attr:`p_flag` entry
-    #     of the specified P-Grid points to the value of rule.
-    #     This sets both their initial state and behaviour during
-    #     :class:`~boltzmann.calculation.Calculation`
-    #     to the ones stated in the indexed
-    #     :attr:`~Initialization.rules`.
-    #
-    #     Parameters
-    #     ----------
-    #     rule : int
-    #         Index of the to be applied rule in
-    #         :attr:`arr`.
-    #     p_min, p_max :  array_like(int)
-    #         Indices of the boundaries on where to apply the rule.
-    #         The rule is applied on all P-Grid points p, such that
-    #         p_min[i] <= p[i] <= p_max[i]
-    #         Indices are in vector form (indexing a non-flattened P-Grid).
-    #     """
-    #     assert 0 <= rule < self.arr.size
-    #     if _p.dim is 1:
-    #         assert type(p_min) is int
-    #         assert type(p_max) is int
-    #         p_flag[p_min:p_max+1] = rule
-    #     elif self._p.dim is 2:
-    #         assert type(p_min) in [list, np.ndarray]
-    #         assert type(p_max) in [list, np.ndarray]
-    #         assert np.array(p_min).size is self._p.dim
-    #         assert np.array(p_max).size is self._p.dim
-    #         self.p_flag[p_min[0]:p_max[0]+1,
-    #                     p_min[1]:p_max[1]+1] = rule
-    #     elif self._p.dim is 3:
-    #         assert type(p_min) in [list, np.ndarray]
-    #         assert type(p_max) in [list, np.ndarray]
-    #         assert np.array(p_min).size is self._p.dim
-    #         assert np.array(p_max).size is self._p.dim
-    #         self.p_flag[p_min[0]:p_max[0]+1,
-    #                     p_min[1]:p_max[1]+1,
-    #                     p_min[2]:p_max[2]+1] = rule
-    #     return
-    #
-    # def create_psv_grid(self):
-    #     """Generates the initialized PSV-Grid
-    #     (:attr:`~boltzmann.calculation.Calculation.data`,
-    #     :attr:`~boltzmann.calculation.Calculation.result`)
-    #     and :attr:`~boltzmann.calculation.Calculation.p_flag`
-    #     for :class:`~boltzmann.calculation.Calculation`.
-    #
-    #
-    #     returns
-    #     ----------
-    #     psv : np.ndarray(float)
-    #         The initialized PSV-Grid.
-    #         Array of shape=(p.n[0],...,p.n[-2], sv.index[-1])
-    #         and dtype=float.
-    #     p_flag : np.ndarray(int)
-    #         Controls the behavior of each P-Grid point
-    #         during calculation.
-    #         Array of shape=(p.n[0],...,p.n[-2])
-    #         and dtype=int.
-    #     """
-    #     self._s.print()
+        return

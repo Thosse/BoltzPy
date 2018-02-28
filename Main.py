@@ -6,25 +6,29 @@ B.config.add_specimen(2)
 B.config.add_specimen(3)
 B.config.configure_time(1.0, 5)
 B.config.configure_position_space(2,
-                           [2, 10],
-                           step_size=0.1)
+                                  [2, 10],
+                                  step_size=0.1)
 # Todo - still depends on max_v => rounding errors
 B.config.configure_velocity_space(dimension=2,
-                           grid_points_x_axis=5,
-                           max_v=6.0)
+                                  grid_points_x_axis=5,
+                                  max_v=6.0)
+B.config.print(True)
 # B.configure_collisions('complete')
 B.begin_initialization()
 B.init.add_rule('Inner_Point',
                 [1, 2],
-                [[0,0], [0,0]],
+                [[0, 0], [0, 0]],
                 [1, 1],
                 name='foo')
+B.init.apply_rule(0, [0, 0], [1, 9])
 B.init.add_rule('Inner_Point',
-                [10, 20],
-                [[0,1], [0,0]],
+                [2, 4],
+                [[0, 0], [0, 0]],
                 [1, 1],
                 name='bar')
+B.init.apply_rule(1, [0, 0], [1, 1])
 B.init.print(True)
+B.init.create_psv_grid(B.config)
 
 # B.init.
 #     # Make PSV Grid
