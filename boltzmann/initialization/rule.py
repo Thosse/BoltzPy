@@ -51,7 +51,6 @@ class Rule:
         assert all([len(drift) in [2, 3]
                     and len(drift) is len(drift_list[0])
                     for drift in drift_list])
-
         self.cat = cat
         self.name = name
         self.rho = np.array(rho_list)
@@ -70,10 +69,15 @@ class Rule:
         assert self.drift.shape == (n_species, dim_p)
         assert self.temp.shape == (n_species,)
         assert self.cat in [0, 1, 2, 3]
+        return
 
-    def print(self):
+    def print(self,
+              list_of_category_names=None):
         print('Name of Rule = {}'.format(self.name))
-        print('Category = {}'.format(self.cat))
+        if list_of_category_names is not None:
+            print('Category = {}'
+                  ''.format(list_of_category_names[self.cat]))
+        print('Category index = {}'.format(self.cat))
         print('Rho: '
               '{}'.format(self.rho))
         print('Drift:\n'
