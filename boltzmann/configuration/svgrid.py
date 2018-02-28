@@ -39,10 +39,10 @@ class SVGrid:
         Denotes the Grid step size for each specimen.
         Array of shape=(s.n, dim).
     n : np.ndarray(int)
-        n[:, 0:dim] denotes the number of Grid points per dimension
-        for each specimen.
-        n[:, -1] denotes the total number of Grid points
-        for each specimen.
+        n[S, 0:dim] denotes the number of Grid points per dimension
+        for specimen S.
+        n[S, -1] denotes the total number of Grid points
+        for specimen S.
         Array of shape=(s.n, dim+1,).
     index : np.ndarray(int)
         index[i] denotes the beginning of the i-th velocity grid.

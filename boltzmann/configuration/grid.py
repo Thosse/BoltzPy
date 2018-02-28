@@ -7,6 +7,7 @@ class Grid:
     .. todo::
         - Use int-grids (multiples of d) for physical grid?
           Maybe only for calculation?
+          -> Lots of changes necessary in init and calculation routine!
         - Check offset for correctness and sanity,
           and find better solution for sv-grids, if possible
         - Todo Add unit tests
