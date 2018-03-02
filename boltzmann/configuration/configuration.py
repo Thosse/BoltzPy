@@ -18,7 +18,9 @@ class Configuration:
         * generates Collisions (list and weights)
 
     .. todo::
-        - add v grid -> like in sv.setup
+        - add documentation: d is actually halved in v and sv
+          due to integer representation (so far dv is multiples of 2)
+        - offset in sv -> Attribute of sv -> v_pys[i] = G[i]*d[s] + offset
         - link Species and SVGrid somehow
           -> adding Species, after setting up SVGrid
           should delete SVGrid or at least update it
@@ -38,7 +40,8 @@ class Configuration:
     sv : SVGrid
         Contains all data about the Velocity-Space of each Specimen.
         V-Spaces of distinct Specimen differ in step size
-        and number of grid points. Boundaries can also differ slightly.
+        and number of grid points.
+        Maximum physical values may differ slightly between specimen.
     cols : Collisions
         Describes the collisions on the SV-Grid.
     """
@@ -89,23 +92,27 @@ class Configuration:
                      'rectangular')
         return
 
-    # Todo make parameters more intuitive, compared to other grids
     def configure_velocity_space(self,
                                  dimension,
                                  grid_points_x_axis,
-                                 max_v):
+                                 max_v,
+                                 shape='rectangular',
+                                 offset=None):
+        # Todo Add offset as attribute
         step_size = 2 * max_v / (grid_points_x_axis - 1)
         number_of_points_per_dimension = [grid_points_x_axis] * dimension
-        # Offset is chosen s.t. the grid is centered around zero
-        offset = [-max_v] * dimension
-        _v = b_grd.Grid()
-        _v.setup(dimension,
-                 number_of_points_per_dimension,
-                 step_size,
-                 'rectangular',
-                 offset=offset)
+        v = b_grd.Grid()
+        v.setup(dimension,
+                number_of_points_per_dimension,
+                step_size,
+                shape)
+        if offset is not None:
+            assert False, 'This is not properly implemented!' \
+                          'Maybe only allow multiples of all d`s'
+
         self.sv.setup(self.s,
-                      _v)
+                      v,
+                      offset)
         return
 
     def configure_collisions(self, selection_scheme):

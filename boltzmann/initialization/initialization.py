@@ -96,7 +96,7 @@ class Initialization:
         self.rules = np.empty(shape=(0,), dtype=b_rul.Rule)
         self.block_index = np.zeros(shape=(5,),
                                     dtype=int)
-        p_shape = tuple(self.config.p.n[0:-1])
+        p_shape = tuple(self.config.p.n)
         self.p_flag = np.full(shape=p_shape,
                               fill_value=-1,
                               dtype=int)
@@ -200,13 +200,16 @@ class Initialization:
 
         """
         assert 0 <= index_rule < self.block_index[-1]
-        dim = len(self.p_flag.shape)
+        dim = self.config.p.dim
         p_min = np.array(p_min)
         p_max = np.array(p_max)
         assert p_min.shape == (dim,)
         assert p_max.shape == (dim,)
         assert p_min.dtype == int
         assert p_max.dtype == int
+        assert all(np.zeros(p_min.shape) <= p_min)
+        assert all(p_min <= p_max)
+        assert all(p_max <= self.config.p.n)
 
         if dim is 1:
             self.p_flag[p_min:p_max+1] = index_rule
@@ -220,7 +223,7 @@ class Initialization:
         return
 
     def create_psv_grid(self):
-        """Generates the initialized PSV-Grid
+        """Generates and returns the initialized PSV-Grid
         (:attr:`~boltzmann.calculation.Calculation.data`,
         :attr:`~boltzmann.calculation.Calculation.result`).
 
@@ -234,12 +237,12 @@ class Initialization:
             :attr:`~boltzmann.configuration.Configuration.sv`.G.shape
             and dtype=float.
         """
-        shape = tuple(self.config.p.n[0:-1]) + (self.config.sv.index[-1],)
+        self.check_integrity()
+        shape = (self.config.p.G.shape[0], self.config.sv.G.shape[0])
         # Todo Find nicer way to iterate over whole P-Space
-        tmp_shape = (self.config.p.n[-1], self.config.sv.index[-1])
         p_flat = self.p_flag.flatten()
-        psv = np.zeros(shape=tmp_shape, dtype=float)
-        assert p_flat.shape == (psv.shape[0],)
+        assert p_flat.shape == (shape[0],)
+        psv = np.zeros(shape=shape, dtype=float)
         # set Velocity Grids for all specimen
         for i_p in range(p_flat.size):
             # get active rule
@@ -259,7 +262,6 @@ class Initialization:
                 # Todo THIS IS CURRENTLY WRONG! ONLY TEMPORARY FIX
                 adj = psv[i_p, begin:end].sum()
                 psv[i_p, begin:end] *= rho/adj
-        psv = psv.reshape(shape)
         return psv
 
     def check_integrity(self):
@@ -274,10 +276,10 @@ class Initialization:
         # and its submodules
         assert len(Initialization.SPECIFIED_CATEGORIES) is 4
         assert self.block_index.shape == (length+1,)
-        assert self.p_flag.shape == self.config.p.shape
+        assert self.p_flag.size == self.config.p.G.shape[0]
         assert self.p_flag.dtype == int
         assert np.min(self.p_flag) >= 0, 'Uninitialized P-Grid points'
-        assert np.max(self.p_flag) <= self.block_index[-1], 'Undefined Rule'
+        assert np.max(self.p_flag) <= self.rules.size - 1, 'Undefined Rule'
         return
 
     def print(self,

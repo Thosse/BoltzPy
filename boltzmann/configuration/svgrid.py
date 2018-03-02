@@ -18,8 +18,7 @@ class SVGrid:
     """Class of the concatenated Velocity Grid of all Specimen.
 
     .. todo::
-        - Use int-grids (multiples of d) for physical grid?
-          Maybe only for calculation?
+        - v-offset: -> put into attribute of svGrid, add when necessary
         - Ask Hans, should the Grid always contain the center/zero?
         - Todo Add unit tests
         - replace n with index_skips?
@@ -28,35 +27,38 @@ class SVGrid:
           based on the least common multiple,...)
         - self.n[0:dim] should all be equal values. Reduce this?
 
+    .. note::
+      During the setup the Grid is centered around 0.
+      For that it is necessary to halve d and double all entries in G.
+
     Attributes
     ----------
     dim : int
         Dimensionality of all Grids.  Applies to all Specimen.
-    b : np.ndarray(float)
-        Denotes [minimum, maximum] physical Grid values for each specimen.
-        Array of shape=(s.n, dim, 2) and dtype=float.
-    d : np.ndarray(float)
+    d : array(float)
         Denotes the Grid step size for each specimen.
         Array of shape=(s.n, dim).
-    n : np.ndarray(int)
-        n[S, 0:dim] denotes the number of Grid points per dimension
+    n : array(int)
+        n[S, DIM] denotes the number of Velocity-Grid points in dimension DIM
         for specimen S.
-        n[S, -1] denotes the total number of Grid points
+        Array of shape=(s.n, dim)
+    size : array(int)
+        n[S] denotes the total number of Velocity-Grid points
         for specimen S.
-        Array of shape=(s.n, dim+1,).
-    index : np.ndarray(int)
+        Array of shape=(s.n,).
+    index : array(int)
         index[i] denotes the beginning of the i-th velocity grid.
         By Definition index[0] is 0 and index[-1] is n[:,-1].sum().
         Array of shape=(s.n+1) and dType=int.
-    G : np.ndarray
-        The physical Velocity grids of all specimen, concatenated.
+    G : array(int)
+        Concatenated physical Velocity-Grids of all specimen.
         G[index[i]:index[i+1]] is the Velocity Grid of specimen i.
         G[j] denotes the physical coordinates of the j-th grid point.
         Note that some V-Grid-points occur several times,
         for different specimen.
-        Array of shape(index[-1], dim) and dtype=float.
+        Array of shape(index[-1], dim).
     shape : str
-        Shape of all Grids. Applies to all Specimen.
+        Geometric shape of all Velocity-Grids. Equal to all Specimen.
         Can only be rectangular so far.
     """
     def __init__(self):
@@ -64,139 +66,158 @@ class SVGrid:
         self.shape = ''
         self.d = np.zeros(shape=(0,), dtype=float)
         self.n = np.zeros(shape=(0, 0), dtype=int)
+        self.size = np.zeros(shape=(0,), dtype=int)
         self.index = np.zeros(shape=(0,), dtype=int)
-        self.b = np.zeros(shape=(0, 0, 0), dtype=float)
-        self.G = np.zeros((0,), dtype=float)
+        self.G = np.zeros((0,), dtype=int)
         return
 
     def setup(self,
               species,
               velocity_grid,
-              grid_contains_center=True,
+              offset=None,
+              force_contain_center=False,
               check_integrity=True,
               create_grid=True):
+        # Todo add Offset attribute
         assert type(species) is b_spc.Species
         assert type(velocity_grid) is b_grd.Grid
         self.dim = velocity_grid.dim
         self.shape = velocity_grid.shape
-        b = velocity_grid.b
+
         m = species.mass
         m_min = np.amin(m)
+        # The range of the Velocity-Grid of Specimen i is almost constant:
+        # v_max[i]-v_min[i] = n[i] * d[i] ~ CONST
+        # with CONST = velocity_grid.n * velocity_grid.d
+        # If necessary, the range may decrease by at most 1 d[i]
+        # => n may be rounded down
 
-        # step size and mass are inversely proportional
         # The lighter specimen are less inert and move further
         # => d[i]/d[j] = m[j]/m[i]
-        self.d = velocity_grid.d * m_min/m
-        self.d = np.array(self.d, dtype=float)
+        # i.e. d[i] is inversely proportional to m[i]
+        self.d = np.array(velocity_grid.d * m_min/m,
+                          dtype=float)
 
-        # The number of grid points is inversely proportional to the step size
-        # n ~ (b[1]-b[0]) / d + 1
-        # The area spanned by the boundaries is never increased
-        # If necessary, the area only decreases
-        # => n is always rounded down
-        # Todo is reducing the area of b the right approach?
-        self.n = np.zeros((species.n, self.dim+1), dtype=int)
+        # Smaller step sizes lead to larger grids (n[i]*d[i] = CONST).
+        # => n[i]/n[j] ~ d[j]/d[i] ~ m[i]/m[j]
+        # i.e. n[i] is proportional to m[i]
+        self.n = np.zeros((species.n, self.dim), dtype=int)
         for _s in range(species.n):
-            self.n[_s, 0:self.dim] = (b[:, 1] - b[:, 0]) / self.d[_s] + 1
+            # -/+1 are necessary, since we operate with lengths
+            self.n[_s] = (m[_s]/m_min)*(velocity_grid.n-1) + 1
             # The center can be forced to be a grid point,
             # by allowing only uneven numbers per dimension
-            if grid_contains_center:
+            if force_contain_center:
                 for _d in range(0, self.dim):
                     if self.n[_s, _d] % 2 == 0:
                         self.n[_s, _d] -= 1
-            self.n[_s, -1] = self.n[_s, 0:self.dim].prod()
+            if self.shape is 'rectangular':
+                self.size = self.n.prod(axis=1)
+            else:
+                print("ERROR - Unspecified Grid Shape")
+                assert False
 
         # index[i] = n[0] + ... n[i-1]
         self.index = np.zeros((species.n+1,), dtype=int)
         for _s in range(species.n):
-            self.index[_s+1] = self.index[_s] + self.n[_s, -1]
+            self.index[_s+1] = self.index[_s] + self.size[_s]
 
-        # The area spanned by the boundaries is never increased
-        # If necessary, the area only decreases
-        self.b = np.zeros(shape=(species.n, self.dim, 2),
-                          dtype=float)
-        for _s in range(species.n):
-            prev_w = b[:, 1] - b[:, 0]
-            curr_w = (self.n[_s, 0:self.dim] - np.ones(self.dim)) * self.d[_s]
-            diff = 0.5 * (prev_w - curr_w)
-            assert all(diff >= -1e-7), "Increase of Boundaries:\n" \
-                                       "{}".format(diff)
-            self.b[_s, :, 0] = b[:, 0] + diff
-            self.b[_s, :, 1] = b[:, 1] - diff
+        if offset is not None:
+            assert False, 'This is not properly implemented!'
         if create_grid:
-            self.G = self.make_grid()
+            self.create_grid(offset)
         else:
-            self.G = np.zeros((0,), dtype=float)
+            self.G = np.zeros((0,), dtype=int)
         if check_integrity:
             self.check_integrity()
         return
 
-    def make_grid(self):
-        sv_grid = np.zeros(shape=(self.index[-1], self.dim),
-                           dtype=float)
+    def create_grid(self, offset):
+        self.G = np.zeros(shape=(self.index[-1], self.dim),
+                          dtype=int)
         for _s in range(self.n.shape[0]):
             _v = b_grd.Grid()
             _v.setup(self.dim,
-                     self.n[_s, 0:self.dim],
+                     self.n[_s],
                      self.d[_s],
-                     shape=self.shape,
-                     offset=self.b[_s, :, 0])
-            if self.shape is 'rectangular':
-                _grid = _v.make_grid().reshape((_v.n[-1], _v.dim))
-            else:
-                print("ERROR - Unspecified Grid Shape")
-                assert False
-            sv_grid[self.index[_s]:self.index[_s+1], :] = _grid[:]
-        return sv_grid
+                     shape=self.shape)
+            if offset is not None:
+                assert False, 'This is not properly implemented!'
+            _v.center()
+            self.d[_s] = _v.d
+            self.G[self.index[_s]:self.index[_s+1], :] = _v.G[:]
+        return
 
     #####################################
     #               Indexing            #
     #####################################
-    def get_local_flat_index(self,
-                             i_species,
-                             i_vec):
+    def get_index(self,
+                  specimen_index,
+                  grid_entry):
+        """Returns position of given grid_entry in :attr:`SVGrid.G`
+
+        Firstly, we assume the given grid_entry is an element
+        of the given Specimens Velocity-Grid.
+        Under this condition we generate its index in attr:`SVGrid.G`.
+        Secondly, we counter-check if the indexed value matches the given
+        value.
+        If this is true, we return the index,
+        otherweise we return None.
+
+        Parameters
+        ----------
+        specimen_index : int
+        grid_entry : array(int)
+            Array of shape=(self.dim,).
+
+        Returns
+        -------
+        int
+            Index/Position of grid_entry in :attr:`~SVGrid.G`.
+        """
+        # Todo Throw exception if not a grid entry (instead of None)
         i_flat = 0
+        # get vector-index, by reversing Grid.center() - method
+        i_vec = np.array((grid_entry+self.n[specimen_index]-1) // 2,
+                         dtype=int)
         for _d in range(self.dim):
-            n_loc = self.n[i_species, _d]
+            n_loc = self.n[specimen_index, _d]
             i_flat *= n_loc
             i_flat += i_vec[_d]
-        return i_flat
+        i_flat += self.index[specimen_index]
+        if all(np.array(self.G[i_flat] == grid_entry)):
+            return i_flat
+        else:
+            return None
 
     #####################################
     #           Verification            #
     #####################################
     def check_integrity(self):
+        s_n = self.d.shape[0]
         assert type(self.dim) is int
         assert self.dim in [1, 2, 3]
-        s_n = self.b.shape[0]
-        assert type(self.b) is np.ndarray
-        assert self.b.dtype == float
-        assert self.b.shape == (s_n, self.dim, 2)
-        for _s in range(s_n):
-            for _d in range(self.dim):
-                assert self.b[_s, _d, 1] - self.b[_s, _d, 0] > 0
         assert type(self.d) is np.ndarray
+        assert self.d.shape == (s_n,)
         assert self.d.dtype == float
         assert all(self.d > 0)
         assert type(self.n) is np.ndarray
-        assert self.n.shape == (s_n, self.dim+1)
+        assert self.n.shape == (s_n, self.dim)
         assert self.n.dtype == int
-        assert (self.n >= 2).all
+        assert all(self.n.flatten() >= 2)
+        assert type(self.size) is np.ndarray
+        assert self.size.shape == (s_n,)
+        assert self.size.dtype == int
+        assert all(self.size >= 2)
         assert self.index.shape == (s_n+1,)
-        assert np.array_equal(self.index[0:-1] + self.n[:, -1],
+        assert np.array_equal(self.index[0:-1] + self.size,
                               self.index[1:])
         assert self.shape in b_grd.Grid.GRID_SHAPES
-        for _s in range(s_n):
-            _width1 = self.b[_s, :, 1] - self.b[_s, :, 0]
-            _width2 = ((self.n[_s, 0:self.dim] - np.ones(self.dim))
-                       * self.d[_s])
-            np.testing.assert_almost_equal(_width1, _width2)
         if self.shape is 'rectangular':
             for _s in range(s_n):
-                assert self.n[_s, 0:self.dim].prod() == self.n[_s, -1]
-        assert self.G.dtype == float
+                assert self.n[_s].prod() == self.size[_s]
+        assert self.G.dtype == int
         assert self.G.shape == (self.index[-1], self.dim)
-        # Todo check boundaries
         return
 
     def print(self,
@@ -207,16 +228,19 @@ class SVGrid:
         print('')
         for _s in range(self.n.shape[0]):
             print('Specimen_{}'.format(_s))
-            print("Boundaries =")
-            print(self.b[_s])
             print("Number of Total Grid Points = "
                   "{}".format(self.n[_s, -1]))
             print("Grid Points per Dimension = "
                   "{}".format(self.n[_s, 0:self.dim]))
-            print("Step Size = {}".format(self.d[_s]))
+            print("Step Size = {}".format(2*self.d[_s]))
+            print("Boundaries:")
+            beg = self.index[_s]
+            end = self.index[_s+1]
+            print(b_grd.Grid.get_boundaries(self.G[beg:end],
+                                            self.d[_s]))
             if physical_grid:
                 print('Physical Grid :')
                 beg = self.index[_s]
                 end = self.index[_s + 1]
-                print(self.G[beg:end])
+                print(self.G[beg:end]*self.d[_s])
             print('')

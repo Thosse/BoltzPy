@@ -39,10 +39,13 @@ class BoltzmannPDE:
         * generates animations of specified variables
 
     .. todo::
-
-        - Instead of inheritance
-          -> Put Configuration, Init... into Attribute
-          => Gives Namespaces and more readability
+        - Ask Seb about properties
+        - Ask Seb about exceptions
+        - Ask Stefan about circular grids (collision generation, get_index...)
+        - add method: b = boundaries
+          b = [ G[0]*d, G[-1]*d]
+          also for specimen (G[index[i]]*d[i], ...)
+          IS this necessary?
         - read into numpys ufunc -> Speedup
         - time steps apply to calculation or animation?
         - add CUDA Support (PyTorch)
