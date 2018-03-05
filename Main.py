@@ -8,7 +8,6 @@ B.config.configure_time(1.0, 5)
 B.config.configure_position_space(2,
                                   [2, 11],
                                   step_size=0.1)
-# Todo - still depends on max_v => rounding errors
 B.config.configure_velocity_space(dimension=2,
                                   grid_points_x_axis=5,
                                   max_v=6.0)

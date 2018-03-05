@@ -5,7 +5,6 @@ class Grid:
     """Basic class for Positional-, and Time-Grids.
 
     .. todo::
-        - v-offset: -> put into attribute of svGrid, add when necessary
         - Todo Add unit tests
         - Todo Add Circular shape
         - add rotation of grid (useful for velocities)

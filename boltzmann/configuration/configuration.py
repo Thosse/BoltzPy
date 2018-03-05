@@ -20,12 +20,9 @@ class Configuration:
     .. todo::
         - add documentation: d is actually halved in v and sv
           due to integer representation (so far dv is multiples of 2)
-        - offset in sv -> Attribute of sv -> v_pys[i] = G[i]*d[s] + offset
         - link Species and SVGrid somehow
           -> adding Species, after setting up SVGrid
           should delete SVGrid or at least update it
-        - add empty __init__s for all classes
-        - Add Offset parameter for setup velocity method
         - Add Plotting-function to grids
         - Where to specify integration order?
 
@@ -98,7 +95,6 @@ class Configuration:
                                  max_v,
                                  shape='rectangular',
                                  offset=None):
-        # Todo Add offset as attribute
         step_size = 2 * max_v / (grid_points_x_axis - 1)
         number_of_points_per_dimension = [grid_points_x_axis] * dimension
         v = b_grd.Grid()
@@ -106,10 +102,6 @@ class Configuration:
                 number_of_points_per_dimension,
                 step_size,
                 shape)
-        if offset is not None:
-            assert False, 'This is not properly implemented!' \
-                          'Maybe only allow multiples of all d`s'
-
         self.sv.setup(self.s,
                       v,
                       offset)

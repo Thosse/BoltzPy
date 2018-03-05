@@ -18,7 +18,7 @@ class SVGrid:
     """Class of the concatenated Velocity Grid of all Specimen.
 
     .. todo::
-        - v-offset: -> put into attribute of svGrid, add when necessary
+        - add property for physical velocities (offset + G*d)
         - Ask Hans, should the Grid always contain the center/zero?
         - Todo Add unit tests
         - replace n with index_skips?
@@ -60,6 +60,11 @@ class SVGrid:
     shape : str
         Geometric shape of all Velocity-Grids. Equal to all Specimen.
         Can only be rectangular so far.
+    offset : array(float)
+        Offset for the physical velocities.
+        The physical value of any Velocity-Grid point v_i of Specimen S
+        is offset + d[S]*G[i].
+        Array of shape=(dim,).
     """
     def __init__(self):
         self.dim = 0
@@ -69,6 +74,7 @@ class SVGrid:
         self.size = np.zeros(shape=(0,), dtype=int)
         self.index = np.zeros(shape=(0,), dtype=int)
         self.G = np.zeros((0,), dtype=int)
+        self.offset = np.zeros((self.dim,), dtype=float)
         return
 
     def setup(self,
@@ -83,6 +89,15 @@ class SVGrid:
         assert type(velocity_grid) is b_grd.Grid
         self.dim = velocity_grid.dim
         self.shape = velocity_grid.shape
+
+        if offset is None:
+            self.offset = np.zeros((self.dim,), dtype=float)
+        else:
+            assert type(offset) in [int, list, np.ndarray]
+            if type(offset) is int:
+                offset = [offset]
+            self.offset = np.array(offset, dtype=float)
+            assert self.offset.shape is (self.dim,)
 
         m = species.mass
         m_min = np.amin(m)
@@ -103,7 +118,7 @@ class SVGrid:
         # i.e. n[i] is proportional to m[i]
         self.n = np.zeros((species.n, self.dim), dtype=int)
         for _s in range(species.n):
-            # -/+1 are necessary, since we operate with lengths
+            # -/+1 are necessary to switch between points and length
             self.n[_s] = (m[_s]/m_min)*(velocity_grid.n-1) + 1
             # The center can be forced to be a grid point,
             # by allowing only uneven numbers per dimension
@@ -122,17 +137,15 @@ class SVGrid:
         for _s in range(species.n):
             self.index[_s+1] = self.index[_s] + self.size[_s]
 
-        if offset is not None:
-            assert False, 'This is not properly implemented!'
         if create_grid:
-            self.create_grid(offset)
+            self.create_grid()
         else:
             self.G = np.zeros((0,), dtype=int)
         if check_integrity:
             self.check_integrity()
         return
 
-    def create_grid(self, offset):
+    def create_grid(self):
         self.G = np.zeros(shape=(self.index[-1], self.dim),
                           dtype=int)
         for _s in range(self.n.shape[0]):
@@ -141,8 +154,6 @@ class SVGrid:
                      self.n[_s],
                      self.d[_s],
                      shape=self.shape)
-            if offset is not None:
-                assert False, 'This is not properly implemented!'
             _v.center()
             self.d[_s] = _v.d
             self.G[self.index[_s]:self.index[_s+1], :] = _v.G[:]
@@ -218,6 +229,8 @@ class SVGrid:
                 assert self.n[_s].prod() == self.size[_s]
         assert self.G.dtype == int
         assert self.G.shape == (self.index[-1], self.dim)
+        assert self.offset.dtype == float
+        assert self.offset.shape == (self.dim,)
         return
 
     def print(self,
@@ -225,6 +238,7 @@ class SVGrid:
         print("Dimension = {}".format(self.dim))
         print("Index-Array = {}".format(self.index))
         print("Shape = {}".format(self.shape))
+        print("Offset = {}".format(self.offset))
         print('')
         for _s in range(self.n.shape[0]):
             print('Specimen_{}'.format(_s))
