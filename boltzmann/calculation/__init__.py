@@ -1,15 +1,16 @@
 r"""
-calculation Submodule
+Calculation Submodule
 =====================
 
-This module incorporates the Calculation class, which is contains all functionalities related to calculation.
+ * :py:class:`boltzmann.calculation.Calculation`
+
 
 Classes
 -------
 
-Here we list the classes in the submodule for easy referencing and access.
+ * :py:class:`boltzmann.calculation.OutputFunction`
 
- * :py:class:`boltzmann.calculation.Calculation`
 """
 
 from .calculation import Calculation
+from .output_function import OutputFunction

@@ -10,10 +10,11 @@ The Initialization class provides a framework to set up the
 
 of the PSV-Grid.
 
+ * :py:class:`boltzmann.initialization.Initialization`
+
 Classes
 -------
 
- * :py:class:`boltzmann.initialization.Initialization`
  * :py:class:`boltzmann.initialization.Rule`
 
 """
