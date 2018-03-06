@@ -1,5 +1,6 @@
 # Desired Command / Road Map
 import boltzmann as b_pde
+import boltzmann.calculation.output_function as b_opf
 
 B = b_pde.BoltzmannPDE()
 B.config.add_specimen(2)
@@ -28,6 +29,12 @@ B.init.add_rule('Inner_Point',
 B.init.apply_rule(1, [0, 0], [1, 1])
 B.init.print(True)
 print(B.init.create_psv_grid().sum(axis=1).reshape(tuple(B.config.p.n)))
+psv = B.init.create_psv_grid()
+moments = ['Mass']
+f_mass = b_opf.OutputFunction(moments, B.config).f_arr[0]
+res = f_mass(psv)
+print(res)
+
 
 # B.calc.setup(animated_Moments)
 # B.calc.run()

@@ -46,6 +46,8 @@ The Calculation submodule
 
 .. autoclass:: boltzmann.calculation.Calculation
     :members:
+.. autoclass:: boltzmann.calculation.OutputFunction
+    :members:
 
 The Animation submodule
 -----------------------

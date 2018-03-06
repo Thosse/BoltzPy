@@ -10,16 +10,20 @@ import numpy as np
 class Configuration:
     r"""Handles Setup of General Simulation Parameters
 
-        * based solely on User Input
-        * specifies the Specimen-Parameters
-        * generates the Time and Position-Space grids
-        * generates Velocity-Space grids
-          (Combined Velocity Grid for each Specimen)
-        * generates Collisions (list and weights)
+    * based solely on User Input
+    * specifies the Specimen-Parameters
+    * generates the Time and Position-Space grids
+    * generates Velocity-Space grids
+      (Combined Velocity Grid for each Specimen)
+    * generates Collisions (list and weights)
 
     .. todo::
+        - add proper file_name initialization/property
         - add documentation: d is actually halved in v and sv
           due to integer representation (so far dv is multiples of 2)
+        - Add Attributes:
+          * Calculations_per_Frame
+          * Collisions_per_Calculation
         - link Species and SVGrid somehow
           -> adding Species, after setting up SVGrid
           should delete SVGrid or at least update it
@@ -41,6 +45,7 @@ class Configuration:
         Maximum physical values may differ slightly between specimen.
     cols : Collisions
         Describes the collisions on the SV-Grid.
+    file_name : str
     """
 
     def __init__(self):
@@ -52,7 +57,7 @@ class Configuration:
         self.p = b_grd.Grid()
         self.sv = b_svg.SVGrid()
         self.cols = b_col.Collisions()
-        # self.psv = b_psv.PSVGrid()
+        self.file_name = 'default'
         return
 
     #####################################
@@ -134,6 +139,7 @@ class Configuration:
     def print(self,
               physical_grids=False):
         print('========CONFIGURATION========')
+        print(self.file_name)
         print('Specimen:')
         print('---------')
         self.s.print()

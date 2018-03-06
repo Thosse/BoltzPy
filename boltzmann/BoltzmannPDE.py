@@ -27,7 +27,7 @@ class BoltzmannPDE:
           (each init-operation adds an element to an instruction-vector)
           -> save/load-module
 
-    *Calculation*
+    :class:`~boltzmann.calculation.Calculation`
         * acts alternately on the PSV-Grid and a copy of it
         * contains several implementations
           for transport and collision steps
@@ -39,6 +39,8 @@ class BoltzmannPDE:
         * generates animations of specified variables
 
     .. todo::
+        - where to put moments for output(functions) (animation?),
+          what data type for moments? array? list?
         - Ask Seb about properties
         - Ask Seb about exceptions
         - Ask Stefan about circular grids (collision generation, get_index...)
