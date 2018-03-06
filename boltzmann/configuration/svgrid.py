@@ -5,13 +5,13 @@ from boltzmann.configuration import species as b_spc
 from boltzmann.configuration import grid as b_grd
 
 
-def np_gcd(array_of_ints):
-    if array_of_ints.shape == (0,):
-        return 1
-    gcd = array_of_ints[0]
-    for new_number in array_of_ints[1:]:
-        gcd = math.gcd(gcd, new_number)
-    return gcd
+# def np_gcd(array_of_ints):
+#     if array_of_ints.shape == (0,):
+#         return 1
+#     gcd = array_of_ints[0]
+#     for new_number in array_of_ints[1:]:
+#         gcd = math.gcd(gcd, new_number)
+#     return gcd
 
 
 class SVGrid:
@@ -84,12 +84,12 @@ class SVGrid:
               force_contain_center=False,
               check_integrity=True,
               create_grid=True):
-        # Todo add Offset attribute
         assert type(species) is b_spc.Species
         assert type(velocity_grid) is b_grd.Grid
         self.dim = velocity_grid.dim
         self.shape = velocity_grid.shape
-
+        # set offset
+        # Todo put into seperate method?
         if offset is None:
             self.offset = np.zeros((self.dim,), dtype=float)
         else:
