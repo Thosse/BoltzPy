@@ -1,5 +1,5 @@
 import numpy as np
-import math
+# import math
 
 from boltzmann.configuration import species as b_spc
 from boltzmann.configuration import grid as b_grd
@@ -25,11 +25,7 @@ class SVGrid:
         - is it useful to implement different construction schemes?
           (grid boundaries/step_size can be chosen to fit in grids,
           based on the least common multiple,...)
-        - self.n[0:dim] should all be equal values. Reduce this?
-
-    .. note::
-      During the setup the Grid is centered around 0.
-      For that it is necessary to halve d and double all entries in G.
+        - For each S, self.n[S, :] should all be equal values. Reduce this?
 
     Attributes
     ----------
@@ -65,6 +61,19 @@ class SVGrid:
         The physical value of any Velocity-Grid point v_i of Specimen S
         is offset + d[S]*G[i].
         Array of shape=(dim,).
+    multi : int
+        Multiplicator, that determines the ratio of
+        'actual step size' / :attr:`~boltzmann.configuration.Grid.d`.
+        In several cases the Entries in G are multiplied by
+        :attr:`~boltzmann.configuration.Grid.multi`
+        and :attr:`~boltzmann.configuration.Grid.d` are divided by
+        :attr:`~boltzmann.configuration.Grid.multi`.
+        This does not change the physical Values, but enables a variety
+         of features( Currently: several calculation steps per write,
+         simple centralizing ov velocity grids)
+    is_centered : bool
+        True if Grid has been centered, False otherwise.
+
     """
     def __init__(self):
         self.dim = 0
@@ -74,6 +83,8 @@ class SVGrid:
         self.size = np.zeros(shape=(0,), dtype=int)
         self.index = np.zeros(shape=(0,), dtype=int)
         self.G = np.zeros((0,), dtype=int)
+        self.multi = 1
+        self.is_centered = False
         self.offset = np.zeros((self.dim,), dtype=float)
         return
 
@@ -157,6 +168,8 @@ class SVGrid:
             _v.center()
             self.d[_s] = _v.d
             self.G[self.index[_s]:self.index[_s+1], :] = _v.G[:]
+        self.multi = 2
+        self.is_centered = True
         return
 
     #####################################
@@ -238,6 +251,8 @@ class SVGrid:
         print("Dimension = {}".format(self.dim))
         print("Index-Array = {}".format(self.index))
         print("Shape = {}".format(self.shape))
+        print("Multiplicator = {}".format(self.multi))
+        print('Is centered Grid = {}'.format(self.is_centered))
         print("Offset = {}".format(self.offset))
         print('')
         for _s in range(self.n.shape[0]):
@@ -246,7 +261,7 @@ class SVGrid:
                   "{}".format(self.n[_s, -1]))
             print("Grid Points per Dimension = "
                   "{}".format(self.n[_s, 0:self.dim]))
-            print("Step Size = {}".format(2*self.d[_s]))
+            print("Step Size = {}".format(self.d[_s]*self.multi))
             print("Boundaries:")
             beg = self.index[_s]
             end = self.index[_s+1]

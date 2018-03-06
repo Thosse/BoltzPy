@@ -5,7 +5,8 @@ import boltzmann.calculation.output_function as b_opf
 B = b_pde.BoltzmannPDE()
 B.config.add_specimen(2)
 B.config.add_specimen(3)
-B.config.configure_time(1.0, 5)
+B.config.configure_time(1.0, 5, 10)
+print(B.config.t.multi)
 B.config.configure_position_space(2,
                                   [2, 11],
                                   step_size=0.1)

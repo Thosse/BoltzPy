@@ -36,6 +36,8 @@ class Configuration:
         Contains all data about the simulated specimen.
     t : Grid
         Contains all data about simulation time and time step size.
+        :attr:`~boltzmann.configuration.Configuration.t.G`
+        denotes the times at which the results are written out to HDD.
     p : Grid
         Contains all data about Position-Space.
     sv : SVGrid
@@ -75,12 +77,14 @@ class Configuration:
 
     def configure_time(self,
                        max_time,
-                       number_time_steps):
+                       number_time_steps,
+                       calculations_per_time_step=1):
         step_size = max_time / (number_time_steps - 1)
         self.t.setup(1,
                      [number_time_steps],
                      step_size,
-                     shape='rectangular')
+                     shape='rectangular',
+                     multiplicator=calculations_per_time_step)
         self.t.G = self.t.G.reshape((self.t.n[-1],))
         return
 
@@ -139,7 +143,7 @@ class Configuration:
     def print(self,
               physical_grids=False):
         print('========CONFIGURATION========')
-        print(self.file_name)
+        print('Configuration Name: ' + self.file_name)
         print('Specimen:')
         print('---------')
         self.s.print()

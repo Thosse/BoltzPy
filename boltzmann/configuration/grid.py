@@ -9,6 +9,7 @@ class Grid:
         - Todo Add Circular shape
         - add rotation of grid (useful for velocities)
         - Enable non-uniform/adaptive Grids
+          (see :class:`~boltzmann.calculation.Calculation`)
 
     Attributes
     ----------
@@ -28,6 +29,18 @@ class Grid:
     shape : str
         Geometric shape of Grid.
          Can only be rectangular so far.
+    multi : int
+        Multiplicator, that determines the ratio of
+        'actual step size' / :attr:`~boltzmann.configuration.Grid.d`.
+        In several cases the Entries in G are multiplied by
+        :attr:`~boltzmann.configuration.Grid.multi`
+        and :attr:`~boltzmann.configuration.Grid.d` are divided by
+        :attr:`~boltzmann.configuration.Grid.multi`.
+        This does not change the physical Values, but enables a variety
+         of features( Currently: several calculation steps per write,
+         simple centralizing ov velocity grids)
+    is_centered : bool
+        True if Grid has been centered, False otherwise.
     """
     GRID_SHAPES = ['rectangular']
 
@@ -38,27 +51,36 @@ class Grid:
         self.d = 0.0
         self.shape = ''
         self.G = np.zeros((0,), dtype=int)
+        self.multi = 1
+        self.is_centered = False
 
     def setup(self,
               dimension,
               number_of_points_per_dimension,
               step_size,
               shape='rectangular',
-              create_grid=True):
+              create_grid=True,
+              multiplicator=1,):
         self.dim = dimension
         self.n = np.array(number_of_points_per_dimension,
                           dtype=int)
+        self.d = float(step_size)
+
         if shape is 'rectangular':
             self.size = int(self.n.prod())
         else:
             print('ERROR - unsupported Grid shape')
             assert False
         self.shape = shape
-        self.d = float(step_size)
+
         if create_grid:
             self.create_grid()
         else:
             self.G = np.zeros((0,), dtype=int)
+
+        if multiplicator is not 1:
+            self.change_multiplicator(multiplicator)
+
         self.check_integrity()
         return
 
@@ -90,9 +112,52 @@ class Grid:
         self.G = grid.reshape(grid_size)
         return
 
+    # Todo move this into a property
+    def change_multiplicator(self,
+                             new_multi):
+        # Centering can cause conflicts with the multiplicator
+        if self.is_centered:
+            self.revert_center()
+            self.change_multiplicator(new_multi)
+            self.center()
+            return
+
+        assert type(new_multi) is int, 'Unexpceted type of ' \
+                                       'multiplicator: {}' \
+                                       ''.format(type(new_multi))
+        assert new_multi > 1, 'Multiplicator mus be positive:' \
+                              'submitted Value: {}' \
+                              ''.format(new_multi)
+        assert (self.G % self.multi == 0).all, 'The current Grid is not ' \
+                                               'a multiple of its multi.' \
+                                               'This should not be possible!'
+        self.G //= self.multi
+        self.d *= self.multi
+        self.G *= new_multi
+        self.d /= new_multi
+        self.multi = new_multi
+        return
+
     def center(self):
-        self.G = 2*self.G - (self.n-1)
-        self.d *= 0.5
+        if self.is_centered:
+            return
+        alternation = self.multi*(self.n - 1)
+        self.change_multiplicator(2*self.multi)
+        self.G -= alternation
+        self.is_centered = True
+        return
+
+    def revert_center(self):
+        if not self.is_centered:
+            return
+        assert self.multi % 2 is 0, 'A centered grid should have an even' \
+                                    ' multiplicator. ' \
+                                    'The current multiplicator is {}' \
+                                    ''. format(self.multi)
+        alternation = (self.multi // 2) * (self.n - 1)
+        self.G += alternation
+        self.is_centered = False
+        self.change_multiplicator(self.multi // 2)
         return
 
     @staticmethod
@@ -131,6 +196,12 @@ class Grid:
             assert self.n.prod() == self.size
         assert self.G.dtype == int
         assert self.G.shape == (self.size, self.dim)
+        assert type(self.multi) is int
+        assert self.multi >= 1
+        assert (self.G % self.multi == 0).all
+        assert type(self.is_centered) is bool
+        if self.is_centered:
+            assert self.multi % 2 is 0
         return
 
     def print(self,
@@ -140,7 +211,10 @@ class Grid:
         print("Number of Total Grid Points = {}".format(self.size))
         if self.dim is not 1:
             print("Grid Points per Dimension = {}".format(self.n))
-        print("Step Size = {}".format(self.d))
+        print("Step Size = {}".format(self.d * self.multi))
+        if self.multi is not 1:
+            print("Multiplicator = {}".format(self.multi))
+        print('Is centered Grid = {}'.format(self.is_centered))
         print("Boundaries:\n{}".format(Grid.get_boundaries(self.G, self.d)))
         if physical_grids:
             print('Physical Grid:')
