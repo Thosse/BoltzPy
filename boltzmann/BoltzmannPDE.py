@@ -1,6 +1,6 @@
 import boltzmann.configuration.configuration as b_cnf
 import boltzmann.initialization.initialization as b_ini
-# import boltzmann.configuration.calculation as b_clc
+import boltzmann.calculation.calculation as b_clc
 # import boltzmann.configuration.animation as b_ani
 
 
@@ -66,8 +66,14 @@ class BoltzmannPDE:
     init : :class:`~boltzmann.initialization.Initialization`
     """
     def __init__(self):
-        self.config = b_cnf.Configuration()
-        self.init = b_ini.Initialization(self.config)
+        self.cnf = b_cnf.Configuration()
+        self.ini = b_ini.Initialization(self.cnf)
+        # Todo Fix Initialization troubles (lots of check_integrity Errors)
+        # self.clc = b_clc.Calculation(self.cnf, self.ini)
 
     def begin_initialization(self):
-        self.init = b_ini.Initialization(self.config)
+        self.ini = b_ini.Initialization(self.cnf)
+        return
+
+    # def begin_calculation(self, moments):
+    #     self.clc = b_clc.Calculation(self.cnf, self.ini, moments)

@@ -77,6 +77,14 @@ class OutputFunction:
             f_arr.append(f)
         return f_arr
 
+    def apply(self, psv):
+        shape = (len(self.f_arr), self.cnf.p.size, self.cnf.s.n)
+        result = np.zeros(shape, dtype=float)
+        for (i_f, f) in enumerate(self.f_arr):
+            result[i_f, ...] = f(psv)
+        # Todo Add write to file routine here
+        return result
+
     def get_f_mass(self):
         p_shape = (self.cnf.p.size,)
         s_n = self.cnf.s.n
@@ -85,9 +93,8 @@ class OutputFunction:
         def f_mass(psv):
             mass = np.zeros(shape, dtype=float)
             for i_s in range(s_n):
-                beg = self.cnf.sv.index[i_s]
-                end = self.cnf.sv.index[i_s + 1]
-                # calculate sum over velocity grid (last axis)
+                [beg, end] = self.cnf.sv.index[i_s: i_s+2]
+                # mass = sum over velocity grid of specimen (last axis)
                 mass[..., i_s] = np.sum(psv[..., beg:end], axis=-1)
             return mass
 

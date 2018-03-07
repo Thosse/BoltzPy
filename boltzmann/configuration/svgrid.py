@@ -82,7 +82,7 @@ class SVGrid:
         self.n = np.zeros(shape=(0, 0), dtype=int)
         self.size = np.zeros(shape=(0,), dtype=int)
         self.index = np.zeros(shape=(0,), dtype=int)
-        self.G = np.zeros((0,), dtype=int)
+        self.G = np.zeros((0, self.dim), dtype=int)
         self.multi = 1
         self.is_centered = False
         self.offset = np.zeros((self.dim,), dtype=float)
@@ -172,6 +172,17 @@ class SVGrid:
         self.is_centered = True
         return
 
+    # Todo This should be a property
+    def get_max_v(self):
+        max_v = 0.0
+        s_n = self.size.size
+        for s in range(s_n):
+            [beg, end] = self.index[s:s+2]
+            v_arr = (self.G[beg:end] * self.d[s] + self.offset).flatten()
+            new_max_v = np.max(np.absolute(v_arr))
+            max_v = max(max_v, new_max_v)
+        return max_v
+
     #####################################
     #               Indexing            #
     #####################################
@@ -244,6 +255,12 @@ class SVGrid:
         assert self.G.shape == (self.index[-1], self.dim)
         assert self.offset.dtype == float
         assert self.offset.shape == (self.dim,)
+        assert type(self.multi) is int
+        assert self.multi >= 1
+        assert (self.G % self.multi == 0).all
+        assert type(self.is_centered) is bool
+        if self.is_centered:
+            assert self.multi % 2 is 0
         return
 
     def print(self,

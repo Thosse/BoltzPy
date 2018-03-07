@@ -18,9 +18,10 @@ class Configuration:
     * generates Collisions (list and weights)
 
     .. todo::
+        - add moments attribute and attributes for integration parameters
+          (dictionary?)
         - add proper file_name initialization/property
-        - add documentation: d is actually halved in v and sv
-          due to integer representation (so far dv is multiples of 2)
+        - for grid and svgrid -> check print funtion for multi - attribute
         - Add Attributes:
           * Calculations_per_Frame
           * Collisions_per_Calculation

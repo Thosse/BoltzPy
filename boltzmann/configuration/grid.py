@@ -50,7 +50,7 @@ class Grid:
         self.size = 0
         self.d = 0.0
         self.shape = ''
-        self.G = np.zeros((0,), dtype=int)
+        self.G = np.zeros(shape=(self.size, self.dim), dtype=int)
         self.multi = 1
         self.is_centered = False
 
