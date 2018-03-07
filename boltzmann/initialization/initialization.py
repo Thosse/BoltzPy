@@ -186,7 +186,7 @@ class Initialization:
         to the ones specified in the respective
         :attr:`~Initialization.rules`.
         Note that the rule is applied on all P-Grid points p, such that
-        p_min[i_p] <= p[i_p] <= p_max[i_p]
+        p_min[i_p] <= p[i_p] < p_max[i_p]
         Indices are in vector form (indexing a non-flattened P-Grid).
 
         Parameters
@@ -212,14 +212,14 @@ class Initialization:
         assert all(p_max <= self.config.p.n)
 
         if dim is 1:
-            self.p_flag[p_min:p_max+1] = index_rule
+            self.p_flag[p_min[0]:p_max[0]] = index_rule
         elif dim is 2:
-            self.p_flag[p_min[0]:p_max[0]+1,
-                        p_min[1]:p_max[1]+1] = index_rule
+            self.p_flag[p_min[0]:p_max[0],
+                        p_min[1]:p_max[1]] = index_rule
         elif dim is 3:
-            self.p_flag[p_min[0]:p_max[0]+1,
-                        p_min[1]:p_max[1]+1,
-                        p_min[2]:p_max[2]+1] = index_rule
+            self.p_flag[p_min[0]:p_max[0],
+                        p_min[1]:p_max[1],
+                        p_min[2]:p_max[2]] = index_rule
         return
 
     def create_psv_grid(self):
