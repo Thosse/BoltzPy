@@ -1,26 +1,7 @@
-from boltzmann.configuration import species as b_spc
-from boltzmann.configuration import svgrid as b_svg
 
 import numpy as np
-import math
+
 from time import time
-
-
-# Todo this can be optimized
-def get_close_int(float_array, precision=1e-6, dtype=int):
-    int_array = np.zeros(shape=float_array.shape,
-                         dtype=dtype)
-    for (i, real_number) in enumerate(float_array):
-        close_int = int(math.floor(real_number))
-        if math.fabs(close_int - real_number) < precision:
-            int_array[i] = close_int
-        elif math.fabs(close_int+1 - real_number) < precision:
-            int_array[i] = close_int+1
-        else:
-            assert False, "{}-th Number of the Array " \
-                          "is not close to an integer " \
-                          " ({})".format(i, real_number)
-    return int_array
 
 
 class Collisions:
@@ -28,7 +9,7 @@ class Collisions:
     Simple structure, that encapsulates collision data
 
     .. todo::
-        - **Add Stefans Generation-Scheme**
+        - **Add Stefan's Generation-Scheme**
         - can both the transport and the collisions
           be implemented as interpolations? -> GPU Speed-Up
         - How to sort the arrays for maximum efficiency?
@@ -40,76 +21,78 @@ class Collisions:
           which only contains possible values
         - Check if its faster to switch v[0, 1] and v[1, 0]?
         - @generate: replace for loops by numpy.apply_along_axis
-          (this probably needs several additional functions)
+          (this probably needs several additional functions).
+    """
+    def __init__(self, cnf):
+        self._i_arr = np.array([], dtype=int)
+        self._weight = np.array([], dtype=float)
+        self._n = 0
+        self._cnf = cnf
+        return
 
-    Attributes
-    ----------
-    i_arr : np.ndarray
+    @property
+    def i_arr(self):
+        """:obj:`~numpy.ndarray` of :obj:`int`:
         Describes each collision by the 4 indices
         of the colliding velocities.
-        Integer-Array of shape=(n, 4).
-    weight : np.ndarray
-        Denotes Integration weight of each collision.
-        Float-Array of shape=(n,)
-    n : int
-        Total number of Collisions.
-    scheme : str
-        Denotes by which scheme the collisions ware generated
+        Array of shape
+        (:attr:`~boltzmann.configuration.Collisions.n`, 4).
+        """
+        return self._i_arr
 
-       """
-    SELECTION_SCHEMES = ['complete']
+    @property
+    def weight(self):
+        """:obj:`~numpy.ndarray` of :obj:`float`:
+        Integration weight of each collision.
+        Array of shape=(:attr:`~boltzmann.configuration.Collisions.n`,)
+        """
+        return self._weight
 
-    def __init__(self):
-        self.i_arr = np.array([], dtype=int)
-        self.weight = np.array([], dtype=float)
-        self.n = 0
-        self.scheme = ''
+    @property
+    def n(self):
+        """:obj:`int`: Total number of Collisions."""
+        return self._n
 
-    def generate_collisions(self,
-                            species,
-                            sv_grid):
-        assert self.scheme in Collisions.SELECTION_SCHEMES
-        assert type(species) is b_spc.Species
-        assert type(sv_grid) is b_svg.SVGrid
+    @property
+    def cnf(self):
+        """:obj:`~boltzmann.configuration.Configuration`:
+        Points at the Configuration"""
+        return self._cnf
 
+    def generate_collisions(self):
+        """Generate the Collisions based on the specified Selection Scheme"""
         gen_col_time = time()
-        if self.scheme is 'complete':
-            if sv_grid.shape is not 'rectangular':
+        if self.cnf.collision_selection_scheme is 'Complete':
+            if self.cnf.sv.form is not 'rectangular':
                 print('Currently only supports rectangular grids!')
                 assert False
-            self._generate_collisions_complete(species, sv_grid)
+            self._generate_collisions_complete()
         else:
             print('ERROR - Unspecified Collision Scheme')
             assert False
-
         print("Generation of Collision list - Done\n"
               "Total Number of Collisions = {}\n"
               "Time taken =  {} seconds"
               "".format(self.n, round(time() - gen_col_time, 3)))
         return
 
-    def _generate_collisions_complete(self,
-                                      species,
-                                      sv):
-        """Generate all possible, non-useless collisions.
-
-        Parameters
-        ----------
-        species : :class:`~boltzmann.configuration.Species`
-            Data about all Specimen.
-        sv : :class:`~boltzmann.configuration.SVGrid`
-            Velocity-Grids and related data of all Specimen.
-
-        """
-        assert self.scheme is 'complete'
+    # noinspection PyAssignmentToLoopOrWithParameter
+    def _generate_collisions_complete(self):
+        """Generate all possible, non-useless collisions."""
+        assert self.cnf.collision_selection_scheme is 'Complete'
+        # collect collisions in these lists
         i_arr = []
         weight = []
 
-        # Each collision is an array of 4 Velocitiy-Indices
+        # Abbreviations
+        species = self.cnf.s
+        sv = self.cnf.sv
+
+        # Each collision is an array of 4 Velocity-Indices
         # Ordered as: [[v_pre_s0, v_post_s0],
         #              [v_pre_s1, v_post_s1]]
         v = np.zeros((2, 2), dtype=int)
-        # physical velocities (in mutliples of d[s])
+        # physical velocities (in multiples of d[s])
         # indexed as in v:  pv[i, j] = sv.G[ v[i, j] ]
         pv = np.zeros((2, 2, sv.dim), dtype=int)
 
@@ -126,8 +109,6 @@ class Collisions:
         for s[0] in range(species.n):
             m[0] = species.mass[s[0]]
             d[0] = sv.d[s[0]]
-            slc[0] = sv.index[s[0]:s[0] + 2]
-            # noinspection PyAssignmentToLoopOrWithParameter
             for s[1] in range(s[0], species.n):
                 m[1] = species.mass[s[1]]
                 d[1] = sv.d[s[1]]
@@ -136,15 +117,13 @@ class Collisions:
                 for v[0, 0] in range(slc[0, 0], slc[0, 1]):
                     pv[0, 0] = sv.G[v[0, 0]]
                     # v[0, 1] = v_post_s0
-                    # noinspection PyAssignmentToLoopOrWithParameter
                     for v[0, 1] in range(v[0, 0]+1, slc[0, 1]):
                         # due to range, ignores v=(a,a,X,X) (no effect)
                         pv[0, 1] = sv.G[v[0, 1]]
-                        # Velocity difference (dimensional, mutliples of d[1])
+                        # Velocity difference (dimensional, multiples of d[1])
                         # dpv_1 = - dpv_0 = pv[0, 0] - pv[0, 1]
                         dpv_1 = pv[0, 0] - pv[0, 1]
                         # v[1, 0] = v_pre_s1
-                        # noinspection PyAssignmentToLoopOrWithParameter
                         for v[1, 0] in range(slc[1, 0], slc[1, 1]):
                             pv[1, 0] = sv.G[v[1, 0]]
                             # Calculate
@@ -155,21 +134,21 @@ class Collisions:
                                 v[1, 1] = _v11
                             else:
                                 continue
-                            # Check if v fullfills all conditions
-                            if not self.is_collision(d, v, pv):
+                            # Check if v fulfills all conditions
+                            if not self._is_collision(d, v, pv):
                                 continue
                             # Collision is accepted -> Add to List
                             i_arr.append(v.flatten())
                             weight.append(1)
         assert len(i_arr) == len(weight)
-        self.i_arr = np.array(i_arr, dtype=int)
-        self.weight = np.array(weight, dtype=float)
-        self.n = self.i_arr.shape[0]
+        self._i_arr = np.array(i_arr, dtype=int)
+        self._weight = np.array(weight, dtype=float)
+        self._n = self.i_arr.shape[0]
         return
 
     @staticmethod
-    def is_collision(d, v, pv):
-        """Check whether the Collision Candidate fullfills all necessary
+    def _is_collision(d, v, pv):
+        """Check whether the Collision Candidate fulfills all necessary
         Conditions.
 
         Parameters
@@ -187,7 +166,7 @@ class Collisions:
         Returns
         -------
         bool
-            True if collision fullfills all conditions, False otherwise.
+            True if collision fulfills all conditions, False otherwise.
         """
         # Ignore v=(X,b,b,X) (only for s[0]=s[1], has no effect)
         if v[0, 1] == v[1, 0]:
@@ -195,16 +174,16 @@ class Collisions:
         # Ignore Collisions with no initial velocity difference
         elif np.allclose(pv[0, 0] * d[0], pv[1, 0] * d[1]):
             return False
-        # Ignore Collisions not fullflling law of conservation of energy
-        elif not Collisions.meets_energy_conservation(d, pv):
+        # Ignore Collisions not fulfilling law of conservation of energy
+        elif not Collisions._meets_energy_conservation(d, pv):
             return False
         # Accept this Collision
         else:
             return True
 
     @staticmethod
-    def meets_energy_conservation(d, pv):
-        """Checks if the collision denoted by v fullfills energy conservation.:
+    def _meets_energy_conservation(d, pv):
+        """Checks if the collision denoted by v fulfills energy conservation.:
 
         Parameters
         ----------
@@ -216,7 +195,7 @@ class Collisions:
         Returns
         -------
         bool
-            True if collision fullfills energy conservation law,
+            True if collision fulfills energy conservation law,
             False otherwise.
         """
         # TODO Add nicely to Docstring

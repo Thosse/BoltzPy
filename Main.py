@@ -15,7 +15,7 @@ B.cnf.configure_velocity_space(dimension=2,
                                grid_points_x_axis=5,
                                max_v=2.0)
 B.cnf.print(True)
-B.cnf.configure_collisions('complete')
+B.cnf.setup_collisions()
 B.begin_initialization()
 B.ini.add_rule('Inner_Point',
                [1, 2],

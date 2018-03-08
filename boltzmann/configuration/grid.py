@@ -1,8 +1,9 @@
+
 import numpy as np
 
 
 class Grid:
-    """Basic class for Positional-, and Time-Grids.
+    """Basic class for Positional-Space or Time-Space Grids.
 
     .. todo::
         - Todo Add unit tests
@@ -11,155 +12,87 @@ class Grid:
         - Enable non-uniform/adaptive Grids
           (see :class:`~boltzmann.calculation.Calculation`)
 
-    Attributes
-    ----------
-    dim : int
-        Grid dimensionality.
-    d : float
-        Step size of the grid.
-    n : np.ndarray(int)
-        Number of grid points per dimension.
-        Array of shape=(dim,) and dType=int.
-    size : int
-        Total number of grid points.
-    G : np.ndarray(float)
-        The physical grid.
-        G[i] denotes the physical coordinates of the i-th grid point.
-        Array of shape(size, dim) and dtype=fType.
-    shape : str
-        Geometric shape of Grid.
-         Can only be rectangular so far.
-    multi : int
-        Multiplicator, that determines the ratio of
-        'actual step size' / :attr:`~boltzmann.configuration.Grid.d`.
-        In several cases the Entries in G are multiplied by
-        :attr:`~boltzmann.configuration.Grid.multi`
-        and :attr:`~boltzmann.configuration.Grid.d` are divided by
-        :attr:`~boltzmann.configuration.Grid.multi`.
-        This does not change the physical Values, but enables a variety
-         of features( Currently: several calculation steps per write,
-         simple centralizing ov velocity grids)
-    is_centered : bool
-        True if Grid has been centered, False otherwise.
     """
-    GRID_SHAPES = ['rectangular']
+    # Todo move into config property
+    GRID_FORMS = ['rectangular']
 
     def __init__(self):
-        self.dim = 0
-        self.n = np.zeros(shape=(self.dim,), dtype=int)
-        self.size = 0
-        self.d = 0.0
-        self.shape = ''
-        self.G = np.zeros(shape=(self.size, self.dim), dtype=int)
-        self.multi = 1
-        self.is_centered = False
+        self._dim = 0
+        self._n = np.zeros(shape=(self.dim,), dtype=int)
+        self._size = 0
+        self._d = 0.0
+        self._form = ''
+        self._G = np.zeros(shape=(self.size, self.dim), dtype=int)
+        self._multi = 1
+        self._flag_is_centered = False
 
-    def setup(self,
-              dimension,
-              number_of_points_per_dimension,
-              step_size,
-              shape='rectangular',
-              create_grid=True,
-              multiplicator=1,):
-        self.dim = dimension
-        self.n = np.array(number_of_points_per_dimension,
-                          dtype=int)
-        self.d = float(step_size)
+    @property
+    def dim(self):
+        """:obj:`int`: Grid dimensionality"""
+        return self._dim
 
-        if shape is 'rectangular':
-            self.size = int(self.n.prod())
-        else:
-            print('ERROR - unsupported Grid shape')
-            assert False
-        self.shape = shape
+    @property
+    def n(self):
+        """:obj:`array` of :obj:`int`:
+        Number of grid points per dimension.
+        Array of shape=(dim,)."""
+        return self._n
 
-        if create_grid:
-            self.create_grid()
-        else:
-            self.G = np.zeros((0,), dtype=int)
+    @property
+    def size(self):
+        """:obj:`int`:
+        Total number of grid elements."""
+        return self._size
 
-        if multiplicator is not 1:
-            self.change_multiplicator(multiplicator)
+    @property
+    def d(self):
+        """:obj:`float`:
+        Step size of the grid."""
+        return self._d
 
-        self.check_integrity()
-        return
+    @property
+    def form(self):
+        """:obj:`str`:
+        Geometric form of Grid.
 
-    def create_grid(self):
-        if self.shape is 'rectangular':
-            self._create_rectangular_grid()
-        else:
-            print("ERROR - Unspecified Grid Shape")
-            assert False
+        Can only be rectangular so far."""
+        return self._form
 
-    def _create_rectangular_grid(self):
-        assert self.shape == 'rectangular'
-        grid_size = (self.size, self.dim)
-        # Create list of 1D grids for each dimension
-        _list_of_1D_grids = [np.arange(0, self.n[i_d])
-                             for i_d in range(self.dim)]
-        # Create mesh grid from 1D grids
-        # Note that *[a,b,c] == a,b,c
-        _mesh_list = np.meshgrid(*_list_of_1D_grids)
-        grid = np.array(_mesh_list, dtype=int)
-        # bring meshgrid into desired order/structure
-        if self.dim is 2:
-            grid = np.array(grid.transpose((2, 1, 0)))
-        elif self.dim is 3:
-            grid = np.array(grid.transpose((2, 1, 3, 0)))
-        elif self.dim is not 1:
-            print("Error")
-            assert False
-        self.G = grid.reshape(grid_size)
-        return
+    # Todo edit docstring
+    @property
+    def G(self,):
+        """:obj:`~np.ndarray` of :obj:`int`:
+        The actual grid, given in multiples of
+        :attr:`d`.
 
-    # Todo move this into a property
-    def change_multiplicator(self,
-                             new_multi):
-        # Centering can cause conflicts with the multiplicator
-        if self.is_centered:
-            self.revert_center()
-            self.change_multiplicator(new_multi)
-            self.center()
-            return
+        G[i] denotes the physical coordinates of the i-th grid point.
+        Array of shape(size, dim) and dtype=fType."""
+        return self._G
 
-        assert type(new_multi) is int, 'Unexpceted type of ' \
-                                       'multiplicator: {}' \
-                                       ''.format(type(new_multi))
-        assert new_multi > 1, 'Multiplicator mus be positive:' \
-                              'submitted Value: {}' \
-                              ''.format(new_multi)
-        assert (self.G % self.multi == 0).all, 'The current Grid is not ' \
-                                               'a multiple of its multi.' \
-                                               'This should not be possible!'
-        self.G //= self.multi
-        self.d *= self.multi
-        self.G *= new_multi
-        self.d /= new_multi
-        self.multi = new_multi
-        return
+    # Todo edit docstring
+    @property
+    def multi(self, ):
+        """:obj:`int`:
+        Multiplicator, that determines the ratio of
+        'actual step size' / :attr:`d`.
+        In several cases the Entries in G are multiplied by
+        :attr:`multi`
+        and :attr:`d` are divided by
+        :attr:`multi`.
+        This does not change the physical Values, but enables a variety
+        of features( Currently: several calculation steps per write,
+        simple centralizing ov velocity grids)"""
+        return self._multi
 
-    def center(self):
-        if self.is_centered:
-            return
-        alternation = self.multi*(self.n - 1)
-        self.change_multiplicator(2*self.multi)
-        self.G -= alternation
-        self.is_centered = True
-        return
+    @property
+    def is_centered(self, ):
+        """:obj:`bool`:
+        True if Grid has been centered
+        (i.e. :meth:`center` was called).
+        False otherwise."""
+        return self._flag_is_centered
 
-    def revert_center(self):
-        if not self.is_centered:
-            return
-        assert self.multi % 2 is 0, 'A centered grid should have an even' \
-                                    ' multiplicator. ' \
-                                    'The current multiplicator is {}' \
-                                    ''. format(self.multi)
-        alternation = (self.multi // 2) * (self.n - 1)
-        self.G += alternation
-        self.is_centered = False
-        self.change_multiplicator(self.multi // 2)
-        return
-
+    # Todo make Property out of this!
     @staticmethod
     def get_boundaries(grid, d):
         # Workaround for (X,)-shapes
@@ -178,9 +111,137 @@ class Grid:
         return bound
 
     #####################################
+    #           Configuration           #
+    #####################################
+    def setup(self,
+              dimension,
+              number_of_points_per_dimension,
+              step_size,
+              form='rectangular',
+              create_grid=True,
+              multi=1):
+        self._dim = dimension
+        self._n = np.array(number_of_points_per_dimension,
+                           dtype=int)
+        self._d = float(step_size)
+
+        if form is 'rectangular':
+            self._size = int(self.n.prod())
+        else:
+            print('ERROR - unsupported Grid shape')
+            # Todo throw exception
+            assert False
+        self._form = form
+
+        if create_grid:
+            self._create_grid()
+        else:
+            self._G = np.zeros((0,), dtype=int)
+
+        if multi is not 1:
+            self.change_multiplicator(multi)
+
+        self.check_integrity()
+        return
+
+    def _create_grid(self):
+        """Create Grid, based on :attr:`form`"""
+        if self.form is 'rectangular':
+            self._create_rectangular_grid()
+        else:
+            print("ERROR - Unspecified Grid Shape")
+            assert False
+
+    def _create_rectangular_grid(self):
+        assert self.form == 'rectangular'
+        grid_shape = (self.size, self.dim)
+        # Create list of 1D grids for each dimension
+        list_of_1D_grids = [np.arange(0, self.n[i_d])
+                            for i_d in range(self.dim)]
+        # Create mesh grid from 1D grids
+        # Note that *[a,b,c] == a,b,c
+        mesh_list = np.meshgrid(*list_of_1D_grids)
+        grid = np.array(mesh_list, dtype=int)
+        # bring meshgrid into desired order/structure
+        if self.dim is 2:
+            grid = np.array(grid.transpose((2, 1, 0)))
+        elif self.dim is 3:
+            grid = np.array(grid.transpose((2, 1, 3, 0)))
+        elif self.dim is not 1:
+            print("Error - Unsupported Grid dimension: "
+                  "{}".format(self.dim))
+            # Todo throw exception
+            assert False
+        self._G = grid.reshape(grid_shape)
+        return
+
+    # Todo edit behavior, check need to revert center
+    # Todo doubling or halving should be doable without revert center + center
+    def change_multiplicator(self,
+                             new_multi):
+        assert type(new_multi) is int, 'Unexpected type of ' \
+                                       'multiplicator: {}' \
+                                       ''.format(type(new_multi))
+        assert new_multi > 1, 'Multiplicator mus be positive:' \
+                              'submitted Value: {}' \
+                              ''.format(new_multi)
+
+        # Centering can cause conflicts with the multiplicator
+        if self.is_centered:
+            self.revert_center()
+            self.change_multiplicator(new_multi)
+            self.center()
+            return
+        else:
+            assert (self.G % self.multi == 0).all, 'The current, uncentered ' \
+                                                   'Grid is not ' \
+                                                   'a multiple of its multi.'
+        self._G //= self.multi
+        self._d *= self.multi
+        self._G *= new_multi
+        self._d /= new_multi
+        self._multi = new_multi
+        return
+
+    def center(self):
+        """Center the Grid
+        (:attr:`G`)
+        around zero.
+        """
+        # Todo only increase multiplier, if necessary
+        if self.is_centered:
+            return
+        alternation = self.multi*(self.n - 1)
+        self.change_multiplicator(2*self.multi)
+        self._G -= alternation
+        self._flag_is_centered = True
+        return
+
+    def revert_center(self):
+        if not self.is_centered:
+            return
+        assert self.multi % 2 is 0, 'A centered grid should have an even' \
+                                    ' multiplicator. ' \
+                                    'The current multiplicator is {}' \
+                                    ''. format(self.multi)
+        alternation = (self.multi // 2) * (self.n - 1)
+        self._G += alternation
+        self._flag_is_centered = False
+        self.change_multiplicator(self.multi // 2)
+        return
+
+    def reshape(self, shape):
+        """Changes the shape of the Grid
+        (:attr:`G`).
+        """
+        self._G = self._G.reshape(shape)
+        return
+
+    #####################################
     #           Verification            #
     #####################################
     def check_integrity(self):
+        """Sanity Check"""
         assert type(self.dim) is int
         assert self.dim in [1, 2, 3]
         assert type(self.d) is float
@@ -191,8 +252,8 @@ class Grid:
         assert all(self.n >= 2)
         assert type(self.size) is int
         assert self.size >= 2
-        assert self.shape in Grid.GRID_SHAPES
-        if self.shape is 'rectangular':
+        assert self.form in Grid.GRID_FORMS
+        if self.form is 'rectangular':
             assert self.n.prod() == self.size
         assert self.G.dtype == int
         assert self.G.shape == (self.size, self.dim)
@@ -206,8 +267,9 @@ class Grid:
 
     def print(self,
               physical_grids=False):
+        """Prints all Properties for Debugging Purposes"""
         print("Dimension = {}".format(self.dim))
-        print("Shape = {}".format(self.shape))
+        print("Geometric Form = {}".format(self.form))
         print("Number of Total Grid Points = {}".format(self.size))
         if self.dim is not 1:
             print("Grid Points per Dimension = {}".format(self.n))

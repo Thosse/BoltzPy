@@ -26,6 +26,7 @@ class SVGrid:
           (grid boundaries/step_size can be chosen to fit in grids,
           based on the least common multiple,...)
         - For each S, self.n[S, :] should all be equal values. Reduce this?
+        - implement base-class for multi-grid, where grid is multiGrid of dim=1
 
     Attributes
     ----------
@@ -53,7 +54,7 @@ class SVGrid:
         Note that some V-Grid-points occur several times,
         for different specimen.
         Array of shape(index[-1], dim).
-    shape : str
+    form : str
         Geometric shape of all Velocity-Grids. Equal to all Specimen.
         Can only be rectangular so far.
     offset : array(float)
@@ -77,7 +78,7 @@ class SVGrid:
     """
     def __init__(self):
         self.dim = 0
-        self.shape = ''
+        self.form = ''
         self.d = np.zeros(shape=(0,), dtype=float)
         self.n = np.zeros(shape=(0, 0), dtype=int)
         self.size = np.zeros(shape=(0,), dtype=int)
@@ -98,7 +99,7 @@ class SVGrid:
         assert type(species) is b_spc.Species
         assert type(velocity_grid) is b_grd.Grid
         self.dim = velocity_grid.dim
-        self.shape = velocity_grid.shape
+        self.form = velocity_grid.form
         # set offset
         # Todo put into seperate method?
         if offset is None:
@@ -137,7 +138,7 @@ class SVGrid:
                 for _d in range(0, self.dim):
                     if self.n[_s, _d] % 2 == 0:
                         self.n[_s, _d] -= 1
-            if self.shape is 'rectangular':
+            if self.form is 'rectangular':
                 self.size = self.n.prod(axis=1)
             else:
                 print("ERROR - Unspecified Grid Shape")
@@ -164,7 +165,7 @@ class SVGrid:
             _v.setup(self.dim,
                      self.n[_s],
                      self.d[_s],
-                     shape=self.shape)
+                     form=self.form)
             _v.center()
             self.d[_s] = _v.d
             self.G[self.index[_s]:self.index[_s+1], :] = _v.G[:]
@@ -197,7 +198,7 @@ class SVGrid:
         Secondly, we counter-check if the indexed value matches the given
         value.
         If this is true, we return the index,
-        otherweise we return None.
+        otherwise we return None.
 
         Parameters
         ----------
@@ -228,6 +229,7 @@ class SVGrid:
     #####################################
     #           Verification            #
     #####################################
+
     def check_integrity(self):
         s_n = self.d.shape[0]
         assert type(self.dim) is int
@@ -247,8 +249,8 @@ class SVGrid:
         assert self.index.shape == (s_n+1,)
         assert np.array_equal(self.index[0:-1] + self.size,
                               self.index[1:])
-        assert self.shape in b_grd.Grid.GRID_SHAPES
-        if self.shape is 'rectangular':
+        assert self.form in b_grd.Grid.GRID_FORMS
+        if self.form is 'rectangular':
             for _s in range(s_n):
                 assert self.n[_s].prod() == self.size[_s]
         assert self.G.dtype == int
@@ -267,7 +269,7 @@ class SVGrid:
               physical_grid=False):
         print("Dimension = {}".format(self.dim))
         print("Index-Array = {}".format(self.index))
-        print("Shape = {}".format(self.shape))
+        print("Shape = {}".format(self.form))
         print("Multiplicator = {}".format(self.multi))
         print('Is centered Grid = {}'.format(self.is_centered))
         print("Offset = {}".format(self.offset))

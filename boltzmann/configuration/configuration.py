@@ -3,7 +3,6 @@ from . import grid as b_grd
 from . import svgrid as b_svg
 from . import collisions as b_col
 
-
 import numpy as np
 
 
@@ -21,46 +20,103 @@ class Configuration:
         - add moments attribute and attributes for integration parameters
           (dictionary?)
         - add proper file_name initialization/property
-        - for grid and svgrid -> check print funtion for multi - attribute
+        - for Grid and SVGrid -> check print function for multi - attribute
         - Add Attributes:
           * Calculations_per_Frame
           * Collisions_per_Calculation
         - link Species and SVGrid somehow
           -> adding Species, after setting up SVGrid
           should delete SVGrid or at least update it
+
+          * Idea: each class has an is_set_up flag
+          * after any change -> check flags of depending classes
+          * main classes need to be linked for that!
+
         - Add Plotting-function to grids
         - Where to specify integration order?
 
     Attributes
     ----------
-    s : Species
+    s : :class:`~boltzmann.configuration.Species`
         Contains all data about the simulated specimen.
-    t : Grid
+    t : :class:`~boltzmann.configuration.Grid`
         Contains all data about simulation time and time step size.
         :attr:`~boltzmann.configuration.Configuration.t.G`
         denotes the times at which the results are written out to HDD.
-    p : Grid
+    p : :class:`~boltzmann.configuration.Grid`
         Contains all data about Position-Space.
-    sv : SVGrid
+    sv : :class:`~boltzmann.configuration.SVGrid`
         Contains all data about the Velocity-Space of each Specimen.
         V-Spaces of distinct Specimen differ in step size
         and number of grid points.
         Maximum physical values may differ slightly between specimen.
-    cols : Collisions
+    cols : :class:`~boltzmann.configuration.Collisions`
         Describes the collisions on the SV-Grid.
-    file_name : str
+    file_name : :obj:`str`
+    file_path : :obj:`str`
     """
 
     def __init__(self):
         # Empty Initialization here
-        # remaining Attributes are set up separately
+        # Most Attributes are set up separately
+        self._animated_moments = ['Mass']
+        self._collision_selection_scheme = 'Complete'
         self.s = b_spc.Species()
-        self.t = b_grd.Grid()
         self.t = b_grd.Grid()
         self.p = b_grd.Grid()
         self.sv = b_svg.SVGrid()
-        self.cols = b_col.Collisions()
-        self.file_name = 'default'
+        self.cols = b_col.Collisions(self)
+        # Todo Add these Attributes properly
+        # self.file_name = 'default'
+        # self.file_path = ''
+
+        return
+
+    @property
+    def supported_output(self):
+        """Set of all currently supported moments."""
+        supported_output = {'Mass',
+                            'Mass_Flow',
+                            'Momentum',
+                            'Momentum_Flow',
+                            'Energy',
+                            'Energy_Flow'}
+        return supported_output
+
+    @property
+    def supported_selection_schemes(self):
+        """Set of all currently supported collision selection schemes."""
+        supported_selection_schemes = {'Complete'}
+        return supported_selection_schemes
+
+    # Todo use np.array -> make use of shape property?
+    @property
+    def animated_moments(self):
+        """:obj:`list` of :obj:`str`:
+        List of the Moments to be stored and animated"""
+        return self._animated_moments
+
+    @animated_moments.setter
+    def animated_moments(self, list_of_moments):
+        if any([mom not in self.supported_output
+                for mom in list_of_moments]):
+            # Todo throw exception
+            assert False
+        self._animated_moments = list_of_moments
+        return
+
+    @property
+    def collision_selection_scheme(self):
+        """:obj:`str`:
+        Selection Scheme for Collisions"""
+        return self._collision_selection_scheme
+
+    @collision_selection_scheme.setter
+    def collision_selection_scheme(self, scheme):
+        if scheme not in self.supported_selection_schemes:
+            # Todo throw exception
+            assert False
+        self._collision_selection_scheme = scheme
         return
 
     #####################################
@@ -84,9 +140,8 @@ class Configuration:
         self.t.setup(1,
                      [number_time_steps],
                      step_size,
-                     shape='rectangular',
-                     multiplicator=calculations_per_time_step)
-        self.t.G = self.t.G.reshape((self.t.n[-1],))
+                     multi=calculations_per_time_step)
+        self.t.reshape((self.t.size,))
         return
 
     def configure_position_space(self,
@@ -95,8 +150,7 @@ class Configuration:
                                  step_size):
         self.p.setup(dimension,
                      list_number_of_points_per_dimension,
-                     step_size,
-                     'rectangular')
+                     step_size, )
         return
 
     def configure_velocity_space(self,
@@ -117,14 +171,17 @@ class Configuration:
                       offset)
         return
 
-    def configure_collisions(self, selection_scheme):
-        assert selection_scheme in b_col.Collisions.SELECTION_SCHEMES
-        self.cols.scheme = selection_scheme
-        self.cols.generate_collisions(self.s,
-                                      self.sv)
+    def setup_collisions(self):
+        self.cols.scheme = self.collision_selection_scheme
+        self.cols.generate_collisions()
         return
 
+    #####################################
+    #            Verification           #
+    #####################################
+
     def check_integrity(self):
+        """Sanity Check"""
         self.s.check_integrity()
         assert self.s.mass.dtype == np.float64
         assert self.s.alpha.dtype == np.float64
@@ -143,8 +200,9 @@ class Configuration:
 
     def print(self,
               physical_grids=False):
+        """Prints all Properties for Debugging Purposes"""
         print('========CONFIGURATION========')
-        print('Configuration Name: ' + self.file_name)
+        print('Configuration Name: ')  # Todo + self.file_name)
         print('Specimen:')
         print('---------')
         self.s.print()
