@@ -8,20 +8,20 @@ class Species:
     ----------
     n : int
         Denotes total number of specimen.
-    mass : np.ndarray
+    mass : array(int)
         Describes relative (not physical!) mass of each specimen.
-        Array of shape (n,) and integer data type.
-    alpha : np.ndarray
+        Array of shape (n,).
+    alpha : array(float)
         Describes Probabilities of collision between 2 specimen..
-        Array of shape=(n, n) and dtype float.
-    names : np.ndarray
+        Array of shape=(n, n).
+    names : list(str)
         Denotes Names of Specimen.
         Used in Animation
-        Array of shape (n,) and dtype str.
-    colors : np.ndarray
+        Array of shape (n,).
+    colors : list(str)
         Denotes Color of Specimen.
         Used in Animation
-        Array of shape (n,) and dtype str.
+        Array of shape (n,).
 
     """
     COLOR_LIST = ['blue',       'red',      'green',
