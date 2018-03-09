@@ -60,9 +60,9 @@ class Collisions:
         return self._cnf
 
     def generate_collisions(self):
-        """Generate the Collisions based on the specified Selection Scheme"""
+        """Generates the Collisions, based on the Selection Scheme"""
         gen_col_time = time()
-        if self.cnf.collision_selection_scheme is 'Complete':
+        if self.cnf.collision_selection_scheme == 'Complete':
             if self.cnf.sv.form is not 'rectangular':
                 print('Currently only supports rectangular grids!')
                 assert False
@@ -109,6 +109,7 @@ class Collisions:
         for s[0] in range(species.n):
             m[0] = species.mass[s[0]]
             d[0] = sv.d[s[0]]
+            slc[0] = sv.index[s[0]:s[0] + 2]
             for s[1] in range(s[0], species.n):
                 m[1] = species.mass[s[1]]
                 d[1] = sv.d[s[1]]
@@ -160,7 +161,7 @@ class Collisions:
             Indices of the colliding velocities in the SV-Grid.
             Array of shape=(2,2).
         pv : array(int)
-            Indices of the colliding velocities in the SV-Grid
+            Physical Velocities, as multiples of their respective step size d.
             Array of shape=(2,2, sv.dim).
 
         Returns
