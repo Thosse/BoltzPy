@@ -169,8 +169,8 @@ class Calculation:
         cal_time = time()
         # Todo revise the function -> write do HDD
         tmp_result = np.zeros(shape=(self._cnf.t.size,
-                                     self._cnf.p.size,
-                                     self._cnf.s.n),
+                                     self._cnf.s.n,
+                                     self._cnf.p.size),
                               dtype=float)
         for (i_write, t_write) in enumerate(self._t):
             while self.t_cur != t_write:

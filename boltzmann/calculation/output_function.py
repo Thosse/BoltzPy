@@ -82,7 +82,7 @@ class OutputFunction:
         n_mom = len(self._cnf.animated_moments)
         data_p_shape = data.shape[0:-1]
         n_specimen = self._cnf.s.n
-        shape = (n_mom,) + data_p_shape + (n_specimen,)
+        shape = (n_mom,) + (n_specimen,) + data_p_shape
         # shape == (len(self.f_arr), self._cnf.p.size, self._cnf.s.n)
         result = np.zeros(shape, dtype=float)
         for (i_f, f) in enumerate(self.f_arr):
@@ -93,7 +93,7 @@ class OutputFunction:
     def _get_f_mass(self):
         p_shape = (self._cnf.p.size,)
         s_n = self._cnf.s.n
-        shape = p_shape + (s_n,)
+        shape = (s_n,) + p_shape
 
         def f_mass(data):
             """Returns Mass Distribution of given data."""
@@ -101,6 +101,6 @@ class OutputFunction:
             for i_s in range(s_n):
                 [beg, end] = self._cnf.sv.index[i_s: i_s+2]
                 # mass = sum over velocity grid of specimen (last axis)
-                mass[..., i_s] = np.sum(data[..., beg:end], axis=-1)
+                mass[i_s, :] = np.sum(data[..., beg:end], axis=-1)
             return mass
         return f_mass
