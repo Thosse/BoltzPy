@@ -231,6 +231,7 @@ class SVGrid:
     #####################################
 
     def check_integrity(self):
+        """Sanity Check"""
         s_n = self.d.shape[0]
         assert type(self.dim) is int
         assert self.dim in [1, 2, 3]
@@ -267,6 +268,7 @@ class SVGrid:
 
     def print(self,
               physical_grid=False):
+        """Prints all Properties for Debugging Purposes"""
         print("Dimension = {}".format(self.dim))
         print("Index-Array = {}".format(self.index))
         print("Shape = {}".format(self.form))
