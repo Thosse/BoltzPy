@@ -9,12 +9,14 @@ class Collisions:
     Simple structure, that encapsulates collision data
 
     .. todo::
+        - check integrity (non neg weights,
+          no multiple occurrences, physical correctness)
+        - print method
         - **Add Stefan's Generation-Scheme**
         - can both the transport and the collisions
           be implemented as interpolations? -> GPU Speed-Up
         - How to sort the arrays for maximum efficiency?
-        - check integrity (non neg weights,
-          no multiple occurrences, physical correctness)
+
         - count collisions for each pair of specimen? Useful?
         - only for implemented index_difference:
           choose v[2] out of smaller grid
@@ -24,29 +26,38 @@ class Collisions:
           (this probably needs several additional functions).
     """
     def __init__(self, cnf):
-        self._i_arr = np.array([], dtype=int)
-        self._weight = np.array([], dtype=float)
+        self._collision_arr = np.array([], dtype=int)
+        self._weight_arr = np.array([], dtype=float)
         self._n = 0
         self._cnf = cnf
         return
 
     @property
-    def i_arr(self):
+    def collision_arr(self):
         """:obj:`~numpy.ndarray` of :obj:`int`:
-        Describes each collision by the 4 indices
-        of the colliding velocities.
-        Array of shape
-        (:attr:`~boltzmann.configuration.Collisions.n`, 4).
+        Array of all simulated collisions.
+
+        A collision :obj:`c` is described by the 4-tuple
+        :attr:`c_arr` [ :obj:`c`, :].
+        It is an array of 4 indices of the
+        :obj:`~boltzmann.configuration.SVGrid`,
+        ordered is as follows:
+
+            * :obj:`c_arr[c, 0]` = v_pre_collision of Specimen 1
+            * :obj:`c_arr[c, 1]` = v_post_collision of Specimen 1
+            * :obj:`c_arr[c, 2]` = v_pre_collision of Specimen 2
+            * :obj:`c_arr[c, 3]` = v_post_collision of Specimen 2
         """
-        return self._i_arr
+        return self._collision_arr
 
     @property
-    def weight(self):
+    def weight_arr(self):
         """:obj:`~numpy.ndarray` of :obj:`float`:
-        Integration weight of each collision.
+        Array of numeric integration weights
+        for each collision in c_arr.
         Array of shape=(:attr:`~boltzmann.configuration.Collisions.n`,)
         """
-        return self._weight
+        return self._weight_arr
 
     @property
     def n(self):
@@ -59,15 +70,18 @@ class Collisions:
         Points at the Configuration"""
         return self._cnf
 
-    def generate_collisions(self):
+    def setup(self):
         """Generates the Collisions, based on the Selection Scheme"""
         gen_col_time = time()
         if self.cnf.collision_selection_scheme == 'Complete':
-            if self.cnf.sv.form is not 'rectangular':
+            if self.cnf.sv.form is 'rectangular':
+                self._generate_collisions_complete()
+            else:
+                # Todo Throw exception
                 print('Currently only supports rectangular grids!')
                 assert False
-            self._generate_collisions_complete()
         else:
+            # Todo Throw exception
             print('ERROR - Unspecified Collision Scheme')
             assert False
         print("Generation of Collision list - Done\n"
@@ -76,13 +90,14 @@ class Collisions:
               "".format(self.n, round(time() - gen_col_time, 3)))
         return
 
+    # Todo Simplify - Looks horrible
     # noinspection PyAssignmentToLoopOrWithParameter
     def _generate_collisions_complete(self):
         """Generate all possible, non-useless collisions."""
         assert self.cnf.collision_selection_scheme is 'Complete'
         # collect collisions in these lists
-        i_arr = []
-        weight = []
+        col_arr = []
+        weight_arr = []
 
         # Abbreviations
         species = self.cnf.s
@@ -139,13 +154,24 @@ class Collisions:
                             if not self._is_collision(d, v, pv):
                                 continue
                             # Collision is accepted -> Add to List
-                            i_arr.append(v.flatten())
-                            weight.append(1)
-        assert len(i_arr) == len(weight)
-        self._i_arr = np.array(i_arr, dtype=int)
-        self._weight = np.array(weight, dtype=float)
-        self._n = self.i_arr.shape[0]
+                            col_arr.append(v.flatten())
+                            weight = self.compute_weight_arr(s)
+                            weight_arr.append(weight)
+        assert len(col_arr) == len(weight_arr)
+        self._collision_arr = np.array(col_arr, dtype=int)
+        self._weight_arr = np.array(weight_arr, dtype=float)
+        self._n = self._collision_arr.shape[0]
         return
+
+    def compute_weight_arr(self, specimen):
+        """Computes the Collision weight
+
+        Currently only depends on the colliding Specimen .
+        This will change in the future.
+        """
+        alpha = self._cnf.s.alpha[specimen[0], specimen[1]]
+        n_cols = self._cnf.collision_steps_per_time_step
+        return alpha / n_cols
 
     @staticmethod
     def _is_collision(d, v, pv):

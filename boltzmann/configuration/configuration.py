@@ -2,28 +2,15 @@ from . import species as b_spc
 from . import grid as b_grd
 from . import svgrid as b_svg
 from . import collisions as b_col
-
 import numpy as np
 
 
 class Configuration:
-    r"""Handles Setup of General Simulation Parameters
-
-    * based solely on User Input
-    * specifies the Specimen-Parameters
-    * generates the Time and Position-Space grids
-    * generates Velocity-Space grids
-      (Combined Velocity Grid for each Specimen)
-    * generates Collisions (list and weights)
+    r"""Handles User Input and sets up the Simulation Parameters
 
     .. todo::
-        - add moments attribute and attributes for integration parameters
-          (dictionary?)
         - add proper file_name initialization/property
         - for Grid and SVGrid -> check print function for multi - attribute
-        - Add Attributes:
-          * Calculations_per_Frame
-          * Collisions_per_Calculation
         - link Species and SVGrid somehow
           -> adding Species, after setting up SVGrid
           should delete SVGrid or at least update it
@@ -33,13 +20,12 @@ class Configuration:
           * main classes need to be linked for that!
 
         - Add Plotting-function to grids
-        - Where to specify integration order?
 
     Attributes
     ----------
-    s : :class:`~boltzmann.configuration.Species`
-        Contains all data about the simulated specimen.
-    t : :class:`~boltzmann.configuration.Grid`
+    s : :class:`Species`:
+        Contains all data about the simulated Specimen.
+    t : :class:`Grid`
         Contains all data about simulation time and time step size.
         :attr:`~boltzmann.configuration.Configuration.t.G`
         denotes the times at which the results are written out to HDD.
@@ -57,25 +43,29 @@ class Configuration:
     """
 
     def __init__(self):
-        # Empty Initialization here
         # Most Attributes are set up separately
-        self._animated_moments = ['Mass']
-        self._collision_selection_scheme = 'Complete'
+        # Public Attributes
         self.s = b_spc.Species()
         self.t = b_grd.Grid()
         self.p = b_grd.Grid()
         self.sv = b_svg.SVGrid()
         self.cols = b_col.Collisions(self)
-        # Todo Add these Attributes properly
-        # Todo find reasonable intial value
-        # self._config_file_name = 'default'
-        # self.file_path = ''
-        # Todo add integration order parameters here
+        # Read-Write Properties
+        self._animated_moments = ['Mass']
+        self._collision_selection_scheme = 'Complete'
+        # Todo self.knudsen_number = 1
+        self.collision_steps_per_time_step = 1
+        self.order_operator_splitting = 1
+        self.order_transport = 1
+        self.order_collision = 1
+        # Todo self._config_file_name = None
+        # Todo self.file_path = None
         return
 
     @property
     def supported_output(self):
-        """Set of all currently supported moments."""
+        """:obj:`set` of :obj:`str`:
+        Set of all currently supported moments."""
         supported_output = {'Mass',
                             'Mass_Flow',
                             'Momentum',
@@ -86,7 +76,8 @@ class Configuration:
 
     @property
     def supported_selection_schemes(self):
-        """Set of all currently supported collision selection schemes."""
+        """:obj:`set` of :obj:`str`:
+        Set of all currently supported selection schemes for collisions."""
         supported_selection_schemes = {'Complete'}
         return supported_selection_schemes
 
@@ -172,9 +163,11 @@ class Configuration:
                       offset)
         return
 
-    def setup_collisions(self):
-        self.cols.scheme = self.collision_selection_scheme
-        self.cols.generate_collisions()
+    def setup(self):
+        """Prepares Configuration for Initialization """
+        self.check_integrity(ignore_collisions=True)
+        self.cols.setup()
+        self.check_integrity()
         return
 
     # Todo implement this function
@@ -188,23 +181,17 @@ class Configuration:
     #####################################
     #            Verification           #
     #####################################
-
-    def check_integrity(self):
+    def check_integrity(self,
+                        ignore_collisions=False):
         """Sanity Check"""
         self.s.check_integrity()
-        assert self.s.mass.dtype == np.float64
-        assert self.s.alpha.dtype == np.float64
         self.t.check_integrity()
-        assert type(self.t.dim) is int
-        assert type(self.t.d) is float
         self.p.check_integrity()
-        assert type(self.p.dim) is int
-        assert type(self.p.d) is float
         self.sv.check_integrity()
         assert self.sv.dim >= self.p.dim
-        assert type(self.sv.dim) is int
-        assert type(self.sv.d) is float
         # Todo Assert Collisions
+        # if not ignore_collisions:
+        # assert collisions
         return
 
     def print(self,
