@@ -4,11 +4,6 @@ import numpy as np
 
 class Species:
     """A simple class encapsulating data about species to be simulated."""
-    # Todo move this into a property?
-    COLOR_LIST = ['blue',       'red',      'green',
-                  'yellow',     'black',    'brown',
-                  'orange',     'pink',     'gray']
-
     def __init__(self):
         self._n = 0
         self._mass = np.zeros(shape=(0,), dtype=int)
@@ -17,6 +12,16 @@ class Species:
         self._color = []
         self.check_integrity()
         return
+
+    @property
+    def supported_colors(self):
+        """:obj:`list` of :obj:`str`:
+                List of all currently supported colors.
+                Used in :class:`~boltzmann.animation.Animation`."""
+        supported_colors = ['blue', 'red', 'green',
+                            'yellow', 'black', 'brown',
+                            'orange', 'pink', 'gray']
+        return supported_colors
 
     @property
     def n(self):
@@ -87,12 +92,12 @@ class Species:
             assert type(name) is str
         # Give default value to color and sanity check
         if color is None:
-            _free_colors = [c for c in Species.COLOR_LIST
+            _free_colors = [c for c in self.supported_colors
                             if c not in self.color]
             assert _free_colors is not [], "All Colors are used, add more."
             color = _free_colors[0]
         else:
-            assert color in Species.COLOR_LIST, "Unsupported Color"
+            assert color in self.supported_colors, "Unsupported Color"
         # Actual Assignment of new values
         self._n += 1
         self._mass.resize(self.n)
@@ -125,7 +130,8 @@ class Species:
         assert all([type(name) is str for name in self.name])
         assert len(self.color) is self.n
         assert type(self.color) is list
-        assert all([color in Species.COLOR_LIST for color in self.color])
+        assert all([color in self.supported_colors
+                    for color in self.color])
 
     def print(self):
         """Prints all Properties for Debugging Purposes"""
