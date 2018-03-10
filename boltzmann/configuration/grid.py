@@ -256,7 +256,12 @@ class Grid:
         if self.form is 'rectangular':
             assert self.n.prod() == self.size
         assert self.G.dtype == int
-        assert self.G.shape == (self.size, self.dim)
+        # Todo Exception for t-Grid - make this streamlined
+        if self.dim == 1:
+            assert (self.G.shape == (self.size, self.dim)
+                    or self.G.shape == (self.size,))
+        else:
+            assert self.G.shape == (self.size, self.dim)
         assert type(self.multi) is int
         assert self.multi >= 1
         assert (self.G % self.multi == 0).all
