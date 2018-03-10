@@ -265,8 +265,7 @@ class Grid:
             assert self.multi % 2 is 0
         return
 
-    def print(self,
-              physical_grids=False):
+    def print(self, physical_grids=False):
         """Prints all Properties for Debugging Purposes"""
         print("Dimension = {}".format(self.dim))
         print("Geometric Form = {}".format(self.form))

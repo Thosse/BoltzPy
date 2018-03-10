@@ -52,7 +52,7 @@ class Configuration:
         Maximum physical values may differ slightly between specimen.
     cols : :class:`~boltzmann.configuration.Collisions`
         Describes the collisions on the SV-Grid.
-    file_name : :obj:`str`
+    config_file_name : :obj:`str`
     file_path : :obj:`str`
     """
 
@@ -67,9 +67,10 @@ class Configuration:
         self.sv = b_svg.SVGrid()
         self.cols = b_col.Collisions(self)
         # Todo Add these Attributes properly
-        # self.file_name = 'default'
+        # Todo find reasonable intial value
+        # self._config_file_name = 'default'
         # self.file_path = ''
-
+        # Todo add integration order parameters here
         return
 
     @property
@@ -176,6 +177,14 @@ class Configuration:
         self.cols.generate_collisions()
         return
 
+    # Todo implement this function
+    # def get_config_file_address(self, name?):
+    #     """Returns a files address
+    #     of the config file or stored moments or stored animation"""
+    #     files = [self.cnf.file_name + '_' + mom
+    #              for mom in moments]
+    #     return files
+
     #####################################
     #            Verification           #
     #####################################
@@ -201,9 +210,12 @@ class Configuration:
     def print(self,
               physical_grids=False):
         """Prints all Properties for Debugging Purposes"""
-        print('========CONFIGURATION========')
+        print('\n========CONFIGURATION========\n')
         print('Configuration Name: ')  # Todo + self.file_name)
-        print('Specimen:')
+        print('Animated Moments:\n{}'.format(self.animated_moments))
+        print('Collision Selection Scheme: '
+              '{}'.format(self.collision_selection_scheme))
+        print('\nSpecimen:')
         print('---------')
         self.s.print()
         print('')
