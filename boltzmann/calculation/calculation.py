@@ -1,3 +1,4 @@
+
 from boltzmann.configuration import configuration as b_cnf
 from boltzmann.initialization import initialization as b_ini
 from . import output_function as b_opf
@@ -7,8 +8,8 @@ from time import time
 
 
 class Calculation:
-    """
-    Manages calculation process based on minimal set of parameters.
+    """Manages calculation process based on minimal set of porameters.
+
     This class focuses purely on performance
     and readily sacrifices readability.
     For equivalent, more understandable, but less performant Code
@@ -24,6 +25,8 @@ class Calculation:
           (only 1 flag(==0) for inner points necessary)?
           Use p_flag as an array of pointers, that point to their
           calculation function (depending on their type)
+        - implement complete output, for testing
+
 
         - Implement complex Geometries for P-Grid:
 
@@ -33,7 +36,7 @@ class Calculation:
 
         - Implement adaptive P-Grid:
             * The P-Grid is given as an array of the P-Gris Points - Array_0
-            * Each P-Grid Point has several seperate lists of Pointers:
+            * Each P-Grid Point has several separate lists of Pointers:
 
               * List_0 contains Pointers to the Neighbours in the P-Grid.
               * List_1,... are empty in the beginning
@@ -51,7 +54,7 @@ class Calculation:
                 In that case only add the remaining points to Array_1 and
                 let the Pointer in List_1 point to the existing point in
                 Array_1
-              * In Order to fullfill the boundary conditions it is necessary
+              * In Order to fulfill the boundary conditions it is necessary
                 to add "Ghost-Boundary-Points" to the neighbouring points
                 of the finer Grid.
                 There is a PHD-Thesis about this. -> Find it
@@ -68,7 +71,6 @@ class Calculation:
                 of a finer area,with 'Ghost-Boundary-Points'
               * The total number of Grid-Refinement-Levels should be bound
 
-
     Parameters
     ----------
     cnf : :class:`~boltzmann.configuration.Configuration`
@@ -76,130 +78,148 @@ class Calculation:
 
     Attributes
     ----------
-    data, result : np.ndarray
-        State of the simulation.
-        After time step t, data[i_p, i_v] == f(t, p.G[i_p], sv.G[i_v]).
-        Both Collisions and Transport steps
-        read their data from *data*
-        and write the results to *result*.
-        Afterwards data and result are either synchronized
-        (data[:] =  results[:])
-        or swapped (data, results = results, data).
-        Array of shape=(p.n[-1], sv.index[-1])
-        and dtype=float.
-
-    p_flag : np.ndarray(int)
-        Let i_p be an index of P-Space, then
-        p_flag[i_p] describes whether
-        i_p is an inner point, boundary point, or input/output point.
-        This controls the behaviour of this P-Grid point
-        during calculation.
-        For each different value in p_flag a custom sub-function is generated.
-    c_arr : np.ndarray(int)
-        c_arr[i_c, :] is an array of 4 indices of the SVGrid,
-        which describe a single collision i_c.
-        The ordering is as follows:
-
-            | c_arr[_, 0] = v_pre_collision of Specimen 1
-            | c_arr[_, 1] = v_post_collision of Specimen 1
-            | c_arr[_, 2] = v_pre_collision of Specimen 2
-            | c_arr[_, 3] = v_post_collision of Specimen 2
-
-    c_w : np.ndarray(float)
-        c_w[i_c] denotes the weight for c_arr[i_c, :]
-        in the collision step.
-    t_arr : np.ndarray(int)
-        t_arr is used in the **transport step**.
-        Each t_arr[i_v, _] denotes an index difference in P-Space,
-        such that data[p + t_arr[i_v, _], i_v]
-        is used for the calculation of result[p, i_v].
-    t_w : np.ndarray(float)
-        t_w[i_t, :] denotes the weight for t_arr[i_t, :]
-        in the transport step
-    f_out : :class:`~boltzmann.calculation.OutputFunction`
-        Processes :attr:`~boltzmann.calculation.Calculation.result`
-        in the specified intervalls and stores results on HDD.
-    cnf : :class:`~boltzmann.configuration.Configuration`
     t_cur : int
         Current time step.
     """
     def __init__(self,
                  cnf=b_cnf.Configuration(),
-                 ini=b_ini.Initialization(),
-                 moments=list()):
-        self.data = ini.create_psv_grid()
-        self.result = np.copy(self.data)
-        # self.p_flag = ini.p_flag
+                 ini=b_ini.Initialization()):
+        # Visible Properties
+        self._data = ini.create_psv_grid()
+        self._result = np.copy(self.data)
+        self._p_flag = ini.p_flag
+        self._f_out = b_opf.OutputFunction(cnf)
+        # Private Attributes
+        # self._c_arr = cnf.cols.collision_arr
+        # self._c_weight = cnf.cols.weight_arr
+        # Public Attributes
+        self.t_cur = cnf.t.G[0]
+        self._t = cnf.t.G
         # Todo replace cnf by subset of necessary attributes?
-        self.cnf = cnf
-        # self.c_arr = cnf.cols.i_arr
-        # self.c_w = cnf.cols.weight
-        # self.t_arr = np.zeros((0,), dtype=int)
-        # self.t_w = np.zeros((0,), dtype=float)
-        # Todo moments is only temporary an extra parameter
-        self.f_out = b_opf.OutputFunction(moments, cnf)
-        # Todo Remove write_mass, replace by appending current results
+        self._cnf = cnf
+        # t_arr: np.ndarray(int)
+        # t_arr is used in the ** transport step **.
+        # Each t_arr[i_v, _] denotes an index difference in P - Space,
+        # such that data[p + t_arr[i_v, _], i_v] is used
+        # for the calculation of result[p, i_v].
+        # Todo self.t_arr = np.zeros((0,), dtype=int)
+        # t_w : np.ndarray(float)
+        # t_w[i_t, :] denotes the weight for t_arr[i_t, :]
+        # in the transport step
+        # Todo self.t_w = np.zeros((0,), dtype=float)
+
+        # Todo Remove output, replace by appending current results
         # Todo to a file
-        write_shape = (self.cnf.t.size, self.cnf.p.size, self.cnf.s.n)
-        self.write_mass = np.zeros(write_shape, dtype=float)
-        self.t_cur = 0
+        output_shape = (cnf.t.size, cnf.p.size, cnf.s.n)
+        self.output_mass = np.zeros(output_shape, dtype=float)
+
         return
+
+    # Todo Edit docstring (attr links)
+    @property
+    def data(self):
+        """:obj:`~numpy.ndarray` of :obj:`float`:
+        State of the simulation.
+
+        At time step t, position p and velocity v:
+
+            data[p, v] = f(t, p, v).
+
+        Both Collisions and Transport steps
+        read their data from :attr:`data`
+        and write the results to :attr:`_result`.
+        Afterwards :attr:`data` and :attr:`_result` are either synchronized
+        (data[:] =  _results[:])
+        or swapped (data, _results = _results, data).
+        Array of shape
+        ( :attr:`boltzmann.Configuration.p`.size,
+        :attr:`boltzmann.Configuration.sv.index` [-1]).
+        """
+        return self._data
+
+    @property
+    def p_flag(self):
+        """:obj:`~numpy.ndarray` of :obj:`int`:
+        For each P-:class:`~boltzmann.configuration.Grid` point :obj:`p`,
+        :attr:`p_flag` [:obj:`p`] describes the category of :obj:`p`
+        (see :attr:`~boltzmann.initialization.Initialization.supported_categories`).
+
+        :attr:`p_flag` controls the behaviour of each
+        P-:class:`~boltzmann.configuration.Grid` point
+        during :class:`Calculation`.
+        For each different value in :attr:`p_flag`
+        a custom function is generated.
+        """
+        return self._p_flag
+
+    # Todo Compare to output_func docs and recheck, docstring
+    @property
+    def f_out(self):
+        """:obj:`~boltzmann.calculation.OutputFunction`:
+        Processes :attr:`data`
+        in the specified intervals
+        (see :attr:`~boltzmann.configuration.Configuration.t`)
+        and returns the results.
+        In the future it directly stores the results on HDD.
+        """
+        return self._f_out
 
     def run(self):
         self.check_conditions()
         cal_time = time()
-        for t_write in range(self.cnf.t.size):
-            while self.t_cur != self.cnf.t.G[t_write]:
+        # Todo revise the function -> write do HDD
+        tmp_result = np.zeros(shape=(self._cnf.t.size,
+                                     self._cnf.p.size,
+                                     self._cnf.s.n),
+                              dtype=float)
+        for (i_write, t_write) in enumerate(self._t):
+            while self.t_cur != t_write:
                 self.calc_time_step()
                 self.t_cur += 1
             # Todo replace write_mass with  write_results method
             # self.write_results()
-            self.write_mass[t_write, ...] = self.f_out.apply(self.data)
+            tmp_result[i_write, ...] = self.f_out.apply(self.data)
         print("Calculation - Done\n"
               "Time taken =  {} seconds"
               "".format(round(time() - cal_time, 3)))
-        return
+        return tmp_result
 
     def calc_time_step(self):
         self.calc_transport_step()
-        # Todo Add attribute to store collisons_per_calc_step
-        tmp_cols_per_calc = 5
-        for _ in range(tmp_cols_per_calc):
+        for _ in range(self._cnf.n_collision_steps_per_time_step):
             self.calc_collision_step()
         return
 
     def calc_collision_step(self):
         # Todo Check this again, done in a hurry!
-        self.result = np.copy(self.data)
         # Todo removal of boundaries only temporary
-        for p in range(1, self.cnf.p.size-1):
-            for [i_col, col] in enumerate(self.cnf.cols.i_arr):
+        for p in range(1, self._cnf.p.size-1):
+            for [i_col, col] in enumerate(self._cnf.cols.collision_arr):
                 d_col = (self.data[p, col[0]] * self.data[p, col[2]]
                          - self.data[p, col[1]] * self.data[p, col[3]])
-                d_col *= self.cnf.cols.weight[i_col] * self.cnf.t.d
-                self.result[p, col[0]] -= d_col
-                self.result[p, col[2]] -= d_col
-                self.result[p, col[1]] += d_col
-                self.result[p, col[3]] += d_col
-        self.switch_data_results()
+                d_col *= self._cnf.cols.weight_arr[i_col] * self._cnf.t.d
+                self._result[p, col[0]] -= d_col
+                self._result[p, col[2]] -= d_col
+                self._result[p, col[1]] += d_col
+                self._result[p, col[3]] += d_col
+        self._data = np.copy(self._result)
         return
 
     def calc_transport_step(self):
         # Todo Check this again, done in a hurry!
-        self.result = np.copy(self.data)
-        if self.cnf.p.dim is not 1:
+        if self._cnf.p.dim is not 1:
             print('So far only 1-D Problems are implemented!')
             assert False
-        dt = self.cnf.t.d
-        dp = self.cnf.p.d
-        for s in range(self.cnf.s.n):
-            beg = self.cnf.sv.index[s]
-            end = self.cnf.sv.index[s+1]
-            dv = self.cnf.sv.d * self.cnf.sv.multi
+        dt = self._cnf.t.d
+        dp = self._cnf.p.d
+        for s in range(self._cnf.s.n):
+            beg = self._cnf.sv.index[s]
+            end = self._cnf.sv.index[s+1]
+            dv = self._cnf.sv.d * self._cnf.sv.multi
             # Todo removal of boundaries only temporary
-            for p in range(1, self.cnf.p.size-1):
+            for p in range(1, self._cnf.p.size-1):
                 for v in range(beg, end):
-                    pv = dv * self.cnf.sv.G[v]
+                    pv = dv * self._cnf.sv.G[v]
                     if pv[0] < 0:
                         d_trp = ((1 + pv[0]*dt/dp) * self.data[p, v]
                                  - pv[0]*dt/dp * self.data[p+1, v])
@@ -208,21 +228,16 @@ class Calculation:
                                  + pv[0]*dt/dp * self.data[p-1, v])
                     else:
                         continue
-                    self.result[p, v] = d_trp
-        self.switch_data_results()
+                    self._result[p, v] = d_trp
+        self._data = np.copy(self._result)
         return
 
     def write_results(self):
         self.f_out.apply(self.data)
 
-    def switch_data_results(self):
-        self.data, self.result = self.result, self.data
-        return
-
     def check_conditions(self):
         # check Courant-Friedrichs-Levy-Condition
-        max_v = self.cnf.sv.get_max_v()
-        dt = self.cnf.t.d
-        dp = self.cnf.p.d
+        max_v = self._cnf.sv.get_max_v()
+        dt = self._cnf.t.d
+        dp = self._cnf.p.d
         cfl = max_v * (dt/dp)
-        assert cfl < 1/2
