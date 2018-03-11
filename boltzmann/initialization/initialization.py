@@ -298,13 +298,16 @@ class Initialization:
                 begin = self.cnf.sv.index[i_s]
                 end = self.cnf.sv.index[i_s+1]
                 v_grid = self.cnf.sv.G[begin:end]
+                dv = self.cnf.sv.d[i_s]
                 for (i_v, v) in enumerate(v_grid[:, :]):
+                    # Physical Velocity
+                    pv = dv * v
                     # Todo np.array(v) only for PyCharm Warning - Check out
-                    diff_v = np.sum((np.array(v) - r.drift[i_s])**2)
+                    diff_v = np.sum((np.array(pv) - r.drift[i_s])**2)
                     psv[i_p, begin + i_v] = rho * math.exp(-0.5*(diff_v/temp))
-                # Adjust initialized values, to match configurations
                 # Todo read into Rjasanov's script and do this correctly
                 # Todo THIS IS CURRENTLY WRONG! ONLY TEMPORARY FIX
+                # Adjust initialized values, to match configurations
                 adj = psv[i_p, begin:end].sum()
                 psv[i_p, begin:end] *= rho/adj
         return psv
