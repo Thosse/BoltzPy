@@ -82,8 +82,8 @@ class Calculation:
         Current time step.
     """
     def __init__(self,
-                 cnf=b_cnf.Configuration(),
-                 ini=b_ini.Initialization()):
+                 cnf,
+                 ini):
         # Visible Properties
         self._data = ini.create_psv_grid()
         self._result = np.copy(self.data)
@@ -112,7 +112,6 @@ class Calculation:
         # Todo to a file
         output_shape = (cnf.t.size, cnf.p.size, cnf.s.n)
         self.output_mass = np.zeros(output_shape, dtype=float)
-
         return
 
     # Todo Edit docstring (attr links)
@@ -186,7 +185,7 @@ class Calculation:
 
     def calc_time_step(self):
         self.calc_transport_step()
-        for _ in range(self._cnf.n_collision_steps_per_time_step):
+        for _ in range(self._cnf.collision_steps_per_time_step):
             self.calc_collision_step()
         return
 
@@ -215,20 +214,20 @@ class Calculation:
         for s in range(self._cnf.s.n):
             beg = self._cnf.sv.index[s]
             end = self._cnf.sv.index[s+1]
-            dv = self._cnf.sv.d * self._cnf.sv.multi
+            dv = self._cnf.sv.d[s]
             # Todo removal of boundaries only temporary
             for p in range(1, self._cnf.p.size-1):
                 for v in range(beg, end):
                     pv = dv * self._cnf.sv.G[v]
                     if pv[0] < 0:
-                        d_trp = ((1 + pv[0]*dt/dp) * self.data[p, v]
-                                 - pv[0]*dt/dp * self.data[p+1, v])
+                        new_val = ((1 + pv[0]*dt/dp) * self.data[p, v]
+                                   - pv[0]*dt/dp * self.data[p+1, v])
                     elif pv[0] > 0:
-                        d_trp = ((1 - pv[0]*dt/dp) * self.data[p, v]
-                                 + pv[0]*dt/dp * self.data[p-1, v])
+                        new_val = ((1 - pv[0]*dt/dp) * self.data[p, v]
+                                   + pv[0]*dt/dp * self.data[p-1, v])
                     else:
                         continue
-                    self._result[p, v] = d_trp
+                    self._result[p, v] = new_val
         self._data = np.copy(self._result)
         return
 
@@ -241,3 +240,5 @@ class Calculation:
         dt = self._cnf.t.d
         dp = self._cnf.p.d
         cfl = max_v * (dt/dp)
+        assert cfl < 1/4
+        return
