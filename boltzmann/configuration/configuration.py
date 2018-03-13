@@ -2,7 +2,9 @@ from . import species as b_spc
 from . import grid as b_grd
 from . import svgrid as b_svg
 from . import collisions as b_col
-import numpy as np
+
+
+from sys import stdout as stdout
 
 
 class Configuration:
@@ -10,6 +12,8 @@ class Configuration:
 
     .. todo::
         - add proper file_name initialization/property
+          config_file_name : :obj:`str`
+          file_path : :obj:`str`
         - for Grid and SVGrid -> check print function for multi - attribute
         - link Species and SVGrid somehow
           -> adding Species, after setting up SVGrid
@@ -38,8 +42,6 @@ class Configuration:
         Maximum physical values may differ slightly between specimen.
     cols : :class:`~boltzmann.configuration.Collisions`
         Describes the collisions on the SV-Grid.
-    config_file_name : :obj:`str`
-    file_path : :obj:`str`
     """
 
     def __init__(self):
@@ -202,6 +204,8 @@ class Configuration:
         print('Animated Moments:\n{}'.format(self.animated_moments))
         print('Collision Selection Scheme: '
               '{}'.format(self.collision_selection_scheme))
+        print('Collision Steps per Time Step: {}'
+              ''.format(self.collision_steps_per_time_step))
         print('\nSpecimen:')
         print('---------')
         self.s.print()
@@ -215,3 +219,4 @@ class Configuration:
         print('Velocity-Space Data:')
         print('--------------------')
         self.sv.print(physical_grids)
+        stdout.flush()
