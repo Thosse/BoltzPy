@@ -226,6 +226,24 @@ class SVGrid:
         else:
             return None
 
+    def get_specimen(self, velocity_index):
+        """Returns Specimen (index) of given velocity index`
+
+        Parameters
+        ----------
+        velocity_index : int
+
+        Returns
+        -------
+        int
+            Index of Specimen.
+        """
+        for i in range(self.index.size):
+            if self.index[i] <= velocity_index < self.index[i+1]:
+                return i
+        # Todo Throw exception
+        return None
+
     #####################################
     #           Verification            #
     #####################################
