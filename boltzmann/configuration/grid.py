@@ -275,7 +275,7 @@ class Grid:
         if self.multi is not 1:
             print("Multiplicator = {}".format(self.multi))
         print('Is centered Grid = {}'.format(self.is_centered))
-        print("Boundaries:\n{}".format(Grid.boundaries))
+        print("Boundaries:\n{}".format(self.boundaries))
         if physical_grids:
             print('Physical Grid:')
             print(self.G*self.d)
