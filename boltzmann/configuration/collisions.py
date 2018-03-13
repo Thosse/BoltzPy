@@ -73,21 +73,25 @@ class Collisions:
     def setup(self):
         """Generates the Collisions, based on the Selection Scheme"""
         gen_col_time = time()
+        print('Generating Collision Array...', end='\r')
+
         if self.cnf.collision_selection_scheme == 'Complete':
             if self.cnf.sv.form is 'rectangular':
                 self._generate_collisions_complete()
             else:
-                # Todo Throw exception
-                print('Currently only supports rectangular grids!')
-                assert False
+                raise AttributeError('Currently, only rectangular '
+                                     'grids are supported')
+
         else:
-            # Todo Throw exception
-            print('ERROR - Unspecified Collision Scheme')
-            assert False
-        print("Generation of Collision list - Done\n"
-              "Total Number of Collisions = {}\n"
-              "Time taken =  {} seconds"
-              "".format(self.n, round(time() - gen_col_time, 3)))
+            message = 'Unsupported Selection Scheme:' \
+                      '{}'.format(self.cnf.collision_selection_scheme)
+            raise AttributeError(message)
+
+        print('Generating Collision Array...Done\n'
+              'Time taken =  {} seconds\n'
+              'Total Number of Collisions = {}\n'
+              ''.format(round(time() - gen_col_time, 3), self.n))
+        self.check_integrity()
         return
 
     # Todo Simplify - Looks horrible
@@ -150,9 +154,15 @@ class Collisions:
                                 v[1, 1] = _v11
                             else:
                                 continue
+                            # if v[1, 1] < v[0, 0], then the collision was
+                            # already found before
+                            if v[1, 1] < v[0, 0]:
+                                continue
+
                             # Check if v fulfills all conditions
                             if not self._is_collision(d, v, pv):
                                 continue
+
                             # Collision is accepted -> Add to List
                             col_arr.append(v.flatten())
                             weight = self.compute_weight_arr(s)
@@ -171,7 +181,10 @@ class Collisions:
         """
         alpha = self._cnf.s.alpha[specimen[0], specimen[1]]
         n_cols = self._cnf.collision_steps_per_time_step
-        return alpha / n_cols
+        if n_cols != 0:
+            return alpha / n_cols
+        else:
+            return alpha
 
     @staticmethod
     def _is_collision(d, v, pv):
@@ -240,3 +253,45 @@ class Collisions:
                                + d[1] * (pv[1, 1]**2))
         post_energy = post_energy.sum()
         return np.allclose(pre_energy, post_energy)
+
+    #####################################
+    #           Verification            #
+    #####################################
+    def check_integrity(self):
+        """Sanity Check"""
+        assert type(self._collision_arr) == np.ndarray
+        assert self._collision_arr.dtype == int
+        assert self._collision_arr.shape == (self._n, 4)
+        for col in self._collision_arr:
+            assert col[0] < col[1]
+            assert col[0] < col[2]
+            di_0 = self._cnf.sv.G[col[1]] - self._cnf.sv.G[col[0]]
+            di_1 = self._cnf.sv.G[col[3]] - self._cnf.sv.G[col[2]]
+            assert all(np.array(di_1 + di_0) == 0)
+            s = [self._cnf.sv.get_specimen(v_col) for v_col in col]
+            assert s[0] == s[1] and s[2] == s[3]
+        assert type(self._weight_arr) == np.ndarray
+        assert self._weight_arr.dtype == float
+        assert self._weight_arr.shape == (self._n,)
+        assert type(self._n) is int
+        return
+
+# Todo Keep for testing
+    # @staticmethod
+    # def Test_is_v_in_col_arr(v, col_arr):
+    #     """Check if :obj:`v` or an equivalent permutation of it
+    #     is already in :obj:`col_arr`"""
+    #     # Todo speed up
+    #     v = v.flatten()
+    #     # set of permutation, which are checked:
+    #     col_permutations = np.zeros((4, 4))
+    #     col_permutations[0] = np.copy(v)
+    #     col_permutations[1] = np.array([v[1], v[0], v[3], v[2]])
+    #     col_permutations[2] = np.array([v[2], v[3], v[0], v[1]])
+    #     col_permutations[3] = np.array([v[3], v[2], v[1], v[0]])
+    #     for old_col in col_arr:
+    #         if np.any(np.all(col_permutations == old_col, axis=1)):
+    #             print("Permutations = \n{}".format(col_permutations))
+    #             print("Found Col = \n{}".format(old_col))
+    #             return True
+    #     return False
