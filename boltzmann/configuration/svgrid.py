@@ -311,8 +311,6 @@ class SVGrid:
             print("Step Size = {}".format(self.d[s]*self.multi))
             print("Boundaries:\n"
                   "{}".format(self.boundaries[s]))
-            beg = self.index[s]
-            end = self.index[s+1]
             if physical_grid:
                 print('Physical Grid :')
                 beg = self.index[s]
