@@ -92,20 +92,14 @@ class Grid:
         False otherwise."""
         return self._flag_is_centered
 
-    # Todo make Property out of this!
-    @staticmethod
-    def get_boundaries(grid, d):
-        # Workaround for (X,)-shapes
-        if len(grid.shape) is 1:
-            dim = 1
-        else:
-            dim = grid.shape[-1]
-        min_val = np.min(grid, axis=0)
-        max_val = np.max(grid, axis=0)
-        bound = np.array([min_val, max_val])*d
-        if dim is 2:
+    @property
+    def boundaries(self):
+        min_val = np.min(self.G, axis=0)
+        max_val = np.max(self.G, axis=0)
+        bound = np.array([min_val, max_val]) * self.d
+        if self.dim is 2:
             bound = bound.transpose()
-        elif dim is not 1:
+        elif self.dim is not 1:
             assert False, 'This is not tested for 3d'
             # Todo figure out transpose order
         return bound
@@ -281,7 +275,7 @@ class Grid:
         if self.multi is not 1:
             print("Multiplicator = {}".format(self.multi))
         print('Is centered Grid = {}'.format(self.is_centered))
-        print("Boundaries:\n{}".format(Grid.get_boundaries(self.G, self.d)))
+        print("Boundaries:\n{}".format(Grid.boundaries))
         if physical_grids:
             print('Physical Grid:')
             print(self.G*self.d)

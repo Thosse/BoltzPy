@@ -304,8 +304,6 @@ class SVGrid:
             print("Boundaries:")
             beg = self.index[_s]
             end = self.index[_s+1]
-            print(b_grd.Grid.get_boundaries(self.G[beg:end],
-                                            self.d[_s]))
             if physical_grid:
                 print('Physical Grid :')
                 beg = self.index[_s]
