@@ -89,6 +89,25 @@ class SVGrid:
         self.offset = np.zeros((self.dim,), dtype=float)
         return
 
+    @property
+    def boundaries(self):
+        boundaries = np.zeros(shape=(self.size.size,
+                                     2,
+                                     self.dim),
+                              dtype=float)
+        for s in range(self.size.size):
+            [beg, end] = self.index[[s, s+1]]
+            G = self.G[beg:end]
+            min_val = np.min(G, axis=0)
+            max_val = np.max(G, axis=0)
+            bound = np.array([min_val, max_val]) * self.d[s]
+            if self.dim is 2:
+                boundaries[s] = bound.transpose()
+            elif self.dim is not 1:
+                assert False, 'This is not tested for 3d'
+                # Todo figure out transpose order
+        return boundaries
+
     def setup(self,
               species,
               velocity_grid,
@@ -172,17 +191,6 @@ class SVGrid:
         self.multi = 2
         self.is_centered = True
         return
-
-    # Todo This should be a property
-    def get_max_v(self):
-        max_v = 0.0
-        s_n = self.size.size
-        for s in range(s_n):
-            [beg, end] = self.index[s:s+2]
-            v_arr = (self.G[beg:end] * self.d[s] + self.offset).flatten()
-            new_max_v = np.max(np.absolute(v_arr))
-            max_v = max(max_v, new_max_v)
-        return max_v
 
     #####################################
     #               Indexing            #
@@ -294,19 +302,20 @@ class SVGrid:
         print('Is centered Grid = {}'.format(self.is_centered))
         print("Offset = {}".format(self.offset))
         print('')
-        for _s in range(self.n.shape[0]):
-            print('Specimen_{}'.format(_s))
+        for s in range(self.n.shape[0]):
+            print('Specimen_{}'.format(s))
             print("Number of Total Grid Points = "
-                  "{}".format(self.n[_s, -1]))
+                  "{}".format(self.n[s, -1]))
             print("Grid Points per Dimension = "
-                  "{}".format(self.n[_s, 0:self.dim]))
-            print("Step Size = {}".format(self.d[_s]*self.multi))
-            print("Boundaries:")
-            beg = self.index[_s]
-            end = self.index[_s+1]
+                  "{}".format(self.n[s, 0:self.dim]))
+            print("Step Size = {}".format(self.d[s]*self.multi))
+            print("Boundaries:\n"
+                  "{}".format(self.boundaries[s]))
+            beg = self.index[s]
+            end = self.index[s+1]
             if physical_grid:
                 print('Physical Grid :')
-                beg = self.index[_s]
-                end = self.index[_s + 1]
-                print(self.G[beg:end]*self.d[_s])
+                beg = self.index[s]
+                end = self.index[s + 1]
+                print(self.G[beg:end]*self.d[s])
             print('')
