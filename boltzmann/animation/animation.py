@@ -67,7 +67,7 @@ class Animation:
     def update_data(self, i, data, lines):
         for i_m in range(data.shape[1]):
             for i_sp in range(data.shape[2]):
-                lines[i_m, i_sp].set_data(self.cnf.p.G*self.cnf.p.dim,
+                lines[i_m, i_sp].set_data(self.cnf.p.G*self.cnf.p.d,
                                           data[i, i_m, i_sp, :])
         return lines
 
@@ -104,8 +104,9 @@ class Animation:
             # add subplot into a 3x2 grid
             ax = self.figure.add_subplot(1, 1, i_m + 1)
             # set range of X-axis
-            x_min = self.cnf.p.G[0]
-            x_max = self.cnf.p.G[-1]
+            x_boundary = self.cnf.p.boundaries
+            x_min = x_boundary[0]
+            x_max = x_boundary[1]
             ax.set_xlim(x_min, x_max)
             # set range of Y-axis, based on occurring values in data
             # TODO check if there is something wrong here
