@@ -1,4 +1,5 @@
 numpy
+scipy
 matplotlib
 # ffmpeg must be installed on system
 # Todo figure out a default case, if ffmpeg is missing

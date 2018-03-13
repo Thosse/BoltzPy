@@ -2,6 +2,7 @@
 from . import output_function as b_opf
 
 import numpy as np
+from scipy.sparse import csr_matrix
 from time import time
 
 
@@ -92,6 +93,7 @@ class Calculation:
         # Public Attributes
         self.t_cur = cnf.t.G[0]
         self._cnf = cnf
+        self.col_mat = self.generate_collision_matrix()
         # t_arr: np.ndarray(int)
         # t_arr is used in the ** transport step **.
         # Each t_arr[i_v, _] denotes an index difference in P - Space,
@@ -163,6 +165,7 @@ class Calculation:
 
     def run(self):
         self.check_conditions()
+
         cal_time = time()
         print('Calculating...',
               end='\r')
@@ -172,18 +175,43 @@ class Calculation:
                 self.t_cur += 1
                 rem_time = round((self._cnf.t.size*self._cnf.t.multi
                                   / self.t_cur - 1)
-                                 * round(time() - cal_time), 2)
+                                 * (time() - cal_time), 2)
                 print('Calculating...{}'
                       ''.format(rem_time),
                       end='\r')
-            # Todo replace write_mass with  write_results method
+            # Todo replace output by writing to file
             # self.write_results()
             self.output[i_w, ...] = self.f_out.apply(self.data)
-
         print("Calculating...Done\n"
               "Time taken =  {} seconds"
-              "".format(round(time() - cal_time, 3)))
+              "".format(round(time() - cal_time, 2)))
         return self.output
+
+    def generate_collision_matrix(self):
+        if self._cnf.collision_steps_per_time_step == 0:
+            return None
+        gen_mat_time = time()
+        print('Generating Collision Matrix...',
+              end='\r')
+        # Size of complete velocity grid
+        rows = self._cnf.sv.index[-1]
+        # Number of different collisions
+        columns = self._cnf.cols.n
+        col_matrix = np.zeros(shape=(rows, columns),
+                              dtype=float)
+        for [i_col, col] in enumerate(self._cnf.cols.collision_arr):
+            # Negative sign for pre-collision velocities
+            # => necessary for stability
+            #   v[i]*v[j] - v[k]*v[l] is used as collision term
+            #   => v'[*] = ... - X*u[*]
+            col_weight = self._cnf.t.d * self._cnf.cols.weight_arr[i_col]
+            col_matrix[col, i_col] = [-1, 1, -1, 1]
+            col_matrix[col, i_col] *= col_weight
+        col_mat = csr_matrix(col_matrix)
+        print("Generating Collision Matrix...Done\n"
+              "Time taken =  {} seconds\n"
+              "".format(round(time() - gen_mat_time, 2)))
+        return col_mat
 
     def calc_time_step(self):
         self.calc_transport_step()
@@ -192,18 +220,13 @@ class Calculation:
         return
 
     def calc_collision_step(self):
-        # Todo Check this again, done in a hurry!
-        # Todo removal of boundaries only temporary
-        for p in range(1, self._cnf.p.size-1):
-            for [i_col, col] in enumerate(self._cnf.cols.collision_arr):
-                d_col = (self.data[p, col[0]] * self.data[p, col[2]]
-                         - self.data[p, col[1]] * self.data[p, col[3]])
-                d_col *= self._cnf.cols.weight_arr[i_col] * self._cnf.t.d
-                self._result[p, col[0]] -= d_col
-                self._result[p, col[2]] -= d_col
-                self._result[p, col[1]] += d_col
-                self._result[p, col[3]] += d_col
-        self._data = np.copy(self._result)
+        for p in range(self._cnf.p.size):
+            u_c0 = self._data[p, self._cnf.cols.collision_arr[:, 0]]
+            u_c1 = self._data[p, self._cnf.cols.collision_arr[:, 1]]
+            u_c2 = self._data[p, self._cnf.cols.collision_arr[:, 2]]
+            u_c3 = self._data[p, self._cnf.cols.collision_arr[:, 3]]
+            col_factor = (np.multiply(u_c0, u_c2) - np.multiply(u_c1, u_c3))
+            self._data[p] += self.col_mat.dot(col_factor)
         return
 
     def calc_transport_step(self):
@@ -221,7 +244,7 @@ class Calculation:
             for p in range(1, self._cnf.p.size-1):
                 for v in range(beg, end):
                     pv = dv * self._cnf.sv.G[v]
-                    if pv[0] < 0:
+                    if pv[0] <= 0:
                         new_val = ((1 + pv[0]*dt/dp) * self.data[p, v]
                                    - pv[0]*dt/dp * self.data[p+1, v])
                     elif pv[0] > 0:
@@ -230,7 +253,7 @@ class Calculation:
                     else:
                         continue
                     self._result[p, v] = new_val
-        self._data = np.copy(self._result)
+        self._data[...] = self._result[...]
         return
 
     def write_results(self):
@@ -243,4 +266,21 @@ class Calculation:
         dp = self._cnf.p.d
         cfl = max_v * (dt/dp)
         assert cfl < 1/2
+        return
+
+
+class CalculationTest(Calculation):
+    def calc_collision_step(self):
+        # Todo Check this again, done in a hurry!
+        # Todo removal of boundaries only temporary
+        for p in range(0, self._cnf.p.size):
+            for [i_col, col] in enumerate(self._cnf.cols.collision_arr):
+                d_col = (self.data[p, col[0]] * self.data[p, col[2]]
+                         - self.data[p, col[1]] * self.data[p, col[3]])
+                d_col *= self._cnf.cols.weight_arr[i_col] * self._cnf.t.d
+                self._result[p, col[0]] -= d_col
+                self._result[p, col[2]] -= d_col
+                self._result[p, col[1]] += d_col
+                self._result[p, col[3]] += d_col
+        self._data = np.copy(self._result)
         return
