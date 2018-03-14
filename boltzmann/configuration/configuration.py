@@ -216,8 +216,8 @@ class Configuration:
 
         1. Generates a default Velocity :class:`Grid`
         2. Calls :meth:`SVGrid.setup`
-          with the newly generated Velocity :class:`Grid`
-          as a parameter
+           with the newly generated Velocity :class:`Grid`
+           as a parameter
         """
         step_size = 2 * max_v / (grid_points_x_axis - 1)
         number_of_points_per_dimension = [grid_points_x_axis] * dimension
@@ -259,7 +259,7 @@ class Configuration:
         """Prints all Properties for Debugging Purposes"""
         print('\n========CONFIGURATION========\n')
         print('Configuration Name: ')  # Todo + self.file_name)
-        print('Animated Moments:\n{}'.format(self.animated_moments.flatten()))
+        print('Animated Moments:\n{}'.format(self.animated_moments))
         print('Collision Selection Scheme: '
               '{}'.format(self.collision_selection_scheme))
         print('Collision Steps per Time Step: {}'
