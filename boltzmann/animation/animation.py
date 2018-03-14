@@ -109,8 +109,8 @@ class Animation:
             ax = self.figure.add_subplot(shape[0], shape[1], i_m + 1)
             # set range of X-axis
             x_boundary = self.cnf.p.boundaries
-            x_min = x_boundary[0]
-            x_max = x_boundary[1]
+            x_min = x_boundary[0, 0]
+            x_max = x_boundary[1, 0]
             ax.set_xlim(x_min, x_max)
             # set range of Y-axis, based on occurring values in data
             # TODO check if there is something wrong here

@@ -115,11 +115,6 @@ class Grid:
         min_val = np.min(self.G, axis=0)
         max_val = np.max(self.G, axis=0)
         bound = np.array([min_val, max_val]) * self.d
-        if self.dim is 2:
-            bound = bound.transpose()
-        elif self.dim is not 1:
-            assert False, 'This is not tested for 3d'
-            # Todo figure out transpose order
         return bound
 
     #####################################
@@ -290,6 +285,7 @@ class Grid:
         assert type(self.is_centered) is bool
         if self.is_centered:
             assert self.multi % 2 is 0
+        assert self.boundaries.shape == (2, self.dim)
         return
 
     def print(self, physical_grids=False):
