@@ -299,10 +299,3 @@ class Grid:
             print('Physical Grid:')
             print(self.G*self.d)
         print('')
-
-G = Grid()
-G.setup(1, [5], 0.1)
-G.print(True)
-
-G.double_multiplicator()
-G.print(True)
