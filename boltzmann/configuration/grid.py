@@ -15,52 +15,18 @@ class Grid:
     """
     def __init__(self):
         self._dim = 0
+        self._form = ''
+        self._multi = 1
+        self._d = 0.0
         self._n = np.zeros(shape=(self.dim,), dtype=int)
         self._size = 0
-        self._d = 0.0
-        self._form = ''
         self._G = np.zeros(shape=(self.size, self.dim), dtype=int)
-        self._multi = 1
         self._flag_is_centered = False
 
     @property
     def dim(self):
-        """:obj:`int`: Grid dimensionality."""
+        """:obj:`int`: :obj:`Grid` dimensionality."""
         return self._dim
-
-    @property
-    def n(self):
-        """:obj:`~numpy.ndarray` of :obj:`int`:
-        Number of grid points per dimension.
-        Array of shape (:attr:`dim`,).
-        """
-        return self._n
-
-    @property
-    def size(self):
-        """:obj:`int`:
-        Total number of grid points.
-        """
-        return self._size
-
-    @property
-    def d(self):
-        """:obj:`float`:
-        Internal step size of the grid.
-
-        Physical step size of uniform :class:`Grid` may differ
-        (see :attr:`multi`, :class:`Configuration`).
-        """
-        return self._d
-
-    @property
-    def supported_forms(self):
-        """:obj:`set` of :obj:`str`:
-       Set of all currently supported geometric forms(:attr:`form`)
-       for the :class:`Grid`.
-       """
-        supported_forms = {'rectangular'}
-        return supported_forms
 
     @property
     def form(self):
@@ -71,8 +37,46 @@ class Grid:
         return self._form
 
     @property
+    def multi(self, ):
+        """:obj:`int`:
+        Determines the ratio of
+        physical step size / internal step size (:attr:`d`).
+
+        See :meth:`double_multiplicator`, :meth:`halve_multiplicator`.
+        :attr:`multi` does not change the physical values,
+        but enables a variety of features
+        (see :attr:`Configuration.t`, :attr:`Configuration.sv`)
+        """
+        return self._multi
+
+    @property
+    def d(self):
+        """:obj:`float` :
+        Internal step size of the grid.
+
+        Physical step size of uniform :class:`Grid` may differ
+        (see :attr:`multi`, :class:`Configuration`).
+        """
+        return self._d
+
+    @property
+    def n(self):
+        """:obj:`~numpy.ndarray` of :obj:`int` :
+        Number of grid points per dimension.
+        Array of shape (:attr:`dim`,).
+        """
+        return self._n
+
+    @property
+    def size(self):
+        """:obj:`int` :
+        Total number of grid points.
+        """
+        return self._size
+
+    @property
     def G(self,):
-        """:obj:`~np.ndarray` of :obj:`int`:
+        """:obj:`~np.ndarray` of :obj:`int` :
         Physical values of the :class:`Grid` points,
         given in multiples of :attr:`d`.
 
@@ -82,23 +86,8 @@ class Grid:
         return self._G
 
     @property
-    def multi(self, ):
-        """:obj:`int`:
-        Determines the ratio of
-        physical step size / internal step size (:attr:`d`).
-
-        In several cases the Entries in :attr:`G` are multiplied by
-        :attr:`multi`
-        and :attr:`d` are divided by
-        :attr:`multi`.
-        This does not change the physical values, but enables a variety
-        of features (see :attr:`Configuration.t`, :attr:`Configuration.sv`)
-        """
-        return self._multi
-
-    @property
     def is_centered(self, ):
-        """:obj:`bool`:
+        """:obj:`bool` :
         True if Grid has been centered
         (i.e. :meth:`center` was called).
         False otherwise.
@@ -106,9 +95,18 @@ class Grid:
         return self._flag_is_centered
 
     @property
+    def supported_forms(self):
+        """:obj:`set` of :obj:`str` :
+       Set of all currently supported geometric forms(:attr:`form`)
+       for the :class:`Grid`.
+       """
+        supported_forms = {'rectangular'}
+        return supported_forms
+
+    @property
     def boundaries(self):
-        """:obj:`~numpy.ndarray` of :obj:`float`:
-        Minimum and maximum physical values of all :class:`Grid` points.
+        """:obj:`~numpy.ndarray` of :obj:`float` :
+        Minimum and maximum physical values over all :class:`Grid` points.
 
         Array of shape (2, :attr:`dim`).
         """

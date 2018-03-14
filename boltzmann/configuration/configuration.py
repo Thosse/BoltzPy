@@ -52,14 +52,14 @@ class Configuration:
 
     @property
     def s(self):
-        """:obj:`Species`:
+        """:obj:`Species` :
         Contains all data about the simulated Specimen.
         """
         return self._s
 
     @property
     def t(self):
-        """:obj:`Grid`
+        """:obj:`Grid` :
         Contains all data about simulation time and time step size.
 
         * :attr:`Grid.G` denotes the time steps
@@ -72,14 +72,14 @@ class Configuration:
 
     @property
     def p(self):
-        """:obj:`Grid`
+        """:obj:`Grid` :
         Contains all data about Position-Space.
         """
         return self._p
 
     @property
     def sv(self):
-        """:obj:`SVGrid`
+        """:obj:`SVGrid` :
         Contains all data about the Velocity-Space of each Specimen.
         V-Spaces of distinct Specimen differ in step size
         and number of grid points.
@@ -89,14 +89,14 @@ class Configuration:
 
     @property
     def cols(self):
-        """:obj:`Collisions`
+        """:obj:`Collisions` :
         Describes the collisions on :attr:`sv.G`.
          """
         return self._cols
 
     @property
     def supported_output(self):
-        """:obj:`set` of :obj:`str`:
+        """:obj:`set` of :obj:`str` :
         Set of all currently supported moments.
         """
         supported_output = {'Mass',
@@ -114,7 +114,7 @@ class Configuration:
 
     @property
     def supported_selection_schemes(self):
-        """:obj:`set` of :obj:`str`:
+        """:obj:`set` of :obj:`str` :
         Set of all currently supported selection schemes
         for collisions.
         """
@@ -123,7 +123,7 @@ class Configuration:
 
     @property
     def animated_moments(self):
-        """:obj:`~numpy.ndarray` of :obj:`str`:
+        """:obj:`~numpy.ndarray` of :obj:`str` :
         Array of the moments to be stored and animated.
 
         Every single moment is an element of :attr:`supported_output`.
@@ -142,7 +142,7 @@ class Configuration:
 
     @property
     def collision_selection_scheme(self):
-        """:obj:`str`:
+        """:obj:`str` :
         Selection Scheme for Collisions,
         is an element of :attr:`supported_selection_schemes`"""
         return self._collision_selection_scheme
