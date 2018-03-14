@@ -15,7 +15,6 @@ class Configuration:
         - add proper file_name initialization/property
           config_file_name : :obj:`str`
           file_path : :obj:`str`
-        - for Grid and SVGrid -> check print function for multi - attribute
         - link Species and SVGrid somehow
           -> adding Species, after setting up SVGrid
           should delete SVGrid or at least update it

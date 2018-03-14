@@ -186,37 +186,32 @@ class Grid:
             message = "Error - Unsupported Grid dimension: " \
                       "{}".format(self.dim)
             raise AttributeError(message)
-        # Todo keep to check 3D arrays - remove after that
         assert grid.shape == tuple(self.n) + (self.dim,)
         self._G = grid.reshape(grid_shape)
         return
 
-    # Todo edit behavior, check need to revert center
-    # Todo doubling or halving should be doable without revert center + center
-    def change_multiplicator(self,
-                             new_multi):
-        assert type(new_multi) is int, 'Unexpected type of ' \
-                                       'multiplicator: {}' \
-                                       ''.format(type(new_multi))
-        assert new_multi >= 1, 'Multiplicator mus be positive:' \
-                               'submitted Value: {}' \
-                               ''.format(new_multi)
+    def double_multiplicator(self):
+        """Double the current :attr:`multi`.
 
-        # Centering can cause conflicts with the multiplicator
-        if self.is_centered:
-            self.revert_center()
-            self.change_multiplicator(new_multi)
-            self.center()
-            return
-        else:
-            assert (self.G % self.multi == 0).all, 'The current, uncentered ' \
-                                                   'Grid is not ' \
-                                                   'a multiple of its multi.'
-        self._G //= self.multi
-        self._d *= self.multi
-        self._G *= new_multi
-        self._d /= new_multi
-        self._multi = new_multi
+        Also doubles all Entries in :attr:`G` and halves :attr:`d`.
+        """
+        self._G *= 2
+        self._d /= 2
+        self._multi *= 2
+        return
+
+    def halve_multiplicator(self):
+        """Halve the current :attr:`multi`.
+
+        Also halves all Entries in :attr:`G` and doubles :attr:`d`.
+        """
+        assert self.multi % 2 == 0, "All Entries in :attr:`G`" \
+                                    "should be multiples of 2."
+        assert all(self.G % 2 == 0), "All Entries in :attr:`G`" \
+                                     "should be multiples of 2."
+        self._G /= 2
+        self._d *= 2
+        self._multi /= 2
         return
 
     def center(self):
@@ -224,11 +219,10 @@ class Grid:
         (:attr:`G`)
         around zero and sets :attr:`is_centered` to :obj:`True`.
         """
-        # Todo only increase multiplier, if necessary
         if self.is_centered:
             return
         alternation = self.multi*(self.n - 1)
-        self.change_multiplicator(2*self.multi)
+        self.double_multiplicator()
         self._G -= alternation
         self._flag_is_centered = True
         return
@@ -246,7 +240,7 @@ class Grid:
         alternation = (self.multi // 2) * (self.n - 1)
         self._G += alternation
         self._flag_is_centered = False
-        self.change_multiplicator(self.multi // 2)
+        self.halve_multiplicator()
         return
 
     def reshape(self, shape):
@@ -295,14 +289,20 @@ class Grid:
         print("Number of Total Grid Points = {}".format(self.size))
         if self.dim is not 1:
             print("Grid Points per Dimension = {}".format(self.n))
-
+        if self.multi is not 1:
             print("Multiplicator = {}".format(self.multi))
             print("Internal Step Size = {}".format(self.d))
         print("Physical Step Size = {}".format(self.d * self.multi))
-        if self.multi is not 1:
-            print('Is centered Grid = {}'.format(self.is_centered))
+        print('Is centered Grid = {}'.format(self.is_centered))
         print("Boundaries:\n{}".format(self.boundaries))
         if physical_grids:
             print('Physical Grid:')
             print(self.G*self.d)
         print('')
+
+G = Grid()
+G.setup(1, [5], 0.1)
+G.print(True)
+
+G.double_multiplicator()
+G.print(True)
