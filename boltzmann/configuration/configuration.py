@@ -25,34 +25,15 @@ class Configuration:
           * main classes need to be linked for that!
 
         - Add Plotting-function to grids
-
-    Attributes
-    ----------
-    s : :class:`Species`:
-        Contains all data about the simulated Specimen.
-    t : :class:`Grid`
-        Contains all data about simulation time and time step size.
-        :attr:`~boltzmann.configuration.Configuration.t.G`
-        denotes the times at which the results are written out to HDD.
-    p : :class:`~boltzmann.configuration.Grid`
-        Contains all data about Position-Space.
-    sv : :class:`~boltzmann.configuration.SVGrid`
-        Contains all data about the Velocity-Space of each Specimen.
-        V-Spaces of distinct Specimen differ in step size
-        and number of grid points.
-        Maximum physical values may differ slightly between specimen.
-    cols : :class:`~boltzmann.configuration.Collisions`
-        Describes the collisions on the SV-Grid.
     """
-
     def __init__(self):
-        # Most Attributes are set up separately
-        # Public Attributes
-        self.s = b_spc.Species()
-        self.t = b_grd.Grid()
-        self.p = b_grd.Grid()
-        self.sv = b_svg.SVGrid()
-        self.cols = b_col.Collisions(self)
+        # Most Attributes are Private and set up separately
+        # Read Only Properties
+        self._s = b_spc.Species()
+        self._t = b_grd.Grid()
+        self._p = b_grd.Grid()
+        self._sv = b_svg.SVGrid()
+        self._cols = b_col.Collisions(self)
         # Read-Write Properties
         self._animated_moments = np.array([['Mass',
                                             'Momentum_X'],
@@ -71,13 +52,58 @@ class Configuration:
         return
 
     @property
+    def s(self):
+        """:obj:`Species`:
+        Contains all data about the simulated Specimen.
+        """
+        return self._s
+
+    @property
+    def t(self):
+        """:obj:`Grid`
+        Contains all data about simulation time and time step size.
+
+        * :attr:`Grid.G` denotes the time steps
+          at which the results are written out to HDD
+        * :attr:`Grid.multi` denotes the number of calculation steps
+          between two writes.
+
+        """
+        return self._t
+
+    @property
+    def p(self):
+        """:obj:`Grid`
+        Contains all data about Position-Space.
+        """
+        return self._p
+
+    @property
+    def sv(self):
+        """:obj:`SVGrid`
+        Contains all data about the Velocity-Space of each Specimen.
+        V-Spaces of distinct Specimen differ in step size
+        and number of grid points.
+        Maximum physical values may differ slightly between specimen.
+        """
+        return self._sv
+
+    @property
+    def cols(self):
+        """:obj:`Collisions`
+        Describes the collisions on :attr:`sv.G`.
+         """
+        return self._cols
+
+    @property
     def supported_output(self):
         """:obj:`set` of :obj:`str`:
-        Set of all currently supported moments."""
+        Set of all currently supported moments.
+        """
         supported_output = {'Mass',
-                            'Momentum X',
-                            'Momentum Y',
-                            'Momentum Z',
+                            'Momentum_X',
+                            'Momentum_Y',
+                            'Momentum_Z',
                             'Momentum_Flow_X',
                             'Momentum_Flow_Y',
                             'Momentum_Flow_Z',
@@ -90,19 +116,24 @@ class Configuration:
     @property
     def supported_selection_schemes(self):
         """:obj:`set` of :obj:`str`:
-        Set of all currently supported selection schemes for collisions."""
+        Set of all currently supported selection schemes
+        for collisions.
+        """
         supported_selection_schemes = {'Complete'}
         return supported_selection_schemes
 
     @property
     def animated_moments(self):
-        """:obj:`list` of :obj:`str`:
-        List of the Moments to be stored and animated"""
+        """:obj:`~numpy.ndarray` of :obj:`str`:
+        Array of the moments to be stored and animated.
+
+        Every single moment is an element of :attr:`supported_output`.
+        """
         return self._animated_moments
 
     @animated_moments.setter
     def animated_moments(self, array_of_moments):
-        for mom in array_of_moments:
+        for mom in array_of_moments.flatten():
             if mom not in self.supported_output:
                 message = "Unsupported Output: {}" \
                           "".format(mom)
@@ -113,7 +144,8 @@ class Configuration:
     @property
     def collision_selection_scheme(self):
         """:obj:`str`:
-        Selection Scheme for Collisions"""
+        Selection Scheme for Collisions,
+        is an element of :attr:`supported_selection_schemes`"""
         return self._collision_selection_scheme
 
     @collision_selection_scheme.setter
@@ -133,6 +165,10 @@ class Configuration:
                      alpha_list=None,
                      name=None,
                      color=None):
+        """Adds a Specimen to :attr:`~Configuration.s`.
+
+        Directly calls :meth:`Species.add_specimen`
+        """
         self.s.add_specimen(mass,
                             alpha_list,
                             name,
@@ -142,6 +178,13 @@ class Configuration:
                        max_time,
                        number_time_steps,
                        calculations_per_time_step=1):
+        """Sets up :attr:`~Configuration.t`.
+
+        1. Calculates step size
+        2. Calls :meth:`Grid.setup`
+        3. Calls :meth:`Grid.reshape`:
+           Changes shape from (1,1) to (1,)
+        """
         step_size = max_time / (number_time_steps - 1)
         self.t.setup(1,
                      [number_time_steps],
@@ -154,9 +197,13 @@ class Configuration:
                                  dimension,
                                  list_number_of_points_per_dimension,
                                  step_size):
+        """Sets up :attr:`~Configuration.p`.
+
+        Directly calls :meth:`Grid.setup`.
+        """
         self.p.setup(dimension,
                      list_number_of_points_per_dimension,
-                     step_size, )
+                     step_size)
         return
 
     def configure_velocity_space(self,
@@ -165,6 +212,13 @@ class Configuration:
                                  max_v,
                                  shape='rectangular',
                                  offset=None):
+        """Sets up :attr:`~Configuration.sv`.
+
+        1. Generates a default Velocity :class:`Grid`
+        2. Calls :meth:`SVGrid.setup`
+          with the newly generated Velocity :class:`Grid`
+          as a parameter
+        """
         step_size = 2 * max_v / (grid_points_x_axis - 1)
         number_of_points_per_dimension = [grid_points_x_axis] * dimension
         v = b_grd.Grid()
@@ -177,35 +231,27 @@ class Configuration:
                       offset)
         return
 
+    # Todo move to calculation
     def setup(self):
-        """Prepares Configuration for Initialization """
-        self.check_integrity(ignore_collisions=True)
-        self.cols.setup()
+        """Prepares Configuration for Initialization,
+         by generating the Collisions"""
         self.check_integrity()
+        self.cols.setup()
         return
-
-    # Todo implement this function
-    # def get_config_file_address(self, name?):
-    #     """Returns a files address
-    #     of the config file or stored moments or stored animation"""
-    #     files = [self.cnf.file_name + '_' + mom
-    #              for mom in moments]
-    #     return files
 
     #####################################
     #            Verification           #
     #####################################
-    def check_integrity(self,
-                        ignore_collisions=False):
-        """Sanity Check"""
+    def check_integrity(self):
+        """Sanity Check. Checks Integrity of all Attributes"""
         self.s.check_integrity()
         self.t.check_integrity()
         self.p.check_integrity()
         self.sv.check_integrity()
+        assert self.t.dim == 1
+        assert self.t.G.shape == (self.t.size,)
         assert self.sv.dim >= self.p.dim
-        # Todo Assert Collisions
-        # if not ignore_collisions:
-        # assert collisions
+        assert self.sv.size.size == self.s.n
         return
 
     def print(self,
