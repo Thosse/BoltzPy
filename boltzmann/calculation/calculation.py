@@ -107,7 +107,7 @@ class Calculation:
 
         # Todo Remove output, replace by appending current results
         self.output = np.zeros(shape=(self._cnf.t.size,
-                                      len(self._cnf.animated_moments),
+                                      self._cnf.animated_moments.size,
                                       self._cnf.s.n,
                                       self._cnf.p.size),
                                dtype=float)
@@ -167,7 +167,7 @@ class Calculation:
         self.check_conditions()
 
         cal_time = time()
-        print('Calculating...',
+        print('Calculating...          ',
               end='\r')
         for (i_w, t_w) in enumerate(self._cnf.t.G):
             while self.t_cur != t_w:
@@ -176,13 +176,13 @@ class Calculation:
                 rem_time = round((self._cnf.t.size*self._cnf.t.multi
                                   / self.t_cur - 1)
                                  * (time() - cal_time), 2)
-                print('Calculating...{}'
+                print('Calculating...{}          '
                       ''.format(rem_time),
                       end='\r')
             # Todo replace output by writing to file
             # self.write_results()
             self.output[i_w, ...] = self.f_out.apply(self.data)
-        print("Calculating...Done\n"
+        print("Calculating...Done          \n"
               "Time taken =  {} seconds"
               "".format(round(time() - cal_time, 2)))
         return self.output

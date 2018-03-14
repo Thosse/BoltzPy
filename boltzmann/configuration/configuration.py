@@ -3,6 +3,7 @@ from . import grid as b_grd
 from . import svgrid as b_svg
 from . import collisions as b_col
 
+import numpy as np
 
 from sys import stdout as stdout
 
@@ -53,7 +54,9 @@ class Configuration:
         self.sv = b_svg.SVGrid()
         self.cols = b_col.Collisions(self)
         # Read-Write Properties
-        self._animated_moments = ['Mass']
+        self._animated_moments = np.array([['Mass', 'Momentum_X'],
+                                           ['Momentum_X', 'Momentum_Flow_X'],
+                                           ['Energy', 'Energy_Flow_X']])
         self._collision_selection_scheme = 'Complete'
         # Todo self.knudsen_number = 1
         self.collision_steps_per_time_step = 1
@@ -69,11 +72,16 @@ class Configuration:
         """:obj:`set` of :obj:`str`:
         Set of all currently supported moments."""
         supported_output = {'Mass',
-                            'Mass_Flow',
-                            'Momentum',
-                            'Momentum_Flow',
+                            'Momentum X',
+                            'Momentum Y',
+                            'Momentum Z',
+                            'Momentum_Flow_X',
+                            'Momentum_Flow_Y',
+                            'Momentum_Flow_Z',
                             'Energy',
-                            'Energy_Flow'}
+                            'Energy_Flow_X',
+                            'Energy_Flow_Y',
+                            'Energy_Flow_Z'}
         return supported_output
 
     @property
@@ -201,7 +209,7 @@ class Configuration:
         """Prints all Properties for Debugging Purposes"""
         print('\n========CONFIGURATION========\n')
         print('Configuration Name: ')  # Todo + self.file_name)
-        print('Animated Moments:\n{}'.format(self.animated_moments))
+        print('Animated Moments:\n{}'.format(self.animated_moments.flatten()))
         print('Collision Selection Scheme: '
               '{}'.format(self.collision_selection_scheme))
         print('Collision Steps per Time Step: {}'

@@ -44,6 +44,7 @@ class Animation:
         return
 
     def animate(self, data):
+        print(data.shape)
         ani = animation.FuncAnimation(self.figure,
                                       self.update_data,
                                       fargs=(data,
@@ -52,6 +53,7 @@ class Animation:
                                       frames=self.cnf.t.size,
                                       interval=1,
                                       blit=False)
+        input()
         if self.save_animation:
             # Todo Do this properly
             print('add Saving Method!')
@@ -61,14 +63,14 @@ class Animation:
             #          dpi=300)
             # print('Saving Animation         -- %.3e s\n' % (time() - sav_t))
         else:
-            plt.show()
+            plt.show("Press any Key: ")
         return
 
-    def update_data(self, i, data, lines):
-        for i_m in range(data.shape[1]):
-            for i_sp in range(data.shape[2]):
-                lines[i_m, i_sp].set_data(self.cnf.p.G*self.cnf.p.d,
-                                          data[i, i_m, i_sp, :])
+    def update_data(self, t, data, lines):
+        for m in range(data.shape[1]):
+            for s in range(data.shape[2]):
+                lines[m, s].set_data(self.cnf.p.G*self.cnf.p.d,
+                                     data[t, m, s, :])
         return lines
 
     def setup_figure(self):
@@ -99,10 +101,12 @@ class Animation:
             assert False
         # list of all subplots
         axes = []
-        for (i_m, name) in enumerate(self.cnf.animated_moments):
+        moments = self.cnf.animated_moments.flatten()
+        for (i_m, name) in enumerate(moments):
             # Todo This grid shape should be customizable
-            # add subplot into a 3x2 grid
-            ax = self.figure.add_subplot(1, 1, i_m + 1)
+            # add subplot in with shape as in cnf.animated_moments
+            shape = self.cnf.animated_moments.shape
+            ax = self.figure.add_subplot(shape[0], shape[1], i_m + 1)
             # set range of X-axis
             x_boundary = self.cnf.p.boundaries
             x_min = x_boundary[0]
@@ -110,7 +114,7 @@ class Animation:
             ax.set_xlim(x_min, x_max)
             # set range of Y-axis, based on occurring values in data
             # TODO check if there is something wrong here
-            y_min = min(0, 1.25 * np.min(data[:, i_m :, :]))
+            y_min = min(0, 1.25 * np.min(data[:, i_m, :, :]))
             y_max = 1.25 * np.max(data[:, i_m, :, :])
             ax.set_ylim(y_min, y_max)
             # give subplots titles
@@ -134,7 +138,8 @@ class Animation:
         a structured array for easy addressing.
         """
         lines = []
-        for (m, name) in enumerate(self.cnf.animated_moments):
+        moments = self.cnf.animated_moments.flatten()
+        for (m, name) in enumerate(moments):
             moment_lines = []
             for s in range(self.cnf.s.n):
                 # initialize line without any data
