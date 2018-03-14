@@ -54,9 +54,12 @@ class Configuration:
         self.sv = b_svg.SVGrid()
         self.cols = b_col.Collisions(self)
         # Read-Write Properties
-        self._animated_moments = np.array([['Mass', 'Momentum_X'],
-                                           ['Momentum_X', 'Momentum_Flow_X'],
-                                           ['Energy', 'Energy_Flow_X']])
+        self._animated_moments = np.array([['Mass',
+                                            'Momentum_X'],
+                                           ['Momentum_X',
+                                            'Momentum_Flow_X'],
+                                           ['Energy',
+                                            'Energy_Flow_X']])
         self._collision_selection_scheme = 'Complete'
         # Todo self.knudsen_number = 1
         self.collision_steps_per_time_step = 1
@@ -91,7 +94,6 @@ class Configuration:
         supported_selection_schemes = {'Complete'}
         return supported_selection_schemes
 
-    # Todo use np.array -> make use of shape property?
     @property
     def animated_moments(self):
         """:obj:`list` of :obj:`str`:
@@ -99,12 +101,13 @@ class Configuration:
         return self._animated_moments
 
     @animated_moments.setter
-    def animated_moments(self, list_of_moments):
-        if any([mom not in self.supported_output
-                for mom in list_of_moments]):
-            # Todo throw exception
-            assert False
-        self._animated_moments = list_of_moments
+    def animated_moments(self, array_of_moments):
+        for mom in array_of_moments:
+            if mom not in self.supported_output:
+                message = "Unsupported Output: {}" \
+                          "".format(mom)
+                raise AttributeError(message)
+        self._animated_moments = np.array(array_of_moments)
         return
 
     @property
@@ -116,8 +119,9 @@ class Configuration:
     @collision_selection_scheme.setter
     def collision_selection_scheme(self, scheme):
         if scheme not in self.supported_selection_schemes:
-            # Todo throw exception
-            assert False
+            message = 'Unsupported Selection Scheme:' \
+                      '{}'.format(self.collision_selection_scheme)
+            raise AttributeError(message)
         self._collision_selection_scheme = scheme
         return
 
