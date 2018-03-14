@@ -6,10 +6,10 @@ class Species:
     """A simple class encapsulating data about species to be simulated."""
     def __init__(self):
         self._n = 0
-        self._mass = np.zeros(shape=(0,), dtype=int)
-        self._alpha = np.zeros(shape=(0, 0), dtype=float)
-        self._name = []
-        self._color = []
+        self._mass = np.zeros(shape=(self._n,), dtype=int)
+        self._alpha = np.zeros(shape=(self._n, self._n), dtype=float)
+        self._names = []
+        self._colors = []
         self.check_integrity()
         return
 
@@ -46,97 +46,110 @@ class Species:
         return self._alpha
 
     @property
-    def name(self):
+    def names(self):
         """:obj:`list` of :obj:`str`:
         List of Names of all Specimen
         (Used in :class:`~boltzmann.animation.Animation`).
         List of length :attr:`n`.
         """
-        return self._name
+        return self._names
 
     @property
-    def color(self):
+    def colors(self):
         """:obj:`list` of :obj:`str`:
         List of Colors of all Specimen
         (Used in :class:`~boltzmann.animation.Animation`).
         List of length :attr:`n`.
         """
-        return self._color
+        return self._colors
 
     #####################################
     #           Configuration           #
     #####################################
-    # Todo replace alpha_list, name and color by keyword argument
-    # Todo clean up assert and default value block
-    # Tod add documentation (esp. for keywords)
     def add_specimen(self,
                      mass=1,
-                     alpha_list=None,
-                     name=None,
-                     color=None):
-        # assign default values and/or sanity check
-        # sanity check for mass
+                     **kwargs):
+        """Adds a new specimen.
+
+        Parameters
+        ----------
+        mass : int
+        **kwargs : The keyword arguments are used to manually set attributes
+            **alpha_list** set the new row and column of :attr:`alpha`
+
+            **name** set the new element of :attr:`names`
+
+            **color** set the new element of :attr:`colors`
+
+            """
+        # Handle Keywords
         assert type(mass) is int and mass > 0
-        # Give default value to alpha list and sanity check
-        if alpha_list is None:
-            # Todo Check if this is a good default parameter
-            alpha_list = [1] * (self.n+1)
+        if 'name' in kwargs:
+            assert type(kwargs['name']) is str
+            name = kwargs['name']
         else:
-            assert type(alpha_list) is list
-            assert all([type(_) in [int, float] for _ in alpha_list])
-            assert len(alpha_list) is (self.n+1)
-        # Give default value to name and sanity check
-        if name is None:
             name = 'Specimen_' + str(self.n)
+        if 'alpha_list' in kwargs:
+            assert type(kwargs['alpha_list']) is list
+            assert all([type(alpha) in [int, float]
+                        and alpha >= 0
+                        for alpha in kwargs['alpha_list']])
+            assert len(kwargs['alpha_list']) is (self.n + 1)
+            alpha_list = kwargs['alpha_list']
         else:
-            assert type(name) is str
-        # Give default value to color and sanity check
-        if color is None:
-            _free_colors = [c for c in self.supported_colors
-                            if c not in self.color]
-            assert _free_colors is not [], "All Colors are used, add more."
-            color = _free_colors[0]
+            alpha_list = [1] * (self.n+1)
+
+        if 'color' in kwargs:
+            assert kwargs['color'] in self.supported_colors
+            color = kwargs['color']
         else:
-            assert color in self.supported_colors, "Unsupported Color"
-        # Actual Assignment of new values
+            free_color_list = [c for c in self.supported_colors
+                               if c not in self.colors]
+            assert len(free_color_list) is not 0, "All Colors are used, " \
+                                                  "add more."
+            color = free_color_list[0]
+
+        # Assign new values
         self._n += 1
         self._mass.resize(self.n)
-        # Todo find read only properties of array
-        # Todo (self.mass[-1] = mass also works)
         self._mass[-1] = mass
         # Add a row and a column to alpha
         _alpha = np.zeros(shape=(self.n, self.n),
                           dtype=float)
         _alpha[0:-1, 0:-1] = self.alpha
         self._alpha = _alpha
-        # Todo find read only properties of array
-        # Todo see mass
         self._alpha[-1, :] = np.array(alpha_list)
         self._alpha[:, -1] = np.array(alpha_list)
-        self._name.append(name)
-        self._color.append(color)
+        self._names.append(name)
+        self._colors.append(color)
         self.check_integrity()
+        return
 
     def check_integrity(self):
-        """Sanity Check"""
+        """Sanity Check. Checks Integrity of all Attributes"""
         assert type(self.n) is int
         assert self.n >= 0
         assert type(self.mass) is np.ndarray
+        assert self.mass.shape == (self.n,)
+        assert self.mass.dtype == int
         assert all(self.mass > 0)
         assert type(self.alpha) is np.ndarray
         assert self.alpha.shape == (self.n, self.n)
-        assert type(self.name) is list
-        assert len(self.name) is self.n
-        assert all([type(name) is str for name in self.name])
-        assert len(self.color) is self.n
-        assert type(self.color) is list
+        assert self.alpha.dtype == float
+        assert np.all(self.alpha >= 0)
+        assert type(self.names) is list
+        assert len(self.names) is self.n
+        assert all([type(name) is str for name in self.names])
+        assert len(self.colors) is self.n
+        assert type(self.colors) is list
         assert all([color in self.supported_colors
-                    for color in self.color])
+                    for color in self.colors])
 
     def print(self):
         """Prints all Properties for Debugging Purposes"""
         print("Number of Specimen = {}".format(self.n))
-        print("Names of Specimen  = {}".format(self.name))
+        print("Names of Specimen  = {}".format(self.names))
         print("Masses of Specimen = {}".format(self.mass))
         print("Collision-Factor-Matrix = \n{}".format(self.alpha))
-        print("Colors of Specimen = {}".format(self.color))
+        print("Colors of Specimen = {}".format(self.colors))
+        return

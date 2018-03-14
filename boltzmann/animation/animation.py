@@ -146,7 +146,7 @@ class Animation:
                 line = self.axes[m].plot([],
                                          [],
                                          linestyle='-',
-                                         color=self.cnf.s.color[s],
+                                         color=self.cnf.s.colors[s],
                                          linewidth=2)
                 # plot returns a tuple, we only need the first element
                 line = line[0]
@@ -156,7 +156,7 @@ class Animation:
 
     def setup_legend(self):
         self.figure.legend(self.lines[0, 0:self.cnf.s.n],
-                           self.cnf.s.name,    # List of Species-Names
+                           self.cnf.s.names,    # List of Species-Names
                            loc='lower center',  # Position Legend at the bottom
                            ncol=min(self.cnf.s.n, 8),   # use at most 8 columns
                            mode='expand',       # expand legend horizontally
