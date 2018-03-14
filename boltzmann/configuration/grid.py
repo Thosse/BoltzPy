@@ -134,7 +134,7 @@ class Grid:
         dimension : :obj:`int`
         number_of_points_per_dimension : :obj:`int`
         step_size : :obj:`int`
-        form : :obj:`int`, optional
+        form : :obj:`str`, optional
         multi : :obj:`int`, optional
         """
         self._dim = dimension
@@ -244,7 +244,7 @@ class Grid:
         return
 
     def reshape(self, shape):
-        """Changes the shape of (:attr:`G`)."""
+        """Changes the shape of :attr:`G`."""
         self._G = self._G.reshape(shape)
         return
 
