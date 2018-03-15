@@ -4,5 +4,8 @@
 # ignore all build folders
 *build/
 
+# ignore Simulations folder
+Simulations/
+
 # ignore .idea folder
 .idea/

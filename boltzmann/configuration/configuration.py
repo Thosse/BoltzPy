@@ -12,6 +12,7 @@ class Configuration:
     r"""Handles User Input and sets up the Simulation Parameters
 
     .. todo::
+        - Add Knudsen Number Attribute or Property?
         - add proper file_name initialization/property
           config_file_name : :obj:`str`
           file_path : :obj:`str`
@@ -41,13 +42,13 @@ class Configuration:
                                            ['Energy',
                                             'Energy_Flow_X']])
         self._collision_selection_scheme = 'Complete'
-        # Todo self.knudsen_number = 1
         self.collision_steps_per_time_step = 1
         self.order_operator_splitting = 1
         self.order_transport = 1
         self.order_collision = 1
-        # Todo self._config_file_name = None
-        # Todo self.file_path = None
+        self._name = 'default'
+        self._path = '/home/thomas/GPU_Server/' \
+                     'Promotion/Software/BoltzPy/Simulations/'
         return
 
     @property
@@ -156,6 +157,38 @@ class Configuration:
         self._collision_selection_scheme = scheme
         return
 
+    @property
+    def name(self):
+        """:obj:`str` :
+        Name of the current Configuration.
+        Important for reading and writing to/from HDD.
+        """
+        return self._name
+
+    @name.setter
+    def name(self, name):
+        assert type(name) is str
+        if name[-3:] == '.py':
+            name = name[:-3]
+        self._name = name
+        return
+
+    @property
+    def path(self):
+        """:obj:`str` :
+        Path to this Configuration file.
+        Important for reading and writing to/from HDD.
+        """
+        return self._path
+
+    @path.setter
+    def path(self, path):
+        assert type(path) is str
+        if len(path) >= 1 and path[-1] != '/':
+            path += '/'
+        self._path = path
+        return
+
     #####################################
     #           Configuration           #
     #####################################
@@ -247,13 +280,16 @@ class Configuration:
         assert self.t.G.shape == (self.t.size,)
         assert self.sv.dim >= self.p.dim
         assert self.sv.size.size == self.s.n
+        assert type(self.name) is str
+        assert type(self.path) is str
         return
 
     def print(self,
               physical_grids=False):
         """Prints all Properties for Debugging Purposes"""
         print('\n========CONFIGURATION========\n')
-        print('Configuration Name: ')  # Todo + self.file_name)
+        print('Configuration Name: {}'.format(self.name))
+        print('Path to Configuration: {}'.format(self.path))
         print('Animated Moments:\n{}'.format(self.animated_moments))
         print('Collision Selection Scheme: '
               '{}'.format(self.collision_selection_scheme))

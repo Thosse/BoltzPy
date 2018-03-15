@@ -35,6 +35,15 @@ class Animation:
         self.setup_legend()
         return
 
+    @property
+    def file_address(self):
+        """:obj:`str` :
+        Complete address (path + filename + file type)
+        of output animation file.
+        """
+        file_address = self.cnf.path + self.cnf.name + '.mp4'
+        return file_address
+
     # Todo remove data - read from file
     def run(self, data):
         ani_time = time()
@@ -56,7 +65,7 @@ class Animation:
                                       interval=1,
                                       blit=False)
         if self.save_animation:
-            ani.save('animation.mp4',
+            ani.save(self.file_address,
                      self.writer,
                      dpi=300)
         else:
