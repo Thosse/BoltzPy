@@ -43,11 +43,10 @@ class Animation:
         self.animate(data)
         print('Animating....Done\n'
               'Time taken =  {} seconds'
-              ''.format(round(time() - ani_time, 3)))
+              '\n'.format(round(time() - ani_time, 3)))
         return
 
     def animate(self, data):
-        print(data.shape)
         ani = animation.FuncAnimation(self.figure,
                                       self.update_data,
                                       fargs=(data,
