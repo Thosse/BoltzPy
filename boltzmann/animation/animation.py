@@ -7,32 +7,26 @@ import numpy as np
 
 
 class Animation:
-    r"""Determines Calculation Output and handles animation or results
+    """Handles Animation of the Results
 
-    Attributes
+    Parameters
     ----------
-    save_animation : bool
-        If True, render and save the animation into a video file, but don't
-        play the video. If False, play the video, but don't save it
-    writer : :class:`matplotlib.animation.FFMpegWriter`
-    figure : :class:`matplotlib.figure.Figure`
-        """
+    cnf : :class:`~boltzmann.configuration.Configuration`
+    """
     def __init__(self,
                  cnf,
-                 data,
-                 save_animation=False):
-        self.cnf = cnf
-        # self.moments = self.cnf.animated_moments
-        self.save_animation = save_animation
-        self.writer = animation.writers['ffmpeg'](fps=15, bitrate=1800)
-        # Todo replace this by a filename property of Configuration class
-        # Todo Add configuration attribute: path!
-        # self.files = [self.cnf.file_name + '_' + mom
-        #               for mom in self.cnf.animated_moments]
-        self.figure = self.setup_figure()
-        self.axes = self.setup_axes(data)
-        self.lines = self.setup_plot_lines()
-        self.setup_legend()
+                 save_animation=True):
+        self._cnf = cnf
+        self._save_animation = save_animation
+        self.fig_size = (16, 9)
+        if self._save_animation:
+            self.dpi = 300
+        else:
+            self.dpi = 100
+        self._writer = animation.writers['ffmpeg'](fps=15, bitrate=1800)
+        self._figure = plt.figure()
+        self._axes = np.zeros((0,), dtype=object)
+        self._lines = np.zeros((0,), dtype=object)
         return
 
     @property
@@ -41,60 +35,35 @@ class Animation:
         Complete address (path + filename + file type)
         of output animation file.
         """
-        file_address = self.cnf.path + self.cnf.name + '.mp4'
+        file_address = self._cnf.get_file_address(self._cnf.name, 'mp4')
         return file_address
 
-    # Todo remove data - read from file
-    def run(self, data):
+    def run(self):
+        """Sets up Figure, creates animated plot
+        and either shows it or saves it to disk."""
         ani_time = time()
         print('Animating....',
               end='\r')
-        self.animate(data)
+        self._setup_figure()
+        self._setup_axes()
+        self._setup_lines()
+        self._setup_legend()
+        self._animate()
         print('Animating....Done\n'
               'Time taken =  {} seconds'
               '\n'.format(round(time() - ani_time, 3)))
         return
 
-    def animate(self, data):
-        ani = animation.FuncAnimation(self.figure,
-                                      self.update_data,
-                                      fargs=(data,
-                                             self.lines),
-                                      # init_func=init   # Todo speeds up!
-                                      frames=self.cnf.t.size,
-                                      interval=1,
-                                      blit=False)
-        if self.save_animation:
-            ani.save(self.file_address,
-                     self.writer,
-                     dpi=300)
-        else:
-            plt.show()
+    def _setup_figure(self):
+        if self._cnf.p.dim is not 1:
+            message = 'Animation is currently only implemented ' \
+                      'for 1D Problems'
+            raise NotImplementedError(message)
+        self._figure = plt.figure(figsize=self.fig_size,
+                                  dpi=self.dpi)
         return
 
-    def update_data(self, t, data, lines):
-        for m in range(data.shape[1]):
-            for s in range(data.shape[2]):
-                lines[m, s].set_data(self.cnf.p.G*self.cnf.p.d,
-                                     data[t, m, s, :])
-        return lines
-
-    def setup_figure(self):
-        if self.cnf.p.dim is not 1:
-            message = 'Animation is currently only implemented for 1D Problems'
-            raise NotImplementedError(message)
-        # Todo put this into configuration
-        # Todo add auto configuration
-        fig_size = (16, 9)
-        # Todo put this into configuration
-        # Todo add auto configuration
-        if self.save_animation:
-            dpi = 300
-        else:
-            dpi = 100
-        return plt.figure(figsize=fig_size, dpi=dpi)
-
-    def setup_axes(self, data):
+    def _setup_axes(self):
         """Sets up Subplots (Position and Preferences)
 
         For each animated moment there is a separate coordinate system (axes)
@@ -102,69 +71,141 @@ class Animation:
         This Method specifies the position, the range of values
         and the title for each of these axes.
         """
-        if self.cnf.p.dim is not 1:
-            message = 'Animation is currently only implemented for 1D Problems'
+        if self._cnf.p.dim is not 1:
+            message = 'Animation is currently only implemented ' \
+                      'for 1D Problems'
             raise NotImplementedError(message)
         # list of all subplots
         axes = []
-        moments = self.cnf.animated_moments.flatten()
-        for (i_m, name) in enumerate(moments):
-            # Todo This grid shape should be customizable
-            # add subplot in with shape as in cnf.animated_moments
-            shape = self.cnf.animated_moments.shape
-            ax = self.figure.add_subplot(shape[0], shape[1], i_m + 1)
+        moments = self._cnf.animated_moments.flatten()
+        shape = self._cnf.animated_moments.shape
+        for (i_m, moment) in enumerate(moments):
+            # subplots begin counting at 1
+            ax = self._figure.add_subplot(shape[0], shape[1], i_m + 1)
             # set range of X-axis
-            x_boundary = self.cnf.p.boundaries
-            x_min = x_boundary[0, 0]
-            x_max = x_boundary[1, 0]
-            ax.set_xlim(x_min, x_max)
+            self._set_range(ax)
             # set range of Y-axis, based on occurring values in data
-            # TODO check if there is something wrong here
-            y_min = min(0, 1.25 * np.min(data[:, i_m, :, :]))
-            y_max = 1.25 * np.max(data[:, i_m, :, :])
-            ax.set_ylim(y_min, y_max)
+            self._set_val_limits(ax, moment)
             # give subplots titles
-            ax.set_title(name)
-            # Todo This depends on grid shape (soon customizable)
-            # show X-axis values only on lowest row
-            if i_m < 4:
-                ax.set_xticklabels([])
-
+            ax.set_title(moment)
+            self._set_tick_labels(ax, i_m)
             axes.append(ax)
-        return np.array(axes)
+        self._axes = np.array(axes)
+        return
 
-    def setup_plot_lines(self):
+    def _set_range(self, ax):
+        if self._cnf.p.dim is not 1:
+            message = 'Animation is currently only implemented ' \
+                      'for 1D Problems'
+            raise NotImplementedError(message)
+        x_boundaries = self._cnf.p.boundaries
+        x_min = x_boundaries[0, 0]
+        x_max = x_boundaries[1, 0]
+        ax.set_xlim(x_min, x_max)
+        return
+
+    def _set_val_limits(self, ax, moment):
+        if self._cnf.p.dim is not 1:
+            message = 'Animation is currently only implemented ' \
+                      'for 1D Problems' \
+                      'This needs to be done for 3D plots'
+            raise NotImplementedError(message)
+        min_val = 0
+        max_val = 0
+        for t in self._cnf.t.G:
+            file_address = self._cnf.get_file_address(moment, 'npy', t)
+            result_t = np.load(file_address)
+            min_val = min(min_val, np.min(result_t))
+            max_val = max(max_val, np.max(result_t))
+        ax.set_ylim(1.25 * min_val, 1.25 * max_val)
+        return
+
+    def _set_tick_labels(self, ax, i_m):
+        if self._cnf.p.dim is not 1:
+            message = 'Animation is currently only implemented ' \
+                      'for 1D Problems' \
+                      'This needs to be done for 3D plots'
+            raise NotImplementedError(message)
+        shape = self._cnf.animated_moments.shape
+        last_row = (shape[0]-1) * shape[1]
+        if i_m < last_row:
+            ax.set_xticklabels([])
+        return
+
+    def _setup_lines(self):
         """ Sets up Plot lines
 
-        For each animated moment there is a separate line for each specimen.
-        Each one of those lines is a separate plot,
-        containing data which is updated for each new frame.
-        These plots are located in
-        :attr:`boltzmann.animation.Animation.lines`,
-        a structured array for easy addressing.
+        For each pair of (animated moment, specimen)
+        there is a separate line to be plotted.
+        Since ach one of those lines is a separate plot,
+        it contains data which is updated for each new frame.
+        This date is located in :attr:`_lines`.
         """
+        if self._cnf.p.dim is not 1:
+            message = 'Animation is currently only implemented ' \
+                      'for 1D Problems' \
+                      'This needs to be done for 3D plots'
+            raise NotImplementedError(message)
         lines = []
-        moments = self.cnf.animated_moments.flatten()
-        for (m, name) in enumerate(moments):
+        moments = self._cnf.animated_moments.flatten()
+        for (m, moment) in enumerate(moments):
             moment_lines = []
-            for s in range(self.cnf.s.n):
+            for s in range(self._cnf.s.n):
                 # initialize line without any data
-                line = self.axes[m].plot([],
-                                         [],
-                                         linestyle='-',
-                                         color=self.cnf.s.colors[s],
-                                         linewidth=2)
+                line = self._axes[m].plot([],
+                                          [],
+                                          linestyle='-',
+                                          color=self._cnf.s.colors[s],
+                                          linewidth=2)
                 # plot returns a tuple, we only need the first element
                 line = line[0]
                 moment_lines.append(line)
             lines.append(moment_lines)
-        return np.array(lines)
-
-    def setup_legend(self):
-        self.figure.legend(self.lines[0, 0:self.cnf.s.n],
-                           self.cnf.s.names,    # List of Species-Names
-                           loc='lower center',  # Position Legend at the bottom
-                           ncol=min(self.cnf.s.n, 8),   # use at most 8 columns
-                           mode='expand',       # expand legend horizontally
-                           borderaxespad=0.5)
+        self._lines = np.array(lines)
         return
+
+    def _setup_legend(self):
+        # List of Species-Names
+        names = self._cnf.s.names
+        # Position of the Legend in the figure
+        location = 'lower center'
+        # number of columns in Legend
+        n_columns = self._cnf.s.n
+        self._figure.legend(self._lines[0, :],
+                            names,
+                            loc=location,
+                            ncol=n_columns,
+                            # expand legend horizontally
+                            mode='expand',
+                            borderaxespad=0.5)
+        return
+
+    def _animate(self, ):
+        ani = animation.FuncAnimation(self._figure,
+                                      self._update_data,
+                                      fargs=(self._lines,),
+                                      # Todo speed up!
+                                      # init_func=init
+                                      frames=self._cnf.t.size,
+                                      interval=1,
+                                      blit=False)
+        if self._save_animation:
+            ani.save(self.file_address,
+                     self._writer,
+                     dpi=self.dpi)
+        else:
+            plt.show()
+        return
+
+    def _update_data(self, t, lines):
+        n_specimen = self._cnf.s.n
+        moments = self._cnf.animated_moments.flatten()
+        for (m, moment) in enumerate(moments):
+            file_address = self._cnf.get_file_address(moment,
+                                                      'npy',
+                                                      self._cnf.t.G[t])
+            result_t = np.load(file_address)
+            for s in range(n_specimen):
+                lines[m, s].set_data(self._cnf.p.G*self._cnf.p.d,
+                                     result_t[s, :])
+        return lines

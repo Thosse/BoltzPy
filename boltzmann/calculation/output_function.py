@@ -2,22 +2,18 @@ import numpy as np
 
 
 class OutputFunction:
-    """Processes and stores results for animation.
+    """Provides the :meth:`apply` method which
+    processes the :attr:`Calculation.data`
+    and stores the results on the disk.
 
-    The class provides the
-    :meth:`apply` method which iteratively calculates the specified moments
-    (see :attr:`~boltzmann.configuration.Configuration.animated_moments`)
-    by applying the respective functions in
-    :attr:`f_arr` on the current
-    :attr:`~boltzmann.calculation.Calculation.data` PSV-Grid.
-    The results are currently returned.
-    In the near future they will be logged/appended to a file.
-
-    .. todo::
-      - choose if Positional grid should be dimensional?
-      - implement rest of moment functions
-      - figure out if using self.cnf in f_mass(psv)
-        leads to the Configuration never being deleted from memory
+    The class generates functions (:attr:`f_arr`) for all moments in
+    :attr:`~boltzmann.configuration.Configuration.animated_moments`.
+    These functions
+    take a PSV-Grid (like :attr:`Calculation.data`) as a parameter
+    and return the respective physical property as the result.
+    The :meth:`apply` method iteratively calls all
+    the functions in :attr:`f_arr`
+    and writes each results to a single file on the disk.
 
     Parameters
     ----------
@@ -26,8 +22,15 @@ class OutputFunction:
     def __init__(self,
                  cnf):
         self._cnf = cnf
-        self._f_arr = self.create_function_list()
+        self._f_arr = np.array([], dtype=object)
+        self._setup_f_arr()
         return
+
+    @property
+    def cnf(self):
+        """:obj:`~boltzmann.configuration.Configuration`:
+        Points at the Configuration"""
+        return self._cnf
 
     @property
     def f_arr(self):
@@ -35,23 +38,13 @@ class OutputFunction:
         List of moment generating functions."""
         return self._f_arr
 
-    # Todo Implement write to file routine
-    # @property
-    # def files(self):
-    #     """:obj:`list` of :obj:`function`:
-    #         files : list(str)
-    #     files[i] is the name of the file, to which the results
-    #     of f_arr[i] are appended.
-    #     List of moment generating functions."""
-    #     return self._files
-
-    def create_function_list(self):
-        """Generates the list of moment generating functions"""
+    def _setup_f_arr(self):
+        """Sets up :attr:`f_arr`"""
         f_arr = []
-        for mom in self._cnf.animated_moments.flatten():
+        for mom in self.cnf.animated_moments.flatten():
             if mom == 'Mass':
                 f = self._get_f_mass()
-            # Todo Implement Mass_Flow? == Momentum?
+            # Todo Mass_Flow == Momentum? Ask Hans
             # elif mom is 'Mass_Flow':
             #     f = self._get_f_mass_flow()
             elif mom == 'Momentum_X':
@@ -76,116 +69,142 @@ class OutputFunction:
                 f = self._get_f_energy_flow(2)
             else:
                 message = 'Unsupported Output: {}'.format(mom)
-                raise AttributeError(message)
+                raise NotImplementedError(message)
             f_arr.append(f)
-        return f_arr
+        self._f_arr = np.array(f_arr)
+        return
 
-    # For write_2_HDD this needs a complete Revision
-    def apply(self, data):
-        """Applies functions in :attr:`f_arr` onto the given
-        :attr:`Calculation.data` and returns the result.
-        In the future, the results are written directly onto the HDD.
+    def apply(self, calc):
+        """Processes the current :attr:`Calculation.data`
+        and writes the results to the disk.
+
+        Iteratively applies all functions in :attr:`f_arr`
+        onto the current :attr:`Calculation.data`
+        and writes each result
+        to a single file on the disk.
 
         Parameters
         ----------
-        data : :obj:`~numpy.ndarray` of :obj:`float`
-            The current :attr:`Calculation.data`
-            during :class:`Calculation`.
+        calc : :obj:`Calculation`
         """
-        n_mom = self._cnf.animated_moments.size
-        data_p_shape = data.shape[0:-1]
-        n_specimen = self._cnf.s.n
-        shape = (n_mom,) + (n_specimen,) + data_p_shape
-        result = np.zeros(shape, dtype=float)
-        for (i_f, f) in enumerate(self.f_arr):
-            result[i_f, ...] = f(data)
-        # Todo Add write to file routine here
-        return result
+        moments = self._cnf.animated_moments.flatten()
+        data_p_shape = calc.data.shape[0:-1]
+        n_specimen = self.cnf.s.n
+        result_shape = (n_specimen,) + data_p_shape
+        for (i_m, moment) in enumerate(moments):
+            file_address = self._cnf.get_file_address(moment,
+                                                      'npy',
+                                                      t=calc.t_cur)
+            result = self.f_arr[i_m](calc.data)
+
+            assert result.shape == result_shape
+            np.save(file_address, result)
+        return
 
     def _get_f_mass(self):
-        p_shape = (self._cnf.p.size,)
-        s_n = self._cnf.s.n
+        """Generates and returns generating function for Mass"""
+        p_shape = (self.cnf.p.size,)
+        s_n = self.cnf.s.n
         shape = (s_n,) + p_shape
 
         def f_mass(data):
-            """Returns Mass Distribution of given data."""
+            """Returns Mass for each
+            P-:class:`boltzmann.configuration.Grid` point,
+            based on given data
+            """
             mass = np.zeros(shape, dtype=float)
             for i_s in range(s_n):
-                [beg, end] = self._cnf.sv.index[i_s: i_s+2]
+                [beg, end] = self.cnf.sv.index[i_s: i_s+2]
                 # mass = sum over velocity grid of specimen (last axis)
                 mass[i_s, :] = np.sum(data[..., beg:end], axis=-1)
             return mass
         return f_mass
 
     def _get_f_momentum(self, direction):
+        """Generates and returns generating function for Momentum"""
         assert direction in [0, 1, 2]
-        p_shape = (self._cnf.p.size,)
-        s_n = self._cnf.s.n
+        p_shape = (self.cnf.p.size,)
+        s_n = self.cnf.s.n
         shape = (s_n,) + p_shape
 
         def f_momentum(data):
-            """Returns Mass Distribution of given data."""
+            """Returns Momentum for each
+            P-:class:`boltzmann.configuration.Grid` point,
+            based on given data
+            """
             momentum = np.zeros(shape, dtype=float)
             for s in range(s_n):
-                [beg, end] = self._cnf.sv.index[s: s+2]
-                V_dir = self._cnf.sv.G[beg:end, direction]
+                [beg, end] = self.cnf.sv.index[s: s+2]
+                V_dir = self.cnf.sv.G[beg:end, direction]
                 momentum[s, :] = np.sum(V_dir * data[..., beg:end],
                                         axis=1)
-                momentum[s, :] *= self._cnf.s.mass[s]
+                momentum[s, :] *= self.cnf.s.mass[s]
             return momentum
         return f_momentum
 
     def _get_f_momentum_flow(self, direction):
-        p_shape = (self._cnf.p.size,)
-        s_n = self._cnf.s.n
+        """Generates and returns generating function for Momentum Flow"""
+        p_shape = (self.cnf.p.size,)
+        s_n = self.cnf.s.n
         shape = (s_n,) + p_shape
 
         def f_momentum_flow(data):
-            """Returns Mass Distribution of given data."""
+            """Returns Momentum Flow for each
+            P-:class:`boltzmann.configuration.Grid` point,
+            based on given data
+            """
             momentum_flow = np.zeros(shape, dtype=float)
             for s in range(s_n):
-                [beg, end] = self._cnf.sv.index[s: s+2]
-                V_dir = np.array(self._cnf.sv.G[beg:end, direction])
+                [beg, end] = self.cnf.sv.index[s: s+2]
+                V_dir = np.array(self.cnf.sv.G[beg:end, direction])
                 momentum_flow[s, :] = np.sum(V_dir**2 * data[..., beg:end],
                                              axis=1)
-                momentum_flow[s, :] *= self._cnf.s.mass[s]
+                momentum_flow[s, :] *= self.cnf.s.mass[s]
             return momentum_flow
         return f_momentum_flow
 
     def _get_f_energy(self):
-        p_shape = (self._cnf.p.size,)
-        s_n = self._cnf.s.n
+        """Generates and returns generating function for Energy"""
+        p_shape = (self.cnf.p.size,)
+        s_n = self.cnf.s.n
         shape = (s_n,) + p_shape
 
         def f_energy(data):
-            """Returns Mass Distribution of given data."""
+            """Returns Energy for each
+            P-:class:`boltzmann.configuration.Grid` point,
+            based on given data
+            """
             energy = np.zeros(shape, dtype=float)
             for s in range(s_n):
-                [beg, end] = self._cnf.sv.index[s: s+2]
-                V = np.array(self._cnf.sv.G[beg:end, :])
+                [beg, end] = self.cnf.sv.index[s: s+2]
+                V = np.array(self.cnf.sv.G[beg:end, :])
                 V_norm = np.sqrt(np.sum(V**2, axis=1))
                 energy[s, :] = np.sum(V_norm * data[..., beg:end],
                                       axis=1)
-                energy[s, :] *= 0.5 * self._cnf.s.mass[s]
+                energy[s, :] *= 0.5 * self.cnf.s.mass[s]
             return energy
         return f_energy
 
     def _get_f_energy_flow(self, direction):
-        p_shape = (self._cnf.p.size,)
-        s_n = self._cnf.s.n
+        """Generates and returns generating function for Energy Flow"""
+        p_shape = (self.cnf.p.size,)
+        s_n = self.cnf.s.n
         shape = (s_n,) + p_shape
 
         def f_energy_flow(data):
-            """Returns Mass Distribution of given data."""
+            """Returns Energy Flow for each
+            P-:class:`boltzmann.configuration.Grid` point,
+            based on given data
+            """
             energy_flow = np.zeros(shape, dtype=float)
             for s in range(s_n):
-                [beg, end] = self._cnf.sv.index[s: s + 2]
-                V = np.array(self._cnf.sv.G[beg:end, :])
+                [beg, end] = self.cnf.sv.index[s: s + 2]
+                V = np.array(self.cnf.sv.G[beg:end, :])
                 V_norm = np.sqrt(np.sum(V ** 2, axis=1))
-                V_dir = np.array(self._cnf.sv.G[beg:end, direction])
+                V_dir = np.array(self.cnf.sv.G[beg:end, direction])
                 energy_flow[s, :] = np.sum(V_norm * V_dir * data[..., beg:end],
                                            axis=1)
-                energy_flow[s, :] *= 0.5 * self._cnf.s.mass[s]
+                energy_flow[s, :] *= 0.5 * self.cnf.s.mass[s]
             return energy_flow
 
         return f_energy_flow

@@ -104,13 +104,6 @@ class Calculation:
         # t_w[i_t, :] denotes the weight for t_arr[i_t, :]
         # in the transport step
         # Todo self.t_w = np.zeros((0,), dtype=float)
-
-        # Todo Remove output, replace by appending current results
-        self.output = np.zeros(shape=(self._cnf.t.size,
-                                      self._cnf.animated_moments.size,
-                                      self._cnf.s.n,
-                                      self._cnf.p.size),
-                               dtype=float)
         return
 
     # Todo Edit docstring (attr links)
@@ -179,13 +172,12 @@ class Calculation:
                 print('Calculating...{}          '
                       ''.format(rem_time),
                       end='\r')
-            # Todo replace output by writing to file
-            # self.write_results()
-            self.output[i_w, ...] = self.f_out.apply(self.data)
+            # .write results to disk
+            self.f_out.apply(self)
         print("Calculating...Done          \n"
               "Time taken =  {} seconds"
               "".format(round(time() - cal_time, 2)))
-        return self.output
+        return
 
     def generate_collision_matrix(self):
         if self._cnf.collision_steps_per_time_step == 0:
@@ -255,9 +247,6 @@ class Calculation:
                     self._result[p, v] = new_val
         self._data[...] = self._result[...]
         return
-
-    def write_results(self):
-        self.f_out.apply(self.data)
 
     def check_conditions(self):
         # check Courant-Friedrichs-Levy-Condition

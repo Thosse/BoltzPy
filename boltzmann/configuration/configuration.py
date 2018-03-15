@@ -189,6 +189,39 @@ class Configuration:
         self._path = path
         return
 
+    def get_file_address(self, name, file_type='', t=None):
+        """Returns the file address of the specified moment and time
+
+        Parameters
+        ----------
+        name : str
+            :attr:`Configuration.name` or an element of
+            :attr:`Configuration.animated_moments`
+        file_type : str, optional
+            '', 'npy', or 'mp4'.
+        t : None or int, optional
+            Index of the time grid point in :Attr:`Configuration.t`
+
+        Returns
+        -------
+        str
+            File address on the disk.
+        """
+        assert type(name) in [str, np.str_]
+        assert name in self.animated_moments or name == self.name
+        assert file_type in ['', 'npy', 'mp4']
+        if t is not None:
+            assert t in self.t.G
+        file_address = self.path
+        if name in self.animated_moments:
+            file_address += 'Numerical_Results/'
+        file_address += name
+        if t is not None:
+            file_address += '_{}'.format(t)
+        if file_type in ['npy', 'mp4']:
+            file_address += '.' + file_type
+        return file_address
+
     #####################################
     #           Configuration           #
     #####################################
