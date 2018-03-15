@@ -19,10 +19,11 @@ class Animation:
         """
     def __init__(self,
                  cnf,
-                 data):
+                 data,
+                 save_animation=False):
         self.cnf = cnf
         # self.moments = self.cnf.animated_moments
-        self.save_animation = False
+        self.save_animation = save_animation
         self.writer = animation.writers['ffmpeg'](fps=15, bitrate=1800)
         # Todo replace this by a filename property of Configuration class
         # Todo Add configuration attribute: path!
@@ -37,10 +38,12 @@ class Animation:
     # Todo remove data - read from file
     def run(self, data):
         ani_time = time()
+        print('Animating....',
+              end='\r')
         self.animate(data)
-        print("Animation - Done\n"
-              "Time taken =  {} seconds"
-              "".format(round(time() - ani_time, 3)))
+        print('Animating....Done\n'
+              'Time taken =  {} seconds'
+              ''.format(round(time() - ani_time, 3)))
         return
 
     def animate(self, data):
@@ -53,17 +56,12 @@ class Animation:
                                       frames=self.cnf.t.size,
                                       interval=1,
                                       blit=False)
-        input()
         if self.save_animation:
-            # Todo Do this properly
-            print('add Saving Method!')
-            # sav_t = time()
-            # ani.save(cf_path + '_' + cf_name + '_animation.mp4',
-            #          WRITER,
-            #          dpi=300)
-            # print('Saving Animation         -- %.3e s\n' % (time() - sav_t))
+            ani.save('animation.mp4',
+                     self.writer,
+                     dpi=300)
         else:
-            plt.show("Press any Key: ")
+            plt.show()
         return
 
     def update_data(self, t, data, lines):
@@ -75,8 +73,8 @@ class Animation:
 
     def setup_figure(self):
         if self.cnf.p.dim is not 1:
-            print("This is only defined for 1D Problems!")
-            assert False
+            message = 'Animation is currently only implemented for 1D Problems'
+            raise NotImplementedError(message)
         # Todo put this into configuration
         # Todo add auto configuration
         fig_size = (16, 9)
@@ -97,8 +95,8 @@ class Animation:
         and the title for each of these axes.
         """
         if self.cnf.p.dim is not 1:
-            print("This is only defined for 1-D Problems!")
-            assert False
+            message = 'Animation is currently only implemented for 1D Problems'
+            raise NotImplementedError(message)
         # list of all subplots
         axes = []
         moments = self.cnf.animated_moments.flatten()
