@@ -269,15 +269,16 @@ class Grid:
         if self.G.ndim is 1:
             assert self.dim is 1
             assert self.G.shape == (self.size,)
+            assert self.boundaries.shape == (2,)
         else:
             assert self.G.shape == (self.size, self.dim)
+            assert self.boundaries.shape == (2, self.dim)
         assert type(self.multi) is int
         assert self.multi >= 1
         assert (self.G % self.multi == 0).all
         assert type(self.is_centered) is bool
         if self.is_centered:
             assert self.multi % 2 is 0
-        assert self.boundaries.shape == (2, self.dim)
         return
 
     def print(self, physical_grids=False):
