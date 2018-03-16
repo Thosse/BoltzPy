@@ -5,6 +5,7 @@ from . import collisions as b_col
 
 import numpy as np
 
+import os
 from sys import stdout as stdout
 
 
@@ -13,9 +14,9 @@ class Configuration:
 
     .. todo::
         - Add Knudsen Number Attribute or Property?
-        - add proper file_name initialization/property
-          config_file_name : :obj:`str`
-          file_path : :obj:`str`
+        - improve name and path attributes:
+          Currently you need to change path first, then name,
+          otherwise unnecessary folders are created in the old path
         - link Species and SVGrid somehow
           -> adding Species, after setting up SVGrid
           should delete SVGrid or at least update it
@@ -46,9 +47,9 @@ class Configuration:
         self.order_operator_splitting = 1
         self.order_transport = 1
         self.order_collision = 1
-        self._name = 'default'
-        self._path = '/home/thomas/GPU_Server/' \
-                     'Promotion/Software/BoltzPy/Simulations/'
+        self._path = __file__[:-40] + 'Simulations/'
+        self._name = ''
+        self.name = 'default'
         return
 
     @property
@@ -158,22 +159,6 @@ class Configuration:
         return
 
     @property
-    def name(self):
-        """:obj:`str` :
-        Name of the current Configuration.
-        Important for reading and writing to/from HDD.
-        """
-        return self._name
-
-    @name.setter
-    def name(self, name):
-        assert type(name) is str
-        if name[-3:] == '.py':
-            name = name[:-3]
-        self._name = name
-        return
-
-    @property
     def path(self):
         """:obj:`str` :
         Path to this Configuration file.
@@ -186,7 +171,37 @@ class Configuration:
         assert type(path) is str
         if len(path) >= 1 and path[-1] != '/':
             path += '/'
+        if not os.path.exists(path):
+            message = 'The specified file path does not exist:\n' \
+                      '{}'.format(path)
+            raise FileNotFoundError(message)
+
         self._path = path
+        return
+
+    @property
+    def name(self):
+        """:obj:`str` :
+        Name of the current Configuration.
+        Important for reading and writing to/from HDD.
+        """
+        return self._name
+
+    @name.setter
+    def name(self, name):
+        assert type(name) is str
+        if name[-3:] == '.py':
+            name = name[:-3]
+
+        # Make sure Subfolder for Numerical Results exists
+        path_to_subfolder = self.path + self.name + '/'
+        if not os.path.exists(path_to_subfolder):
+            print('No directory for numerical results found!')
+            os.makedirs(path_to_subfolder)
+            print('Made directory:\n'
+                  '{}'.format(path_to_subfolder))
+
+        self._name = name
         return
 
     def get_file_address(self, name, file_type='', t=None):
@@ -214,7 +229,7 @@ class Configuration:
             assert t in self.t.G
         file_address = self.path
         if name in self.animated_moments:
-            file_address += 'Numerical_Results/'
+            file_address += self.name + '/'
         file_address += name
         if t is not None:
             file_address += '_{}'.format(t)
@@ -297,7 +312,8 @@ class Configuration:
         """Prepares Configuration for Initialization,
          by generating the Collisions"""
         self.check_integrity()
-        self.cols.setup()
+        if self.collision_steps_per_time_step >= 1:
+            self.cols.setup()
         return
 
     #####################################
