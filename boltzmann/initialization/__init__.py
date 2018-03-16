@@ -1,21 +1,21 @@
 r"""
 Initialization Submodule
 ========================
-The Initialization class provides a framework to set up the
+The :py:class:`~boltzmann.initialization.Initialization`
+submodule provides a framework to:
 
-* initial states of inner points.
-* boundary points and conditions
-  (Input/output points with time conditions on v, rho,..;
-  boundary point with specified reflections)
+* Set up a set of initialization
+  :py:class:`~boltzmann.initialization.Rule`
+  which specify the
 
-of the PSV-Grid.
+  * initial states of inner points
+  * Behaviour in the Simulation, e.g.
 
- * :py:class:`boltzmann.initialization.Initialization`
+    * Normal Inner point
+    * Input/output points with time conditions on v, rho,..
+    * Boundary point with specified reflections
 
-Classes
--------
-
- * :py:class:`boltzmann.initialization.Rule`
+* Initialize the PSV-Grid on which the Calculation acts
 
 """
 

@@ -3,16 +3,7 @@ import numpy as np
 
 
 class Grid:
-    """Basic class for Positional-Space or Time-Space Grids.
-
-    .. todo::
-        - Todo Add unit tests
-        - Todo Add Circular shape
-        - add rotation of grid (useful for velocities)
-        - Enable non-uniform/adaptive Grids
-          (see :class:`~boltzmann.calculation.Calculation`)
-
-    """
+    """Basic class for Positional-Space or Time-Space Grids."""
     def __init__(self):
         self._dim = 0
         self._form = ''

@@ -1,7 +1,7 @@
+
 from . import species as b_spc
 from . import grid as b_grd
 from . import svgrid as b_svg
-from . import collisions as b_col
 
 import numpy as np
 
@@ -25,7 +25,15 @@ class Configuration:
           * after any change -> check flags of depending classes
           * main classes need to be linked for that!
 
+        :class:`Grid`
+
+        - Add unit tests
+        - Add Circular shape
+        - Add rotation of grid (useful for velocities)
+        - Enable non-uniform/adaptive Grids
+          (see :class:`~boltzmann.calculation.Calculation`)
         - Add Plotting-function to grids
+
     """
     def __init__(self):
         # Most Attributes are Private and set up separately
@@ -34,7 +42,6 @@ class Configuration:
         self._t = b_grd.Grid()
         self._p = b_grd.Grid()
         self._sv = b_svg.SVGrid()
-        self._cols = b_col.Collisions(self)
         # Read-Write Properties
         self._animated_moments = np.array([['Mass',
                                             'Momentum_X'],
@@ -90,13 +97,6 @@ class Configuration:
         return self._sv
 
     @property
-    def cols(self):
-        """:obj:`Collisions` :
-        Describes the collisions on :attr:`sv.G`.
-         """
-        return self._cols
-
-    @property
     def supported_output(self):
         """:obj:`set` of :obj:`str` :
         Set of all currently supported moments.
@@ -118,7 +118,7 @@ class Configuration:
     def supported_selection_schemes(self):
         """:obj:`set` of :obj:`str` :
         Set of all currently supported selection schemes
-        for collisions.
+        for :class:`~boltzmann.calculation.Collisions`.
         """
         supported_selection_schemes = {'Complete'}
         return supported_selection_schemes
@@ -145,7 +145,7 @@ class Configuration:
     @property
     def collision_selection_scheme(self):
         """:obj:`str` :
-        Selection Scheme for Collisions,
+        Selection Scheme for :class:`~boltzmann.calculation.Collisions`,
         is an element of :attr:`supported_selection_schemes`"""
         return self._collision_selection_scheme
 
@@ -305,15 +305,6 @@ class Configuration:
         self.sv.setup(self.s,
                       v,
                       offset)
-        return
-
-    # Todo move to calculation
-    def setup(self):
-        """Prepares Configuration for Initialization,
-         by generating the Collisions"""
-        self.check_integrity()
-        if self.collision_steps_per_time_step >= 1:
-            self.cols.setup()
         return
 
     #####################################

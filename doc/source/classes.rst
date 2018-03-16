@@ -27,9 +27,6 @@ The Configuration submodule
     :members:
 .. autoclass:: boltzmann.configuration.SVGrid
     :members:
-.. autoclass:: boltzmann.configuration.Collisions
-    :members:
-
 
 
 The Initialization submodule
@@ -47,6 +44,8 @@ The Calculation submodule
 .. autoclass:: boltzmann.calculation.Calculation
     :members:
 .. autoclass:: boltzmann.calculation.OutputFunction
+    :members:
+.. autoclass:: boltzmann.calculation.Collisions
     :members:
 
 The Animation submodule

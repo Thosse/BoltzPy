@@ -1,5 +1,6 @@
 
 import numpy as np
+from scipy.sparse import csr_matrix
 
 from time import time
 
@@ -26,11 +27,19 @@ class Collisions:
           (this probably needs several additional functions).
     """
     def __init__(self, cnf):
+        self._cnf = cnf
         self._collision_arr = np.array([], dtype=int)
         self._weight_arr = np.array([], dtype=float)
         self._n = 0
-        self._cnf = cnf
+        self._mat = csr_matrix(np.array([[]]))
+        self.setup()
         return
+
+    @property
+    def cnf(self):
+        """:obj:`~boltzmann.configuration.Configuration`:
+        Points at the Configuration"""
+        return self._cnf
 
     @property
     def collision_arr(self):
@@ -65,11 +74,12 @@ class Collisions:
         return self._n
 
     @property
-    def cnf(self):
-        """:obj:`~boltzmann.configuration.Configuration`:
-        Points at the Configuration"""
-        return self._cnf
+    def mat(self):
+        return self._mat
 
+    #####################################
+    #           Configuration           #
+    #####################################
     def setup(self):
         """Generates the Collisions, based on the Selection Scheme"""
         gen_col_time = time()
@@ -91,6 +101,7 @@ class Collisions:
               'Time taken =  {} seconds\n'
               'Total Number of Collisions = {}\n'
               ''.format(round(time() - gen_col_time, 3), self.n))
+        self.generate_collision_matrix()
         self.check_integrity()
         return
 
@@ -223,7 +234,8 @@ class Collisions:
 
     @staticmethod
     def _meets_energy_conservation(d, pv):
-        """Checks if the collision denoted by v fulfills energy conservation.:
+        """Checks if the collision denoted by pv
+        fulfills energy conservation
 
         Parameters
         ----------
@@ -253,6 +265,33 @@ class Collisions:
                                + d[1] * (pv[1, 1]**2))
         post_energy = post_energy.sum()
         return np.allclose(pre_energy, post_energy)
+
+    def generate_collision_matrix(self):
+        if self._cnf.collision_steps_per_time_step == 0:
+            return None
+        gen_mat_time = time()
+        print('Generating Collision Matrix...',
+              end='\r')
+        # Size of complete velocity grid
+        rows = self._cnf.sv.index[-1]
+        # Number of different collisions
+        columns = self.n
+        col_matrix = np.zeros(shape=(rows, columns),
+                              dtype=float)
+        for [i_col, col] in enumerate(self.collision_arr):
+            # Negative sign for pre-collision velocities
+            # => necessary for stability
+            #   v[i]*v[j] - v[k]*v[l] is used as collision term
+            #   => v'[*] = ... - X*u[*]
+            col_weight = self._cnf.t.d * self.weight_arr[i_col]
+            col_matrix[col, i_col] = [-1, 1, -1, 1]
+            col_matrix[col, i_col] *= col_weight
+        col_mat = csr_matrix(col_matrix)
+        self._mat = col_mat
+        print("Generating Collision Matrix...Done\n"
+              "Time taken =  {} seconds\n"
+              "".format(round(time() - gen_mat_time, 2)))
+        return
 
     #####################################
     #           Verification            #

@@ -1,26 +1,19 @@
 r"""
 Configuration Submodule
 =======================
-The Configuration submodule provides the following functionalities:
+The :py:class:`~boltzmann.configuration.Configuration`
+submodule provides the following functionalities:
 
-* Specify the simulated Specimen
-* Configure Time-, Positional-Space-, and Velocity-Space-Grids
-* Generate the Collisions, based on the Velocity-Space-Grids (SV-Grids)
-
- * :py:class:`boltzmann.configuration.Configuration`
- 
-Classes
-----------
-
- * :py:class:`boltzmann.configuration.Species`
- * :py:class:`boltzmann.configuration.Grid`
- * :py:class:`boltzmann.configuration.SVGrid`
- * :py:class:`boltzmann.configuration.Collisions`
+ * Specify the simulated
+   :py:class:`~boltzmann.configuration.Species`
+ * Configure Time-:py:class:`~boltzmann.configuration.Grid`
+   and Positional-Space-:py:class:`~boltzmann.configuration.Grid`
+ * Configure Specimen-Velocity-Grids
+   (:py:class:`~boltzmann.configuration.SVGrid`)
 
 """
 
 from .configuration import Configuration
-from .species import Species
 from .grid import Grid
+from .species import Species
 from .svgrid import SVGrid
-from .collisions import Collisions
