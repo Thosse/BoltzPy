@@ -8,28 +8,21 @@ from time import time
 
 
 class Calculation:
-    """Manages calculation process based on minimal set of parameters.
+    """Manages calculation process
 
-    This class focuses purely on performance
-    and readily sacrifices readability.
-    For equivalent, more understandable, but less performant Code
+    For equivalent, straightforward, but less performant Code
     see the CalculationTest Class!
 
     ..todo::
-        - write out current time_step (updated terminal output)
         - decide on t_arr:
             * is it an integer, or array(int)
             * for higher order transport -> multiple entries?
         - Properly implement calculation( switches for Orders, vectorized))
-        - Definition of t_arr is only temporary
         - directly use p_flag? shrink it down
           (only 1 flag(==0) for inner points necessary)?
           Use p_flag as an array of pointers, that point to their
           calculation function (depending on their type)
         - implement complete output, for testing
-        - Move collisions to calculation?
-
-
         - Implement complex Geometries for P-Grid:
 
             * Each P-Grid Point has a list of Pointers to its Neighbours
@@ -48,8 +41,8 @@ class Calculation:
               * Add a Array with the additional points - Array_1
               * The Entries of the additional Points are interpolated
                 from the neighbours in the coarse grid
-              * Fill List_1 with Pointers to the new, finer neighbouring points
-                in Array_1
+              * Fill List_1 with Pointers to the new,
+                finer neighbouring points in Array_1
               * Note that it's necessary to check for some points, if they've
                 been added already, by neighbouring points
                 (for each Neighbour in List_0, check List_1).
@@ -60,8 +53,10 @@ class Calculation:
                 to add "Ghost-Boundary-Points" to the neighbouring points
                 of the finer Grid.
                 There is a PHD-Thesis about this. -> Find it
-              * Those Ghost points are only interpolated from their Neighbours
-                there is no extra transport & collision step necessary for them
+              * Those Ghost points are only interpolated
+                from their Neighbours
+                there is no extra transport & collision step necessary
+                for them
               * When moving to a finer Grid, the time-step is halved
                 for both transport and collision on all Grids.
                 This is not that bad, as for Collisions only the number of
@@ -77,11 +72,6 @@ class Calculation:
     ----------
     cnf : :class:`~boltzmann.configuration.Configuration`
     ini : :class:`~boltzmann.initialization.Initialization`
-
-    Attributes
-    ----------
-    t_cur : int
-        Current time step.
     """
     def __init__(self,
                  cnf,
@@ -93,8 +83,8 @@ class Calculation:
         self._result = np.copy(self.data)
         self._p_flag = ini.p_flag
         self._f_out = b_opf.OutputFunction(cnf)
-        # Public Attributes
-        self.t_cur = cnf.t.G[0]
+        self._t_cur = cnf.t.G[0]
+        self._cal_time = time()     # to estimate remaining time
         # t_arr: np.ndarray(int)
         # t_arr is used in the ** transport step **.
         # Each t_arr[i_v, _] denotes an index difference in P - Space,
@@ -108,39 +98,47 @@ class Calculation:
         return
 
     @property
+    def cnf(self):
+        """:obj:`~boltzmann.configuration.Configuration`:
+        Points at the Configuration"""
+        return self._cnf
+
+    @property
     def cols(self):
         """:obj:`Collisions` :
-        Describes the collisions on :attr:`sv.G`.
-         """
+        Describes the :class:`Collisions` that are applied at
+        the collision step (:meth:`~_calc_collision_step`).
+        """
         return self._cols
 
-    # Todo Edit docstring (attr links)
     @property
     def data(self):
         """:obj:`~numpy.ndarray` of :obj:`float`:
-        State of the simulation.
+        Current state of the simulation
 
-        At time step t, position p and velocity v:
+        At time step :attr:`t_cur`, position p and velocity v:
 
-            data[p, v] = f(t, p, v).
+            data[p, v] = f(:attr:`t_cur`, p, v).
 
-        Both Collisions and Transport steps
-        read their data from :attr:`data`
-        and write the results to :attr:`_result`.
-        Afterwards :attr:`data` and :attr:`_result` are either synchronized
-        (data[:] =  _results[:])
-        or swapped (data, _results = _results, data).
         Array of shape
-        ( :attr:`boltzmann.Configuration.p`.size,
-        :attr:`boltzmann.Configuration.sv.index` [-1]).
+        (:attr:`cnf`.
+        :attr:`~boltzmann.configuration.Configuration.p`.
+        :attr:`~boltzmann.configuration.Grid.size`,
+        :attr:`cnf`.
+        :attr:`~boltzmann.configuration.Configuration.sv`.
+        :attr:`~boltzmann.configuration.SVGrid.index` [-1]).
         """
         return self._data
 
     @property
     def p_flag(self):
         """:obj:`~numpy.ndarray` of :obj:`int`:
+        Currently p_flag does nothing.
+
+        In the future:
+
         For each P-:class:`~boltzmann.configuration.Grid` point :obj:`p`,
-        :attr:`p_flag` [:obj:`p`] describes the category of :obj:`p`
+        :attr:`p_flag` [:obj:`p`] describes its category
         (see
         :attr:`~boltzmann.initialization.Initialization.supported_categories`).
 
@@ -152,48 +150,66 @@ class Calculation:
         """
         return self._p_flag
 
-    # Todo Compare to output_func docs and recheck, docstring
     @property
     def f_out(self):
         """:obj:`~boltzmann.calculation.OutputFunction`:
-        Processes :attr:`data`
-        in the specified intervals
-        (see :attr:`~boltzmann.configuration.Configuration.t`)
-        and returns the results.
-        In the future it directly stores the results on HDD.
         """
         return self._f_out
 
-    def run(self):
-        self.check_conditions()
+    @property
+    def t_cur(self):
+        """:obj:`int`:
+        The current time step.
+        """
+        return self._t_cur
 
-        cal_time = time()
+    #####################################
+    #            Calculation            #
+    #####################################
+    def run(self):
+        """Starts the Calculation and writes the interim results
+        to the disk
+        """
+        assert self.check_stability_conditions()
+        self._cal_time = time()
         print('Calculating...          ',
               end='\r')
+
         for (i_w, t_w) in enumerate(self._cnf.t.G):
             while self.t_cur != t_w:
-                self.calc_time_step()
-                self.t_cur += 1
-                rem_time = round((self._cnf.t.size*self._cnf.t.multi
-                                  / self.t_cur - 1)
-                                 * (time() - cal_time), 1)
-                print('Calculating...{}          '
-                      ''.format(rem_time),
-                      end='\r')
-            # .write results to disk
+                self._calculate_time_step()
+            # generate Output and write it to disk
             self.f_out.apply(self)
-        print("Calculating...Done          \n"
+
+        print("Calculating...Done                      \n"
               "Time taken =  {} seconds"
-              "".format(round(time() - cal_time, 3)))
+              "".format(round(time() - self._cal_time, 3)))
         return
 
-    def calc_time_step(self):
-        self.calc_transport_step()
+    def _calculate_time_step(self):
+        """Executes a single time step
+        and prints an estimate of the remaining time to the terminal"""
+        # executing time step
+        self._calculate_transport_step()
         for _ in range(self._cnf.collision_steps_per_time_step):
-            self.calc_collision_step()
+            self._calculate_collision_step()
+        self._t_cur += 1
+        # executing time step
+        self._print_time_estimate()
         return
 
-    def calc_collision_step(self):
+    def _print_time_estimate(self):
+        """Prints an estimate of the remaining time to the terminal"""
+        remaining_steps = self._cnf.t.G[-1] - self.t_cur
+        est_step_duration = (time() - self._cal_time) / self.t_cur
+        estimated_time = round(remaining_steps * est_step_duration, 1)
+        print('Calculating...{}'
+              ''.format(estimated_time),
+              end='\r')
+        return
+
+    def _calculate_collision_step(self):
+        """Executes a single collision step on complete P-Grid"""
         for p in range(self._cnf.p.size):
             u_c0 = self._data[p, self.cols.collision_arr[:, 0]]
             u_c1 = self._data[p, self.cols.collision_arr[:, 1]]
@@ -203,11 +219,12 @@ class Calculation:
             self._data[p] += self.cols.mat.dot(col_factor)
         return
 
-    def calc_transport_step(self):
-        # Todo Check this again, done in a hurry!
+    def _calculate_transport_step(self):
+        """Executes single collision step on complete P-Grid"""
         if self._cnf.p.dim is not 1:
-            print('So far only 1-D Problems are implemented!')
-            assert False
+            message = 'Transport is currently only implemented ' \
+                      'for 1D Problems'
+            raise NotImplementedError(message)
         dt = self._cnf.t.d
         dp = self._cnf.p.d
         for s in range(self._cnf.s.n):
@@ -230,20 +247,23 @@ class Calculation:
         self._data[...] = self._result[...]
         return
 
-    def check_conditions(self):
+    def check_stability_conditions(self):
+        """Checks Stability Conditions
+
+        Returns
+        bool
+            True, if all conditions are satisfied.
+            False, otherwise."""
         # check Courant-Friedrichs-Levy-Condition
         max_v = np.linalg.norm(self._cnf.sv.boundaries, axis=2).max()
         dt = self._cnf.t.d
         dp = self._cnf.p.d
-        cfl = max_v * (dt/dp)
-        assert cfl < 1/2
-        return
+        cfl_condition = max_v * (dt/dp) < 1/2
+        return cfl_condition
 
 
 class CalculationTest(Calculation):
     def calc_collision_step(self):
-        # Todo Check this again, done in a hurry!
-        # Todo removal of boundaries only temporary
         for p in range(0, self._cnf.p.size):
             for [i_col, col] in enumerate(self.cols.collision_arr):
                 d_col = (self.data[p, col[0]] * self.data[p, col[2]]
