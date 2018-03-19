@@ -8,9 +8,6 @@ class OutputFunction:
 
     The class generates functions (:attr:`f_arr`) for all moments in
     :attr:`~boltzmann.configuration.Configuration.animated_moments`.
-    These functions
-    take a PSV-Grid (like :attr:`Calculation.data`) as a parameter
-    and return the respective physical property as the result.
     The :meth:`apply` method iteratively calls all
     the functions in :attr:`f_arr`
     and writes each results to a single file on the disk.
@@ -34,8 +31,12 @@ class OutputFunction:
 
     @property
     def f_arr(self):
-        """:obj:`list` of :obj:`function`:
-        List of moment generating functions."""
+        """:obj:`~numpy.ndarray` of :obj:`function`:
+        Array of moment generating functions.
+
+        These functions
+        take :attr:`Calculation.data` as a parameter
+        and return the respective physical property as the result."""
         return self._f_arr
 
     def _setup_f_arr(self):
@@ -81,7 +82,8 @@ class OutputFunction:
         Iteratively applies all functions in :attr:`f_arr`
         onto the current :attr:`Calculation.data`
         and writes each result
-        to a single file on the disk.
+        to a single file (per function and time step)
+        on the disk.
 
         Parameters
         ----------

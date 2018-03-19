@@ -54,6 +54,7 @@ class Configuration:
         self.order_operator_splitting = 1
         self.order_transport = 1
         self.order_collision = 1
+        # __file__ = path to current file
         self._path = __file__[:-40] + 'Simulations/'
         self._name = ''
         self.name = 'default'

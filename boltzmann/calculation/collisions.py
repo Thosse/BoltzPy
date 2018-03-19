@@ -12,7 +12,7 @@ class Collisions:
     .. todo::
         - check integrity (non neg weights,
           no multiple occurrences, physical correctness)
-        - print method
+        - print method - visualization of collisions
         - **Add Stefan's Generation-Scheme**
         - can both the transport and the collisions
           be implemented as interpolations? -> GPU Speed-Up
@@ -32,75 +32,87 @@ class Collisions:
         self._weight_arr = np.array([], dtype=float)
         self._n = 0
         self._mat = csr_matrix(np.array([[]]))
-        self.setup()
+        if self._cnf.collision_steps_per_time_step != 0:
+            self._setup()
         return
 
     @property
     def cnf(self):
-        """:obj:`~boltzmann.configuration.Configuration`:
-        Points at the Configuration"""
+        """:obj:`~boltzmann.configuration.Configuration` :
+        Points at the Configuration
+        """
         return self._cnf
 
     @property
     def collision_arr(self):
-        """:obj:`~numpy.ndarray` of :obj:`int`:
-        Array of all simulated collisions.
+        """:obj:`~numpy.ndarray` of :obj:`int` :
+        Array of all simulated collisions
 
-        A collision :obj:`c` is described by the 4-tuple
-        :attr:`c_arr` [ :obj:`c`, :].
+        Each collision :obj:`c` is described by the 4-tuple
+        :attr:`collision_arr` [ :obj:`c`, :].
         It is an array of 4 indices of the
         :obj:`~boltzmann.configuration.SVGrid`,
         ordered is as follows:
 
-            * :obj:`c_arr[c, 0]` = v_pre_collision of Specimen 1
-            * :obj:`c_arr[c, 1]` = v_post_collision of Specimen 1
-            * :obj:`c_arr[c, 2]` = v_pre_collision of Specimen 2
-            * :obj:`c_arr[c, 3]` = v_post_collision of Specimen 2
+            * :obj:`collision_arr` [c, 0]`
+              = pre collision velocity of Specimen 1
+            * :obj:`collision_arr` [c, 1]`
+              = post collision velocity of Specimen 1
+            * :obj:`collision_arr` [c, 2]`
+              = pre collision velocity of Specimen 2
+            * :obj:`collision_arr` [c, 3]`
+              = post collision velocity of Specimen 2
         """
         return self._collision_arr
 
     @property
     def weight_arr(self):
-        """:obj:`~numpy.ndarray` of :obj:`float`:
+        """:obj:`~numpy.ndarray` of :obj:`float` :
         Array of numeric integration weights
-        for each collision in c_arr.
-        Array of shape=(:attr:`~boltzmann.configuration.Collisions.n`,)
+        for each collision in
+        :obj:`collision_arr`.
+        Array of shape=(:attr:`n`,)
         """
         return self._weight_arr
 
     @property
     def n(self):
-        """:obj:`int`: Total number of Collisions."""
+        """:obj:`int` : Total number of Collisions"""
         return self._n
 
     @property
     def mat(self):
+        """:obj:`~scipy.sparse.csr.csr_matrix` :
+        Auxiliary Matrix (sparse), for fast execution of
+        the collision step in :meth:`Calculation.run`
+        """
         return self._mat
 
     #####################################
     #           Configuration           #
     #####################################
-    def setup(self):
-        """Generates the Collisions, based on the Selection Scheme"""
+    def _setup(self):
+        """Generates the :obj:`collision_arr`,
+        based on the
+        :attr:`~boltzmann.configuration.Configuration.collision_selection_scheme`
+        """
         gen_col_time = time()
         print('Generating Collision Array...', end='\r')
-
         if self.cnf.collision_selection_scheme == 'Complete':
             if self.cnf.sv.form is 'rectangular':
                 self._generate_collisions_complete()
             else:
                 raise AttributeError('Currently, only rectangular '
                                      'grids are supported')
-
         else:
             message = 'Unsupported Selection Scheme:' \
                       '{}'.format(self.cnf.collision_selection_scheme)
             raise AttributeError(message)
-
         print('Generating Collision Array...Done\n'
               'Time taken =  {} seconds\n'
               'Total Number of Collisions = {}\n'
               ''.format(round(time() - gen_col_time, 3), self.n))
+
         self.generate_collision_matrix()
         self.check_integrity()
         return

@@ -153,6 +153,7 @@ class Calculation:
     @property
     def f_out(self):
         """:obj:`~boltzmann.calculation.OutputFunction`:
+        Handles generation and saving of interim results
         """
         return self._f_out
 
@@ -248,9 +249,10 @@ class Calculation:
         return
 
     def check_stability_conditions(self):
-        """Checks Stability Conditions
+        """Checks Courant-Friedrichs-Levy Condition
 
         Returns
+        -------
         bool
             True, if all conditions are satisfied.
             False, otherwise."""
