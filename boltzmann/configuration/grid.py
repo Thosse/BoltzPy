@@ -101,6 +101,9 @@ class Grid:
 
         Array of shape (2, :attr:`dim`).
         """
+        # in uninitialized Grids: Min/Max operation raises Errors
+        if self.size == 0:
+            return np.zeros((2, self.dim), dtype=float)
         min_val = np.min(self.G, axis=0)
         max_val = np.max(self.G, axis=0)
         bound = np.array([min_val, max_val]) * self.d
