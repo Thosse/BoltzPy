@@ -1,13 +1,17 @@
 
 from time import time
 import matplotlib.pyplot as plt
-import matplotlib.animation as animation
+import matplotlib.animation as mpl_ani
 
 import numpy as np
 
 
 class Animation:
     """Handles Animation of the Results
+
+    Sets up :obj:`matplotlib.animation` object
+    with a separate subplot for each animated moment
+    and a separate line per specimen and moment.
 
     Parameters
     ----------
@@ -23,7 +27,7 @@ class Animation:
             self.dpi = 300
         else:
             self.dpi = 100
-        self._writer = animation.writers['ffmpeg'](fps=15, bitrate=1800)
+        self._writer = mpl_ani.writers['ffmpeg'](fps=15, bitrate=1800)
         self._figure = plt.figure()
         self._axes = np.zeros((0,), dtype=object)
         self._lines = np.zeros((0,), dtype=object)
@@ -181,14 +185,14 @@ class Animation:
         return
 
     def _animate(self, ):
-        ani = animation.FuncAnimation(self._figure,
-                                      self._update_data,
-                                      fargs=(self._lines,),
-                                      # Todo speed up!
-                                      # init_func=init
-                                      frames=self._cnf.t.size,
-                                      interval=1,
-                                      blit=False)
+        ani = mpl_ani.FuncAnimation(self._figure,
+                                    self._update_data,
+                                    fargs=(self._lines,),
+                                    # Todo speed up!
+                                    # init_func=init
+                                    frames=self._cnf.t.size,
+                                    interval=1,
+                                    blit=False)
         if self._save_animation:
             ani.save(self.file_address,
                      self._writer,
