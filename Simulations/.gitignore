@@ -1,0 +1,5 @@
+# This Directory contains Simulation data
+# Git should ignore everything in this derectory
+*
+# Except this file
+!.gitignore
