@@ -55,9 +55,8 @@ class Configuration:
         self.order_transport = 1
         self.order_collision = 1
         # __file__ = path to current file
-        self._path = __file__[:-40] + 'Simulations/'
-        self._name = ''
-        self.name = 'default'
+        self._fileAddress = [__file__[:-40] + 'Simulations/',
+                             'default']
         return
 
     @property
@@ -160,61 +159,57 @@ class Configuration:
         return
 
     @property
-    def path(self):
+    def fileAddress(self):
         """:obj:`str` :
         Path to this Configuration file.
         Important for reading and writing to/from HDD.
         """
-        return self._path
+        return self._fileAddress[0] + self._fileAddress[1]
 
-    @path.setter
-    def path(self, path):
-        assert type(path) is str
-        if len(path) >= 1 and path[-1] != '/':
-            path += '/'
+    @fileAddress.setter
+    def fileAddress(self, newAddress):
+        assert type(newAddress) is str
+        # separate path and file and check validity
+        sep = newAddress.rfind('/')
+        if sep == -1 or sep == len(newAddress) - 1:
+            message = 'The provided file address is invalid:' \
+                      '{}'.format(newAddress)
+            raise AttributeError(message)
+        path = newAddress[0:sep+1]
+        file = newAddress[sep+1:]
+        # Assert valid file name
+        if '.' in file or '"' in file or "'" in file:
+            message = 'The provided file name is invalid:' \
+                      '{}'.format(file)
+            raise AttributeError(message)
+        # Assert Path exists
         if not os.path.exists(path):
-            message = 'The specified file path does not exist:\n' \
+            message = 'The specified file path does not exist.' \
+                      'You need to create it first: ' \
                       '{}'.format(path)
             raise FileNotFoundError(message)
+        # If necessary, create Subfolder for Numerical Results
+        subfolder = path + file + '/'
+        if not os.path.exists(subfolder):
+            os.makedirs(subfolder)
+            print('Created directory for numerical results:\n'
+                  '{}'.format(subfolder))
 
-        self._path = path
+        self._fileAddress[0] = path
+        self._fileAddress[1] = file
         return
 
-    @property
-    def name(self):
-        """:obj:`str` :
-        Name of the current Configuration.
-        Important for reading and writing to/from HDD.
-        """
-        return self._name
-
-    @name.setter
-    def name(self, name):
-        assert type(name) is str
-        if name[-3:] == '.py':
-            name = name[:-3]
-
-        # Make sure Subfolder for Numerical Results exists
-        path_to_subfolder = self.path + self.name + '/'
-        if not os.path.exists(path_to_subfolder):
-            print('No directory for numerical results found!')
-            os.makedirs(path_to_subfolder)
-            print('Made directory:\n'
-                  '{}'.format(path_to_subfolder))
-
-        self._name = name
-        return
-
-    def get_file_address(self, name, file_type='', t=None):
+    # TODO change into get_file_address(
+    # TODO identifier = 'Animation', animated_moments,...
+    def get_file_address(self, identifier, t=None):
         """Returns the file address of the specified moment and time
 
         Parameters
         ----------
-        name : str
-            :attr:`Configuration.name` or an element of
+        identifier : str
+            Identifies the file to be addressed.
+            Must be 'animation' or an
             :attr:`Configuration.animated_moments`
-        file_type : str, optional
-            '', 'npy', or 'mp4'.
         t : None or int, optional
             Index of the time grid point in :Attr:`Configuration.t`
 
@@ -223,19 +218,17 @@ class Configuration:
         str
             File address on the disk.
         """
-        assert type(name) in [str, np.str_]
-        assert name in self.animated_moments or name == self.name
-        assert file_type in ['', 'npy', 'mp4']
+        assert type(identifier) in [str, np.str_]
+        assert (identifier in self.animated_moments
+                or identifier in ['animation'])
         if t is not None:
             assert t in self.t.G
-        file_address = self.path
-        if name in self.animated_moments:
-            file_address += self.name + '/'
-        file_address += name
-        if t is not None:
-            file_address += '_{}'.format(t)
-        if file_type in ['npy', 'mp4']:
-            file_address += '.' + file_type
+        file_address = self.fileAddress
+        if identifier in self.animated_moments:
+            assert t is not None
+            file_address += '/' + identifier + '_{}'.format(t) + '.npy'
+        elif identifier is 'animation':
+            file_address += '.mp4'
         return file_address
 
     #####################################
@@ -321,16 +314,16 @@ class Configuration:
         assert self.t.G.shape == (self.t.size,)
         assert self.sv.dim >= self.p.dim
         assert self.sv.size.size == self.s.n
-        assert type(self.name) is str
-        assert type(self.path) is str
+        assert all([type(_) is str for _ in self._fileAddress])
+        # subfolder for numerical results exists
+        assert os.path.exists(self.fileAddress + '/')
         return
 
     def print(self,
               physical_grids=False):
         """Prints all Properties for Debugging Purposes"""
         print('\n========CONFIGURATION========\n')
-        print('Configuration Name: {}'.format(self.name))
-        print('Path to Configuration: {}'.format(self.path))
+        print('Configuration File Address: {}'.format(self.fileAddress))
         print('Animated Moments:\n{}'.format(self.animated_moments))
         print('Collision Selection Scheme: '
               '{}'.format(self.collision_selection_scheme))

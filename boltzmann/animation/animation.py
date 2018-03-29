@@ -33,15 +33,6 @@ class Animation:
         self._lines = np.zeros((0,), dtype=object)
         return
 
-    @property
-    def file_address(self):
-        """:obj:`str` :
-        Complete address (path + filename + file type)
-        of output animation file.
-        """
-        file_address = self._cnf.get_file_address(self._cnf.name, 'mp4')
-        return file_address
-
     def run(self):
         """Sets up Figure, creates animated plot
         and either shows it or saves it to disk."""
@@ -117,7 +108,7 @@ class Animation:
         min_val = 0
         max_val = 0
         for t in self._cnf.t.G:
-            file_address = self._cnf.get_file_address(moment, 'npy', t)
+            file_address = self._cnf.get_file_address(moment, t)
             result_t = np.load(file_address)
             min_val = min(min_val, np.min(result_t))
             max_val = max(max_val, np.max(result_t))
@@ -194,7 +185,7 @@ class Animation:
                                     interval=1,
                                     blit=False)
         if self._save_animation:
-            ani.save(self.file_address,
+            ani.save(self._cnf.get_file_address('animation'),
                      self._writer,
                      dpi=self.dpi)
         else:
@@ -206,7 +197,6 @@ class Animation:
         moments = self._cnf.animated_moments.flatten()
         for (m, moment) in enumerate(moments):
             file_address = self._cnf.get_file_address(moment,
-                                                      'npy',
                                                       self._cnf.t.G[t])
             result_t = np.load(file_address)
             for s in range(n_specimen):

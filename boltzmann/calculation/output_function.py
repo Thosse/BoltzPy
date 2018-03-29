@@ -95,7 +95,6 @@ class OutputFunction:
         result_shape = (n_specimen,) + data_p_shape
         for (i_m, moment) in enumerate(moments):
             file_address = self._cnf.get_file_address(moment,
-                                                      'npy',
                                                       t=calc.t_cur)
             result = self.f_arr[i_m](calc.data)
 
