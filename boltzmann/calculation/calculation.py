@@ -262,18 +262,3 @@ class Calculation:
         dp = self._cnf.p.d
         cfl_condition = max_v * (dt/dp) < 1/2
         return cfl_condition
-
-
-class CalculationTest(Calculation):
-    def calc_collision_step(self):
-        for p in range(0, self._cnf.p.size):
-            for [i_col, col] in enumerate(self.cols.collision_arr):
-                d_col = (self.data[p, col[0]] * self.data[p, col[2]]
-                         - self.data[p, col[1]] * self.data[p, col[3]])
-                d_col *= self.cols.weight_arr[i_col] * self._cnf.t.d
-                self._result[p, col[0]] -= d_col
-                self._result[p, col[2]] -= d_col
-                self._result[p, col[1]] += d_col
-                self._result[p, col[3]] += d_col
-        self._data = np.copy(self._result)
-        return

@@ -159,24 +159,24 @@ class Configuration:
         return
 
     @property
-    def fileAddress(self):
+    def file_address(self):
         """:obj:`str` :
         Path to this Configuration file.
         Important for reading and writing to/from HDD.
         """
         return self._fileAddress[0] + self._fileAddress[1]
 
-    @fileAddress.setter
-    def fileAddress(self, newAddress):
-        assert type(newAddress) is str
+    @file_address.setter
+    def file_address(self, new_address):
+        assert type(new_address) is str
         # separate path and file and check validity
-        sep = newAddress.rfind('/')
-        if sep == -1 or sep == len(newAddress) - 1:
+        sep = new_address.rfind('/')
+        if sep == -1 or sep == len(new_address) - 1:
             message = 'The provided file address is invalid:' \
-                      '{}'.format(newAddress)
+                      '{}'.format(new_address)
             raise AttributeError(message)
-        path = newAddress[0:sep+1]
-        file = newAddress[sep+1:]
+        path = new_address[0:sep+1]
+        file = new_address[sep+1:]
         # Assert valid file name
         if '.' in file or '"' in file or "'" in file:
             message = 'The provided file name is invalid:' \
@@ -199,8 +199,6 @@ class Configuration:
         self._fileAddress[1] = file
         return
 
-    # TODO change into get_file_address(
-    # TODO identifier = 'Animation', animated_moments,...
     def get_file_address(self, identifier, t=None):
         """Returns the file address of the specified moment and time
 
@@ -223,7 +221,7 @@ class Configuration:
                 or identifier in ['animation'])
         if t is not None:
             assert t in self.t.G
-        file_address = self.fileAddress
+        file_address = self.file_address
         if identifier in self.animated_moments:
             assert t is not None
             file_address += '/' + identifier + '_{}'.format(t) + '.npy'
@@ -316,14 +314,14 @@ class Configuration:
         assert self.sv.size.size == self.s.n
         assert all([type(_) is str for _ in self._fileAddress])
         # subfolder for numerical results exists
-        assert os.path.exists(self.fileAddress + '/')
+        assert os.path.exists(self.file_address + '/')
         return
 
     def print(self,
               physical_grids=False):
         """Prints all Properties for Debugging Purposes"""
         print('\n========CONFIGURATION========\n')
-        print('Configuration File Address: {}'.format(self.fileAddress))
+        print('Configuration File Address: {}'.format(self.file_address))
         print('Animated Moments:\n{}'.format(self.animated_moments))
         print('Collision Selection Scheme: '
               '{}'.format(self.collision_selection_scheme))
