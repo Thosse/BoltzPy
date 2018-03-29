@@ -2,7 +2,7 @@ r"""
 BoltzPy
 ======================
 
-The BoltzPy package is a solver for the boltzmann equation
+The BoltzPy package is a deterministic solver for the boltzmann equation
 to simulate rarefied gases with multiple specimen of
 varying masses.
 It's based on new results in Kinetic gas theory and on discrete velocity models.
@@ -17,13 +17,14 @@ for the simulation of the boltzmann equation for gas mixtures.
 Features:
 
  * Basic Configuration
-
-Planned:
  * Implementation of 1D geometries
  * Basic Initialization
  * Basic Calculation
  * Animation of several characteristic variables
  * Generate all possible collisions
+
+Planned:
+
  * Automatic reduction of collisions (BRECHTKEN/SASSE)
  * Plan and Implement (small-sized) config file
  * Implement 2D and 3D geometries

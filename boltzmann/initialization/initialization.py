@@ -292,6 +292,7 @@ class Initialization:
         for i_p in range(p_flat.size):
             # get active rule
             r = self.rule_arr[p_flat[i_p]]
+            # Todo - simply call r_apply method?
             for i_s in range(self.cnf.s.n):
                 rho = r.rho[i_s]
                 temp = r.temp[i_s]
@@ -299,7 +300,7 @@ class Initialization:
                 end = self.cnf.sv.index[i_s+1]
                 v_grid = self.cnf.sv.G[begin:end]
                 dv = self.cnf.sv.d[i_s]
-                for (i_v, v) in enumerate(v_grid[:, :]):
+                for (i_v, v) in enumerate(v_grid):
                     # Physical Velocity
                     pv = dv * v
                     # Todo np.array(v) only for PyCharm Warning - Check out
