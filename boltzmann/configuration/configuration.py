@@ -55,8 +55,8 @@ class Configuration:
         self.order_transport = 1
         self.order_collision = 1
         # __file__ = path to current file
-        self._fileAddress = [__file__[:-40] + 'Simulations/',
-                             'default']
+        self._fileAddress = ['', '']
+        self.file_address = __file__[:-40] + 'Simulations/default'
         return
 
     @property
