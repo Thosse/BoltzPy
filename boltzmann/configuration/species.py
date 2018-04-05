@@ -13,15 +13,37 @@ class Species:
         self.check_integrity()
         return
 
+    # Todo move into constant
     @property
     def supported_colors(self):
         """:obj:`list` of :obj:`str`:
                 List of all currently supported colors.
                 Used in :class:`~boltzmann.animation.Animation`."""
         supported_colors = ['blue', 'red', 'green',
-                            'yellow', 'black', 'brown',
-                            'orange', 'pink', 'gray']
+                            'yellow', 'brown', 'gray',
+                            'olive', 'purple', 'cyan',
+                            'orange', 'pink', 'lime']
         return supported_colors
+
+    @property
+    def default_parameters(self):
+        """:obj:`dict`: Contains all default values for :meth:`add_specimen`.
+        """
+        free_color_list = [color for color in self.supported_colors
+                           if color not in self._colors]
+        assert len(free_color_list) is not 0, "All Colors are used, " \
+                                              "add more."
+        color = next((color for color in self.supported_colors
+                      if color not in self._colors),
+                     'black')
+        if color is 'black':
+            raise UserWarning('All available colors are used up.'
+                              'Any new specimen will be colored black.')
+        def_par = {'mass': 1,
+                   'name': 'Specimen_' + str(self.n),
+                   'alpha_list': [1] * (self.n + 1),
+                   'color': color}
+        return def_par
 
     @property
     def n(self):
@@ -67,42 +89,35 @@ class Species:
     #           Configuration           #
     #####################################
     def add_specimen(self,
-                     mass=1,
-                     **kwargs):
+                     mass=None,
+                     name=None,
+                     alpha_list=None,
+                     color=None):
         """Adds a new specimen.
 
         Parameters
         ----------
-        mass : int
-        **kwargs : The keyword arguments are used to manually set attributes
-            **alpha_list** set the new row and column of :attr:`alpha`
-
-            **name** set the new element of :attr:`names`
-
-            **color** set the new element of :attr:`colors`
+        mass : int, optional
+        alpha_list : :obj:`list` of :obj:`float`
+            Row and column of :attr:`alpha` collision probability matrix
+        name : :obj:`str`, optional
+        color : :obj:`str`, optional set the new element of :attr:`colors`
 
             """
         # Handle Keywords
-        assert type(mass) is int and mass > 0
-        if 'name' in kwargs:
-            assert type(kwargs['name']) is str
-            name = kwargs['name']
+        if mass is None:
+            mass = self.default_parameters['mass']
+        if name is None:
+            name = self.default_parameters['name']
+        if alpha_list is None:
+            alpha_list = self.default_parameters['alpha_list']
         else:
-            name = 'Specimen_' + str(self.n)
-        if 'alpha_list' in kwargs:
-            assert type(kwargs['alpha_list']) is list
+            assert type(alpha_list) is list
             assert all([type(alpha) in [int, float]
                         and alpha >= 0
-                        for alpha in kwargs['alpha_list']])
-            assert len(kwargs['alpha_list']) is (self.n + 1)
-            alpha_list = kwargs['alpha_list']
-        else:
-            alpha_list = [1] * (self.n+1)
-
-        if 'color' in kwargs:
-            assert kwargs['color'] in self.supported_colors
-            color = kwargs['color']
-        else:
+                        for alpha in alpha_list])
+            assert len(alpha_list) is (self.n + 1)
+        if color is None:
             free_color_list = [c for c in self.supported_colors
                                if c not in self.colors]
             assert len(free_color_list) is not 0, "All Colors are used, " \
@@ -114,10 +129,10 @@ class Species:
         self._mass.resize(self.n)
         self._mass[-1] = mass
         # Add a row and a column to alpha
-        _alpha = np.zeros(shape=(self.n, self.n),
-                          dtype=float)
-        _alpha[0:-1, 0:-1] = self.alpha
-        self._alpha = _alpha
+        alpha = np.zeros(shape=(self.n, self.n),
+                         dtype=float)
+        alpha[0:-1, 0:-1] = self.alpha
+        self._alpha = alpha
         self._alpha[-1, :] = np.array(alpha_list)
         self._alpha[:, -1] = np.array(alpha_list)
         self._names.append(name)
