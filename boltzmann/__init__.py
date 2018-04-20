@@ -33,27 +33,12 @@ Planned:
 
 Classes:
 
-The Main class, which provides a simple framework to write test cases as a
-small python-script:
-
- * :py:class:`boltzmann.BoltzmannPDE`
-
-A framework for testing all implemented methods is provided by:
-
- * :py:class:`boltzmann.BoltzmannTest`
-
-Submodules:
-
-The, mostly autonomic, submodules are:
-
  * :py:mod:`boltzmann.configuration`
  * :py:mod:`boltzmann.initialization`
  * :py:mod:`boltzmann.calculation`
  * :py:mod:`boltzmann.animation`
 """
 
-from .BoltzmannPDE import BoltzmannPDE
-from .BoltzmannTest import BoltzmannTest
 import boltzmann.configuration
 import boltzmann.initialization
 import boltzmann.calculation

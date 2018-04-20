@@ -233,14 +233,12 @@ class Configuration:
     #           Configuration           #
     #####################################
     def add_specimen(self,
-                     mass=1,
                      **kwargs):
         """Adds a Specimen to :attr:`~Configuration.s`.
 
         Directly calls :meth:`Species.add_specimen`
         """
-        self.s.add_specimen(mass,
-                            **kwargs)
+        self.s.add_specimen(**kwargs)
 
     def configure_time(self,
                        max_time,

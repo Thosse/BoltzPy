@@ -8,18 +8,12 @@
 Class Index
 ===========
 
-The Boltzmann module
---------------------
-
-.. autoclass:: boltzmann.BoltzmannPDE
-    :members:
-.. autoclass:: boltzmann.BoltzmannTest
-    :members:
-
 The Configuration submodule
 ---------------------------
 
 .. autoclass:: boltzmann.configuration.Configuration
+    :members:
+.. autoclass:: boltzmann.configuration.Specimen
     :members:
 .. autoclass:: boltzmann.configuration.Species
     :members:

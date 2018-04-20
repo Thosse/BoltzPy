@@ -202,12 +202,12 @@ class Collisions:
         Currently only depends on the colliding Specimen .
         This will change in the future.
         """
-        alpha = self._cnf.s.alpha[specimen[0], specimen[1]]
+        col_rate = self._cnf.s.collision_rate_matrix[specimen[0], specimen[1]]
         n_cols = self._cnf.collision_steps_per_time_step
         if n_cols != 0:
-            return alpha / n_cols
+            return col_rate / n_cols
         else:
-            return alpha
+            return col_rate
 
     @staticmethod
     def _is_collision(d, v, pv):
