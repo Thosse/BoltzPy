@@ -107,6 +107,8 @@ class Species:
         # Handle Keywords
         if mass is None:
             mass = self.default_parameters['mass']
+        else:
+            assert type(mass) is int
         if name is None:
             name = self.default_parameters['name']
         if alpha_list is None:
