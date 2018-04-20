@@ -104,14 +104,6 @@ class Calculation:
         return self._cnf
 
     @property
-    def cols(self):
-        """:obj:`Collisions` :
-        Describes the :class:`Collisions` that are applied at
-        the collision step (:meth:`~_calc_collision_step`).
-        """
-        return self._cols
-
-    @property
     def data(self):
         """:obj:`~numpy.ndarray` of :obj:`float`:
         Current state of the simulation
@@ -212,12 +204,12 @@ class Calculation:
     def _calculate_collision_step(self):
         """Executes a single collision step on complete P-Grid"""
         for p in range(self._cnf.p.size):
-            u_c0 = self._data[p, self.cols.collision_arr[:, 0]]
-            u_c1 = self._data[p, self.cols.collision_arr[:, 1]]
-            u_c2 = self._data[p, self.cols.collision_arr[:, 2]]
-            u_c3 = self._data[p, self.cols.collision_arr[:, 3]]
+            u_c0 = self._data[p, self._cols.collision_arr[:, 0]]
+            u_c1 = self._data[p, self._cols.collision_arr[:, 1]]
+            u_c2 = self._data[p, self._cols.collision_arr[:, 2]]
+            u_c3 = self._data[p, self._cols.collision_arr[:, 3]]
             col_factor = (np.multiply(u_c0, u_c2) - np.multiply(u_c1, u_c3))
-            self._data[p] += self.cols.mat.dot(col_factor)
+            self._data[p] += self._cols.mat.dot(col_factor)
         return
 
     def _calculate_transport_step(self):
