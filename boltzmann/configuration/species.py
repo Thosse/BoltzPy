@@ -19,31 +19,18 @@ class Species:
         if type(item) is int:
             return self._specimen_array[item]
         elif type(item) is str:
-            for s in self._specimen_array:
-                if s.name == item:
-                    return s
-            return None
+            item = self._get_item_position(item)
+            return self._specimen_array[item]
         else:
             message = "item must be either the index(int) or name(str)"
             raise TypeError(message)
-
-    @property
-    def supported_colors(self):
-        """:obj:`list` of :obj:`str`:
-                List of all currently supported colors.
-                Used in :class:`~boltzmann.animation.Animation`."""
-        supported_colors = ['blue', 'red', 'green',
-                            'yellow', 'brown', 'gray',
-                            'olive', 'purple', 'cyan',
-                            'orange', 'pink', 'lime']
-        return supported_colors
 
     @property
     def default_parameters(self):
         """:obj:`dict`: Default parameters for :meth:`add_specimen`.
         """
         used_colors = [s.color for s in self._specimen_array]
-        color = next((color for color in self.supported_colors
+        color = next((color for color in self.colors_supported
                       if color not in used_colors),
                      'black')
         # TODO Raise Warning in this case?
@@ -80,6 +67,28 @@ class Species:
         return colors
 
     @property
+    def colors_supported(self):
+        """:obj:`list` of :obj:`str`:
+                List of all default colors."""
+        supported_colors = ['blue', 'red', 'green',
+                            'yellow', 'brown', 'gray',
+                            'olive', 'purple', 'cyan',
+                            'orange', 'pink', 'lime',
+                            'black']
+        return supported_colors
+
+    @property
+    def colors_unused(self):
+        """:obj:`list` of :obj:`str`:
+                        List of all default colors without any
+                        :obj:`Specimen` of that color."""
+        # black color should only used, if all other colors are used up
+        used_colors = self.colors + ['black']
+        unused_colors = [color for color in self.colors_supported
+                         if color not in used_colors]
+        return unused_colors
+
+    @property
     def names(self):
         """:obj:`list` of :obj:`int` :
         List of names of all :class:`Specimen`.
@@ -90,12 +99,53 @@ class Species:
     #####################################
     #           Configuration           #
     #####################################
+    def edit_specimen(self,
+                      item,
+                      name=None,
+                      color=None,
+                      mass=None,
+                      collision_rate=None):
+        """Edits attributes of a :obj:`Specimen`.
+
+        Parameters
+        ----------
+        item : :obj:`int` or :obj:`str`
+            Index or name of the :obj:`Specimen` to be edited
+        name : :obj:`str`, optional
+        color : :obj:`str`, optional
+        mass : int, optional
+        collision_rate : :obj:`list` of :obj:`float`, optional
+            Determines the collision probability between two specimen.
+            Row (and column) of :attr:`collision_rate_matrix`.
+        """
+        item = self._get_item_position(item)
+
+        # Handle Keyword Arguments
+        if name is not None:
+            b_spm.Specimen.check_integrity(name=name)
+            self[item].name = name
+        if color is not None:
+            b_spm.Specimen.check_integrity(color=color)
+            self[item].color = color
+        if mass is not None:
+            b_spm.Specimen.check_integrity(mass=mass)
+            self[item].mass = mass
+        if collision_rate is not None:
+            if type(collision_rate) is list:
+                collision_rate = np.array(collision_rate)
+            b_spm.Specimen.check_integrity(collision_rate=collision_rate)
+            self.collision_rate_matrix[item, :] = collision_rate
+            self.collision_rate_matrix[:, item] = collision_rate
+
+        self.check_integrity()
+        return
+
     def add_specimen(self,
                      name=None,
                      color=None,
                      mass=None,
                      collision_rate=None):
-        """Adds a new specimen.
+        """Adds a new :obj:`Specimen`.
 
         Parameters
         ----------
@@ -107,45 +157,67 @@ class Species:
             Row (and column) of :attr:`collision_rate_matrix`.
         """
         # Handle Keyword Arguments
-        if name is None:
-            name = self.default_parameters['name']
-        else:
-            b_spm.Specimen.check_integrity(name=name)
-        if color is None:
-            color = self.default_parameters['color']
-        else:
-            b_spm.Specimen.check_integrity(color=color)
-        if mass is None:
-            mass = self.default_parameters['mass']
-        else:
-            b_spm.Specimen.check_integrity(mass=mass)
-        if collision_rate is None:
-            collision_rate = self.default_parameters['collision_rate']
-        else:
-            if type(collision_rate) is list:
-                collision_rate = np.array(collision_rate)
-            b_spm.Specimen.check_integrity(collision_rate=collision_rate)
+        default = self.default_parameters
 
         # Add the new row/column to self.collision_rate_matrix
         tmp_col_rat_mat = np.zeros(shape=(self.n + 1, self.n + 1),
                                    dtype=float)
         tmp_col_rat_mat[0:-1, 0:-1] = self.collision_rate_matrix
         self.collision_rate_matrix = tmp_col_rat_mat
-        self.collision_rate_matrix[-1, :] = np.array(collision_rate)
-        self.collision_rate_matrix[:, -1] = np.array(collision_rate)
+        self.collision_rate_matrix[-1, :] = default['collision_rate']
+        self.collision_rate_matrix[:, -1] = default['collision_rate']
         self._relink_all_collision_rates()
 
-        # Create and add new Specimen
-        new_specimen = b_spm.Specimen(name,
-                                      color,
-                                      mass,
+        # Create and append default Specimen
+        new_specimen = b_spm.Specimen(default['name'],
+                                      default['color'],
+                                      default['mass'],
                                       self.collision_rate_matrix[-1, :])
         self._specimen_array = np.append(self._specimen_array,
                                          [new_specimen])
+        # edit new Specimen
+        self.edit_specimen(-1,
+                           name=name,
+                           color=color,
+                           mass=mass,
+                           collision_rate=collision_rate)
         self.check_integrity()
         return
 
+    def delete_specimen(self, item):
+        """Removes a :obj:`Specimen`.
+
+        Parameters
+        ----------
+        item : :obj:`int` or :obj:`str`
+            Index or name of the :obj:`Specimen` to be removed.
+        """
+        item = self._get_item_position(item)
+        self._specimen_array = np.delete(self._specimen_array, item)
+        self.collision_rate_matrix = np.delete(self.collision_rate_matrix,
+                                               item,
+                                               axis=0)
+        self.collision_rate_matrix = np.delete(self.collision_rate_matrix,
+                                               item,
+                                               axis=1)
+        self._relink_all_collision_rates()
+        return
+
+    def _get_item_position(self, item):
+        assert type(item) in [int, str]
+        if type(item) is str:
+            item = self.names.index(item)
+        assert type(item) is int
+        if item >= self.n:
+            msg = 'index {} is out of bounds ' \
+                  'for axis 0 ' \
+                  'with size {}'.format(item, self.n)
+            raise IndexError(msg)
+        return item
+
     def _relink_all_collision_rates(self):
+        """Resets the :attr:`Specimen.collision_rate` attributes
+        for every single :obj:`Specimen`"""
         for (i_s, s) in enumerate(self._specimen_array):
             s.collision_rate = self.collision_rate_matrix[i_s, :]
         return
@@ -170,11 +242,12 @@ class Species:
         assert self.collision_rate_matrix.shape == (self.n, self.n)
         return
 
-    def print(self):
+    def print(self, print_collision_rates_separately=False):
         """Prints all Properties for Debugging."""
         print("Number of Specimen = {}".format(self.n))
         for s in self._specimen_array:
-            s.print()
-        print("Collision-Factor-Matrix = \n"
-              "{}".format(self.collision_rate_matrix))
+            s.print(print_collision_rates_separately)
+        if not print_collision_rates_separately:
+            print("Collision-Factor-Matrix = \n"
+                  "{}".format(self.collision_rate_matrix))
         return
