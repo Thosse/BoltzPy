@@ -17,6 +17,9 @@ class Specimen:
         self.check_integrity(self)
         return
 
+    #####################################
+    #            Verification           #
+    #####################################
     @staticmethod
     def check_integrity(check_instance=None,
                         name=None,
@@ -44,6 +47,7 @@ class Specimen:
                                  color=self.color,
                                  mass=self.mass,
                                  collision_rate=self.collision_rate)
+            return
         if name is not None:
             assert type(name) is str
         if color is not None:
