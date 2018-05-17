@@ -94,19 +94,19 @@ class Collisions:
     def _setup(self):
         """Generates the :obj:`collision_arr`,
         based on the
-        :attr:`~boltzmann.configuration.Configuration.collision_selection_scheme`
+        :attr:`~boltzmann.configuration.Configuration.coll_select_scheme`
         """
         gen_col_time = time()
         print('Generating Collision Array...', end='\r')
-        if self.cnf.collision_selection_scheme == 'Complete':
-            if self.cnf.sv.form is 'rectangular':
+        if self.cnf.coll_select_scheme == 'Complete':
+            if self.cnf.sv.form == 'rectangular':
                 self._generate_collisions_complete()
             else:
                 raise AttributeError('Currently, only rectangular '
                                      'grids are supported')
         else:
             message = 'Unsupported Selection Scheme:' \
-                      '{}'.format(self.cnf.collision_selection_scheme)
+                      '{}'.format(self.cnf.coll_select_scheme)
             raise AttributeError(message)
         print('Generating Collision Array...Done\n'
               'Time taken =  {} seconds\n'
@@ -121,7 +121,7 @@ class Collisions:
     # noinspection PyAssignmentToLoopOrWithParameter
     def _generate_collisions_complete(self):
         """Generate all possible, non-useless collisions."""
-        assert self.cnf.collision_selection_scheme is 'Complete'
+        assert self.cnf.coll_select_scheme == 'Complete'
         # collect collisions in these lists
         col_arr = []
         weight_arr = []

@@ -54,7 +54,7 @@ class Specimen:
             assert type(color) is str
             assert color in mpl_colors
         if mass is not None:
-            assert type(mass) == int
+            assert type(mass) in [int, np.int64]
             assert mass > 0
         if collision_rate is not None:
             assert type(collision_rate) is np.ndarray

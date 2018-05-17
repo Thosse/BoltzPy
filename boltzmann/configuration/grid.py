@@ -135,7 +135,7 @@ class Grid:
         self._multi = multi
         self._d = float(step_size) / self._multi
 
-        if form is 'rectangular':
+        if form == 'rectangular':
             self._size = int(self.n.prod())
         else:
             message = "Unsupported Grid Form: {}".format(form)
@@ -149,7 +149,7 @@ class Grid:
         """Call specialized method to construct :attr:`G`,
         based on :attr:`form`.
         """
-        if self.form is 'rectangular':
+        if self.form == 'rectangular':
             self._construct_rectangular_grid()
         else:
             message = "Unsupported Grid Form: {}".format(self.form)
@@ -168,11 +168,11 @@ class Grid:
         mesh_list = np.meshgrid(*list_of_1D_grids)
         grid = np.array(mesh_list, dtype=int)
         # bring meshgrid into desired order/structure
-        if self.dim is 1:
+        if self.dim == 1:
             grid = np.array(grid.transpose((1, 0)))
-        elif self.dim is 2:
+        elif self.dim == 2:
             grid = np.array(grid.transpose((2, 1, 0)))
-        elif self.dim is 3:
+        elif self.dim == 3:
             grid = np.array(grid.transpose((2, 1, 3, 0)))
         else:
             message = "Error - Unsupported Grid dimension: " \
@@ -225,7 +225,7 @@ class Grid:
         """
         if not self.is_centered:
             return
-        assert self.multi % 2 is 0, 'A centered grid should have an even' \
+        assert self.multi % 2 == 0, 'A centered grid should have an even' \
                                     ' multiplicator. ' \
                                     'The current multiplicator is {}' \
                                     ''. format(self.multi)
@@ -238,6 +238,57 @@ class Grid:
     def reshape(self, shape):
         """Changes the shape of :attr:`G`."""
         self._G = self._G.reshape(shape)
+        return
+
+    #####################################
+    #           Serialization           #
+    #####################################
+    @staticmethod
+    def load(hdf5_file):
+        """Creates and Returns a :obj:`Grid` object,
+        based on the parameters in the given file.
+
+        Parameters
+        ----------
+        hdf5_file : h5py.File
+            Opened HDF5 :obj:`Configuration` file.
+
+        Returns
+        -------
+        :obj:`Grid`
+        """
+        grid = Grid()
+        # read data from file
+        dim = int(hdf5_file["Dimension"].value)
+        n = hdf5_file["Points_per_Dimension"].value
+        d = hdf5_file["Step_Size"].value
+        form = hdf5_file["Form"].value
+        multi = int(hdf5_file["Multiplicator"].value)
+        # Todo Check Integrity
+        # setup g
+        grid.setup(dim, n, d, form, multi)
+        grid.check_integrity()
+        return grid
+
+    def save(self, hdf5_file):
+        """Writes the parameters of the :obj:`Species` object
+        to the given file.
+
+        Parameters
+        ----------
+        hdf5_file : h5py.File
+            Opened HDF5 :obj:`Configuration` file.
+        """
+        self.check_integrity()
+        # Clean State of Current group
+        for key in hdf5_file.keys():
+            del hdf5_file[key]
+        # read data from file
+        hdf5_file["Dimension"] = self.dim
+        hdf5_file["Points_per_Dimension"] = self.n
+        hdf5_file["Step_Size"] = self.d
+        hdf5_file["Form"] = self.form
+        hdf5_file["Multiplicator"] = self.multi
         return
 
     #####################################
@@ -256,12 +307,12 @@ class Grid:
         assert type(self.size) is int
         assert self.size >= 2
         assert self.form in self.supported_forms
-        if self.form is 'rectangular':
+        if self.form == 'rectangular':
             assert self.n.prod() == self.size
         assert self.G.dtype == int
         assert self.G.ndim in [1, 2]
-        if self.G.ndim is 1:
-            assert self.dim is 1
+        if self.G.ndim == 1:
+            assert self.dim == 1
             assert self.G.shape == (self.size,)
             assert self.boundaries.shape == (2,)
         else:
@@ -272,7 +323,7 @@ class Grid:
         assert (self.G % self.multi == 0).all
         assert type(self.is_centered) is bool
         if self.is_centered:
-            assert self.multi % 2 is 0
+            assert self.multi % 2 == 0
         return
 
     def print(self, physical_grids=False):
@@ -280,9 +331,9 @@ class Grid:
         print("Dimension = {}".format(self.dim))
         print("Geometric Form = {}".format(self.form))
         print("Number of Total Grid Points = {}".format(self.size))
-        if self.dim is not 1:
+        if self.dim != 1:
             print("Grid Points per Dimension = {}".format(self.n))
-        if self.multi is not 1:
+        if self.multi != 1:
             print("Multiplicator = {}".format(self.multi))
             print("Internal Step Size = {}".format(self.d))
         print("Physical Step Size = {}".format(self.d * self.multi))

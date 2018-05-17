@@ -184,7 +184,7 @@ class Calculation:
         and prints an estimate of the remaining time to the terminal"""
         # executing time step
         self._calculate_transport_step()
-        for _ in range(self._cnf.collision_steps_per_time_step):
+        for _ in range(self._cnf.coll_substeps):
             self._calculate_collision_step()
         self._t_cur += 1
         # executing time step
@@ -214,7 +214,7 @@ class Calculation:
 
     def _calculate_transport_step(self):
         """Executes single collision step on complete P-Grid"""
-        if self._cnf.p.dim is not 1:
+        if self._cnf.p.dim != 1:
             message = 'Transport is currently only implemented ' \
                       'for 1D Problems'
             raise NotImplementedError(message)

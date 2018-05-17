@@ -2,6 +2,7 @@
 from . import specimen as b_spm
 
 import numpy as np
+import h5py
 
 
 class Species:
@@ -220,6 +221,66 @@ class Species:
         for every single :obj:`Specimen`"""
         for (i_s, s) in enumerate(self._specimen_array):
             s.collision_rate = self.collision_rate_matrix[i_s, :]
+        return
+
+    #####################################
+    #           Serialization           #
+    #####################################
+    @staticmethod
+    def load(hdf5_file):
+        """Creates and Returns a :obj:`Species` object,
+        based on the parameters in the given file.
+
+        Parameters
+        ----------
+        hdf5_file : h5py.File
+            Opened HDF5 :obj:`Configuration` file.
+
+        Returns
+        -------
+        :obj:`Species`
+        """
+        s = Species()
+        # read data from file
+        names = hdf5_file["Names"]
+        colors = hdf5_file["Colors"].value
+        masses = hdf5_file["Masses"].value
+        col_rate = hdf5_file["Collision_Rate_Matrix"].value
+        # Todo move into elementwise check_integrity
+        assert len(names.shape) is 1 and len(col_rate.shape) is 2
+        assert names.shape == colors.shape == masses.shape
+        assert col_rate.shape == (names.size, names.size)
+        # setup s iteratively
+        for i in range(names.size):
+            s.add_specimen(name=names[i],
+                           color=colors[i],
+                           mass=masses[i],
+                           collision_rate=col_rate[i, 0:i+1])
+        s.check_integrity()
+        return s
+
+    def save(self, hdf5_file):
+        """Writes the parameters of the :obj:`Species` object
+        to the given file.
+
+        Parameters
+        ----------
+        hdf5_file : h5py.File
+            Opened HDF5 :obj:`Configuration` file.
+        """
+        self.check_integrity()
+        for key in hdf5_file.keys():
+            del hdf5_file[key]
+        # Set special data type for String-Arrays
+        #  noinspection PyUnresolvedReferences
+        h5py_string_type = h5py.special_dtype(vlen=str)
+        # Write Attributes
+        hdf5_file["Names"] = np.array(self.names,
+                                      dtype=h5py_string_type)
+        hdf5_file["Colors"] = np.array(self.colors,
+                                       dtype=h5py_string_type)
+        hdf5_file["Masses"] = self.mass
+        hdf5_file["Collision_Rate_Matrix"] = self.collision_rate_matrix
         return
 
     #####################################

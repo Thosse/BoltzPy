@@ -1,5 +1,7 @@
 numpy
 scipy
 matplotlib
+h5py
+
 # ffmpeg must be installed on system
 # Todo figure out a default case, if ffmpeg is missing

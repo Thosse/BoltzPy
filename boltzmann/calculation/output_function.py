@@ -1,10 +1,12 @@
+
 import numpy as np
+import h5py
 
 
 class OutputFunction:
     """Provides the :meth:`apply` method which
     processes the :attr:`Calculation.data`
-    and stores the results on the disk.
+    and writes the results to the simulation file.
 
     The class generates functions (:attr:`f_arr`) for all moments in
     :attr:`~boltzmann.configuration.Configuration.animated_moments`.
@@ -21,6 +23,7 @@ class OutputFunction:
         self._cnf = cnf
         self._f_arr = np.array([], dtype=object)
         self._setup_f_arr()
+        self._setup_hdf5_subgroups()
         return
 
     @property
@@ -38,6 +41,51 @@ class OutputFunction:
         take :attr:`Calculation.data` as a parameter
         and return the respective physical property as the result."""
         return self._f_arr
+
+    def apply(self, calc):
+        """Processes the current :attr:`Calculation.data`
+        and writes the results to the disk.
+
+        Iteratively applies all moment generating functions
+        in :attr:`f_arr` to the current :attr:`Calculation.data`
+        and writes the results to the simulation file at
+        :attr:`Configuration.file_address<boltzmann.configuration.Configuration.file_address>`.
+
+        Parameters
+        ----------
+        calc : :obj:`Calculation`
+        """
+        moments = self._cnf.animated_moments.flatten()
+        species = self._cnf.s.names
+        time_index = calc.t_cur // self._cnf.t.multi
+        file = h5py.File(self._cnf.file_address)["Results"]
+        for (i_m, moment) in enumerate(moments):
+            result = self.f_arr[i_m](calc.data)
+            for (i_s, specimen) in enumerate(species):
+                file_m = file[specimen][moment]
+                file_m[time_index] = result[i_s]
+        return
+
+    def _setup_hdf5_subgroups(self):
+        file = h5py.File(self._cnf.file_address)
+        # Todo don't overwrite existing results!
+        if "Results" not in file.keys():
+            file.create_group("Results")
+        file_r = file["Results"]
+        for specimen in self._cnf.s.names:
+            if specimen not in file_r.keys():
+                file_r.create_group(specimen)
+            file_s = file_r[specimen]
+            for moment in self._cnf.animated_moments.flatten():
+                if moment not in file_s.keys():
+                    # Todo make property for shape?
+                    # todo this simplifies complete output?
+                    shape = (self._cnf.t.n[0],
+                             self._cnf.p.G.shape[0])
+                    file_s.create_dataset(moment,
+                                          shape=shape,
+                                          dtype=float)
+        return
 
     def _setup_f_arr(self):
         """Sets up :attr:`f_arr`"""
@@ -73,33 +121,6 @@ class OutputFunction:
                 raise NotImplementedError(message)
             f_arr.append(f)
         self._f_arr = np.array(f_arr)
-        return
-
-    def apply(self, calc):
-        """Processes the current :attr:`Calculation.data`
-        and writes the results to the disk.
-
-        Iteratively applies all functions in :attr:`f_arr`
-        onto the current :attr:`Calculation.data`
-        and writes each result
-        to a single file (per function and time step)
-        on the disk.
-
-        Parameters
-        ----------
-        calc : :obj:`Calculation`
-        """
-        moments = self._cnf.animated_moments.flatten()
-        data_p_shape = calc.data.shape[0:-1]
-        n_specimen = self.cnf.s.n
-        result_shape = (n_specimen,) + data_p_shape
-        for (i_m, moment) in enumerate(moments):
-            file_address = self._cnf.get_file_address(moment,
-                                                      t=calc.t_cur)
-            result = self.f_arr[i_m](calc.data)
-
-            assert result.shape == result_shape
-            np.save(file_address, result)
         return
 
     def _get_f_mass(self):

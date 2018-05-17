@@ -2,6 +2,7 @@
 from time import time
 import matplotlib.pyplot as plt
 import matplotlib.animation as mpl_ani
+import h5py
 
 import numpy as np
 
@@ -89,7 +90,7 @@ class Animation:
         return
 
     def _set_range(self, ax):
-        if self._cnf.p.dim is not 1:
+        if self._cnf.p.dim != 1:
             message = 'Animation is currently only implemented ' \
                       'for 1D Problems'
             raise NotImplementedError(message)
@@ -100,18 +101,36 @@ class Animation:
         return
 
     def _set_val_limits(self, ax, moment):
-        if self._cnf.p.dim is not 1:
+        """Sets the range of values (range of the density functions)
+        for the subplot(ax) of the given moment.
+
+        Calculates the minimum and maximum occurring value
+        for this moment over all :obj:`~Configuration.Specimen`.
+        These values are set as the limits of values
+
+        Parameters
+        ----------
+        ax : :obj:`matplotlib.axes._subplots.AxesSubplot`
+            Subplot for moment
+        moment : str
+            Name of the moment
+        """
+        if self._cnf.p.dim != 1:
             message = 'Animation is currently only implemented ' \
                       'for 1D Problems' \
                       'This needs to be done for 3D plots'
             raise NotImplementedError(message)
         min_val = 0
         max_val = 0
-        for t in self._cnf.t.G:
-            file_address = self._cnf.get_file_address(moment, t)
-            result_t = np.load(file_address)
-            min_val = min(min_val, np.min(result_t))
-            max_val = max(max_val, np.max(result_t))
+        species = self._cnf.s.names
+        file = h5py.File(self._cnf.file_address, mode='r')["Results"]
+        for specimen in species:
+            file_m = file[specimen][moment]
+            for t in self._cnf.t.G:
+                i_t = t // self._cnf.t.multi
+                result_t = file_m[i_t]
+                min_val = min(min_val, np.min(result_t))
+                max_val = max(max_val, np.max(result_t))
         ax.set_ylim(1.25 * min_val, 1.25 * max_val)
         return
 
@@ -185,21 +204,21 @@ class Animation:
                                     interval=1,
                                     blit=False)
         if self._save_animation:
-            ani.save(self._cnf.get_file_address('animation'),
+            ani.save(self._cnf.file_address[0:-4] + '.mp4',
                      self._writer,
                      dpi=self.dpi)
         else:
             plt.show()
         return
 
-    def _update_data(self, t, lines):
-        n_specimen = self._cnf.s.n
+    def _update_data(self, time_step, lines):
+        species = self._cnf.s.names
         moments = self._cnf.animated_moments.flatten()
-        for (m, moment) in enumerate(moments):
-            file_address = self._cnf.get_file_address(moment,
-                                                      self._cnf.t.G[t])
-            result_t = np.load(file_address)
-            for s in range(n_specimen):
-                lines[m, s].set_data(self._cnf.p.G*self._cnf.p.d,
-                                     result_t[s, :])
+        file = h5py.File(self._cnf.file_address, mode='r')["Results"]
+        for (i_s, specimen) in enumerate(species):
+            for (i_m, moment) in enumerate(moments):
+                result = file[specimen][moment]
+                result_t = result[time_step]
+                lines[i_m, i_s].set_data(self._cnf.p.G*self._cnf.p.d,
+                                         result_t)
         return lines

@@ -19,7 +19,9 @@ cnf.configure_velocity_space(dimension=2,
                              grid_points_x_axis=4,    # 8
                              max_v=1.5)       # 1.5
 cnf.collision_steps_per_time_step = 1     # 50
-cnf.print()
+cnf.print(False)
+cnf.save()
+
 
 ini = b_ini.Initialization(cnf)
 ini.add_rule('Inner Point',
