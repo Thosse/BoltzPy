@@ -30,12 +30,9 @@ class Species:
     def default_parameters(self):
         """:obj:`dict`: Default parameters for :meth:`add_specimen`.
         """
-        used_colors = [s.color for s in self._specimen_array]
         color = next((color for color in self.colors_supported
-                      if color not in used_colors),
+                      if color not in self.colors),
                      'black')
-        # TODO Raise Warning in this case?
-        # if color is 'black':
         default_params = {
                           'name': 'Specimen_' + str(self.n),
                           'color': color,
@@ -123,18 +120,18 @@ class Species:
 
         # Handle Keyword Arguments
         if name is not None:
-            b_spm.Specimen.check_integrity(name=name)
+            b_spm.Specimen.check_parameters(name=name)
             self[item].name = name
         if color is not None:
-            b_spm.Specimen.check_integrity(color=color)
+            b_spm.Specimen.check_parameters(color=color)
             self[item].color = color
         if mass is not None:
-            b_spm.Specimen.check_integrity(mass=mass)
+            b_spm.Specimen.check_parameters(mass=mass)
             self[item].mass = mass
         if collision_rate is not None:
             if type(collision_rate) is list:
                 collision_rate = np.array(collision_rate)
-            b_spm.Specimen.check_integrity(collision_rate=collision_rate)
+            b_spm.Specimen.check_parameters(collision_rate=collision_rate)
             self.collision_rate_matrix[item, :] = collision_rate
             self.collision_rate_matrix[:, item] = collision_rate
 
@@ -286,13 +283,14 @@ class Species:
     #####################################
     #            Verification           #
     #####################################
+    # Todo add Check_parameters?
     def check_integrity(self):
         """Sanity Check. Checks Integrity of all Attributes"""
         assert type(self.n) is int
         assert self.n >= 0
         for (i_s, s) in enumerate(self._specimen_array):
             assert type(s) is b_spm.Specimen
-            s.check_integrity(check_instance=s)
+            s.check_integrity()
             col_rat_1 = s.collision_rate
             col_rat_2 = self.collision_rate_matrix[i_s, :]
             col_rat_3 = self.collision_rate_matrix[:, i_s]

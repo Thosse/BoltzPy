@@ -59,7 +59,7 @@ class Configuration:
                                            ['Energy',
                                             'Energy_Flow_X']])
         # Setup HDF5 File (stores all Configuration Data)
-        self._fileAddress = ''
+        self._file_address = ''
         self.file_address = file_name
         # Load non-default file, if it exists
         if file_name != "default" and os.path.exists(self.file_address):
@@ -145,14 +145,10 @@ class Configuration:
 
     @animated_moments.setter
     def animated_moments(self, array_of_moments):
-        # Todo move into Check integrity for all setters
-        # + check that shape is 2d
-        for mom in array_of_moments.flatten():
-            if mom not in self.supported_output:
-                message = "Unsupported Output: {}" \
-                          "".format(mom)
-                raise AttributeError(message)
-        self._animated_moments = np.array(array_of_moments)
+        if type(array_of_moments) is list:
+            array_of_moments = np.array(array_of_moments)
+        self.check_parameters(animated_moments=array_of_moments)
+        self._animated_moments = array_of_moments
         return
 
     @property
@@ -164,15 +160,7 @@ class Configuration:
 
     @coll_select_scheme.setter
     def coll_select_scheme(self, scheme):
-        if type(scheme) is not str:
-            message = 'Invalid Type ' \
-                      'for Collision Selection Scheme:' \
-                      '{}'.format(type(scheme))
-            raise TypeError(message)
-        if scheme not in self.supported_selection_schemes:
-            message = 'Unsupported Selection Scheme:' \
-                      '{}'.format(self.coll_select_scheme)
-            raise ValueError(message)
+        self.check_parameters(coll_select_scheme=scheme)
         self._coll_select_scheme = scheme
         return
 
@@ -185,14 +173,7 @@ class Configuration:
 
     @coll_substeps.setter
     def coll_substeps(self, number_of_steps):
-        if type(number_of_steps) is not int:
-            message = 'Invalid Type for Collision sub steps:' \
-                      '{}'.format(type(number_of_steps))
-            raise TypeError(message)
-        if number_of_steps < 0:
-            message = 'Invalid Number of Collision sub steps:' \
-                      '{}'.format(number_of_steps)
-            raise ValueError(message)
+        self.check_parameters(coll_substeps=number_of_steps)
         self._coll_substeps = number_of_steps
         return
 
@@ -205,16 +186,7 @@ class Configuration:
 
     @conv_order_os.setter
     def conv_order_os(self, conv_order):
-        if type(conv_order) is not int:
-            msg = 'Invalid Type for Convergence Order:' \
-                      '{}'.format(type(conv_order))
-            raise TypeError(msg)
-        if conv_order not in [1, 2]:
-            message = 'Invalid Convergence Order:' \
-                      '{}'.format(conv_order)
-            raise ValueError(message)
-        if conv_order != 1:
-            raise NotImplementedError
+        self.check_parameters(conv_order_os=conv_order)
         self._conv_order_os = conv_order
         return
 
@@ -228,16 +200,7 @@ class Configuration:
 
     @conv_order_coll.setter
     def conv_order_coll(self, conv_order):
-        if type(conv_order) is not int:
-            msg = 'Invalid Type for Convergence Order:' \
-                  '{}'.format(type(conv_order))
-            raise TypeError(msg)
-        if conv_order not in [1, 2, 3]:
-            message = 'Invalid Convergence Order:' \
-                      '{}'.format(conv_order)
-            raise ValueError(message)
-        if conv_order != 1:
-            raise NotImplementedError
+        self.check_parameters(conv_order_coll=conv_order)
         self._conv_order_coll = conv_order
         return
 
@@ -251,16 +214,7 @@ class Configuration:
 
     @conv_order_transp.setter
     def conv_order_transp(self, conv_order):
-        if type(conv_order) is not int:
-            msg = 'Invalid Type for Convergence Order:' \
-                  '{}'.format(type(conv_order))
-            raise TypeError(msg)
-        if conv_order not in [1, 2]:
-            message = 'Invalid Convergence Order:' \
-                      '{}'.format(conv_order)
-            raise ValueError(message)
-        if conv_order != 1:
-            raise NotImplementedError
+        self.check_parameters(conv_order_transp=conv_order)
         self._conv_order_transp = conv_order
         return
 
@@ -270,11 +224,10 @@ class Configuration:
         Path to this Configuration file.
         Important for reading and writing to/from HDD.
         """
-        return self._fileAddress
+        return self._file_address
 
     @file_address.setter
     def file_address(self, new_address):
-        assert type(new_address) is str
         # isolate path from address
         sep = new_address.rfind('/')
         if sep == -1:
@@ -311,7 +264,7 @@ class Configuration:
                 raise ValueError(msg)
         # Add '.sim' ending to file name again
         file_name += '.sim'
-        self._fileAddress = path + file_name
+        self._file_address = path + file_name
         return
 
     #####################################
@@ -325,6 +278,7 @@ class Configuration:
         """
         self.s.add_specimen(**kwargs)
 
+    # Todo Choose between step size or number of time steps
     def configure_time(self,
                        max_time,
                        number_time_steps,
@@ -351,6 +305,12 @@ class Configuration:
         """Sets up :attr:`~Configuration.p`.
 
         Directly calls :meth:`Grid.setup`.
+
+        Parameters
+        ----------
+        dimension : :obj:`int`
+        list_number_of_points_per_dimension : :obj:`list` of :obj:`int`
+        step_size : :obj:`float`
         """
         self.p.setup(dimension,
                      list_number_of_points_per_dimension,
@@ -421,7 +381,7 @@ class Configuration:
             self._p = b_grd.Grid.load(file_c["Position_Space"])
         except KeyError:
             self._p = b_grd.Grid()
-        # TODO self._sv = b_svg.SVGrid()
+        # TODO self._sv = b_svg.SVGrid() is not implemented so far
         # Default Parameters
         try:
             key = "Collision_Selection_Scheme"
@@ -455,8 +415,7 @@ class Configuration:
         except KeyError:
             self._animated_moments = None
         file.close()
-        # Todo Ignore None/Unset Values for check Integrity?
-        # self.check_integrity()
+        self.check_integrity()
         return
 
     def save(self, file_address=None):
@@ -500,7 +459,6 @@ class Configuration:
         # Save other Parameters
         file_c["Collision_Selection_Scheme"] = self.coll_select_scheme
         file_c["Collision_Substeps"] = self.coll_substeps
-        # Todo move into subgroup or attributes?
         file_c["Convergence_Order_Operator_Splitting"] = self.conv_order_os
         file_c["Convergence_Order_Transport"] = self.conv_order_transp
         file_c["Convergence_Order_Collision_Operator"] = self.conv_order_coll
@@ -517,17 +475,130 @@ class Configuration:
     #####################################
     #            Verification           #
     #####################################
-    def check_integrity(self):
-        """Sanity Check. Checks Integrity of all Attributes"""
-        self.s.check_integrity()
-        self.t.check_integrity()
-        self.p.check_integrity()
-        self.sv.check_integrity()
-        assert self.t.dim == 1
-        assert self.t.G.shape == (self.t.size,)
-        assert self.sv.dim >= self.p.dim
-        assert self.sv.size.size == self.s.n
-        assert all([type(_) is str for _ in self._fileAddress])
+    def check_integrity(self, complete_check=True):
+        """Sanity Check.
+        Calls :meth:`check_parameters` to check validity of all attributes.
+
+        Parameters
+        ----------
+        complete_check : :obj:`bool`, optional
+            If True, then all attributes must be set (not None).
+            If False, then unassigned attributes are ignored.
+        """
+        self.check_parameters(species=self._s,
+                              time_grid=self._t,
+                              position_grid=self._p,
+                              species_velocity_grid=self._sv,
+                              file_address=self.file_address,
+                              animated_moments=self.animated_moments,
+                              coll_select_scheme=self.coll_select_scheme,
+                              coll_substeps=self.coll_substeps,
+                              conv_order_os=self.conv_order_os,
+                              conv_order_transp=self.conv_order_transp,
+                              conv_order_coll=self.conv_order_coll,
+                              complete_check=complete_check)
+        return
+
+    @staticmethod
+    def check_parameters(species=None,
+                         time_grid=None,
+                         position_grid=None,
+                         species_velocity_grid=None,
+                         file_address=None,
+                         animated_moments=None,
+                         coll_select_scheme=None,
+                         coll_substeps=None,
+                         conv_order_os=None,
+                         conv_order_transp=None,
+                         conv_order_coll=None,
+                         complete_check=False):
+        """Sanity Check.
+        Checks integrity of given parameters and their interactions.
+
+        Parameters
+        ----------
+        species : :obj:`Species`, optional
+        time_grid : :obj:`Grid`, optional
+        position_grid : :obj:`Grid`, optional
+        species_velocity_grid : :obj:`SVGrid`, optional
+        file_address : str, optional
+        animated_moments : list of lists or np.ndarray(2d), optional
+        coll_select_scheme : str, optional
+        coll_substeps : int, optional
+        conv_order_os : int, optional
+        conv_order_transp : int, optional
+        conv_order_coll : int, optional
+        complete_check : :obj:`bool`, optional
+            If True, then all parameters must be set (not None).
+            If False, then unassigned parameters are ignored.
+        """
+        # For complete check, assert that all parameters are assigned
+        if complete_check is True:
+            assert all([param is not None for param in locals().values()])
+        else:
+            assert isinstance(complete_check, bool)
+
+        # check all parameters, if set
+        if species is not None:
+            assert isinstance(species, b_spc.Species)
+            species.check_integrity()
+
+        if time_grid is not None:
+            assert isinstance(time_grid, b_grd.Grid)
+            time_grid.check_integrity()
+            assert time_grid.dim == 1
+            assert time_grid.G.shape == (time_grid.size,)
+
+        if position_grid is not None:
+            assert isinstance(position_grid, b_grd.Grid)
+            position_grid.check_integrity()
+
+        if species_velocity_grid is not None:
+            assert isinstance(species_velocity_grid, b_svg.SVGrid)
+            species_velocity_grid.check_integrity()
+
+        if position_grid is not None and species_velocity_grid is not None:
+            assert species_velocity_grid.dim >= position_grid.dim
+
+        if species is not None and species_velocity_grid is not None:
+            assert species_velocity_grid.size.size == species.n
+
+        if file_address is not None:
+            assert type(file_address) is str
+            # Todo move from setter into here?
+
+        if animated_moments is not None:
+            assert isinstance(animated_moments, np.ndarray)
+            assert len(animated_moments.shape) is 2
+            assert all([mom in Configuration().supported_output
+                        for mom in animated_moments.flatten()])
+
+        if coll_select_scheme is not None:
+            assert isinstance(coll_select_scheme, str)
+            selection_schemes = Configuration().supported_selection_schemes
+            assert coll_select_scheme in selection_schemes
+
+        if coll_substeps is not None:
+            assert isinstance(coll_substeps, int)
+            assert coll_substeps >= 0
+
+        if conv_order_os is not None:
+            assert isinstance(conv_order_os, int)
+            assert conv_order_os in [1, 2]
+            if conv_order_os != 1:
+                raise NotImplementedError
+
+        if conv_order_coll is not None:
+            assert isinstance(conv_order_coll, int)
+            assert conv_order_coll in [1, 2, 3]
+            if conv_order_coll != 1:
+                raise NotImplementedError
+
+        if conv_order_transp is not None:
+            assert isinstance(conv_order_transp, int)
+            assert conv_order_transp in [1, 2]
+            if conv_order_transp != 1:
+                raise NotImplementedError
         return
 
     def print(self,

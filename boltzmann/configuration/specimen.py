@@ -14,53 +14,72 @@ class Specimen:
         self.color = color
         self.mass = mass
         self.collision_rate = collision_rate
-        self.check_integrity(self)
+        self.check_integrity()
         return
 
     #####################################
     #            Verification           #
     #####################################
-    @staticmethod
-    def check_integrity(check_instance=None,
-                        name=None,
-                        color=None,
-                        mass=None,
-                        collision_rate=None):
-        """Checks Integrity of Attributes.
-        If parameter check_instance is set, the whole instance is checked.
-        Otherwise only the specified parameters are checked.
+    def check_integrity(self, complete_check=True):
+        """Sanity Check.
+        Calls :meth:`check_parameters` to check validity of all attributes.
 
         Parameters
         ----------
-        check_instance : :obj:`Specimen`, optional
+        complete_check : :obj:`bool`, optional
+            If True, then all attributes must be set (not None).
+            If False, then unassigned attributes are ignored.
+        """
+        self.check_parameters(name=self.name,
+                              color=self.color,
+                              mass=self.mass,
+                              collision_rate=self.collision_rate,
+                              complete_check=complete_check)
+        return
+
+    @staticmethod
+    def check_parameters(name=None,
+                         color=None,
+                         mass=None,
+                         collision_rate=None,
+                         complete_check=False):
+        """Sanity Check.
+        Checks integrity of given parameters and their interactions.
+
+        Parameters
+        ----------
         name : :obj:`str`, optional
         color : :obj:`str`, optional
         mass : :obj:`int`, optional
         collision_rate : :obj:`np.ndarray` of :obj:`float`, optional
             Determines the collision probability between two specimen.
             Should be a row or column of :attr:`collision_rate_matrix`.
+        complete_check : :obj:`bool`, optional
+            If True, then all parameters must be set (not None).
+            If False, then unassigned parameters are ignored.
         """
-        if check_instance is not None:
-            assert type(check_instance) is Specimen
-            self = check_instance
-            self.check_integrity(name=self.name,
-                                 color=self.color,
-                                 mass=self.mass,
-                                 collision_rate=self.collision_rate)
-            return
+        # For complete check, assert that all parameters are assigned
+        if complete_check is True:
+            assert all([param is not None for param in locals().values()])
+        else:
+            assert isinstance(complete_check, bool)
+
+        # check all parameters, if set
         if name is not None:
             assert type(name) is str
+
         if color is not None:
             assert type(color) is str
             assert color in mpl_colors
+
         if mass is not None:
             assert type(mass) in [int, np.int64]
             assert mass > 0
+
         if collision_rate is not None:
-            assert type(collision_rate) is np.ndarray
+            assert isinstance(collision_rate, np.ndarray)
             assert len(collision_rate.shape) == 1
             assert collision_rate.dtype == float
-            # noinspection PyTypeChecker
             assert np.all(collision_rate >= 0)
         return
 
