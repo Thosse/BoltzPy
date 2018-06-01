@@ -124,8 +124,8 @@ class Grid:
         Parameters
         ----------
         dimension : :obj:`int`
-        number_of_points_per_dimension : :obj:`int`
-        step_size : :obj:`int`
+        number_of_points_per_dimension : :obj:`list` of :obj:`int`
+        step_size : :obj:`float`
         form : :obj:`str`, optional
         multi : :obj:`int`, optional
         """
