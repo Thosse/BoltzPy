@@ -67,6 +67,7 @@ class Specimen:
         # check all parameters, if set
         if name is not None:
             assert type(name) is str
+            assert len(name) > 0
 
         if color is not None:
             assert type(color) is str

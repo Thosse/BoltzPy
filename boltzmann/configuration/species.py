@@ -288,10 +288,13 @@ class Species:
         """Sanity Check. Checks Integrity of all Attributes"""
         assert type(self.n) is int
         assert self.n >= 0
-        for (i_s, s) in enumerate(self._specimen_array):
-            assert type(s) is b_spm.Specimen
-            s.check_integrity()
-            col_rat_1 = s.collision_rate
+        for (i_s, specimen) in enumerate(self._specimen_array):
+            assert type(specimen) is b_spm.Specimen
+            specimen.check_integrity()
+            # names must be unique
+            assert self.names.count(specimen.name) == 1
+            # collision rate is a link to a row of the collision matrix
+            col_rat_1 = specimen.collision_rate
             col_rat_2 = self.collision_rate_matrix[i_s, :]
             col_rat_3 = self.collision_rate_matrix[:, i_s]
             assert np.shares_memory(col_rat_1, col_rat_2)
