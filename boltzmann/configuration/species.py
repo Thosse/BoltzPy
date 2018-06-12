@@ -26,6 +26,19 @@ class Species:
             message = "item must be either the index(int) or name(str)"
             raise TypeError(message)
 
+    # Todo check for more pythonic way
+    def _get_item_position(self, item):
+        assert type(item) in [int, str]
+        if type(item) is str:
+            item = self.names.index(item)
+        assert type(item) is int
+        if item >= self.n:
+            msg = 'index {} is out of bounds ' \
+                  'for axis 0 ' \
+                  'with size {}'.format(item, self.n)
+            raise IndexError(msg)
+        return item
+
     @property
     def default_parameters(self):
         """:obj:`dict`: Default parameters for :meth:`add_specimen`.
@@ -116,24 +129,24 @@ class Species:
             Determines the collision probability between two specimen.
             Row (and column) of :attr:`collision_rate_matrix`.
         """
-        item = self._get_item_position(item)
+        item_index = self._get_item_position(item)
 
         # Handle Keyword Arguments
         if name is not None:
             b_spm.Specimen.check_parameters(name=name)
-            self[item].name = name
+            self[item_index].name = name
         if color is not None:
             b_spm.Specimen.check_parameters(color=color)
-            self[item].color = color
+            self[item_index].color = color
         if mass is not None:
             b_spm.Specimen.check_parameters(mass=mass)
-            self[item].mass = mass
+            self[item_index].mass = mass
         if collision_rate is not None:
             if type(collision_rate) is list:
-                collision_rate = np.array(collision_rate)
+                collision_rate = np.array(collision_rate, dtype=float)
             b_spm.Specimen.check_parameters(collision_rate=collision_rate)
-            self.collision_rate_matrix[item, :] = collision_rate
-            self.collision_rate_matrix[:, item] = collision_rate
+            self.collision_rate_matrix[item_index, :] = collision_rate
+            self.collision_rate_matrix[:, item_index] = collision_rate
 
         self.check_integrity()
         return
@@ -201,18 +214,6 @@ class Species:
         self._relink_all_collision_rates()
         return
 
-    def _get_item_position(self, item):
-        assert type(item) in [int, str]
-        if type(item) is str:
-            item = self.names.index(item)
-        assert type(item) is int
-        if item >= self.n:
-            msg = 'index {} is out of bounds ' \
-                  'for axis 0 ' \
-                  'with size {}'.format(item, self.n)
-            raise IndexError(msg)
-        return item
-
     def _relink_all_collision_rates(self):
         """Resets the :attr:`Specimen.collision_rate` attributes
         for every single :obj:`Specimen`"""
@@ -243,7 +244,6 @@ class Species:
         colors = hdf5_file["Colors"].value
         masses = hdf5_file["Masses"].value
         col_rate = hdf5_file["Collision_Rate_Matrix"].value
-        # Todo move into elementwise check_integrity
         assert len(names.shape) is 1 and len(col_rate.shape) is 2
         assert names.shape == colors.shape == masses.shape
         assert col_rate.shape == (names.size, names.size)
@@ -283,7 +283,6 @@ class Species:
     #####################################
     #            Verification           #
     #####################################
-    # Todo add Check_parameters?
     def check_integrity(self):
         """Sanity Check. Checks Integrity of all Attributes"""
         assert type(self.n) is int
