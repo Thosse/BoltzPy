@@ -5,13 +5,12 @@ The :py:class:`~boltzmann.configuration.Configuration`
 submodule provides the following functionalities:
 
  * Specify the simulated
-   :py:class:`~boltzmann.configuration.Specimen` / 
-   :py:class:`~boltzmann.configuration.Species`
- * Configure Time-:py:class:`~boltzmann.configuration.Grid`
-   and Positional-Space-:py:class:`~boltzmann.configuration.Grid`
- * Configure Specimen-Velocity-Grids
-   (:py:class:`~boltzmann.configuration.SVGrid`)
-
+   :py:class:`~boltzmann.configuration.Species` /
+   :py:class:`~boltzmann.configuration.Specimen`
+ * Configure :py:class:`Time Grid <boltzmann.configuration.Grid>`
+   and :py:class:`Positional-Space-Grid <boltzmann.configuration.Grid>`
+ * Configure :py:class:`Specimen-Velocity-Grids
+   <boltzmann.configuration.SVGrid>`
 """
 
 from .configuration import Configuration

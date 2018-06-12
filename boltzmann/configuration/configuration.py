@@ -14,10 +14,9 @@ class Configuration:
     r"""Handles User Input and sets up the Simulation Parameters
 
     .. todo::
+        - allow save/load functions for incompletely initialized
+          Configurations / Initializations
         - Add Knudsen Number Attribute or Property?
-        - improve name and path attributes:
-          Currently you need to change path first, then name,
-          otherwise unnecessary folders are created in the old path
         - link Species and SVGrid somehow
           -> adding Species, after setting up SVGrid
           should delete SVGrid or at least update it
@@ -34,7 +33,6 @@ class Configuration:
         - Enable non-uniform/adaptive Grids
           (see :class:`~boltzmann.calculation.Calculation`)
         - Add Plotting-function to grids
-
     """
     # Todo Give Warning, when Specifically using "default"
     def __init__(self, file_name="default"):
@@ -61,6 +59,7 @@ class Configuration:
         # Setup HDF5 File (stores all Configuration Data)
         self._file_address = ''
         self.file_address = file_name
+
         # Load non-default file, if it exists
         if file_name != "default" and os.path.exists(self.file_address):
             self.load()
