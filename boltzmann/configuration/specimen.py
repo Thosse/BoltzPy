@@ -41,7 +41,7 @@ class Specimen:
         assert isinstance(self.collision_rate, np.ndarray)
         # parameter can also be list/array of ints,
         # instance attribute must be nd.array of floats
-        assert self.collision_rate.dtype is float
+        assert self.collision_rate.dtype == float
         return
 
     @staticmethod
