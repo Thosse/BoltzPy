@@ -326,20 +326,23 @@ class Grid:
             assert self.multi % 2 == 0
         return
 
-    def print(self, physical_grids=False):
-        """Prints all Properties for Debugging Purposes"""
-        print("Dimension = {}".format(self.dim))
-        print("Geometric Form = {}".format(self.form))
-        print("Number of Total Grid Points = {}".format(self.size))
+    def __str__(self, write_physical_grids=True):
+        """Converts the instance to a string, describing all attributes."""
+        description = ''
+        description += "Dimension = {}\n".format(self.dim)
+        description += "Geometric Form = {}\n".format(self.form)
+        description += "Number of Total Grid Points = {}\n".format(self.size)
         if self.dim != 1:
-            print("Grid Points per Dimension = {}".format(self.n))
+            description += "Grid Points per Dimension = {}\n".format(self.n)
         if self.multi != 1:
-            print("Multiplicator = {}".format(self.multi))
-            print("Internal Step Size = {}".format(self.d))
-        print("Physical Step Size = {}".format(self.d * self.multi))
-        print('Is centered Grid = {}'.format(self.is_centered))
-        print("Boundaries:\n{}".format(self.boundaries))
-        if physical_grids:
-            print('Physical Grid:')
-            print(self.G*self.d)
-        print('')
+            description += "Multiplicator = {}\n".format(self.multi)
+            description += "Internal Step Size = {}\n".format(self.d)
+        description += "Physical Step Size = {}\n".format(self.d * self.multi)
+        description += 'Is centered Grid = {}\n'.format(self.is_centered)
+        description += "Boundaries:\n"
+        description += '\t' + self.boundaries.__str__().replace('\n', '\n\t')
+        if write_physical_grids:
+            description += '\n'
+            description += 'Physical Grid:\n\t'
+            description += (self.G*self.d).__str__().replace('\n', '\n\t')
+        return description

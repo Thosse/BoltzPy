@@ -292,28 +292,32 @@ class SVGrid:
             assert self.multi % 2 is 0
         return
 
-    def print(self,
-              physical_grid=False):
-        """Prints all Properties for Debugging Purposes"""
-        print("Dimension = {}".format(self.dim))
-        print("Index-Array = {}".format(self.index))
-        print("Shape = {}".format(self.form))
-        print("Multiplicator = {}".format(self.multi))
-        print('Is centered Grid = {}'.format(self.is_centered))
-        print("Offset = {}".format(self.offset))
-        print('')
+    def __str__(self,
+                write_physical_grid=False):
+        """Converts the instance to a string, describing all attributes."""
+        description = ''
+        description += "Dimension = {}\n".format(self.dim)
+        description += "Index-Array = {}\n".format(self.index)
+        description += "Shape = {}\n".format(self.form)
+        description += "Multiplicator = {}\n".format(self.multi)
+        description += 'Is centered Grid = {}\n'.format(self.is_centered)
+        description += "Offset = {}\n".format(self.offset)
         for s in range(self.n.shape[0]):
-            print('Specimen_{}'.format(s))
-            print("Number of Total Grid Points = "
-                  "{}".format(self.n[s, -1]))
-            print("Grid Points per Dimension = "
-                  "{}".format(self.n[s, 0:self.dim]))
-            print("Step Size = {}".format(self.d[s]*self.multi))
-            print("Boundaries:\n"
-                  "{}".format(self.boundaries[s]))
-            if physical_grid:
-                print('Physical Grid :')
+            description += 'Specimen_{}:\n'.format(s)
+            # Todo This number is wrong!
+            description += "\tNumber of Total Grid Points = " \
+                           "{}\n".format(self.n[s, -1])
+            description += "\tGrid Points per Dimension = " \
+                           "{}\n".format(self.n[s, 0:self.dim])
+            description += "\tStep Size = {}\n".format(self.d[s]*self.multi)
+            description += "\tBoundaries:\n\t\t"
+            description += self.boundaries[s].__str__().replace('\n', '\n\t\t')
+            if write_physical_grid:
+                description += '\n'
+                description += '\tPhysical Grid :\n'
                 beg = self.index[s]
                 end = self.index[s + 1]
-                print(self.G[beg:end]*self.d[s])
-            print('')
+                matrix_string = (self.G[beg:end]*self.d[s]).__str__()
+                description += '\t\t' + matrix_string.replace('\n', '\n\t\t')
+            description += '\n'
+        return description[:-1]

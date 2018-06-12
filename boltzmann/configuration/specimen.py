@@ -94,11 +94,14 @@ class Specimen:
             assert np.all(collision_rate >= 0)
         return
 
-    def print(self, print_collision_rate=False):
-        """Prints all Properties for Debugging."""
-        print("Name of Specimen  = {}".format(self.name))
-        print("Color of Specimen = {}".format(self.color))
-        print("Mass of Specimen = {}".format(self.mass))
-        if print_collision_rate:
-            print("Collision-Factors = \n{}".format(self.collision_rate))
-        return
+    def __str__(self, write_collision_factors=True):
+        """Converts the instance to a string, describing all attributes."""
+        description = ''
+        description += "Name = {}\n".format(self.name)
+        description += "Color = {}\n".format(self.color)
+        description += "Mass = {}".format(self.mass)
+        if write_collision_factors:
+            description += '\n'
+            description += "Collision-Factors: \n\t{}".format(
+                self.collision_rate)
+        return description

@@ -606,27 +606,41 @@ class Configuration:
                 raise NotImplementedError
         return
 
-    def print(self,
-              physical_grids=False):
-        """Prints all Properties for Debugging Purposes"""
-        print('\n========CONFIGURATION========\n')
-        print('Configuration File Address: {}'.format(self.file_address))
-        print('Animated Moments:\n{}'.format(self.animated_moments))
-        print('Collision Selection Scheme: '
-              '{}'.format(self.coll_select_scheme))
-        print('Collision Steps per Time Step: {}'
-              ''.format(self.coll_substeps))
-        print('\nSpecimen:')
-        print('---------')
-        self.s.print()
-        print('')
-        print('Time Data:')
-        print('----------')
-        self.t.print(physical_grids)
-        print('Position-Space Data:')
-        print('--------------------')
-        self.p.print(physical_grids)
-        print('Velocity-Space Data:')
-        print('--------------------')
-        self.sv.print(physical_grids)
-        stdout.flush()
+    def __str__(self,
+                write_physical_grids=False):
+        """Converts the instance to a string, describing all attributes."""
+        description = ''
+        description += '========CONFIGURATION========\n'
+        description += 'Configuration File Address:\n '
+        description += '\t' + self.file_address
+        description += '\n'
+        description += 'Animated Moments:\n'
+        moment_string = self.animated_moments.__str__()
+        description += '\t' + moment_string.replace('\n', '\n\t')
+        description += '\n'
+        description += 'Collision Selection Scheme = ' \
+                       '{}'.format(self.coll_select_scheme)
+        description += '\n'
+        description += 'Collision Steps per Time Step = ' \
+                       '{}'.format(self.coll_substeps)
+        description += '\n'
+        description += '\n'
+        description += 'Specimen:\n'
+        description += '---------\n'
+        description += '\t' + self.s.__str__().replace('\n', '\n\t')
+        description += '\n'
+        description += '\n'
+        description += 'Time Data:\n'
+        description += '----------\n'
+        description += '\t' + self.t.__str__(write_physical_grids).replace('\n', '\n\t')
+        description += '\n'
+        description += '\n'
+        description += 'Position-Space Data:\n'
+        description += '--------------------\n'
+        description += '\t' + self.p.__str__(write_physical_grids).replace('\n', '\n\t')
+        description += '\n'
+        description += '\n'
+        description += 'Velocity-Space Data:\n'
+        description += '--------------------\n'
+        description += '\t' + self.sv.__str__(write_physical_grids).replace('\n', '\n\t')
+        return description

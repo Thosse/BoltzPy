@@ -303,12 +303,16 @@ class Species:
         assert self.collision_rate_matrix.shape == (self.n, self.n)
         return
 
-    def print(self, print_collision_rates_separately=False):
-        """Prints all Properties for Debugging."""
-        print("Number of Specimen = {}".format(self.n))
-        for s in self._specimen_array:
-            s.print(print_collision_rates_separately)
-        if not print_collision_rates_separately:
-            print("Collision-Factor-Matrix = \n"
-                  "{}".format(self.collision_rate_matrix))
-        return
+    def __str__(self):
+        """Converts the instance to a string, describing all attributes."""
+        description = "Number of Specimen = {}\n".format(self.n)
+        for (i_s, specimen) in enumerate(self._specimen_array):
+            description += 'Specimen_{}:'.format(i_s)
+            description += '\n'
+            description += '\t'
+            description += specimen.__str__().replace('\n', '\n\t')
+            description += '\n\n'
+        description += "Collision-Factor-Matrix: \n"
+        matrix_string = self.collision_rate_matrix.__str__()
+        description += "\t" + matrix_string.replace('\n', '\n\t')
+        return description
