@@ -35,6 +35,13 @@ class Specimen:
                               mass=self.mass,
                               collision_rate=self.collision_rate,
                               complete_check=complete_check)
+        # Additional Conditions on instance:
+        # parameter can also be a list,
+        # instance attributes must be nd.array
+        assert isinstance(self.collision_rate, np.ndarray)
+        # parameter can also be list/array of ints,
+        # instance attribute must be nd.array of floats
+        assert self.collision_rate.dtype is float
         return
 
     @staticmethod
@@ -78,9 +85,12 @@ class Specimen:
             assert mass > 0
 
         if collision_rate is not None:
+            # lists are also accepted as parameters
+            if isinstance(collision_rate, list):
+                collision_rate = np.array(collision_rate)
             assert isinstance(collision_rate, np.ndarray)
             assert len(collision_rate.shape) == 1
-            assert collision_rate.dtype == float
+            assert collision_rate.dtype in [int, float]
             assert np.all(collision_rate >= 0)
         return
 

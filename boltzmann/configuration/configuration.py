@@ -496,6 +496,9 @@ class Configuration:
                               conv_order_transp=self.conv_order_transp,
                               conv_order_coll=self.conv_order_coll,
                               complete_check=complete_check)
+        # Additional Conditions on instance:
+        # parameter can be list, instance attributes must be nd.array
+        assert isinstance(self.animated_moments, np.ndarray)
         return
 
     @staticmethod
@@ -567,6 +570,9 @@ class Configuration:
             # Todo move from setter into here?
 
         if animated_moments is not None:
+            # lists are also accepted as parameters
+            if isinstance(animated_moments, list):
+                animated_moments = np.array(animated_moments)
             assert isinstance(animated_moments, np.ndarray)
             assert len(animated_moments.shape) is 2
             assert all([mom in Configuration().supported_output
