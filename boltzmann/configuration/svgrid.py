@@ -304,9 +304,8 @@ class SVGrid:
         description += "Offset = {}\n".format(self.offset)
         for s in range(self.n.shape[0]):
             description += 'Specimen_{}:\n'.format(s)
-            # Todo This number is wrong!
-            description += "\tNumber of Total Grid Points = " \
-                           "{}\n".format(self.n[s, -1])
+            description += "\tTotal Number of Grid Points = " \
+                           "{}\n".format(self.size[s])
             description += "\tGrid Points per Dimension = " \
                            "{}\n".format(self.n[s, 0:self.dim])
             description += "\tStep Size = {}\n".format(self.d[s]*self.multi)
