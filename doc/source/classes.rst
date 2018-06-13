@@ -48,3 +48,8 @@ The Animation submodule
 .. autoclass:: boltzmann.animation.Animation
     :members:
 
+Constants
+---------
+
+.. automodule:: boltzmann.constants
+    :members:

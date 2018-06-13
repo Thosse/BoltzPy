@@ -2,6 +2,7 @@
 from . import species as b_spc
 from . import grid as b_grd
 from . import svgrid as b_svg
+import boltzmann.constants as b_const
 
 import numpy as np
 import h5py
@@ -62,6 +63,9 @@ class Configuration:
         # Load non-default file, if it exists
         if file_name != "default" and os.path.exists(self.file_address):
             self.load()
+        # Todo this should be changed
+        # -> compare the current configuration, to the saved one.
+        # If its equal, then there is no need to run the calculation again
         # Clear default file, if it exists
         elif file_name == "default" and os.path.exists(self.file_address):
             os.remove(self.file_address)
@@ -106,38 +110,12 @@ class Configuration:
         return self._sv
 
     @property
-    def supported_output(self):
-        """:obj:`set` of :obj:`str` :
-        Set of all currently supported moments.
-        """
-        supported_output = {'Mass',
-                            'Momentum_X',
-                            'Momentum_Y',
-                            'Momentum_Z',
-                            'Momentum_Flow_X',
-                            'Momentum_Flow_Y',
-                            'Momentum_Flow_Z',
-                            'Energy',
-                            'Energy_Flow_X',
-                            'Energy_Flow_Y',
-                            'Energy_Flow_Z'}
-        return supported_output
-
-    @property
-    def supported_selection_schemes(self):
-        """:obj:`set` of :obj:`str` :
-        Set of all currently supported selection schemes
-        for :class:`~boltzmann.calculation.Collisions`.
-        """
-        supported_selection_schemes = {'Complete'}
-        return supported_selection_schemes
-
-    @property
     def animated_moments(self):
         """:obj:`~numpy.ndarray` of :obj:`str` :
         Array of the moments to be stored and animated.
 
-        Every single moment is an element of :attr:`supported_output`.
+        Each moment is an element of
+        :const:`~boltzmann.constants.SUPPORTED_OUTPUT`.
         """
         return self._animated_moments
 
@@ -152,8 +130,10 @@ class Configuration:
     @property
     def coll_select_scheme(self):
         """:obj:`str` :
-        Selection Scheme for :class:`~boltzmann.calculation.Collisions`,
-        is an element of :attr:`supported_selection_schemes`"""
+        Selection scheme for the collision partners.
+        Must be an element of
+        :const:`~boltzmann.constants.SUPPORTED_SELECTION_SCHEMES`
+        """
         return self._coll_select_scheme
 
     @coll_select_scheme.setter
@@ -165,7 +145,7 @@ class Configuration:
     @property
     def coll_substeps(self):
         """":obj:`int`:
-            Number of Collision Steps in each Time Step
+            Number of collision substeps per time step.
         """
         return self._coll_substeps
 
@@ -177,8 +157,9 @@ class Configuration:
 
     @property
     def conv_order_os(self):
-        """":obj:`int` in [1, 2]:
-            Convergence Order of Operator Splitting
+        """":obj:`int` :
+            Convergence Order of Operator Splitting.
+            Must be in :const:`~boltzmann.constants.SUPPORTED_ORDERS_OS`.
         """
         return self._conv_order_os
 
@@ -190,9 +171,11 @@ class Configuration:
 
     @property
     def conv_order_coll(self):
-        """":obj:`int` in [1, 2]:
+        """":obj:`int` :
             Convergence Order of Quadrature Formula
             for Approximation of the Collision Operator.
+            Must be in
+            :const:`~boltzmann.constants.SUPPORTED_ORDERS_COLL`.
         """
         return self._conv_order_coll
 
@@ -204,9 +187,10 @@ class Configuration:
 
     @property
     def conv_order_transp(self):
-        """":obj:`int` in [1, 2]:
-            Convergence Order of Transport Step
-            (Partial Differential Equation)
+        """":obj:`int` :
+            Convergence Order of Transport Step (PDE).
+            Must be in
+            :const:`~boltzmann.constants.SUPPORTED_ORDERS_TRANS`.
         """
         return self._conv_order_transp
 
@@ -226,52 +210,22 @@ class Configuration:
 
     @file_address.setter
     def file_address(self, new_address):
-        # isolate path from address
-        sep = new_address.rfind('/')
-        if sep == -1:
-            # Todo Setup proper default path for simulations
-            # Todo Write default path into setup.py?
-            # set default path
-            path = __file__[:-40] + 'Simulations/'
-        elif sep == len(new_address) - 1:
-            msg = 'The provided file address is invalid:' \
-                  'It is a Folder, not a File:\n' \
-                  '{}'.format(new_address)
-            raise ValueError(msg)
-        else:
-            path = new_address[0:sep+1]
-        # Assert file path exists
-        if not os.path.exists(path):
-            message = 'The specified file path does not exist.' \
-                      'You need to create it first: ' \
-                      '{}'.format(path)
-            raise FileNotFoundError(message)
-
-        # isolate file name
-        file_name = new_address[sep+1:]
-        # temporary remove '.sim' ending (if any)
-        if file_name[-4:] == '.sim':
-            file_name = file_name[:-4]
-        # Assert validity of file name
-        invalid_chars = ['.', '"', "'", '/', '§', '$', '&']
-        for char in invalid_chars:
-            if char in file_name:
-                msg = 'The provided file name is invalid: ' \
-                      'It contains invalid characters: "{}"\n' \
-                      '{}'.format(char, file_name)
-                raise ValueError(msg)
-        # Add '.sim' ending to file name again
-        file_name += '.sim'
-        self._file_address = path + file_name
+        self.check_parameters(file_address=new_address)
+        # if no path given, add default path
+        if new_address.rfind('/') == -1:
+            new_address = b_const.DEFAULT_SIMULATION_PATH + new_address
+        if new_address[-4:] != '.sim':
+            new_address += '.sim'
+        self._file_address = new_address
         return
 
     #####################################
     #           Configuration           #
     #####################################
+    # TODO properly add docu and parameters
     def add_specimen(self,
                      **kwargs):
         """Adds a Specimen to :attr:`~Configuration.s`.
-
         Directly calls :meth:`Species.add_specimen`
         """
         self.s.add_specimen(**kwargs)
@@ -455,6 +409,7 @@ class Configuration:
         # file_c.create_group("Velocity_Space")
         # self.p.save(file_c["Velocity_Space"])
         # Save other Parameters
+        # Todo only save, if not None?
         file_c["Collision_Selection_Scheme"] = self.coll_select_scheme
         file_c["Collision_Substeps"] = self.coll_substeps
         file_c["Convergence_Order_Operator_Splitting"] = self.conv_order_os
@@ -475,7 +430,8 @@ class Configuration:
     #####################################
     def check_integrity(self, complete_check=True):
         """Sanity Check.
-        Calls :meth:`check_parameters` to check validity of all attributes.
+        Besides asserting all conditions in :meth:`check_parameters`
+        it asserts the correct type of all attributes of the instance.
 
         Parameters
         ----------
@@ -566,7 +522,32 @@ class Configuration:
 
         if file_address is not None:
             assert type(file_address) is str
-            # Todo move from setter into here?
+            # remove ending, if any
+            if file_address[-4:] == '.sim':
+                file_address = file_address[:-4]
+            # find separator of file_path and file_name
+            sep_pos = file_address.rfind('/')
+            # isolate file_name
+            file_name = file_address[sep_pos + 1:]
+            # file_address must not end  with '/'
+            assert sep_pos != len(file_address) - 1,    \
+                'The provided file address is invalid:' \
+                'It is a Folder, not a File:\n' \
+                '{}'.format(file_address)
+            # Assert validity of file name
+            for char in b_const.INVALID_CHARACTERS:
+                assert char not in file_name,   \
+                    "The provided file name is invalid:\n" \
+                    "It contains invalid characters: '{}'" \
+                    "{}".format(char, file_name)
+            # isolate file_path
+            path = file_address[0:sep_pos + 1]
+            if path == "":
+                path = b_const.DEFAULT_SIMULATION_PATH
+            # Assert file path exists
+            assert os.path.exists(path), \
+                'The specified file path does not exist.' \
+                'You need to create it first:\n{}'.format(path)
 
         if animated_moments is not None:
             # lists are also accepted as parameters
@@ -574,12 +555,12 @@ class Configuration:
                 animated_moments = np.array(animated_moments)
             assert isinstance(animated_moments, np.ndarray)
             assert len(animated_moments.shape) is 2
-            assert all([mom in Configuration().supported_output
+            assert all([mom in b_const.SUPPORTED_OUTPUT
                         for mom in animated_moments.flatten()])
 
         if coll_select_scheme is not None:
             assert isinstance(coll_select_scheme, str)
-            selection_schemes = Configuration().supported_selection_schemes
+            selection_schemes = b_const.SUPPORTED_SELECTION_SCHEMES
             assert coll_select_scheme in selection_schemes
 
         if coll_substeps is not None:
@@ -588,19 +569,19 @@ class Configuration:
 
         if conv_order_os is not None:
             assert isinstance(conv_order_os, int)
-            assert conv_order_os in [1, 2]
+            assert conv_order_os in b_const.SUPPORTED_ORDERS_OS
             if conv_order_os != 1:
                 raise NotImplementedError
 
         if conv_order_coll is not None:
             assert isinstance(conv_order_coll, int)
-            assert conv_order_coll in [1, 2, 3]
+            assert conv_order_coll in b_const.SUPPORTED_ORDERS_COLL
             if conv_order_coll != 1:
                 raise NotImplementedError
 
         if conv_order_transp is not None:
             assert isinstance(conv_order_transp, int)
-            assert conv_order_transp in [1, 2]
+            assert conv_order_transp in b_const.SUPPORTED_ORDERS_TRANS
             if conv_order_transp != 1:
                 raise NotImplementedError
         return
