@@ -7,7 +7,6 @@ import numpy as np
 import h5py
 
 import os
-from sys import stdout as stdout
 
 
 class Configuration:
@@ -632,15 +631,18 @@ class Configuration:
         description += '\n'
         description += 'Time Data:\n'
         description += '----------\n'
-        description += '\t' + self.t.__str__(write_physical_grids).replace('\n', '\n\t')
+        time_string = self.t.__str__(write_physical_grids)
+        description += '\t' + time_string.replace('\n', '\n\t')
         description += '\n'
         description += '\n'
         description += 'Position-Space Data:\n'
         description += '--------------------\n'
-        description += '\t' + self.p.__str__(write_physical_grids).replace('\n', '\n\t')
+        position_string = self.p.__str__(write_physical_grids)
+        description += '\t' + position_string.replace('\n', '\n\t')
         description += '\n'
         description += '\n'
         description += 'Velocity-Space Data:\n'
         description += '--------------------\n'
-        description += '\t' + self.sv.__str__(write_physical_grids).replace('\n', '\n\t')
+        velocity_string = self.sv.__str__(write_physical_grids)
+        description += '\t' + velocity_string.replace('\n', '\n\t')
         return description
