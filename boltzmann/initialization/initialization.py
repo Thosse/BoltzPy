@@ -331,8 +331,13 @@ class Initialization:
         assert self.block_index.shape == (length+1,)
         assert self.p_flag.size == self.cnf.p.G.shape[0]
         assert self.p_flag.dtype == int
-        assert np.min(self.p_flag) >= 0, 'Uninitialized P-Grid points'
-        assert np.max(self.p_flag) <= self.rule_arr.size - 1, 'Undefined Rule'
+        assert np.min(self.p_flag) >= 0, \
+            'Positional Grid is not properly initialized.' \
+            'Some Grid points have no initialization rule!'
+        assert np.max(self.p_flag) <= self.rule_arr.size - 1, \
+            'Undefined Rule! A P-Grid point is set ' \
+            'to be initialized by an undefined initialization rule. ' \
+            'Either add the respective rule, or choose an existing rule.'
         return
 
     def print(self, physical_grid=False):
