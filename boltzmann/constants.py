@@ -29,7 +29,7 @@ SUPP_COLL_SELECTION_SCHEMES = {'Complete'}
 
 #: :obj:`set` of :obj:`int` :
 #: Set of all currently supported Convergence Orders
-#: Quadrature Formula for Approximation of the Collision Operator.
+#: for the Approximation of the Collision Operator.
 SUPP_ORDERS_COLL = {1, 2, 3, 4}
 
 #: :obj:`set` of :obj:`int` :
@@ -39,7 +39,7 @@ SUPP_ORDERS_OS = {1, 2}
 
 #: :obj:`set` of :obj:`int` :
 #: Set of all currently supported Convergence Orders
-#: Quadrature Formula for Approximation of the Collision Operator.
+#: for the Transport Step (PDE).
 SUPP_ORDERS_TRANSP = {1, 2}
 
 #: :obj:`set` of :obj:`str` :
