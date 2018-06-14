@@ -14,9 +14,20 @@ class Configuration:
     r"""Handles User Input and sets up the Simulation Parameters
 
     .. todo::
+        - implement save/load for SVGrids
+        - write __isequal__ magic methods for configuration (and subclasses)
+        - write unittests for save/load methods
         - allow save/load functions for incompletely initialized
           Configurations / Initializations
         - Add Knudsen Number Attribute or Property?
+
+            * Add method to get candidate for characteristic length
+            * show this char length in GUI
+            * automatically calculate Knudsen number with this information
+
+        - add attribute to svgrid, so that velocity arrays
+          can be stored in 2d/3d shape
+          (just create a link, with the right shape)
         - link Species and SVGrid somehow
           -> adding Species, after setting up SVGrid
           should delete SVGrid or at least update it
@@ -24,6 +35,8 @@ class Configuration:
           * Idea: each class has an is_set_up flag
           * after any change -> check flags of depending classes
           * main classes need to be linked for that!
+
+
 
         :class:`Grid`
 
@@ -34,9 +47,19 @@ class Configuration:
           (see :class:`~boltzmann.calculation.Calculation`)
         - Add Plotting-function to grids
 
+        :class:`Species` and :class:`Specimen`
+
+        - add attribute parent/parent_array to specimen
+            - add index attribute to specimen
+            - move most integrity checks from species to specimen
+            - move editing of collision_rate to specimen
+            - if index is None, collision_rate is stored locally (for init)
+            - if index is int, collision rate is read from matrix from parent
+            - when adding specimen to species -> give index and add coll_rate
+
     Parameters
     ----------
-    file_name
+    file_name : :obj:`str`, optional
 
     Attributes
     ----------

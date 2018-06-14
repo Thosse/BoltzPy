@@ -1,4 +1,6 @@
 
+# Todo Everything might move into enum.Enum classes, for more structure
+
 
 #: :obj:`str` : Default path for simulation files.
 #: If only a file name is given, then the file will be located in this folder.

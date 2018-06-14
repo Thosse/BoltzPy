@@ -7,7 +7,8 @@ import h5py
 
 class Species:
     """Handles all :class:`Specimen` objects.
-    Specimen can be accessed by either their index oder name."""
+    Specimen can be accessed by either their index oder name.
+    """
     def __init__(self):
         self._specimen_array = np.ndarray(0, dtype=b_spm.Specimen)
         self.collision_rate_matrix = np.zeros(shape=(0, 0), dtype=float)

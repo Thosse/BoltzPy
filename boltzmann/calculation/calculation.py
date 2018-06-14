@@ -14,10 +14,12 @@ class Calculation:
     see the CalculationTest Class!
 
     ..todo::
+        - enable writing of complete results (not moments) to sim file, for unittests
         - decide on t_arr:
             * is it an integer, or array(int)
             * for higher order transport -> multiple entries?
         - Properly implement calculation( switches for Orders, vectorized))
+        - Implement Operator Splitting of Order 2 (easy)
         - directly use p_flag? shrink it down
           (only 1 flag(==0) for inner points necessary)?
           Use p_flag as an array of pointers, that point to their
