@@ -224,7 +224,7 @@ class Calculation:
             beg = self._cnf.sv.index[s]
             end = self._cnf.sv.index[s+1]
             dv = self._cnf.sv.d[s]
-            # Todo removal of boundaries only temporary
+            # Todo removal of boundaries only temporary, until rules for input/output points or boundary points are set
             for p in range(1, self._cnf.p.size-1):
                 for v in range(beg, end):
                     pv = dv * self._cnf.sv.G[v]
