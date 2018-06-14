@@ -33,8 +33,34 @@ class Configuration:
         - Enable non-uniform/adaptive Grids
           (see :class:`~boltzmann.calculation.Calculation`)
         - Add Plotting-function to grids
+
+    Parameters
+    ----------
+    file_name
+
+    Attributes
+    ----------
+    coll_select_scheme : :obj:`str`
+        Selection scheme for the collision partners.
+        Must be an element of
+        :const:`~boltzmann.constants.SUPP_COLL_SELECTION_SCHEMES`
+    coll_substeps : :obj:`int`
+        Number of collision substeps per time step.
+    conv_order_os : :obj:`int`
+        Convergence Order of Operator Splitting.
+        Must be in :const:`~boltzmann.constants.SUPP_ORDERS_OS`.
+    conv_order_coll : :obj:`int`
+        Convergence Order of Quadrature Formula
+        for Approximation of the Collision Operator.
+        Must be in
+        :const:`~boltzmann.constants.SUPP_ORDERS_COLL`.
+    conv_order_transp : :obj:`int` :
+        Convergence Order of Transport Step (PDE).
+        Must be in
+        :const:`~boltzmann.constants.SUPP_ORDERS_TRANSP`.
     """
     # Todo Give Warning, when Specifically using "default"
+    # Todo move into constant? Change to None?
     def __init__(self, file_name="default"):
         # Most Attributes are Private and set up separately
         # Read Only Properties
@@ -43,13 +69,13 @@ class Configuration:
         self._p = b_grd.Grid()
         self._sv = b_svg.SVGrid()
         # Todo remove default parameters -> None
-        # Todo add properties supported_conv_order_XXX
         # Default Parameters
-        self._coll_select_scheme = 'Complete'
-        self._coll_substeps = 1
-        self._conv_order_os = 1
-        self._conv_order_transp = 1
-        self._conv_order_coll = 1
+        # Todo Move parameters into small Numerical_Scheme class?
+        self.coll_select_scheme = 'Complete'
+        self.coll_substeps = 1
+        self.conv_order_os = 1
+        self.conv_order_transp = 1
+        self.conv_order_coll = 1
         self._animated_moments = np.array([['Mass',
                                             'Momentum_X'],
                                            ['Momentum_X',
@@ -125,79 +151,6 @@ class Configuration:
             array_of_moments = np.array(array_of_moments)
         self.check_parameters(animated_moments=array_of_moments)
         self._animated_moments = array_of_moments
-        return
-
-    @property
-    def coll_select_scheme(self):
-        """:obj:`str` :
-        Selection scheme for the collision partners.
-        Must be an element of
-        :const:`~boltzmann.constants.SUPP_COLL_SELECTION_SCHEMES`
-        """
-        return self._coll_select_scheme
-
-    @coll_select_scheme.setter
-    def coll_select_scheme(self, scheme):
-        self.check_parameters(coll_select_scheme=scheme)
-        self._coll_select_scheme = scheme
-        return
-
-    @property
-    def coll_substeps(self):
-        """":obj:`int`:
-            Number of collision substeps per time step.
-        """
-        return self._coll_substeps
-
-    @coll_substeps.setter
-    def coll_substeps(self, number_of_steps):
-        self.check_parameters(coll_substeps=number_of_steps)
-        self._coll_substeps = number_of_steps
-        return
-
-    @property
-    def conv_order_os(self):
-        """":obj:`int` :
-            Convergence Order of Operator Splitting.
-            Must be in :const:`~boltzmann.constants.SUPP_ORDERS_OS`.
-        """
-        return self._conv_order_os
-
-    @conv_order_os.setter
-    def conv_order_os(self, conv_order):
-        self.check_parameters(conv_order_os=conv_order)
-        self._conv_order_os = conv_order
-        return
-
-    @property
-    def conv_order_coll(self):
-        """":obj:`int` :
-            Convergence Order of Quadrature Formula
-            for Approximation of the Collision Operator.
-            Must be in
-            :const:`~boltzmann.constants.SUPP_ORDERS_COLL`.
-        """
-        return self._conv_order_coll
-
-    @conv_order_coll.setter
-    def conv_order_coll(self, conv_order):
-        self.check_parameters(conv_order_coll=conv_order)
-        self._conv_order_coll = conv_order
-        return
-
-    @property
-    def conv_order_transp(self):
-        """":obj:`int` :
-            Convergence Order of Transport Step (PDE).
-            Must be in
-            :const:`~boltzmann.constants.SUPP_ORDERS_TRANSP`.
-        """
-        return self._conv_order_transp
-
-    @conv_order_transp.setter
-    def conv_order_transp(self, conv_order):
-        self.check_parameters(conv_order_transp=conv_order)
-        self._conv_order_transp = conv_order
         return
 
     @property
@@ -339,27 +292,27 @@ class Configuration:
             key = "Collision_Selection_Scheme"
             self.coll_select_scheme = file_c[key].value
         except KeyError:
-            self._coll_select_scheme = None
+            self.coll_select_scheme = None
         try:
             key = "Collision_Substeps"
             self.coll_substeps = int(file_c[key].value)
         except KeyError:
-            self._coll_substeps = None
+            self.coll_substeps = None
         try:
             key = "Convergence_Order_Operator_Splitting"
             self.conv_order_os = int(file_c[key].value)
         except KeyError:
-            self._conv_order_os = None
+            self.conv_order_os = None
         try:
             key = "Convergence_Order_Transport"
             self.conv_order_transp = int(file_c[key].value)
         except KeyError:
-            self._conv_order_transp = None
+            self.conv_order_transp = None
         try:
             key = "Convergence_Order_Collision_Operator"
             self.conv_order_coll = int(file_c[key].value)
         except KeyError:
-            self._conv_order_coll = None
+            self.conv_order_coll = None
         try:
             key = "Animated_Moments"
             shape = file_c[key].attrs["shape"]

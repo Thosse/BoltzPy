@@ -22,7 +22,8 @@ class Specimen:
     #####################################
     def check_integrity(self, complete_check=True):
         """Sanity Check.
-        Calls :meth:`check_parameters` to check validity of all attributes.
+        Besides asserting all conditions in :meth:`check_parameters`
+        it asserts the correct type of all attributes of the instance.
 
         Parameters
         ----------
