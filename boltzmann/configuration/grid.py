@@ -243,8 +243,7 @@ class Grid:
     #####################################
     #           Serialization           #
     #####################################
-    @staticmethod
-    def load(hdf5_file):
+    def load(self, hdf5_file):
         """Creates and Returns a :obj:`Grid` object,
         based on the parameters in the given file.
 
@@ -257,7 +256,6 @@ class Grid:
         -------
         :obj:`Grid`
         """
-        grid = Grid()
         # read data from file
         dim = int(hdf5_file["Dimension"].value)
         n = hdf5_file["Points_per_Dimension"].value
@@ -266,12 +264,12 @@ class Grid:
         multi = int(hdf5_file["Multiplicator"].value)
         # Todo Check Integrity
         # setup g
-        grid.setup(dim, n, d, form, multi)
-        grid.check_integrity()
-        return grid
+        self.setup(dim, n, d, form, multi)
+        self.check_integrity()
+        return
 
     def save(self, hdf5_file):
-        """Writes the parameters of the :obj:`Species` object
+        """Writes the main attributes of the :obj:`Grid` instance
         to the given file.
 
         Parameters

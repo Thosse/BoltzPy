@@ -300,13 +300,13 @@ class Configuration:
             self._s = b_spc.Species()
         # load Time Space
         try:
-            self._t = b_grd.Grid.load(file_c["Time_Space"])
+            self._t.load(file_c["Time_Space"])
             self._t.reshape((self.t.size,))
         except KeyError:
             self._t = b_grd.Grid()
         # load Position Space
         try:
-            self._p = b_grd.Grid.load(file_c["Position_Space"])
+            self._p.load(file_c["Position_Space"])
         except KeyError:
             self._p = b_grd.Grid()
         # TODO self._sv = b_svg.SVGrid() is not implemented so far
@@ -343,7 +343,7 @@ class Configuration:
         except KeyError:
             self._animated_moments = None
         file.close()
-        self.check_integrity()
+        self.check_integrity(complete_check=False)
         return
 
     def save(self, file_address=None):
