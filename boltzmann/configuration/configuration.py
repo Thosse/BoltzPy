@@ -115,7 +115,7 @@ class Configuration:
         Array of the moments to be stored and animated.
 
         Each moment is an element of
-        :const:`~boltzmann.constants.SUPPORTED_OUTPUT`.
+        :const:`~boltzmann.constants.SUPP_OUTPUT`.
         """
         return self._animated_moments
 
@@ -132,7 +132,7 @@ class Configuration:
         """:obj:`str` :
         Selection scheme for the collision partners.
         Must be an element of
-        :const:`~boltzmann.constants.SUPPORTED_SELECTION_SCHEMES`
+        :const:`~boltzmann.constants.SUPP_COLL_SELECTION_SCHEMES`
         """
         return self._coll_select_scheme
 
@@ -159,7 +159,7 @@ class Configuration:
     def conv_order_os(self):
         """":obj:`int` :
             Convergence Order of Operator Splitting.
-            Must be in :const:`~boltzmann.constants.SUPPORTED_ORDERS_OS`.
+            Must be in :const:`~boltzmann.constants.SUPP_ORDERS_OS`.
         """
         return self._conv_order_os
 
@@ -175,7 +175,7 @@ class Configuration:
             Convergence Order of Quadrature Formula
             for Approximation of the Collision Operator.
             Must be in
-            :const:`~boltzmann.constants.SUPPORTED_ORDERS_COLL`.
+            :const:`~boltzmann.constants.SUPP_ORDERS_COLL`.
         """
         return self._conv_order_coll
 
@@ -190,7 +190,7 @@ class Configuration:
         """":obj:`int` :
             Convergence Order of Transport Step (PDE).
             Must be in
-            :const:`~boltzmann.constants.SUPPORTED_ORDERS_TRANS`.
+            :const:`~boltzmann.constants.SUPP_ORDERS_TRANSP`.
         """
         return self._conv_order_transp
 
@@ -555,12 +555,12 @@ class Configuration:
                 animated_moments = np.array(animated_moments)
             assert isinstance(animated_moments, np.ndarray)
             assert len(animated_moments.shape) is 2
-            assert all([mom in b_const.SUPPORTED_OUTPUT
+            assert all([mom in b_const.SUPP_OUTPUT
                         for mom in animated_moments.flatten()])
 
         if coll_select_scheme is not None:
             assert isinstance(coll_select_scheme, str)
-            selection_schemes = b_const.SUPPORTED_SELECTION_SCHEMES
+            selection_schemes = b_const.SUPP_COLL_SELECTION_SCHEMES
             assert coll_select_scheme in selection_schemes
 
         if coll_substeps is not None:
@@ -569,19 +569,19 @@ class Configuration:
 
         if conv_order_os is not None:
             assert isinstance(conv_order_os, int)
-            assert conv_order_os in b_const.SUPPORTED_ORDERS_OS
+            assert conv_order_os in b_const.SUPP_ORDERS_OS
             if conv_order_os != 1:
                 raise NotImplementedError
 
         if conv_order_coll is not None:
             assert isinstance(conv_order_coll, int)
-            assert conv_order_coll in b_const.SUPPORTED_ORDERS_COLL
+            assert conv_order_coll in b_const.SUPP_ORDERS_COLL
             if conv_order_coll != 1:
                 raise NotImplementedError
 
         if conv_order_transp is not None:
             assert isinstance(conv_order_transp, int)
-            assert conv_order_transp in b_const.SUPPORTED_ORDERS_TRANS
+            assert conv_order_transp in b_const.SUPP_ORDERS_TRANSP
             if conv_order_transp != 1:
                 raise NotImplementedError
         return
