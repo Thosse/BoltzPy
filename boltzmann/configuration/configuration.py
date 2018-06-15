@@ -428,7 +428,7 @@ class Configuration:
                               conv_order_coll=self.conv_order_coll,
                               complete_check=complete_check)
         # Additional Conditions on instance:
-        # parameter can be list, instance attributes must be nd.array
+        # parameter can be list, instance attributes must be np.ndarray
         assert isinstance(self.animated_moments, np.ndarray)
         return
 
@@ -466,10 +466,9 @@ class Configuration:
             If False, then unassigned parameters are ignored.
         """
         # For complete check, assert that all parameters are assigned
+        assert isinstance(complete_check, bool)
         if complete_check is True:
             assert all([param is not None for param in locals().values()])
-        else:
-            assert isinstance(complete_check, bool)
 
         # check all parameters, if set
         if species is not None:
@@ -497,7 +496,7 @@ class Configuration:
             assert species_velocity_grid.size.size == species.n
 
         if file_address is not None:
-            assert type(file_address) is str
+            assert isinstance(file_address, str)
             # remove ending, if any
             if file_address[-4:] == '.sim':
                 file_address = file_address[:-4]

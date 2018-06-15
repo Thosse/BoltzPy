@@ -67,18 +67,17 @@ class Specimen:
             If False, then unassigned parameters are ignored.
         """
         # For complete check, assert that all parameters are assigned
+        assert isinstance(complete_check, bool)
         if complete_check is True:
             assert all([param is not None for param in locals().values()])
-        else:
-            assert isinstance(complete_check, bool)
 
         # check all parameters, if set
         if name is not None:
-            assert type(name) is str
+            assert isinstance(name, str)
             assert len(name) > 0
 
         if color is not None:
-            assert type(color) is str
+            assert isinstance(color, str)
             assert color in mpl_colors
 
         if mass is not None:
