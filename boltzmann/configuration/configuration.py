@@ -484,6 +484,9 @@ class Configuration:
         if position_grid is not None:
             assert isinstance(position_grid, b_grd.Grid)
             position_grid.check_integrity()
+            if position_grid.dim is not 1:
+                msg = "Currently only 1D Simulations are supported!"
+                raise NotImplementedError(msg)
 
         if species_velocity_grid is not None:
             assert isinstance(species_velocity_grid, b_svg.SVGrid)

@@ -8,7 +8,7 @@ DEFAULT_SIMULATION_PATH = __file__[:-22] + 'Simulations/'
 
 # TODO SUPPORTED_SHAPE_OF_ANIMATION_GRID
 
-#: :obj:`set` of :obj:`str` :
+#: :obj:`set` [:obj:`str`] :
 #: Set of all currently supported moments.
 # A set is faster than lists for the __contains__/in operation.
 SUPP_OUTPUT = {'Mass',
@@ -24,32 +24,38 @@ SUPP_OUTPUT = {'Mass',
                'Energy_Flow_Z'
                }
 
-#: :obj:`set` of :obj:`str` :
+#: :obj:`set` [:obj:`str`] :
 #: Set of all currently supported schemes
 #: for the selection of the collision partners.
 SUPP_COLL_SELECTION_SCHEMES = {'Complete'}
 
-#: :obj:`set` of :obj:`int` :
+#: :obj:`set` [:obj:`int`] :
 #: Set of all currently supported Convergence Orders
 #: for the Approximation of the Collision Operator.
 SUPP_ORDERS_COLL = {1, 2, 3, 4}
 
-#: :obj:`set` of :obj:`int` :
+#: :obj:`set` [:obj:`int`] :
 #: Set of all currently supported Convergence Orders
 #: of the Operator Splitting.
 SUPP_ORDERS_OS = {1, 2}
 
-#: :obj:`set` of :obj:`int` :
+#: :obj:`set` [:obj:`int`] :
 #: Set of all currently supported Convergence Orders
 #: for the Transport Step (PDE).
 SUPP_ORDERS_TRANSP = {1, 2}
 
-#: :obj:`set` of :obj:`str` :
+#: :obj:`set` [:obj:`str`] :
 #: Set of all characters, that are forbidden in any file addresses.
 INVALID_CHARACTERS = {'.', '"', "'", '/', '§', '$', '&',
                       '+', '#', ',', ';', '\\', '`', '´'}
 
-#: :obj:`set` of :obj:`str` :
+#: :obj:`set` [:obj:`str`] :
 #: Set of all currently supported geometric forms
 #: for :class:`Grids <boltzmann.configuration.Grid>`.
 SUPP_GRID_FORMS = {'rectangular'}
+
+#: :obj:`set` [:obj:`int`] :
+#: Set of all currently supported
+#: for :class:`~boltzmann.configuration.Grid`
+#: dimensions.
+SUPP_GRID_DIMENSIONS = {1, 2}

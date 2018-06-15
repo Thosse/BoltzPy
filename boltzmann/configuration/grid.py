@@ -24,7 +24,8 @@ class Grid:
         Must be an element of
         :const:`~boltzmann.constants.SUPP_GRID_FORMS`.
     dim : :obj:`int`
-        The :obj:`Grid` dimensionality. Must be in [1, 2, 3].
+        The :obj:`Grid` dimensionality. Must be in
+        :const:`~boltzmann.constants.SUPP_GRID_DIMENSIONS`.
     n : :obj:`~numpy.ndarray` of :obj:`int`
         Number of :obj:`Grid` points per dimension.
         Array of shape (:attr:`dim`,).
@@ -330,7 +331,7 @@ class Grid:
 
         if grid_dimension is not None:
             assert isinstance(grid_dimension, int)
-            assert grid_dimension in [1, 2, 3]
+            assert grid_dimension in b_const.SUPP_GRID_DIMENSIONS
 
         if number_of_grid_points_per_axis is not None:
             if isinstance(number_of_grid_points_per_axis, list):
@@ -365,7 +366,7 @@ class Grid:
         if grid_array is not None:
             assert isinstance(grid_array, np.ndarray)
             assert grid_array.dtype == int
-            assert grid_array.ndim in [1, 2, 3]
+            assert grid_array.ndim in b_const.SUPP_GRID_DIMENSIONS
 
         if grid_multiplicator is not None and grid_array is not None:
             assert (grid_array % grid_multiplicator == 0).all()
