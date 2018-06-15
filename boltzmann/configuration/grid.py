@@ -1,7 +1,12 @@
 
+import boltzmann.constants as b_const
+
 import numpy as np
 
 
+# Todo add property/attribute pd - Physical step size?
+# Todo add check parameters
+# Todo break line in multi attribute docstring
 class Grid:
     """Basic class for Positional-Space or Time-Space Grids."""
     def __init__(self):
@@ -23,7 +28,7 @@ class Grid:
     def form(self):
         """:obj:`str`:
         Geometric form of :class:`Grid`,
-        must be an element of :attr:`supported_forms`.
+        must be an element of :attr:`~boltzmann.constants.SUPP_GRID_FORMS`.
         """
         return self._form
 
@@ -304,7 +309,7 @@ class Grid:
         assert all(self.n >= 2)
         assert type(self.size) is int
         assert self.size >= 2
-        assert self.form in self.supported_forms
+        assert self.form in b_const.SUPP_GRID_FORMS
         if self.form == 'rectangular':
             assert self.n.prod() == self.size
         assert self.G.dtype == int
