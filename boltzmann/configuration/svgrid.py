@@ -290,7 +290,7 @@ class SVGrid:
         assert self.index.shape == (s_n+1,)
         assert np.array_equal(self.index[0:-1] + self.size,
                               self.index[1:])
-        assert self.form in b_grd.Grid().supported_forms
+        assert self.form in b_const.SUPP_GRID_FORMS
         if self.form is 'rectangular':
             for _s in range(s_n):
                 assert self.n[_s].prod() == self.size[_s]

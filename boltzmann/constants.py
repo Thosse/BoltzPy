@@ -48,3 +48,8 @@ SUPP_ORDERS_TRANSP = {1, 2}
 #: Set of all characters, that are forbidden in any file addresses.
 INVALID_CHARACTERS = {'.', '"', "'", '/', '§', '$', '&',
                       '+', '#', ',', ';', '\\', '`', '´'}
+
+#: :obj:`set` of :obj:`str` :
+#: Set of all currently supported geometric forms
+#: for :class:`Grids <boltzmann.configuration.Grid>`.
+SUPP_GRID_FORMS = {'rectangular'}
