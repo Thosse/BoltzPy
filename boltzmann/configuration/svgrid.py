@@ -1,17 +1,9 @@
-import numpy as np
-# import math
 
 from boltzmann.configuration import species as b_spc
 from boltzmann.configuration import grid as b_grd
+import boltzmann.constants as b_const
 
-
-# def np_gcd(array_of_ints):
-#     if array_of_ints.shape == (0,):
-#         return 1
-#     gcd = array_of_ints[0]
-#     for new_number in array_of_ints[1:]:
-#         gcd = math.gcd(gcd, new_number)
-#     return gcd
+import numpy as np
 
 
 class SVGrid:
@@ -91,6 +83,13 @@ class SVGrid:
 
     @property
     def boundaries(self):
+        """Calculates the minimum and maximum values in the velocity grid
+        of each :obj:`~boltzmann.configuration.Specimen`.
+
+        Returns
+        -------
+        :obj:`np.ndarray` of :obj:`float`
+        """
         boundaries = np.zeros(shape=(self.size.size,
                                      2,
                                      self.dim),
@@ -100,11 +99,11 @@ class SVGrid:
             G = self.G[beg:end]
             min_val = np.min(G, axis=0)
             max_val = np.max(G, axis=0)
-            bound = np.array([min_val, max_val]) * self.d[s]
+            bound_s = np.array([min_val, max_val]) * self.d[s]
             if self.dim is 2:
-                boundaries[s] = bound.transpose()
+                boundaries[s] = bound_s.transpose()
             elif self.dim is not 1:
-                assert False, 'This is not tested for 3d'
+                raise NotImplementedError('This is not tested for 3d')
                 # Todo figure out transpose order
         return boundaries
 
@@ -115,12 +114,27 @@ class SVGrid:
               force_contain_center=False,
               check_integrity=True,
               create_grid=True):
+        """
+
+        Parameters
+        ----------
+        species : :obj:`~boltzmann.configuration.Species`
+        velocity_grid : :obj:`~boltzmann.configuration.Grid`
+        offset
+        force_contain_center
+        check_integrity
+        create_grid
+
+        Returns
+        -------
+
+        """
         assert type(species) is b_spc.Species
         assert type(velocity_grid) is b_grd.Grid
         self.dim = velocity_grid.dim
         self.form = velocity_grid.form
         # set offset
-        # Todo put into seperate method?
+        # Todo put into separate method?
         if offset is None:
             self.offset = np.zeros((self.dim,), dtype=float)
         else:
