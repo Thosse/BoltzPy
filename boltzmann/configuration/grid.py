@@ -263,36 +263,128 @@ class Grid:
     #####################################
     #           Verification            #
     #####################################
-    def check_integrity(self):
-        """Sanity Check. Checks Integrity of all Attributes"""
-        assert type(self.dim) is int
-        assert self.dim in [1, 2, 3]
-        assert type(self.d) is float
-        assert self.d > 0
-        assert type(self.n) is np.ndarray
-        assert self.n.dtype == int
-        assert self.n.shape == (self.dim,)
-        assert all(self.n >= 2)
-        assert type(self.size) is int
-        assert self.size >= 2
-        assert self.form in b_const.SUPP_GRID_FORMS
-        if self.form == 'rectangular':
-            assert self.n.prod() == self.size
-        assert self.G.dtype == int
-        assert self.G.ndim in [1, 2]
-        if self.G.ndim == 1:
-            assert self.dim == 1
-            assert self.G.shape == (self.size,)
-            assert self.boundaries().shape == (2,)
-        else:
-            assert self.G.shape == (self.size, self.dim)
+    def check_integrity(self, complete_check=True):
+        """Sanity Check.
+        Besides asserting all conditions in :meth:`check_parameters`
+        it asserts the correct type of all attributes of the instance.
+
+        Parameters
+        ----------
+        complete_check : :obj:`bool`, optional
+            If True, then all attributes must be set (not None).
+            If False, then unassigned attributes are ignored.
+        """
+        self.check_parameters(grid_form=self.form,
+                              grid_dimension=self.dim,
+                              number_of_grid_points_per_axis=self.n,
+                              grid_size=self.size,
+                              grid_step_size=self.d,
+                              grid_multiplicator=self.multi,
+                              grid_array=self.G,
+                              flag_is_centered=self.is_centered,
+                              complete_check=complete_check)
+        # Additional Conditions on instance:
+        # parameter can be list, instance attributes must be np.ndarray
+        assert isinstance(self.n, np.ndarray)
+        # Todo remove dirty dimension hack -> should be uniformly true!
+        if self.dim is not 1:
             assert self.boundaries().shape == (2, self.dim)
-        assert type(self.multi) is int
-        assert self.multi >= 1
-        assert (self.G % self.multi == 0).all
-        assert type(self.is_centered) is bool
-        if self.is_centered:
-            assert self.multi % 2 == 0
+        return
+
+    @staticmethod
+    def check_parameters(grid_form=None,
+                         grid_dimension=None,
+                         number_of_grid_points_per_axis=None,
+                         grid_size=None,
+                         grid_step_size=None,
+                         grid_multiplicator=None,
+                         grid_array=None,
+                         flag_is_centered=None,
+                         complete_check=False):
+        """Sanity Check.
+        Checks integrity of given parameters and their interactions.
+
+        Parameters
+        ----------
+        grid_form : :obj:`str`, optional
+        grid_dimension : :obj:`int`, optional
+        number_of_grid_points_per_axis : :obj:`list` [:obj:`int`], optional
+        grid_size : :obj:`int`, optional
+        grid_step_size : :obj:`float`, optional
+        grid_multiplicator : :obj:`int`, optional
+        grid_array : :obj:`np.ndarray` [:obj:`int`], optional
+        flag_is_centered : :obj:`bool`, optional
+        complete_check : :obj:`bool`, optional
+            If True, then all parameters must be set (not None).
+            If False, then unassigned parameters are ignored.
+        """
+        # For complete check, assert that all parameters are assigned
+        assert isinstance(complete_check, bool)
+        if complete_check is True:
+            assert all([param is not None for param in locals().values()])
+
+        # check all parameters, if set
+        if grid_form is not None:
+            assert isinstance(grid_form, str)
+            assert grid_form in b_const.SUPP_GRID_FORMS
+
+        if grid_dimension is not None:
+            assert isinstance(grid_dimension, int)
+            assert grid_dimension in [1, 2, 3]
+
+        if number_of_grid_points_per_axis is not None:
+            if isinstance(number_of_grid_points_per_axis, list):
+                _n = np.array(number_of_grid_points_per_axis, dtype=int)
+                number_of_grid_points_per_axis = _n
+            assert isinstance(number_of_grid_points_per_axis, np.ndarray)
+            assert number_of_grid_points_per_axis.dtype == int
+            assert all(number_of_grid_points_per_axis >= 2)
+
+        if grid_dimension is not None \
+                and number_of_grid_points_per_axis is not None:
+            assert number_of_grid_points_per_axis.shape == (grid_dimension,)
+
+        if grid_size is not None:
+            assert isinstance(grid_size, int)
+            assert grid_size >= 2
+
+        if grid_form is not None \
+                and number_of_grid_points_per_axis is not None \
+                and grid_size is not None:
+            if grid_form == 'rectangular':
+                assert number_of_grid_points_per_axis.prod() == grid_size
+
+        if grid_step_size is not None:
+            assert isinstance(grid_step_size, float)
+            assert grid_step_size > 0
+
+        if grid_multiplicator is not None:
+            assert isinstance(grid_multiplicator, int)
+            assert grid_multiplicator >= 1
+
+        if grid_array is not None:
+            assert isinstance(grid_array, np.ndarray)
+            assert grid_array.dtype == int
+            assert grid_array.ndim in [1, 2, 3]
+
+        if grid_multiplicator is not None and grid_array is not None:
+            assert (grid_array % grid_multiplicator == 0).all()
+
+        if grid_dimension is not None and grid_size is not None \
+                and grid_array is not None:
+            # Todo remove dirty hack! This should be uniform
+            if grid_array.ndim == 1:
+                assert grid_dimension == 1
+                assert grid_array.shape == (grid_size,)
+            else:
+                assert grid_array.shape == (grid_size, grid_dimension)
+
+        if flag_is_centered is not None:
+            assert isinstance(flag_is_centered, bool)
+
+        if grid_multiplicator is not None and flag_is_centered is not None:
+            if flag_is_centered:
+                assert grid_multiplicator % 2 == 0
         return
 
     def __str__(self, write_physical_grids=True):
