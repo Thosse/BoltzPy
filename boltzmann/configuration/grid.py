@@ -4,18 +4,21 @@ import boltzmann.constants as b_const
 import numpy as np
 
 
-# Todo add property/attribute pd - Physical step size?
-# Todo add check parameters
+# Todo rename physical step size to spacing
+# Todo add spacing as property ?
+# Todo how to reference class attributes in numpy style?
 # Todo break line in multi attribute docstring
 class Grid:
     """Basic class for Positional-Space or Time-Space Grids.
 
     Notes
     -----
-    Note that changing :attr:`Grid.multi`
-    does not change the physical step size
-    or physical values of the :obj:`Grid`,
-    but allows features like adaptive Positional-Grids, or.
+        * Note that changing :attr:`~Grid.multi`
+          does not change the physical step size
+          or physical values of the :obj:`Grid`,
+          but allows features like adaptive Positional-Grids, or.
+        * Note that the physical step size of a uniform :obj:`Grid`
+          is :attr:`multi` * :attr:`d`.
 
     Attributes
     ----------
@@ -26,23 +29,20 @@ class Grid:
     dim : :obj:`int`
         The :obj:`Grid` dimensionality. Must be in
         :const:`~boltzmann.constants.SUPP_GRID_DIMENSIONS`.
-    n : :obj:`~numpy.ndarray` of :obj:`int`
+    n : :obj:`np.ndarray` [:obj:`int`]
         Number of :obj:`Grid` points per dimension.
         Array of shape (:attr:`dim`,).
     size : :obj:`int`
         Total number of :obj:`Grid` points.
     d : :obj:`float`
         Smallest possible step size of the :obj:`Grid`.
-        Note that the physical step size of a uniform :obj:`Grid`
-        is :attr:`multi` * :attr:`d`.
     multi : :obj:`int`
         Ratio of physical step size / :attr:`d`.
         Thus all values in :attr:`G` are multiples of :attr:`multi`.
-    G : :obj:`~np.ndarray` of :obj:`int`
+    G : :obj:`np.ndarray` [:obj:`int`]
         G[i] denotes the physical value/coordinates of
         :class:`Grid` point i
         in multiples of :attr:`d`.
-
         Array of shape (:attr:`size`, :attr:`dim`)
     is_centered : :obj:`bool`
         True if :obj:`Grid` / :attr:`G` has been centered,
@@ -75,7 +75,7 @@ class Grid:
         Parameters
         ----------
         dimension : :obj:`int`
-        number_of_points_per_dimension : :obj:`list` of :obj:`int`
+        number_of_points_per_dimension : :obj:`list` [:obj:`int`]
         step_size : :obj:`float`
         form : :obj:`str`, optional
         multi : :obj:`int`, optional
@@ -171,7 +171,7 @@ class Grid:
         return
 
     def revert_center(self):
-        """Reverts the changes to (:attr:`G`) made in :meth:`center`
+        """Reverts the changes to :attr:`G` made in :meth:`center`
         and sets :attr:`is_centered` back to :obj:`False`
         """
         if not self.is_centered:
@@ -234,7 +234,11 @@ class Grid:
         d = hdf5_file["Step_Size"].value
         form = hdf5_file["Form"].value
         multi = int(hdf5_file["Multiplicator"].value)
-        # Todo Check Integrity
+        Grid.check_parameters(grid_form=form,
+                              grid_dimension=dim,
+                              number_of_grid_points_per_axis=n,
+                              grid_step_size=d,
+                              grid_multiplicator=multi)
         # setup g
         self.setup(dim, n, d, form, multi)
         self.check_integrity()
