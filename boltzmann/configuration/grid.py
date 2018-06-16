@@ -49,14 +49,15 @@ class Grid:
 
     """
     def __init__(self):
-        self.form = ''
-        self.dim = 0
-        self.n = np.zeros(shape=(self.dim,), dtype=int)
-        self.size = 0
-        self.d = 0.0
-        self.multi = 1
-        self.G = np.zeros(shape=(self.size, self.dim), dtype=int)
+        self.form = None
+        self.dim = None
+        self.n = None
+        self.size = None
+        self.d = None
+        self.multi = None
+        self.G = None
         self.is_centered = False
+        self.check_integrity(False)
 
     #####################################
     #           Properties              #
@@ -90,6 +91,8 @@ class Grid:
     #####################################
     #           Configuration           #
     #####################################
+    # Todo move into constructor, assert in method that necessary attributes
+    # Todo are all set
     def setup(self,
               dimension,
               number_of_points_per_dimension,
@@ -234,7 +237,8 @@ class Grid:
         -------
         :obj:`Grid`
         """
-        # read data from file
+        # read attributes from file
+        # Todo allow partial read
         dim = int(hdf5_file["Dimension"].value)
         n = hdf5_file["Points_per_Dimension"].value
         d = hdf5_file["Step_Size"].value
@@ -259,16 +263,21 @@ class Grid:
         hdf5_file : h5py.File
             Opened HDF5 :obj:`Configuration` file.
         """
-        self.check_integrity()
+        self.check_integrity(False)
         # Clean State of Current group
         for key in hdf5_file.keys():
             del hdf5_file[key]
-        # read data from file
-        hdf5_file["Dimension"] = self.dim
-        hdf5_file["Points_per_Dimension"] = self.n
-        hdf5_file["Step_Size"] = self.d
-        hdf5_file["Form"] = self.form
-        hdf5_file["Multiplicator"] = self.multi
+        # write all set attributes to file
+        if self.dim is not None:
+            hdf5_file["Dimension"] = self.dim
+        if self.n is not None:
+            hdf5_file["Points_per_Dimension"] = self.n
+        if self.d is not None:
+            hdf5_file["Step_Size"] = self.d
+        if self.form is not None:
+            hdf5_file["Form"] = self.form
+        if self.multi is not None:
+            hdf5_file["Multiplicator"] = self.multi
         return
 
     #####################################
@@ -296,9 +305,11 @@ class Grid:
                               complete_check=complete_check)
         # Additional Conditions on instance:
         # parameter can be list, instance attributes must be np.ndarray
-        assert isinstance(self.n, np.ndarray)
+        assert self.n is None or isinstance(self.n, np.ndarray)
         # Todo remove dirty dimension hack -> should be uniformly true!
-        if self.dim is not 1:
+        # Todo check before, that boundaries can be calculated
+        if self.dim is not None \
+                and self.dim is not 1:
             assert self.boundaries.shape == (2, self.dim)
         return
 
