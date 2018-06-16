@@ -4,8 +4,6 @@ import boltzmann.constants as b_const
 import numpy as np
 
 
-# Todo rename physical step size to spacing
-# Todo add spacing as property ?
 # Todo how to reference class attributes in numpy style?
 # Todo break line in multi attribute docstring
 class Grid:
@@ -14,11 +12,11 @@ class Grid:
     Notes
     -----
         * Note that changing :attr:`~Grid.multi`
-          does not change the physical step size
-          or physical values of the :obj:`Grid`,
-          but allows features like adaptive Positional-Grids, or.
-        * Note that the physical step size of a uniform :obj:`Grid`
-          is :attr:`multi` * :attr:`d`.
+          does not change the :attr:`spacing`
+          or physical values of the :obj:`Grid`.
+          It's sole purpose is to allow features
+          like adaptive Positional-Grids,
+          or write intervals for Time-Grids.
 
     Attributes
     ----------
@@ -37,7 +35,7 @@ class Grid:
     d : :obj:`float`
         Smallest possible step size of the :obj:`Grid`.
     multi : :obj:`int`
-        Ratio of physical step size / :attr:`d`.
+        Ratio of :attr:`spacing` / :attr:`d`.
         Thus all values in :attr:`G` are multiples of :attr:`multi`.
     G : :obj:`np.ndarray` [:obj:`int`]
         G[i] denotes the physical value/coordinates of
@@ -59,6 +57,35 @@ class Grid:
         self.multi = 1
         self.G = np.zeros(shape=(self.size, self.dim), dtype=int)
         self.is_centered = False
+
+    #####################################
+    #           Properties              #
+    #####################################
+    @property
+    def spacing(self):
+        """Denotes the (physical) distance between two :class:`Grid` points.
+        :attr:`spacing` = :attr:`d` * :attr:`multi`
+         """
+        return self.d * self.multi
+
+    @property
+    def boundaries(self):
+        """Returns Minimum and maximum physical values
+        over all :class:`Grid` points
+        in array of shape (2, :attr:`dim`).
+
+        Returns
+        -------
+        :obj:`~numpy.ndarray` of :obj:`float`
+
+        """
+        # in uninitialized Grids: Min/Max operation raises Errors
+        if self.size == 0:
+            return np.zeros((2, self.dim), dtype=float)
+        min_val = np.min(self.G, axis=0)
+        max_val = np.max(self.G, axis=0)
+        bound = np.array([min_val, max_val]) * self.d
+        return bound
 
     #####################################
     #           Configuration           #
@@ -192,27 +219,6 @@ class Grid:
         return
 
     #####################################
-    #           Utilities               #
-    #####################################
-    def boundaries(self):
-        """Returns Minimum and maximum physical values
-        over all :class:`Grid` points
-        in array of shape (2, :attr:`dim`).
-
-        Returns
-        -------
-        :obj:`~numpy.ndarray` of :obj:`float`
-
-        """
-        # in uninitialized Grids: Min/Max operation raises Errors
-        if self.size == 0:
-            return np.zeros((2, self.dim), dtype=float)
-        min_val = np.min(self.G, axis=0)
-        max_val = np.max(self.G, axis=0)
-        bound = np.array([min_val, max_val]) * self.d
-        return bound
-
-    #####################################
     #           Serialization           #
     #####################################
     def load(self, hdf5_file):
@@ -293,7 +299,7 @@ class Grid:
         assert isinstance(self.n, np.ndarray)
         # Todo remove dirty dimension hack -> should be uniformly true!
         if self.dim is not 1:
-            assert self.boundaries().shape == (2, self.dim)
+            assert self.boundaries.shape == (2, self.dim)
         return
 
     @staticmethod
@@ -403,10 +409,10 @@ class Grid:
         if self.multi != 1:
             description += "Multiplicator = {}\n".format(self.multi)
             description += "Internal Step Size = {}\n".format(self.d)
-        description += "Physical Step Size = {}\n".format(self.d * self.multi)
+        description += "Spacing = {}\n".format(self.spacing)
         description += 'Is centered Grid = {}\n'.format(self.is_centered)
         description += "Boundaries:\n"
-        description += '\t' + self.boundaries().__str__().replace('\n', '\n\t')
+        description += '\t' + self.boundaries.__str__().replace('\n', '\n\t')
         if write_physical_grids:
             description += '\n'
             description += 'Physical Grid:\n\t'

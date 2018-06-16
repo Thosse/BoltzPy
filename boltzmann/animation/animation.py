@@ -94,7 +94,7 @@ class Animation:
             message = 'Animation is currently only implemented ' \
                       'for 1D Problems'
             raise NotImplementedError(message)
-        x_boundaries = self._cnf.p.boundaries()
+        x_boundaries = self._cnf.p.boundaries
         x_min = x_boundaries[0, 0]
         x_max = x_boundaries[1, 0]
         ax.set_xlim(x_min, x_max)
