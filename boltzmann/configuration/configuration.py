@@ -207,64 +207,82 @@ class Configuration:
         self.s.add_specimen(**kwargs)
 
     # Todo Choose between step size or number of time steps
-    def configure_time(self,
-                       max_time,
-                       number_time_steps,
-                       calculations_per_time_step=1):
+    def set_time_grid(self,
+                      max_time,
+                      number_time_steps,
+                      calculations_per_time_step=1):
         """Sets up :attr:`~Configuration.t`.
 
         1. Calculates step size
         2. Calls :meth:`Grid.setup`
         3. Calls :meth:`Grid.reshape`:
            Changes shape from (1,1) to (1,)
+
+        Parameters
+        ----------
+        max_time : :obj:`float`
+        number_time_steps : :obj:`int`
+        calculations_per_time_step : :obj:`int`
         """
         step_size = max_time / (number_time_steps - 1)
-        self.t.setup(1,
-                     [number_time_steps],
-                     step_size,
-                     multi=calculations_per_time_step)
+        self._t = b_grd.Grid(grid_form='rectangular',
+                             grid_dimension=1,
+                             grid_points_per_axis=[number_time_steps],
+                             grid_spacing=step_size,
+                             grid_multiplicator=calculations_per_time_step)
         self.t.reshape((self.t.size,))
         return
 
-    def configure_position_space(self,
-                                 dimension,
-                                 list_number_of_points_per_dimension,
-                                 step_size):
+    def set_position_grid(self,
+                          grid_dimension,
+                          grid_points_per_axis,
+                          grid_spacing):
         """Sets up :attr:`~Configuration.p`.
 
         Directly calls :meth:`Grid.setup`.
 
         Parameters
         ----------
-        dimension : :obj:`int`
-        list_number_of_points_per_dimension : :obj:`list` of :obj:`int`
-        step_size : :obj:`float`
+        grid_dimension : :obj:`int`
+        grid_points_per_axis : :obj:`list` [:obj:`int`]
+        grid_spacing : :obj:`float`
         """
-        self.p.setup(dimension,
-                     list_number_of_points_per_dimension,
-                     step_size)
+        if isinstance(grid_points_per_axis, int):
+            assert grid_dimension == 1
+            grid_points_per_axis = [grid_points_per_axis]
+        self._p = b_grd.Grid(grid_form='rectangular',
+                             grid_dimension=grid_dimension,
+                             grid_points_per_axis=grid_points_per_axis,
+                             grid_spacing=grid_spacing)
         return
 
-    def configure_velocity_space(self,
-                                 dimension,
-                                 grid_points_x_axis,
-                                 max_v,
-                                 shape='rectangular',
-                                 offset=None):
+    def set_velocity_grids(self,
+                           grid_dimension,
+                           grid_points_on_single_axis,
+                           maximum_velocity,
+                           grid_form='rectangular',
+                           offset=None):
         """Sets up :attr:`~Configuration.sv`.
 
         1. Generates a default Velocity :class:`Grid`
         2. Calls :meth:`SVGrid.setup`
            with the newly generated Velocity :class:`Grid`
            as a parameter
+
+        Parameters
+        ----------
+        grid_dimension : :obj:`int`
+        grid_points_on_single_axis : :obj:`int`
+        maximum_velocity : :obj:`float`
+        grid_form : :obj:`str`, optional
+        offset : :obj:`np.ndarray` [:obj:`float`], optional
         """
-        step_size = 2 * max_v / (grid_points_x_axis - 1)
-        number_of_points_per_dimension = [grid_points_x_axis] * dimension
-        v = b_grd.Grid()
-        v.setup(dimension,
-                number_of_points_per_dimension,
-                step_size,
-                shape)
+        step_size = 2 * maximum_velocity / (grid_points_on_single_axis - 1)
+        grid_points_per_axis = [grid_points_on_single_axis] * grid_dimension
+        v = b_grd.Grid(grid_form=grid_form,
+                       grid_dimension=grid_dimension,
+                       grid_points_per_axis=grid_points_per_axis,
+                       grid_spacing=step_size)
         self.sv.setup(self.s,
                       v,
                       offset)

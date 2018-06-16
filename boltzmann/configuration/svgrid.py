@@ -194,11 +194,11 @@ class SVGrid:
         self.G = np.zeros(shape=(self.index[-1], self.dim),
                           dtype=int)
         for _s in range(self.n.shape[0]):
-            _v = b_grd.Grid()
-            _v.setup(self.dim,
-                     self.n[_s],
-                     self.d[_s],
-                     form=self.form)
+            _v = b_grd.Grid(grid_form=self.form,
+                            grid_dimension=self.dim,
+                            grid_points_per_axis=self.n[_s],
+                            grid_spacing=self.d[_s],
+                            grid_multiplicator=1)
             _v.center()
             self.d[_s] = _v.d
             self.G[self.index[_s]:self.index[_s+1], :] = _v.G[:]

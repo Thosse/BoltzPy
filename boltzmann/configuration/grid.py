@@ -3,20 +3,28 @@ import boltzmann.constants as b_const
 
 import numpy as np
 
+from math import isclose as isclose
+
 
 # Todo how to reference class attributes in numpy style?
 # Todo break line in multi attribute docstring
+# Todo rename attribute self.G -> array? iGrid?
+# Todo create property pGrid?
 class Grid:
     """Basic class for Positional-Space or Time-Space Grids.
 
     Notes
     -----
-        * Note that changing :attr:`~Grid.multi`
-          does not change the :attr:`spacing`
-          or physical values of the :obj:`Grid`.
-          It's sole purpose is to allow features
-          like adaptive Positional-Grids,
-          or write intervals for Time-Grids.
+        Note that changing :attr:`~Grid.multi`
+        does not change the :attr:`spacing`
+        or physical values of the :obj:`Grid`.
+        It does change the values of
+        :attr:`~Grid.d` and :attr:`~Grid.G`
+        though.
+
+        The purpose of :attr:`Grid.multi` is to allow features
+        like adaptive (Positional- or Time-) Grids ,
+        or write intervals for Time-Grids.
 
     Attributes
     ----------
@@ -43,21 +51,39 @@ class Grid:
         in multiples of :attr:`d`.
         Array of shape (:attr:`size`, :attr:`dim`)
     is_centered : :obj:`bool`
-        True if :obj:`Grid` / :attr:`G` has been centered,
+        True if :attr:`Grid.G` has been centered,
         i.e. :meth:`center` was called.
         False otherwise.
 
     """
-    def __init__(self):
-        self.form = None
-        self.dim = None
-        self.n = None
+    def __init__(self,
+                 grid_form=None,
+                 grid_dimension=None,
+                 grid_points_per_axis=None,
+                 grid_spacing=None,
+                 grid_multiplicator=1):
+        self.check_parameters(grid_form=grid_form,
+                              grid_dimension=grid_dimension,
+                              grid_points_per_axis=grid_points_per_axis,
+                              grid_spacing=grid_spacing,
+                              grid_multiplicator=grid_multiplicator)
+        self.form = grid_form
+        self.dim = grid_dimension
+        if grid_points_per_axis is None:
+            self.n = None
+        else:
+            self.n = np.array(grid_points_per_axis, dtype=int)
         self.size = None
-        self.d = None
-        self.multi = None
+        if grid_spacing is not None:
+            self.d = grid_spacing / grid_multiplicator
+        else:
+            self.d = None
+        self.multi = grid_multiplicator
         self.G = None
+        # Todo replace by property -> check boundaries[0]? -> problem: offset
         self.is_centered = False
-        self.check_integrity(False)
+        self.setup()
+        return
 
     #####################################
     #           Properties              #
@@ -93,48 +119,23 @@ class Grid:
     #####################################
     # Todo move into constructor, assert in method that necessary attributes
     # Todo are all set
-    def setup(self,
-              dimension,
-              number_of_points_per_dimension,
-              step_size,
-              form='rectangular',
-              multi=1,
-              ):
-        """Constructs :obj:`Grid` object.
-
-        Parameters
-        ----------
-        dimension : :obj:`int`
-        number_of_points_per_dimension : :obj:`list` [:obj:`int`]
-        step_size : :obj:`float`
-        form : :obj:`str`, optional
-        multi : :obj:`int`, optional
+    def setup(self):
+        """Automatically constructs
+        :attr:`~Grid.G` and :attr:`Grid.size`.
         """
-        self.dim = dimension
-        self.n = np.array(number_of_points_per_dimension,
-                          dtype=int)
-        self.multi = multi
-        self.d = float(step_size) / self.multi
+        necessary_params = [self.form, self.dim, self.n, self.d, self.multi]
+        if any([val is None for val in necessary_params]):
+            return False
+        self.check_integrity(False)
 
-        if form == 'rectangular':
-            self.size = int(self.n.prod())
-        else:
-            message = "Unsupported Grid Form: {}".format(form)
-            raise ValueError(message)
-        self.form = form
-        self._construct_grid()
-        self.check_integrity()
-        return
-
-    def _construct_grid(self):
-        """Call specialized method to construct :attr:`G`,
-        based on :attr:`form`.
-        """
         if self.form == 'rectangular':
+            self.size = int(self.n.prod())
             self._construct_rectangular_grid()
         else:
-            message = "Unsupported Grid Form: {}".format(self.form)
-            raise ValueError(message)
+            message = "This Grid form is not implemented yet: " \
+                      "{}".format(self.form)
+            raise NotImplementedError(message)
+        self.check_integrity()
         return
 
     def _construct_rectangular_grid(self):
@@ -163,6 +164,7 @@ class Grid:
         self.G = grid.reshape(grid_shape)
         return
 
+    # Todo remove -> replace by property setter
     def double_multiplicator(self):
         """Double the current :attr:`multi`.
 
@@ -173,6 +175,7 @@ class Grid:
         self.multi *= 2
         return
 
+    # Todo remove -> replace by property setter
     def halve_multiplicator(self):
         """Halve the current :attr:`multi`.
 
@@ -187,6 +190,7 @@ class Grid:
         self.multi /= 2
         return
 
+# Todo rename -> centralize
     def center(self):
         """Centers the Grid
         (:attr:`G`)
@@ -200,6 +204,7 @@ class Grid:
         self.is_centered = True
         return
 
+    # Todo rename -> decentralize
     def revert_center(self):
         """Reverts the changes to :attr:`G` made in :meth:`center`
         and sets :attr:`is_centered` back to :obj:`False`
@@ -216,6 +221,7 @@ class Grid:
         self.halve_multiplicator()
         return
 
+# Todo remove -> fix dirty hack, for time grid shape
     def reshape(self, shape):
         """Changes the shape of :attr:`G`."""
         self.G = self.G.reshape(shape)
@@ -238,20 +244,28 @@ class Grid:
         :obj:`Grid`
         """
         # read attributes from file
-        # Todo allow partial read
-        dim = int(hdf5_file["Dimension"].value)
-        n = hdf5_file["Points_per_Dimension"].value
-        d = hdf5_file["Step_Size"].value
-        form = hdf5_file["Form"].value
-        multi = int(hdf5_file["Multiplicator"].value)
-        Grid.check_parameters(grid_form=form,
-                              grid_dimension=dim,
-                              number_of_grid_points_per_axis=n,
-                              grid_step_size=d,
-                              grid_multiplicator=multi)
-        # setup g
-        self.setup(dim, n, d, form, multi)
-        self.check_integrity()
+        try:
+            self.form = hdf5_file["Form"].value
+        except KeyError:
+            self.form = None
+        try:
+            self.dim = int(hdf5_file["Dimension"].value)
+        except KeyError:
+            self.dim = None
+        try:
+            self.n = hdf5_file["Points_per_Dimension"].value
+        except KeyError:
+            self.n = None
+        try:
+            self.d = hdf5_file["Step_Size"].value
+        except KeyError:
+            self.d = None
+        try:
+            self.multi = int(hdf5_file["Multiplicator"].value)
+        except KeyError:
+            self.multi = None
+        self.check_integrity(False)
+        self.setup()
         return
 
     def save(self, hdf5_file):
@@ -296,10 +310,11 @@ class Grid:
         """
         self.check_parameters(grid_form=self.form,
                               grid_dimension=self.dim,
-                              number_of_grid_points_per_axis=self.n,
+                              grid_points_per_axis=self.n,
                               grid_size=self.size,
                               grid_step_size=self.d,
                               grid_multiplicator=self.multi,
+                              grid_spacing=self.spacing,
                               grid_array=self.G,
                               flag_is_centered=self.is_centered,
                               complete_check=complete_check)
@@ -310,16 +325,18 @@ class Grid:
         # Todo check before, that boundaries can be calculated
         if self.dim is not None \
                 and self.dim is not 1:
-            assert self.boundaries.shape == (2, self.dim)
+            if self.G is not None and self.d is not None:
+                assert self.boundaries.shape == (2, self.dim)
         return
 
     @staticmethod
     def check_parameters(grid_form=None,
                          grid_dimension=None,
-                         number_of_grid_points_per_axis=None,
+                         grid_points_per_axis=None,
                          grid_size=None,
                          grid_step_size=None,
                          grid_multiplicator=None,
+                         grid_spacing=None,
                          grid_array=None,
                          flag_is_centered=None,
                          complete_check=False):
@@ -330,10 +347,11 @@ class Grid:
         ----------
         grid_form : :obj:`str`, optional
         grid_dimension : :obj:`int`, optional
-        number_of_grid_points_per_axis : :obj:`list` [:obj:`int`], optional
+        grid_points_per_axis : :obj:`list` [:obj:`int`], optional
         grid_size : :obj:`int`, optional
         grid_step_size : :obj:`float`, optional
         grid_multiplicator : :obj:`int`, optional
+        grid_spacing : :obj:`float`, optional
         grid_array : :obj:`np.ndarray` [:obj:`int`], optional
         flag_is_centered : :obj:`bool`, optional
         complete_check : :obj:`bool`, optional
@@ -354,27 +372,27 @@ class Grid:
             assert isinstance(grid_dimension, int)
             assert grid_dimension in b_const.SUPP_GRID_DIMENSIONS
 
-        if number_of_grid_points_per_axis is not None:
-            if isinstance(number_of_grid_points_per_axis, list):
-                _n = np.array(number_of_grid_points_per_axis, dtype=int)
-                number_of_grid_points_per_axis = _n
-            assert isinstance(number_of_grid_points_per_axis, np.ndarray)
-            assert number_of_grid_points_per_axis.dtype == int
-            assert all(number_of_grid_points_per_axis >= 2)
+        if grid_points_per_axis is not None:
+            if isinstance(grid_points_per_axis, list):
+                grid_points_per_axis = np.array(grid_points_per_axis,
+                                                dtype=int)
+            assert isinstance(grid_points_per_axis, np.ndarray)
+            assert grid_points_per_axis.dtype == int
+            assert all(grid_points_per_axis >= 2)
 
         if grid_dimension is not None \
-                and number_of_grid_points_per_axis is not None:
-            assert number_of_grid_points_per_axis.shape == (grid_dimension,)
+                and grid_points_per_axis is not None:
+            assert grid_points_per_axis.shape == (grid_dimension,)
 
         if grid_size is not None:
             assert isinstance(grid_size, int)
             assert grid_size >= 2
 
         if grid_form is not None \
-                and number_of_grid_points_per_axis is not None \
+                and grid_points_per_axis is not None \
                 and grid_size is not None:
             if grid_form == 'rectangular':
-                assert number_of_grid_points_per_axis.prod() == grid_size
+                assert grid_points_per_axis.prod() == grid_size
 
         if grid_step_size is not None:
             assert isinstance(grid_step_size, float)
@@ -383,6 +401,15 @@ class Grid:
         if grid_multiplicator is not None:
             assert isinstance(grid_multiplicator, int)
             assert grid_multiplicator >= 1
+
+        if grid_spacing is not None:
+            assert isinstance(grid_spacing, float)
+            assert grid_spacing > 0
+
+        if grid_step_size is not None \
+                and grid_multiplicator is not None \
+                and grid_spacing is not None:
+            assert isclose(grid_spacing, grid_multiplicator*grid_step_size)
 
         if grid_array is not None:
             assert isinstance(grid_array, np.ndarray)
