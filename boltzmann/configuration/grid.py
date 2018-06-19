@@ -3,7 +3,7 @@ import boltzmann.constants as b_const
 
 import numpy as np
 
-from math import isclose as isclose
+from math import isclose
 
 
 # Todo how to reference class attributes in numpy style?
@@ -11,7 +11,7 @@ from math import isclose as isclose
 # Todo rename attribute self.G -> array? iGrid?
 # Todo create property pGrid?
 class Grid:
-    """Basic class for Positional-Space or Time-Space Grids.
+    """Basic class for all Grids.
 
     Notes
     -----
@@ -54,7 +54,6 @@ class Grid:
         True if :attr:`Grid.G` has been centered,
         i.e. :meth:`center` was called.
         False otherwise.
-
     """
     def __init__(self,
                  grid_form=None,
@@ -117,8 +116,6 @@ class Grid:
     #####################################
     #           Configuration           #
     #####################################
-    # Todo move into constructor, assert in method that necessary attributes
-    # Todo are all set
     def setup(self):
         """Automatically constructs
         :attr:`~Grid.G` and :attr:`Grid.size`.

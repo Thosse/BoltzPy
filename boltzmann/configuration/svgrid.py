@@ -7,7 +7,7 @@ import numpy as np
 
 
 class SVGrid:
-    """Class of the concatenated Velocity Grid of all Specimen.
+    """Manages the Velocity Grids of all Specimen.
 
     .. todo::
         - add property for physical velocities (offset + G*d)
@@ -273,6 +273,8 @@ class SVGrid:
     def check_integrity(self):
         """Sanity Check"""
         s_n = self.d.shape[0]
+        print(self.dim)
+        input()
         assert type(self.dim) is int
         assert self.dim in [1, 2, 3]
         assert type(self.d) is np.ndarray
