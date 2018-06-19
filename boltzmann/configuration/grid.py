@@ -68,17 +68,17 @@ class Grid:
                               grid_multiplicator=grid_multiplicator)
         self.form = grid_form
         self.dim = grid_dimension
-        if grid_points_per_axis is None:
-            self.n = None
-        else:
+        if grid_points_per_axis is not None:
             self.n = np.array(grid_points_per_axis, dtype=int)
-        self.size = None
+        else:
+            self.n = None
+        self.size = None    # calculated in setup()
         if grid_spacing is not None:
             self.d = grid_spacing / grid_multiplicator
         else:
             self.d = None
         self.multi = grid_multiplicator
-        self.G = None
+        self.G = None   # generated in setup()
         # Todo replace by property -> check boundaries[0]? -> problem: offset
         self.is_centered = False
         self.setup()
