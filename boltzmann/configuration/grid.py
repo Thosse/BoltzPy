@@ -94,9 +94,10 @@ class Grid:
          """
         return self.d * self.multi
 
+    # Todo this is not ready for empty inits
     @property
     def boundaries(self):
-        """Returns Minimum and maximum physical values
+        """Denotes the minimum and maximum physical values
         over all :class:`Grid` points
         in array of shape (2, :attr:`dim`).
 
@@ -118,11 +119,11 @@ class Grid:
     #####################################
     def setup(self):
         """Automatically constructs
-        :attr:`~Grid.G` and :attr:`Grid.size`.
+        :attr:`Grid.G` and :attr:`Grid.size`.
         """
         necessary_params = [self.form, self.dim, self.n, self.d, self.multi]
         if any([val is None for val in necessary_params]):
-            return False
+            return
         self.check_integrity(False)
 
         if self.form == 'rectangular':
@@ -438,7 +439,7 @@ class Grid:
         description = ''
         description += "Dimension = {}\n".format(self.dim)
         description += "Geometric Form = {}\n".format(self.form)
-        description += "Number of Total Grid Points = {}\n".format(self.size)
+        description += "Total Size = {}\n".format(self.size)
         if self.dim != 1:
             description += "Grid Points per Dimension = {}\n".format(self.n)
         if self.multi != 1:

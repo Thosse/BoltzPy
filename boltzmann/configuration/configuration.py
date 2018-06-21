@@ -258,10 +258,10 @@ class Configuration:
 
     def set_velocity_grids(self,
                            grid_dimension,
-                           grid_points_on_single_axis,
-                           maximum_velocity,
+                           min_points_per_axis,
+                           max_velocity,
                            grid_form='rectangular',
-                           offset=None):
+                           velocity_offset=None):
         """Sets up :attr:`~Configuration.sv`.
 
         1. Generates a default Velocity :class:`Grid`
@@ -272,20 +272,17 @@ class Configuration:
         Parameters
         ----------
         grid_dimension : :obj:`int`
-        grid_points_on_single_axis : :obj:`int`
-        maximum_velocity : :obj:`float`
+        min_points_per_axis : :obj:`int`
+        max_velocity : :obj:`float`
         grid_form : :obj:`str`, optional
-        offset : :obj:`np.ndarray` [:obj:`float`], optional
+        velocity_offset : :obj:`np.ndarray` [:obj:`float`], optional
         """
-        step_size = 2 * maximum_velocity / (grid_points_on_single_axis - 1)
-        grid_points_per_axis = [grid_points_on_single_axis] * grid_dimension
-        v = b_grd.Grid(grid_form=grid_form,
-                       grid_dimension=grid_dimension,
-                       grid_points_per_axis=grid_points_per_axis,
-                       grid_spacing=step_size)
-        self.sv.setup(self.s,
-                      v,
-                      offset)
+        self._sv = b_svg.SVGrid(grid_form=grid_form,
+                                grid_dimension=grid_dimension,
+                                min_points_per_axis=min_points_per_axis,
+                                max_velocity=max_velocity,
+                                velocity_offset=velocity_offset,
+                                species_array=self.s)
         return
 
     #####################################
@@ -495,26 +492,26 @@ class Configuration:
 
         if time_grid is not None:
             assert isinstance(time_grid, b_grd.Grid)
-            time_grid.check_integrity()
+            time_grid.check_integrity(complete_check)
             assert time_grid.dim == 1
             assert time_grid.G.shape == (time_grid.size,)
 
         if position_grid is not None:
             assert isinstance(position_grid, b_grd.Grid)
-            position_grid.check_integrity()
+            position_grid.check_integrity(complete_check)
             if position_grid.dim is not 1:
                 msg = "Currently only 1D Simulations are supported!"
                 raise NotImplementedError(msg)
 
         if species_velocity_grid is not None:
             assert isinstance(species_velocity_grid, b_svg.SVGrid)
-            species_velocity_grid.check_integrity()
+            species_velocity_grid.check_integrity(complete_check)
 
         if position_grid is not None and species_velocity_grid is not None:
             assert species_velocity_grid.dim >= position_grid.dim
 
         if species is not None and species_velocity_grid is not None:
-            assert species_velocity_grid.size.size == species.n
+            assert species_velocity_grid.n_grids == species.n
 
         if file_address is not None:
             assert isinstance(file_address, str)

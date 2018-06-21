@@ -223,13 +223,12 @@ class Calculation:
         dt = self._cnf.t.d
         dp = self._cnf.p.d
         for s in range(self._cnf.s.n):
-            beg = self._cnf.sv.index[s]
-            end = self._cnf.sv.index[s+1]
-            dv = self._cnf.sv.d[s]
+            [beg, end] = self._cnf.sv.range_of_indices(s)
+            dv = self._cnf.sv.vGrids[s].d
             # Todo removal of boundaries only temporary, until rules for input/output points or boundary points are set
             for p in range(1, self._cnf.p.size-1):
                 for v in range(beg, end):
-                    pv = dv * self._cnf.sv.G[v]
+                    pv = dv * self._cnf.sv.SVG[v]
                     if pv[0] <= 0:
                         new_val = ((1 + pv[0]*dt/dp) * self.data[p, v]
                                    - pv[0]*dt/dp * self.data[p+1, v])
@@ -251,7 +250,7 @@ class Calculation:
             True, if all conditions are satisfied.
             False, otherwise."""
         # check Courant-Friedrichs-Levy-Condition
-        max_v = np.linalg.norm(self._cnf.sv.boundaries, axis=2).max()
+        max_v = np.linalg.norm(self._cnf.sv.boundaries, axis=1).max()
         dt = self._cnf.t.d
         dp = self._cnf.p.d
         cfl_condition = max_v * (dt/dp) < 1/2

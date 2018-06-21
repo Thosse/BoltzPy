@@ -3,6 +3,7 @@ import numpy as np
 import h5py
 
 
+#Todo Redo this, add new functionalities from new SVGrid
 class OutputFunction:
     """Provides the :meth:`apply` method which
     processes the :attr:`Calculation.data`
@@ -136,7 +137,7 @@ class OutputFunction:
             """
             mass = np.zeros(shape, dtype=float)
             for i_s in range(s_n):
-                [beg, end] = self.cnf.sv.index[i_s: i_s+2]
+                [beg, end] = self.cnf.sv.range_of_indices(i_s)
                 # mass = sum over velocity grid of specimen (last axis)
                 mass[i_s, :] = np.sum(data[..., beg:end], axis=-1)
             return mass
@@ -156,8 +157,8 @@ class OutputFunction:
             """
             momentum = np.zeros(shape, dtype=float)
             for s in range(s_n):
-                [beg, end] = self.cnf.sv.index[s: s+2]
-                V_dir = self.cnf.sv.G[beg:end, direction]
+                [beg, end] = self.cnf.sv.range_of_indices(s)
+                V_dir = self.cnf.sv.SVG[beg:end, direction]
                 momentum[s, :] = np.sum(V_dir * data[..., beg:end],
                                         axis=1)
                 momentum[s, :] *= self.cnf.s.mass[s]
@@ -177,8 +178,9 @@ class OutputFunction:
             """
             momentum_flow = np.zeros(shape, dtype=float)
             for s in range(s_n):
-                [beg, end] = self.cnf.sv.index[s: s+2]
-                V_dir = np.array(self.cnf.sv.G[beg:end, direction])
+                [beg, end] = self.cnf.sv.range_of_indices(s)
+                # Todo rename direction into axis or something like that
+                V_dir = np.array(self.cnf.sv.SVG[beg:end, direction])
                 momentum_flow[s, :] = np.sum(V_dir**2 * data[..., beg:end],
                                              axis=1)
                 momentum_flow[s, :] *= self.cnf.s.mass[s]
@@ -198,8 +200,8 @@ class OutputFunction:
             """
             energy = np.zeros(shape, dtype=float)
             for s in range(s_n):
-                [beg, end] = self.cnf.sv.index[s: s+2]
-                V = np.array(self.cnf.sv.G[beg:end, :])
+                [beg, end] = self.cnf.sv.range_of_indices(s)
+                V = np.array(self.cnf.sv.SVG[beg:end, :])
                 V_norm = np.sqrt(np.sum(V**2, axis=1))
                 energy[s, :] = np.sum(V_norm * data[..., beg:end],
                                       axis=1)
@@ -220,10 +222,10 @@ class OutputFunction:
             """
             energy_flow = np.zeros(shape, dtype=float)
             for s in range(s_n):
-                [beg, end] = self.cnf.sv.index[s: s + 2]
-                V = np.array(self.cnf.sv.G[beg:end, :])
+                [beg, end] = self.cnf.sv.range_of_indices(s)
+                V = np.array(self.cnf.sv.SVG[beg:end, :])
                 V_norm = np.sqrt(np.sum(V ** 2, axis=1))
-                V_dir = np.array(self.cnf.sv.G[beg:end, direction])
+                V_dir = np.array(self.cnf.sv.SVG[beg:end, direction])
                 energy_flow[s, :] = np.sum(V_norm * V_dir * data[..., beg:end],
                                            axis=1)
                 energy_flow[s, :] *= 0.5 * self.cnf.s.mass[s]

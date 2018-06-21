@@ -7,17 +7,17 @@ from datetime import datetime
 
 
 print('Starting Time:\n' + str(datetime.now()) + '\n')
-cnf = b_cnf.Configuration()
-cnf.add_specimen(mass=1)               # 2
-cnf.add_specimen(mass=2)               # 3
+cnf = b_cnf.Configuration("default")
+cnf.add_specimen(mass=2)               # 2
+cnf.add_specimen(mass=3)               # 3
 cnf.s.collision_rate_matrix *= 50                 # 2
 cnf.set_time_grid(0.1, 11, 10)      # 20 1001 10
 cnf.set_position_grid(1,
                       [21],  # 200
                       grid_spacing=0.1)   # 0.1
 cnf.set_velocity_grids(grid_dimension=2,
-                       grid_points_on_single_axis=4,  # 8
-                       maximum_velocity=1.5)       # 1.5
+                       min_points_per_axis=4,
+                       max_velocity=1.5)
 cnf.collision_steps_per_time_step = 1     # 50
 print(cnf.__str__(write_physical_grids=True))
 cnf.save()

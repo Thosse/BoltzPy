@@ -5,12 +5,18 @@ import boltzmann.constants as b_const
 
 import numpy as np
 
+import math
+
 
 class SVGrid:
-    """Manages the Velocity Grids of all Specimen.
+    """Manages the Velocity Grids of all
+    :class:`~boltzmann.configuration.Species` /
+    :class:`~boltzmann.configuration.Specimen`.
 
     .. todo::
-        - add property for physical velocities (offset + G*d)
+        - Todo rename attribute self.SVG -> iMG? iGrid?
+        - Todo create property pGrid / pMG?
+        - add property for physical velocities (offset + SVG*d)
         - Ask Hans, should the Grid always contain the center/zero?
         - Todo Add unit tests
         - replace n with index_skips?
@@ -22,201 +28,266 @@ class SVGrid:
 
     Attributes
     ----------
-    dim : int
-        Dimensionality of all Grids.  Applies to all Specimen.
-    d : array(float)
-        Denotes the Grid step size for each specimen.
-        Array of shape=(s.n, dim).
-    n : array(int)
-        n[S, DIM] denotes the number of Velocity-Grid points in dimension DIM
-        for specimen S.
-        Array of shape=(s.n, dim)
-    size : array(int)
-        n[S] denotes the total number of Velocity-Grid points
-        for specimen S.
-        Array of shape=(s.n,).
-    index : array(int)
-        index[i] denotes the beginning of the i-th velocity grid.
-        By Definition index[0] is 0 and index[-1] is n[:,-1].sum().
-        Array of shape=(s.n+1) and dType=int.
-    G : array(int)
-        Concatenated physical Velocity-Grids of all specimen.
-        G[index[i]:index[i+1]] is the Velocity Grid of specimen i.
-        G[j] denotes the physical coordinates of the j-th grid point.
-        Note that some V-Grid-points occur several times,
-        for different specimen.
-        Array of shape(index[-1], dim).
-    form : str
-        Geometric shape of all Velocity-Grids. Equal to all Specimen.
-        Can only be rectangular so far.
-    offset : array(float)
-        Offset for the physical velocities.
+    form : :obj:`str`
+        Geometric form of all Velocity :class:`Grids <configuration.Grid>`.
+        Must be an element of
+        :const:`~boltzmann.constants.SUPP_GRID_FORMS`.
+    dim : :obj:`int`
+        Dimensionality of all Velocity :class:`Grids <configuration.Grid>`.
+        Must be in :const:`~boltzmann.constants.SUPP_GRID_DIMENSIONS`.
+    SVG : :obj:`np.ndarray` [:obj:`int`]
+        Concatenated Index-Grids of the
+        :class:`Velocity Grids <boltzmann.configuration.Grid>`
+        (:attr:`Grid.G <boltzmann.configuration.Grid>`) of all
+        :class:`Species`.
+        SVG[_index[i]:_index[i+1]] is the Velocity Grid of specimen i.
+        SVG[j] denotes the physical coordinates of the j-th grid point.
+        Note that some V-Grid points occur in multiple
+        :class:`Velocity Grids <boltzmann.configuration.Grid>`.
+        Array of shape(:attr:`size`, dim).
+    offset : :obj:`np.ndarray` [:obj:`float`]
+        Shifts the physical velocities, to be centered around :attr:`offset`.
         The physical value of any Velocity-Grid point v_i of Specimen S
-        is offset + d[S]*G[i].
+        is :math:`offset + d[S] \cdot SVG[i]`.
         Array of shape=(dim,).
-    multi : int
-        Multiplicator, that determines the ratio of
-        'actual step size' / :attr:`~boltzmann.configuration.Grid.d`.
-        In several cases the Entries in G are multiplied by
-        :attr:`~boltzmann.configuration.Grid.multi`
-        and :attr:`~boltzmann.configuration.Grid.d` are divided by
-        :attr:`~boltzmann.configuration.Grid.multi`.
-        This does not change the physical Values, but enables a variety
-         of features( Currently: several calculation steps per write,
-         simple centralizing ov velocity grids)
-    is_centered : bool
-        True if Grid has been centered, False otherwise.
-
     """
-    def __init__(self):
-        self.dim = 0
-        self.form = ''
-        self.d = np.zeros(shape=(0,), dtype=float)
-        self.n = np.zeros(shape=(0, 0), dtype=int)
-        self.size = np.zeros(shape=(0,), dtype=int)
-        self.index = np.zeros(shape=(0,), dtype=int)
-        self.G = np.zeros((0, self.dim), dtype=int)
-        self.multi = 1
-        self.is_centered = False
-        self.offset = np.zeros((self.dim,), dtype=float)
+    def __init__(self,
+                 grid_form=None,
+                 grid_dimension=None,
+                 min_points_per_axis=None,
+                 max_velocity=None,
+                 velocity_offset=None,
+                 species_array=None):
+        self.check_parameters(grid_form=grid_form,
+                              grid_dimension=grid_dimension,
+                              max_velocity=max_velocity,
+                              min_points_per_axis=min_points_per_axis,
+                              velocity_offset=velocity_offset)
+        self.form = grid_form
+        self.dim = grid_dimension
+        self._MAX_V = max_velocity
+        self._MIN_N = min_points_per_axis
+        if velocity_offset is not None:
+            self.offset = np.array(velocity_offset)
+        else:
+            if grid_dimension is not None:
+                self.offset = np.zeros(grid_dimension, dtype=float)
+            else:
+                self.offset = None
+
+        # The remaining attributes are calculated in setup() method
+        # _index[i] denotes the beginning of the i-th velocity Grid in SVG
+        self._index = None
+        self.vGrids = None
+        self.SVG = None
+
+        self.setup(species_array)
         return
+
+    # Todo figure out whats useful - this currently is not
+    # def __getitem__(self, specimen_index):
+    #     """Returns the indexed :obj:`~boltzmann.configuration.Grid`."""
+    #     return self.vGrids[specimen_index]
+
+    #####################################
+    #           Properties              #
+    #####################################
+    @property
+    def size(self):
+        """:obj:`int` :
+            Denotes the total number of Velocity-Grid points
+            over all :class:`~boltzmann.configuration.Specimen`.
+        """
+        if self._index is None:
+            return None
+        else:
+            return self._index[-1]
+
+    @property
+    def n_grids(self):
+        """:obj:`int` :
+            Denotes the number of different
+            :class:`Velocity Grids <boltzmann.configuration.Grid>`.
+        """
+        return self.vGrids.size
 
     @property
     def boundaries(self):
-        """Calculates the minimum and maximum values in the velocity grid
-        of each :obj:`~boltzmann.configuration.Specimen`.
+        """Denotes the minimum and maximum physical values
+        in the :class:`Velocity Grids <boltzmann.configuration.Grid>`
+        of an arbitrary :class:`~boltzmann.configuration.Specimen`.
+        All :class:`~boltzmann.configuration.Specimen` have equal
+        boundaries.
 
         Returns
         -------
-        :obj:`np.ndarray` of :obj:`float`
+        :obj:`np.ndarray` [:obj:`float`]
         """
-        boundaries = np.zeros(shape=(self.size.size,
-                                     2,
-                                     self.dim),
-                              dtype=float)
-        for s in range(self.size.size):
-            [beg, end] = self.index[[s, s+1]]
-            G = self.G[beg:end]
-            min_val = np.min(G, axis=0)
-            max_val = np.max(G, axis=0)
-            bound_s = np.array([min_val, max_val]) * self.d[s]
-            if self.dim is 2:
-                boundaries[s] = bound_s.transpose()
-            elif self.dim is not 1:
-                raise NotImplementedError('This is not tested for 3d')
-                # Todo figure out transpose order
-        return boundaries
+        if self.vGrids is None:
+            return None
+        else:
+            return self.vGrids[0].boundaries
 
-    def setup(self,
-              species,
-              velocity_grid,
-              offset=None,
-              force_contain_center=False,
-              check_integrity=True,
-              create_grid=True):
-        """
+    #####################################
+    #           Configuration           #
+    #####################################
+    def setup(self, species_array):
+        r"""Automatically constructs the
+        :class:`Velocity Grids <boltzmann.configuration.Grid>`
+        for the given
+        :class:`species_array <boltzmann.configuration.Species>`
+        and initializes the related attributes:
+        :attr:`~SVGrid.vGrids`, :attr:`~SVGrid.SVG`,
+        :attr:`~SVGrid._index` and :attr:`~SVGrid.size`
+
+
+        1. Calculate the minimum number of :ref:`segments <segment>` any
+           :class:`Velocity Grids <boltzmann.configuration.Grid>`
+           should have on any axis.
+        2. Calculate the number of
+           :ref:`complete segments <complete_segment>`, such that
+           any :class:`Velocity Grids <boltzmann.configuration.Grid>`
+           has at least the minimum number of :ref:`segments <segment>`
+           on any axis.
+        3. Calculate the shape and spacing of each
+           :class:`Velocity Grids <boltzmann.configuration.Grid>`,
+           based on its :class:`Specimens <boltzmann.configuration.Specimen>`
+           :attr:`~boltzmann.configuration.Specimen.mass`.
+        4. Initialize and
+           :meth:`centralize <boltzmann.configuration.Grid.center>` the
+           :class:`Velocity Grids <boltzmann.configuration.Grid>`
+           and  store them into :attr:`vGrids`.
+        5. Set up the remaining attributes based on the
+           :class:`Velocity Grids <boltzmann.configuration.Grid>`.
+
+        Notes
+        -----
+          .. _segment:
+
+          * A **segment** is the area between two neighbouring grid points
+            on any grid axis. Along any axis holds
+            :math:`n_{Segments} = n_{points} - 1.`
+
+          .. _complete_segment:
+
+          * A **complete segment** is the smallest union of connected
+            :ref:`segments <segment>`,
+            beginning and ending with a shared grid point for all
+            :class:`Velocity Grids <boltzmann.configuration.Grid>`.
+            In the :class:`Velocity Grid <boltzmann.configuration.Grid>`
+            of any :class:`~boltzmann.configuration.Specimen`,
+            a single complete segment consists of exactly
+            :attr:`~boltzmann.configuration.Specimen.mass` segments.
+            Thus for any :class:`~boltzmann.configuration.Specimen`:
+
+              :math:`n_{Segments} = n_{complete \: Segments} \cdot mass`
+
+
+          * Heavier :class:`~boltzmann.configuration.Specimen`
+            are more inert and move less.
+            Thus, for any
+            :class:`~boltzmann.configuration.Specimen` the
+            :attr:`~boltzmann.configuration.Grid.spacing`
+            of its :class:`Velocity Grid <boltzmann.configuration.Grid>`
+            is inversely proportional to its
+            :attr:`~boltzmann.configuration.Specimen.mass` :
+
+              :math:`spacing[i] \sim \frac{1}{mass[i]}.`
+
+          * A smaller :attr:`~boltzmann.configuration.Grid.spacing`
+            leads to larger grids.
+            Thus for any
+            :class:`~boltzmann.configuration.Specimen` the size of its
+            :class:`Velocity Grid <boltzmann.configuration.Grid>`
+            grows cubic in its :attr:`~boltzmann.configuration.Specimen.mass`.
+
+              :math:`size \sim n^{dim} \sim mass^{dim}`.
 
         Parameters
         ----------
-        species : :obj:`~boltzmann.configuration.Species`
-        velocity_grid : :obj:`~boltzmann.configuration.Grid`
-        offset
-        force_contain_center
-        check_integrity
-        create_grid
-
-        Returns
-        -------
-
+        species_array : :obj:`~boltzmann.configuration.Species`
         """
-        assert type(species) is b_spc.Species
-        assert type(velocity_grid) is b_grd.Grid
-        self.dim = velocity_grid.dim
-        self.form = velocity_grid.form
-        # set offset
-        # Todo put into separate method?
-        if offset is None:
-            self.offset = np.zeros((self.dim,), dtype=float)
-        else:
-            assert type(offset) in [int, list, np.ndarray]
-            if type(offset) is int:
-                offset = [offset]
-            self.offset = np.array(offset, dtype=float)
-            assert self.offset.shape is (self.dim,)
+        necessary_params = [self.form,
+                            self.dim,
+                            self._MAX_V,
+                            self._MIN_N,
+                            species_array]
+        # only run setup, if all necessary parameters are set
+        if any([val is None for val in necessary_params]):
+            return
 
-        m = species.mass
-        m_min = np.amin(m)
-        # The range of the Velocity-Grid of Specimen i is almost constant:
-        # v_max[i]-v_min[i] = n[i] * d[i] ~ CONST
-        # with CONST = velocity_grid.n * velocity_grid.d
-        # If necessary, the range may decrease by at most 1 d[i]
-        # => n may be rounded down
+        # sanity check
+        self.check_integrity(False)
+        assert type(species_array) is b_spc.Species
+        species_array.check_integrity()
 
-        # The lighter specimen are less inert and move further
-        # => d[i]/d[j] = m[j]/m[i]
-        # i.e. d[i] is inversely proportional to m[i]
-        self.d = np.array(velocity_grid.d * m_min/m,
-                          dtype=float)
+        # Construct self.vGrids
+        mass_array = species_array.mass
+        min_mass = np.amin(mass_array)
+        # Minimum number of segments (see docstring)
+        min_segments = self._MIN_N - 1
+        # Number of complete segments (see docstring)
+        n_complete_segments = math.ceil(min_segments / min_mass)
+        number_of_grid_points = [(n_complete_segments * mass) + 1
+                                 for mass in mass_array]
+        grid_shapes = [[n] * self.dim for n in number_of_grid_points]
+        # spacing of the velocity grid for each specimen
+        # Todo replace, allow Grid.init with number of points (array)
+        spacings = [2 * self._MAX_V / (n_i - 1)
+                    for n_i in number_of_grid_points]
+        # Contains the velocity Grid of each specimen
+        vGrids = [b_grd.Grid(grid_form=self.form,
+                             grid_dimension=self.dim,
+                             grid_points_per_axis=grid_shapes[i],
+                             grid_spacing=spacings[i])
+                  for i in range(species_array.n)]
+        # centralize Grids - Todo add option in Grid.setup to center there
+        for G in vGrids:
+            G.center()
+        self.vGrids = np.array(vGrids)
 
-        # Smaller step sizes lead to larger grids (n[i]*d[i] = CONST).
-        # => n[i]/n[j] ~ d[j]/d[i] ~ m[i]/m[j]
-        # i.e. n[i] is proportional to m[i]
-        self.n = np.zeros((species.n, self.dim), dtype=int)
-        for _s in range(species.n):
-            # -/+1 are necessary to switch between points and length
-            self.n[_s] = (m[_s]/m_min)*(velocity_grid.n-1) + 1
-            # The center can be forced to be a grid point,
-            # by allowing only uneven numbers per dimension
-            if force_contain_center:
-                for _d in range(0, self.dim):
-                    if self.n[_s, _d] % 2 == 0:
-                        self.n[_s, _d] -= 1
-            if self.form is 'rectangular':
-                self.size = self.n.prod(axis=1)
-            else:
-                print("ERROR - Unspecified Grid Shape")
-                assert False
+        # construct self._index
+        self._index = np.zeros(species_array.n + 1,
+                               dtype=int)
+        for (i_G, vGrid) in enumerate(vGrids):
+            self._index[i_G + 1] = self._index[i_G] + vGrid.size
 
-        # index[i] = n[0] + ... n[i-1]
-        self.index = np.zeros((species.n+1,), dtype=int)
-        for _s in range(species.n):
-            self.index[_s+1] = self.index[_s] + self.size[_s]
+        # construct self.SVG
+        self.SVG = np.zeros((self.size, self.dim),
+                            dtype=int)
+        # Todo document properly (use  iGrid, if implemented)
+        # store the index grids (vGrid.G) consecutively in self.SVG
+        for (i_G, vGrid) in enumerate(self.vGrids):
+            [beg, end] = self.range_of_indices(i_G)
+            self.SVG[beg: end, :] = vGrid.G[:, :]
+            vGrid.G = self.SVG[beg: end, :]
 
-        if create_grid:
-            self.create_grid()
-        else:
-            self.G = np.zeros((0,), dtype=int)
-        if check_integrity:
-            self.check_integrity()
-        return
-
-    def create_grid(self):
-        self.G = np.zeros(shape=(self.index[-1], self.dim),
-                          dtype=int)
-        for _s in range(self.n.shape[0]):
-            _v = b_grd.Grid(grid_form=self.form,
-                            grid_dimension=self.dim,
-                            grid_points_per_axis=self.n[_s],
-                            grid_spacing=self.d[_s],
-                            grid_multiplicator=1)
-            _v.center()
-            self.d[_s] = _v.d
-            self.G[self.index[_s]:self.index[_s+1], :] = _v.G[:]
-        self.multi = 2
-        self.is_centered = True
+        self.check_integrity()
         return
 
     #####################################
     #               Indexing            #
     #####################################
+
+    def range_of_indices(self, specimen_index):
+        """:obj:`list` [:obj:`int`] :
+            Returns the beginning and end / delimiters
+            of the indexed
+            :class:`Specimens <boltzmann.configuration.Specimen>`
+            :class:`Velocity Grid <boltzmann.configuration.Grid>`
+            in :attr:`~boltzmann.configuration.SVGrid.SVG>`.
+        """
+        return self._index[specimen_index: specimen_index+2]
+
+    # Todo indexing needs to be checked/edited for new SVGrid class
     def get_index(self,
                   specimen_index,
                   grid_entry):
-        """Returns position of given grid_entry in :attr:`SVGrid.G`
+        """Returns position of given grid_entry in :attr:`SVGrid.SVG`
 
         Firstly, we assume the given grid_entry is an element
         of the given Specimens Velocity-Grid.
-        Under this condition we generate its index in attr:`SVGrid.G`.
+        Under this condition we generate its index in attr:`SVGrid.SVG`.
         Secondly, we counter-check if the indexed value matches the given
         value.
         If this is true, we return the index,
@@ -231,19 +302,19 @@ class SVGrid:
         Returns
         -------
         int
-            Index/Position of grid_entry in :attr:`~SVGrid.G`.
+            Index/Position of grid_entry in :attr:`~SVGrid.SVG`.
         """
         # Todo Throw exception if not a grid entry (instead of None)
         i_flat = 0
         # get vector-index, by reversing Grid.center() - method
-        i_vec = np.array((grid_entry+self.n[specimen_index]-1) // 2,
+        i_vec = np.array((grid_entry+self.vGrids[specimen_index].n - 1) // 2,
                          dtype=int)
-        for _d in range(self.dim):
-            n_loc = self.n[specimen_index, _d]
+        for _dim in range(self.dim):
+            n_loc = self.vGrids[specimen_index].n[_dim]
             i_flat *= n_loc
-            i_flat += i_vec[_d]
-        i_flat += self.index[specimen_index]
-        if all(np.array(self.G[i_flat] == grid_entry)):
+            i_flat += i_vec[_dim]
+        i_flat += self._index[specimen_index]
+        if all(np.array(self.SVG[i_flat] == grid_entry)):
             return i_flat
         else:
             return None
@@ -260,52 +331,125 @@ class SVGrid:
         int
             Index of Specimen.
         """
-        for i in range(self.index.size):
-            if self.index[i] <= velocity_index < self.index[i+1]:
+        for i in range(self._index.size):
+            if self._index[i] <= velocity_index < self._index[i+1]:
                 return i
-        # Todo Throw exception
-        return None
+        msg = 'The given index ({}) points out of the boundaries of ' \
+              'SVG, the concatenated Velocity Grid.'.format(velocity_index)
+        raise KeyError(msg)
 
+    #####################################
+    #           Serialization           #
+    #####################################
+    # Todo Add load / save method
     #####################################
     #           Verification            #
     #####################################
+    def check_integrity(self, complete_check=True):
+        """Sanity Check.
+        Besides asserting all conditions in :meth:`check_parameters`
+        it asserts the correct type of all attributes of the instance.
 
-    def check_integrity(self):
-        """Sanity Check"""
-        s_n = self.d.shape[0]
-        print(self.dim)
-        input()
-        assert type(self.dim) is int
-        assert self.dim in [1, 2, 3]
-        assert type(self.d) is np.ndarray
-        assert self.d.shape == (s_n,)
-        assert self.d.dtype == float
-        assert all(self.d > 0)
-        assert type(self.n) is np.ndarray
-        assert self.n.shape == (s_n, self.dim)
-        assert self.n.dtype == int
-        assert all(self.n.flatten() >= 2)
-        assert type(self.size) is np.ndarray
-        assert self.size.shape == (s_n,)
-        assert self.size.dtype == int
-        assert all(self.size >= 2)
-        assert self.index.shape == (s_n+1,)
-        assert np.array_equal(self.index[0:-1] + self.size,
-                              self.index[1:])
-        assert self.form in b_const.SUPP_GRID_FORMS
-        if self.form is 'rectangular':
-            for _s in range(s_n):
-                assert self.n[_s].prod() == self.size[_s]
-        assert self.G.dtype == int
-        assert self.G.shape == (self.index[-1], self.dim)
-        assert self.offset.dtype == float
-        assert self.offset.shape == (self.dim,)
-        assert type(self.multi) is int
-        assert self.multi >= 1
-        assert (self.G % self.multi == 0).all
-        assert type(self.is_centered) is bool
-        if self.is_centered:
-            assert self.multi % 2 is 0
+        Parameters
+        ----------
+        complete_check : :obj:`bool`, optional
+            If True, then all attributes must be set (not None).
+            If False, then unassigned attributes are ignored.
+        """
+        self.check_parameters(grid_form=self.form,
+                              grid_dimension=self.dim,
+                              max_velocity=self._MAX_V,
+                              min_points_per_axis=self._MIN_N,
+                              velocity_offset=self.offset,
+                              multi_grid_indices=self._index,
+                              multi_class_array=self.vGrids,
+                              multi_grid_array=self.SVG,
+                              complete_check=complete_check)
+        # Additional Conditions on instance:
+        # All Velocity Grids must have equal boundaries
+        if self.vGrids is not None:
+            for G in self.vGrids:
+                assert isinstance(G, b_grd.Grid)
+                assert np.array_equal(G.boundaries, self.boundaries)
+        return
+
+    @staticmethod
+    def check_parameters(grid_form=None,
+                         grid_dimension=None,
+                         multi_grid_indices=None,
+                         max_velocity=None,
+                         min_points_per_axis=None,
+                         multi_class_array=None,
+                         multi_grid_array=None,
+                         velocity_offset=None,
+                         complete_check=False):
+        """Sanity Check.
+        Checks integrity of given parameters and their interactions."""
+        assert isinstance(complete_check, bool)
+        if complete_check is True:
+            assert all([param is not None for param in locals().values()])
+
+        # check all parameters, if set
+        if grid_form is not None:
+            assert isinstance(grid_form, str)
+            assert grid_form in b_const.SUPP_GRID_FORMS
+
+        if grid_dimension is not None:
+            assert isinstance(grid_dimension, int)
+            assert grid_dimension in b_const.SUPP_GRID_DIMENSIONS
+
+        if max_velocity is not None:
+            assert isinstance(max_velocity, float)
+            assert max_velocity > 0
+
+        if min_points_per_axis is not None:
+            assert isinstance(min_points_per_axis, int)
+            assert min_points_per_axis > 1
+
+        if velocity_offset is not None:
+            if type(velocity_offset) in [list, float]:
+                velocity_offset = np.array(velocity_offset,
+                                           dtype=float)
+            assert velocity_offset.dtype == float
+
+        if grid_dimension is not None and velocity_offset is not None:
+            assert velocity_offset.shape == (grid_dimension,)
+
+        # Todo undo the assert all
+        # Todo -> submitting a single parameter must be allowed
+        multi_grid_params = [multi_grid_indices,
+                             multi_class_array,
+                             multi_grid_array]
+        if any(param is not None for param in multi_grid_params):
+            assert all(param is not None for param in multi_grid_params)
+            assert grid_dimension is not None
+            assert grid_form is not None
+            assert isinstance(multi_grid_indices, np.ndarray)
+            assert isinstance(multi_class_array, np.ndarray)
+            assert isinstance(multi_grid_array, np.ndarray)
+
+            assert multi_grid_indices.dtype == int
+            assert multi_grid_indices.shape == (multi_class_array.size + 1,)
+            assert all(index >= 0 for index in multi_grid_indices)
+            assert all(multi_grid_indices[i + 1] - multi_grid_indices[i] > 0
+                       for i in range(multi_class_array.size))
+            assert multi_class_array.dtype == 'object'
+            assert multi_grid_array.dtype == int
+            assert multi_grid_array.shape == (multi_grid_indices[-1],
+                                              grid_dimension)
+
+            for (i_G, vGrid) in enumerate(multi_class_array):
+                assert isinstance(vGrid, b_grd.Grid)
+                vGrid.check_integrity()
+                assert vGrid.dim == grid_dimension
+                assert vGrid.form == grid_form
+                if min_points_per_axis is not None:
+                    assert all(np.greater_equal(vGrid.n, min_points_per_axis))
+                beg = multi_grid_indices[i_G]
+                end = multi_grid_indices[i_G + 1]
+                assert vGrid.size == end - beg
+                assert np.array_equal(vGrid.G, multi_grid_array[beg: end])
+
         return
 
     def __str__(self,
@@ -313,26 +457,12 @@ class SVGrid:
         """Converts the instance to a string, describing all attributes."""
         description = ''
         description += "Dimension = {}\n".format(self.dim)
-        description += "Index-Array = {}\n".format(self.index)
-        description += "Shape = {}\n".format(self.form)
-        description += "Multiplicator = {}\n".format(self.multi)
-        description += 'Is centered Grid = {}\n'.format(self.is_centered)
+        description += "Geometric Form = {}\n".format(self.form)
+        description += "Total Size = {}\n".format(self.size)
         description += "Offset = {}\n".format(self.offset)
-        for s in range(self.n.shape[0]):
-            description += 'Specimen_{}:\n'.format(s)
-            description += "\tTotal Number of Grid Points = " \
-                           "{}\n".format(self.size[s])
-            description += "\tGrid Points per Dimension = " \
-                           "{}\n".format(self.n[s, 0:self.dim])
-            description += "\tStep Size = {}\n".format(self.d[s]*self.multi)
-            description += "\tBoundaries:\n\t\t"
-            description += self.boundaries[s].__str__().replace('\n', '\n\t\t')
-            if write_physical_grid:
-                description += '\n'
-                description += '\tPhysical Grid :\n'
-                beg = self.index[s]
-                end = self.index[s + 1]
-                matrix_string = (self.G[beg:end]*self.d[s]).__str__()
-                description += '\t\t' + matrix_string.replace('\n', '\n\t\t')
+
+        for (i_G, vGrid) in enumerate(self.vGrids):
+            description += 'Specimen_{}:\n\t'.format(i_G)
+            description += vGrid.__str__().replace('\n', '\n\t')
             description += '\n'
         return description[:-1]

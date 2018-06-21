@@ -283,7 +283,7 @@ class Initialization:
             :attr:`~boltzmann.configuration.Configuration.sv`.size).
         """
         self.check_integrity()
-        shape = (self.cnf.p.G.shape[0], self.cnf.sv.G.shape[0])
+        shape = (self.cnf.p.G.shape[0], self.cnf.sv.SVG.shape[0])
         # Todo Find nicer way to iterate over whole P-Space
         p_flat = self.p_flag.flatten()
         assert p_flat.size == self.cnf.p.size
@@ -296,10 +296,9 @@ class Initialization:
             for i_s in range(self.cnf.s.n):
                 rho = r.rho[i_s]
                 temp = r.temp[i_s]
-                begin = self.cnf.sv.index[i_s]
-                end = self.cnf.sv.index[i_s+1]
-                v_grid = self.cnf.sv.G[begin:end]
-                dv = self.cnf.sv.d[i_s]
+                [begin, end] = self.cnf.sv.range_of_indices(i_s)
+                v_grid = self.cnf.sv.SVG[begin:end]
+                dv = self.cnf.sv.vGrids[i_s].d
                 for (i_v, v) in enumerate(v_grid):
                     # Physical Velocity
                     pv = dv * v
