@@ -258,7 +258,7 @@ class SVGrid:
         # Contains the velocity Grid of each specimen
         vGrids = [b_grd.Grid(grid_form=self.form,
                              grid_dimension=self.dim,
-                             grid_points_per_axis=grid_shapes[i],
+                             grid_shape=grid_shapes[i],
                              grid_spacing=spacings[i])
                   for i in range(species_array.n)]
         # centralize Grids - Todo add option in Grid.setup to center there

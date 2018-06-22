@@ -227,7 +227,7 @@ class Configuration:
         step_size = max_time / (number_time_steps - 1)
         self._t = b_grd.Grid(grid_form='rectangular',
                              grid_dimension=1,
-                             grid_points_per_axis=[number_time_steps],
+                             grid_shape=[number_time_steps],
                              grid_spacing=step_size,
                              grid_multiplicator=calculations_per_time_step)
         self.t.reshape((self.t.size,))
@@ -235,7 +235,7 @@ class Configuration:
 
     def set_position_grid(self,
                           grid_dimension,
-                          grid_points_per_axis,
+                          grid_shape,
                           grid_spacing):
         """Sets up :attr:`~Configuration.p`.
 
@@ -244,15 +244,15 @@ class Configuration:
         Parameters
         ----------
         grid_dimension : :obj:`int`
-        grid_points_per_axis : :obj:`list` [:obj:`int`]
+        grid_shape : :obj:`list` [:obj:`int`]
         grid_spacing : :obj:`float`
         """
-        if isinstance(grid_points_per_axis, int):
+        if isinstance(grid_shape, int):
             assert grid_dimension == 1
-            grid_points_per_axis = [grid_points_per_axis]
+            grid_shape = [grid_shape]
         self._p = b_grd.Grid(grid_form='rectangular',
                              grid_dimension=grid_dimension,
-                             grid_points_per_axis=grid_points_per_axis,
+                             grid_shape=grid_shape,
                              grid_spacing=grid_spacing)
         return
 

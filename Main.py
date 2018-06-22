@@ -12,8 +12,8 @@ cnf.add_specimen(mass=2)               # 2
 cnf.add_specimen(mass=3)               # 3
 cnf.s.collision_rate_matrix *= 50                 # 2
 cnf.set_time_grid(0.1, 11, 10)      # 20 1001 10
-cnf.set_position_grid(1,
-                      [21],  # 200
+cnf.set_position_grid(grid_dimension=1,
+                      grid_shape=[21],  # 200
                       grid_spacing=0.1)   # 0.1
 cnf.set_velocity_grids(grid_dimension=2,
                        min_points_per_axis=4,

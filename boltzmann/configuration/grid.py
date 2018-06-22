@@ -59,18 +59,18 @@ class Grid:
     def __init__(self,
                  grid_form=None,
                  grid_dimension=None,
-                 grid_points_per_axis=None,
+                 grid_shape=None,
                  grid_spacing=None,
                  grid_multiplicator=1):
         self.check_parameters(grid_form=grid_form,
                               grid_dimension=grid_dimension,
-                              grid_points_per_axis=grid_points_per_axis,
+                              grid_shape=grid_shape,
                               grid_spacing=grid_spacing,
                               grid_multiplicator=grid_multiplicator)
         self.form = grid_form
         self.dim = grid_dimension
-        if grid_points_per_axis is not None:
-            self.n = np.array(grid_points_per_axis, dtype=int)
+        if grid_shape is not None:
+            self.n = np.array(grid_shape, dtype=int)
         else:
             self.n = None
         self.size = None    # calculated in setup()
@@ -320,7 +320,7 @@ class Grid:
         """
         self.check_parameters(grid_form=self.form,
                               grid_dimension=self.dim,
-                              grid_points_per_axis=self.n,
+                              grid_shape=self.n,
                               grid_size=self.size,
                               grid_step_size=self.d,
                               grid_multiplicator=self.multi,
@@ -342,7 +342,7 @@ class Grid:
     @staticmethod
     def check_parameters(grid_form=None,
                          grid_dimension=None,
-                         grid_points_per_axis=None,
+                         grid_shape=None,
                          grid_size=None,
                          grid_step_size=None,
                          grid_multiplicator=None,
@@ -357,7 +357,7 @@ class Grid:
         ----------
         grid_form : :obj:`str`, optional
         grid_dimension : :obj:`int`, optional
-        grid_points_per_axis : :obj:`list` [:obj:`int`], optional
+        grid_shape : :obj:`list` [:obj:`int`], optional
         grid_size : :obj:`int`, optional
         grid_step_size : :obj:`float`, optional
         grid_multiplicator : :obj:`int`, optional
@@ -382,27 +382,27 @@ class Grid:
             assert isinstance(grid_dimension, int)
             assert grid_dimension in b_const.SUPP_GRID_DIMENSIONS
 
-        if grid_points_per_axis is not None:
-            if isinstance(grid_points_per_axis, list):
-                grid_points_per_axis = np.array(grid_points_per_axis,
-                                                dtype=int)
-            assert isinstance(grid_points_per_axis, np.ndarray)
-            assert grid_points_per_axis.dtype == int
-            assert all(grid_points_per_axis >= 2)
+        if grid_shape is not None:
+            if isinstance(grid_shape, list):
+                grid_shape = np.array(grid_shape,
+                                      dtype=int)
+            assert isinstance(grid_shape, np.ndarray)
+            assert grid_shape.dtype == int
+            assert all(grid_shape >= 2)
 
         if grid_dimension is not None \
-                and grid_points_per_axis is not None:
-            assert grid_points_per_axis.shape == (grid_dimension,)
+                and grid_shape is not None:
+            assert grid_shape.shape == (grid_dimension,)
 
         if grid_size is not None:
             assert isinstance(grid_size, int)
             assert grid_size >= 2
 
         if grid_form is not None \
-                and grid_points_per_axis is not None \
+                and grid_shape is not None \
                 and grid_size is not None:
             if grid_form == 'rectangular':
-                assert grid_points_per_axis.prod() == grid_size
+                assert grid_shape.prod() == grid_size
 
         if grid_step_size is not None:
             assert isinstance(grid_step_size, float)
