@@ -51,7 +51,7 @@ class Grid:
         All entries are factors, such that
         :math:`pG = iG \cdot d`.
         Array of shape (:attr:`size`, :attr:`dim`).
-    is_centered : :obj:`bool`
+    create_centered_grid : :obj:`bool`
         True if :attr:`Grid.iG` has been centered,
         i.e. :meth:`center` was called.
         False otherwise.
@@ -61,12 +61,14 @@ class Grid:
                  grid_dimension=None,
                  grid_shape=None,
                  grid_spacing=None,
-                 grid_multiplicator=1):
+                 grid_multiplicator=1,
+                 create_centered_grid=False):
         self.check_parameters(grid_form=grid_form,
                               grid_dimension=grid_dimension,
                               grid_shape=grid_shape,
                               grid_spacing=grid_spacing,
-                              grid_multiplicator=grid_multiplicator)
+                              grid_multiplicator=grid_multiplicator,
+                              grid_is_centered=create_centered_grid)
         self.form = grid_form
         self.dim = grid_dimension
         if grid_shape is not None:
@@ -80,9 +82,7 @@ class Grid:
             self.d = None
         self.multi = grid_multiplicator
         self.iG = None   # generated in setup()
-        # Todo replace by property -> check boundaries[0]? -> problem: offset
-        self.is_centered = False
-        self.setup()
+        self.setup(create_centered_grid)
         return
 
     #####################################
@@ -92,7 +92,8 @@ class Grid:
     def spacing(self):
         """:obj:`float` :
         Denotes the (physical) distance between two :class:`Grid` points.
-        :math:`spacing = d \cdot multi`
+        It holds
+        :math:`spacing = d \cdot multi`.
          """
         return self.d * self.multi
 
@@ -118,7 +119,7 @@ class Grid:
         in array of shape (2, :attr:`dim`).
         """
         # in uninitialized Grids: Min/Max operation raises Errors
-        assert self.iG is not None, "The Gris is not initialized, yet." \
+        assert self.iG is not None, "The Grid is not initialized, yet." \
                                     "Boundaries can not be computed!"
         pG = self.pG
         min_val = np.min(pG, axis=0)
@@ -126,12 +127,39 @@ class Grid:
         bound = np.array([min_val, max_val])
         return bound
 
+    @property
+    def is_centered(self):
+        """:obj:`bool` :
+        True if the :class:`Grid` instance is centered around zero.
+
+        Checks the first and last integer Grid points.
+         """
+        # Grid must be properly initialized first
+        assert self.iG is not None, "The Grid is not initialized, yet."
+        # Todo remove dirty dimension hack
+        if len(self.iG.shape) == 1:
+            tmp_zero = 0
+        else:
+            tmp_zero = np.zeros(self.dim)
+        if np.array_equal(self.iG[0], tmp_zero):
+            return False
+        else:
+            assert np.array_equal(self.iG[0], -self.iG[-1])
+            return True
+
     #####################################
     #           Configuration           #
     #####################################
-    def setup(self):
+    def setup(self,
+              create_centered_grid=False):
         """Automatically constructs
         :attr:`Grid.iG` and :attr:`Grid.size`.
+
+        Parameters
+        ----------
+        create_centered_grid : :obj:`bool`, optional
+            I set to :obj:`True` (non-default),
+            the newly created Grid is :meth:`centralized <center>`.
         """
         necessary_params = [self.form, self.dim, self.n, self.d, self.multi]
         if any([val is None for val in necessary_params]):
@@ -145,6 +173,9 @@ class Grid:
             message = "This Grid form is not implemented yet: " \
                       "{}".format(self.form)
             raise NotImplementedError(message)
+
+        if create_centered_grid:
+            self.center()
         self.check_integrity()
         return
 
@@ -211,7 +242,6 @@ class Grid:
         alternation = self.multi*(self.n - 1)
         self.double_multiplicator()
         self.iG -= alternation
-        self.is_centered = True
         return
 
     # Todo rename -> decentralize
@@ -227,7 +257,6 @@ class Grid:
                                     ''. format(self.multi)
         alternation = (self.multi // 2) * (self.n - 1)
         self.iG += alternation
-        self.is_centered = False
         self.halve_multiplicator()
         return
 
@@ -318,6 +347,13 @@ class Grid:
             If True, then all attributes must be set (not None).
             If False, then unassigned attributes are ignored.
         """
+        if self.iG is None:
+            grid_is_centered = None
+            boundaries = None
+        else:
+            grid_is_centered = self.is_centered
+            boundaries = self.boundaries
+        # todo properly assert boundaries
         self.check_parameters(grid_form=self.form,
                               grid_dimension=self.dim,
                               grid_shape=self.n,
@@ -326,7 +362,7 @@ class Grid:
                               grid_multiplicator=self.multi,
                               grid_spacing=self.spacing,
                               grid_array=self.iG,
-                              flag_is_centered=self.is_centered,
+                              grid_is_centered=grid_is_centered,
                               complete_check=complete_check)
         # Additional Conditions on instance:
         # parameter can be list, instance attributes must be np.ndarray
@@ -348,7 +384,7 @@ class Grid:
                          grid_multiplicator=None,
                          grid_spacing=None,
                          grid_array=None,
-                         flag_is_centered=None,
+                         grid_is_centered=None,
                          complete_check=False):
         """Sanity Check.
         Checks integrity of given parameters and their interactions.
@@ -363,7 +399,7 @@ class Grid:
         grid_multiplicator : :obj:`int`, optional
         grid_spacing : :obj:`float`, optional
         grid_array : :obj:`np.ndarray` [:obj:`int`], optional
-        flag_is_centered : :obj:`bool`, optional
+        grid_is_centered : :obj:`bool`, optional
         complete_check : :obj:`bool`, optional
             If True, then all parameters must be set (not None).
             If False, then unassigned parameters are ignored.
@@ -426,9 +462,6 @@ class Grid:
             assert grid_array.dtype == int
             assert grid_array.ndim in b_const.SUPP_GRID_DIMENSIONS
 
-        if grid_multiplicator is not None and grid_array is not None:
-            assert (grid_array % grid_multiplicator == 0).all()
-
         if grid_dimension is not None and grid_size is not None \
                 and grid_array is not None:
             # Todo remove dirty hack! This should be uniform
@@ -438,12 +471,15 @@ class Grid:
             else:
                 assert grid_array.shape == (grid_size, grid_dimension)
 
-        if flag_is_centered is not None:
-            assert isinstance(flag_is_centered, bool)
+        if grid_is_centered is not None:
+            assert isinstance(grid_is_centered, bool)
 
-        if grid_multiplicator is not None and flag_is_centered is not None:
-            if flag_is_centered:
+        if grid_multiplicator is not None and grid_is_centered is not None:
+            if grid_is_centered:
                 assert grid_multiplicator % 2 == 0
+            elif grid_array is not None:
+                assert np.array_equal(grid_array % grid_multiplicator,
+                                      np.zeros(grid_array.shape, dtype=int))
         return
 
     def __str__(self, write_physical_grids=True):
