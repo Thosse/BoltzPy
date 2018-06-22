@@ -110,7 +110,6 @@ class Grid:
          """
         return self.iG * self.d
 
-    # Todo this is not ready for empty inits
     @property
     def boundaries(self):
         """ :obj:`~numpy.ndarray` of :obj:`float`:
@@ -119,11 +118,12 @@ class Grid:
         in array of shape (2, :attr:`dim`).
         """
         # in uninitialized Grids: Min/Max operation raises Errors
-        if self.size == 0:
-            return np.zeros((2, self.dim), dtype=float)
-        min_val = np.min(self.iG, axis=0)
-        max_val = np.max(self.iG, axis=0)
-        bound = np.array([min_val, max_val]) * self.d
+        assert self.iG is not None, "The Gris is not initialized, yet." \
+                                    "Boundaries can not be computed!"
+        pG = self.pG
+        min_val = np.min(pG, axis=0)
+        max_val = np.max(pG, axis=0)
+        bound = np.array([min_val, max_val])
         return bound
 
     #####################################
