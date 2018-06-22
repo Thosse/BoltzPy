@@ -1,6 +1,0 @@
-# This Directory contains data for unittests
-# this includes configurations and stored results for faster test
-# Git should ignore all subfolders in here
-*/
-# Except this file
-!.gitignore

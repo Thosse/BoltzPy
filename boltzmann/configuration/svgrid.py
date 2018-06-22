@@ -14,17 +14,13 @@ class SVGrid:
     :class:`~boltzmann.configuration.Specimen`.
 
     .. todo::
-        - Todo rename attribute self.SVG -> iMG? iGrid?
-        - Todo create property pGrid / pMG?
-        - add property for physical velocities (offset + SVG*d)
+        - add method for physical velocities (offset + iMG*d).
+          Apply this in pG attribute.
         - Ask Hans, should the Grid always contain the center/zero?
         - Todo Add unit tests
-        - replace n with index_skips?
         - is it useful to implement different construction schemes?
           (grid boundaries/step_size can be chosen to fit in grids,
           based on the least common multiple,...)
-        - For each S, self.n[S, :] should all be equal values. Reduce this?
-        - implement base-class for multi-grid, where grid is multiGrid of dim=1
 
     Attributes
     ----------
@@ -35,16 +31,24 @@ class SVGrid:
     dim : :obj:`int`
         Dimensionality of all Velocity :class:`Grids <configuration.Grid>`.
         Must be in :const:`~boltzmann.constants.SUPP_GRID_DIMENSIONS`.
-    SVG : :obj:`np.ndarray` [:obj:`int`]
-        Concatenated Index-Grids of the
-        :class:`Velocity Grids <boltzmann.configuration.Grid>`
-        (:attr:`Grid.G <boltzmann.configuration.Grid>`) of all
+    vGrids : :obj:`np.ndarray` [:class:`~boltzmann.configuration.Grid`]
+        Array of all Velocity :class:`Grids <boltzmann.configuration.Grid`>.
+        Each Velocity Grids attribute
+        :attr:`Grid.iG <boltzmann.configuration.Grid.iG>`
+        links to its respective slice of :attr:`iMG`.
+    iMG : :obj:`np.ndarray` [:obj:`int`]
+        The *integer Multi-Grid*. It is a concatenation of the
+        Velocity integer Grids
+        (:attr:`Grid.iG <boltzmann.configuration.Grid>`) of all
         :class:`Species`.
-        SVG[_index[i]:_index[i+1]] is the Velocity Grid of specimen i.
-        SVG[j] denotes the physical coordinates of the j-th grid point.
+        It describes the
+        position/physical values (:attr:`pG`)
+        of all Velocity Grid points.
+        All entries are factors, such that
+        :math:`pG = offset + iG \cdot d`.
         Note that some V-Grid points occur in multiple
         :class:`Velocity Grids <boltzmann.configuration.Grid>`.
-        Array of shape(:attr:`size`, dim).
+        Array of shape (:attr:`size`, :attr:`dim`).
     offset : :obj:`np.ndarray` [:obj:`float`]
         Shifts the physical velocities, to be centered around :attr:`offset`.
         The physical value of any Velocity-Grid point v_i of Specimen S
@@ -76,10 +80,10 @@ class SVGrid:
                 self.offset = None
 
         # The remaining attributes are calculated in setup() method
-        # _index[i] denotes the beginning of the i-th velocity Grid in SVG
+        # _index[i] denotes the beginning of the i-th velocity Grid in iMG
         self._index = None
         self.vGrids = None
-        self.SVG = None
+        self.iMG = None
 
         self.setup(species_array)
         return
@@ -95,8 +99,8 @@ class SVGrid:
     @property
     def size(self):
         """:obj:`int` :
-            Denotes the total number of Velocity-Grid points
-            over all :class:`~boltzmann.configuration.Specimen`.
+        Denotes the total number of Velocity-Grid points
+        over all :class:`~boltzmann.configuration.Specimen`.
         """
         if self._index is None:
             return None
@@ -106,27 +110,43 @@ class SVGrid:
     @property
     def n_grids(self):
         """:obj:`int` :
-            Denotes the number of different
-            :class:`Velocity Grids <boltzmann.configuration.Grid>`.
+        Denotes the number of different
+        :class:`Velocity Grids <boltzmann.configuration.Grid>`.
         """
         return self.vGrids.size
 
     @property
-    def boundaries(self):
-        """Denotes the minimum and maximum physical values
-        in the :class:`Velocity Grids <boltzmann.configuration.Grid>`
-        of an arbitrary :class:`~boltzmann.configuration.Specimen`.
-        All :class:`~boltzmann.configuration.Specimen` have equal
-        boundaries.
+    def pMG(self):
+        """:obj:`np.ndarray` [:obj:`float`] :
+        Construct the *physical Multi-Grid* (**time intense!**).
 
-        Returns
-        -------
-        :obj:`np.ndarray` [:obj:`float`]
+            The physical Multi-Grid pG denotes the physical values /
+            position of all :class:`Velocity Grid` points.
+
+                :math:`pG := offset + iG \cdot d`
+
+            Array of shape (:attr:`size`, :attr:`dim`)
+         """
+        pMG = np.zeros(self.iMG.shape, dtype=float) + self.offset
+        for (i_G, G) in enumerate(self.vGrids):
+            [beg, end] = self.range_of_indices(i_G)
+            pMG[beg: end] += G.pG
+        return pMG
+
+    @property
+    def boundaries(self):
+        """:obj:`np.ndarray` [:obj:`float`] :
+        Denotes the minimum and maximum physical values
+        in the :class:`Velocity Grids <boltzmann.configuration.Grid>`.
+
+            All :class:`~boltzmann.configuration.Specimen`
+            have equal boundaries. Thus it is calculated based on
+            an arbitrary :class:`~boltzmann.configuration.Specimen`.
         """
         if self.vGrids is None:
             return None
         else:
-            return self.vGrids[0].boundaries
+            return self.offset + self.vGrids[0].boundaries
 
     #####################################
     #           Configuration           #
@@ -137,7 +157,7 @@ class SVGrid:
         for the given
         :class:`species_array <boltzmann.configuration.Species>`
         and initializes the related attributes:
-        :attr:`~SVGrid.vGrids`, :attr:`~SVGrid.SVG`,
+        :attr:`~SVGrid.vGrids`, :attr:`~SVGrid.iMG`,
         :attr:`~SVGrid._index` and :attr:`~SVGrid.size`
 
 
@@ -252,15 +272,15 @@ class SVGrid:
         for (i_G, vGrid) in enumerate(vGrids):
             self._index[i_G + 1] = self._index[i_G] + vGrid.size
 
-        # construct self.SVG
-        self.SVG = np.zeros((self.size, self.dim),
+        # construct self.iMG
+        self.iMG = np.zeros((self.size, self.dim),
                             dtype=int)
         # Todo document properly (use  iGrid, if implemented)
-        # store the index grids (vGrid.G) consecutively in self.SVG
+        # store the index grids (vGrid.iG) consecutively in self.iMG
         for (i_G, vGrid) in enumerate(self.vGrids):
             [beg, end] = self.range_of_indices(i_G)
-            self.SVG[beg: end, :] = vGrid.G[:, :]
-            vGrid.G = self.SVG[beg: end, :]
+            self.iMG[beg: end, :] = vGrid.iG[:, :]
+            vGrid.iG = self.iMG[beg: end, :]
 
         self.check_integrity()
         return
@@ -270,12 +290,26 @@ class SVGrid:
     #####################################
 
     def range_of_indices(self, specimen_index):
-        """:obj:`list` [:obj:`int`] :
-            Returns the beginning and end / delimiters
-            of the indexed
+        """ Returns the beginning and end delimiters
+        of the indexed
+        :class:`Specimens <boltzmann.configuration.Specimen>`
+        Velocity integer
+        :class:`Grid <boltzmann.configuration.Grid>`
+        in :class:`iMG <boltzmann.configuration.SVGrid>`.
+
+        Parameters
+        ----------
+        specimen_index : :obj:`int`
+            Index of the :class:`Specimen` in the
+            :class:`Specimen Array <Species>`.
+
+        Returns
+        -------
+        :obj:`np.ndarray` [:obj:`int`] :
+            Delimiters of the indexed
             :class:`Specimens <boltzmann.configuration.Specimen>`
-            :class:`Velocity Grid <boltzmann.configuration.Grid>`
-            in :attr:`~boltzmann.configuration.SVGrid.SVG>`.
+            Velocity integer :class:`~boltzmann.configuration.Grid`
+            in :attr:`iMG`.
         """
         return self._index[specimen_index: specimen_index+2]
 
@@ -283,11 +317,11 @@ class SVGrid:
     def get_index(self,
                   specimen_index,
                   grid_entry):
-        """Returns position of given grid_entry in :attr:`SVGrid.SVG`
+        """Returns position of given grid_entry in :attr:`SVGrid.iMG`
 
         Firstly, we assume the given grid_entry is an element
         of the given Specimens Velocity-Grid.
-        Under this condition we generate its index in attr:`SVGrid.SVG`.
+        Under this condition we generate its index in attr:`SVGrid.iMG`.
         Secondly, we counter-check if the indexed value matches the given
         value.
         If this is true, we return the index,
@@ -302,7 +336,7 @@ class SVGrid:
         Returns
         -------
         int
-            Index/Position of grid_entry in :attr:`~SVGrid.SVG`.
+            Index/Position of grid_entry in :attr:`~SVGrid.iMG`.
         """
         # Todo Throw exception if not a grid entry (instead of None)
         i_flat = 0
@@ -314,13 +348,13 @@ class SVGrid:
             i_flat *= n_loc
             i_flat += i_vec[_dim]
         i_flat += self._index[specimen_index]
-        if all(np.array(self.SVG[i_flat] == grid_entry)):
+        if all(np.array(self.iMG[i_flat] == grid_entry)):
             return i_flat
         else:
             return None
 
     def get_specimen(self, velocity_index):
-        """Returns Specimen (index) of given velocity index`
+        """Returns Specimen (index) of given velocity index.
 
         Parameters
         ----------
@@ -335,7 +369,7 @@ class SVGrid:
             if self._index[i] <= velocity_index < self._index[i+1]:
                 return i
         msg = 'The given index ({}) points out of the boundaries of ' \
-              'SVG, the concatenated Velocity Grid.'.format(velocity_index)
+              'iMG, the concatenated Velocity Grid.'.format(velocity_index)
         raise KeyError(msg)
 
     #####################################
@@ -363,7 +397,7 @@ class SVGrid:
                               velocity_offset=self.offset,
                               multi_grid_indices=self._index,
                               multi_class_array=self.vGrids,
-                              multi_grid_array=self.SVG,
+                              multi_grid_array=self.iMG,
                               complete_check=complete_check)
         # Additional Conditions on instance:
         # All Velocity Grids must have equal boundaries
@@ -448,7 +482,7 @@ class SVGrid:
                 beg = multi_grid_indices[i_G]
                 end = multi_grid_indices[i_G + 1]
                 assert vGrid.size == end - beg
-                assert np.array_equal(vGrid.G, multi_grid_array[beg: end])
+                assert np.array_equal(vGrid.iG, multi_grid_array[beg: end])
 
         return
 

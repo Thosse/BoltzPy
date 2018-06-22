@@ -85,7 +85,7 @@ class Calculation:
         self._result = np.copy(self.data)
         self._p_flag = ini.p_flag
         self._f_out = b_opf.OutputFunction(cnf)
-        self._t_cur = cnf.t.G[0]
+        self._t_cur = cnf.t.iG[0]
         self._cal_time = time()     # to estimate remaining time
         # t_arr: np.ndarray(int)
         # t_arr is used in the ** transport step **.
@@ -170,7 +170,7 @@ class Calculation:
         print('Calculating...          ',
               end='\r')
 
-        for (i_w, t_w) in enumerate(self._cnf.t.G):
+        for (i_w, t_w) in enumerate(self._cnf.t.iG):
             while self.t_cur != t_w:
                 self._calculate_time_step()
             # generate Output and write it to disk
@@ -195,7 +195,7 @@ class Calculation:
 
     def _print_time_estimate(self):
         """Prints an estimate of the remaining time to the terminal"""
-        remaining_steps = self._cnf.t.G[-1] - self.t_cur
+        remaining_steps = self._cnf.t.iG[-1] - self.t_cur
         est_step_duration = (time() - self._cal_time) / self.t_cur
         estimated_time = round(remaining_steps * est_step_duration, 1)
         print('Calculating...{}'
@@ -228,7 +228,7 @@ class Calculation:
             # Todo removal of boundaries only temporary, until rules for input/output points or boundary points are set
             for p in range(1, self._cnf.p.size-1):
                 for v in range(beg, end):
-                    pv = dv * self._cnf.sv.SVG[v]
+                    pv = dv * self._cnf.sv.iMG[v]
                     if pv[0] <= 0:
                         new_val = ((1 + pv[0]*dt/dp) * self.data[p, v]
                                    - pv[0]*dt/dp * self.data[p+1, v])

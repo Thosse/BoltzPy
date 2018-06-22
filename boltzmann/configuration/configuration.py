@@ -133,7 +133,7 @@ class Configuration:
         """:obj:`Grid` :
         Contains all data about simulation time and time step size.
 
-        * :attr:`Grid.G` denotes the time steps
+        * :attr:`Grid.iG` denotes the time steps
           at which the results are written out to HDD
         * :attr:`Grid.multi` denotes the number of calculation steps
           between two writes.
@@ -494,7 +494,7 @@ class Configuration:
             assert isinstance(time_grid, b_grd.Grid)
             time_grid.check_integrity(complete_check)
             assert time_grid.dim == 1
-            assert time_grid.G.shape == (time_grid.size,)
+            assert time_grid.iG.shape == (time_grid.size,)
 
         if position_grid is not None:
             assert isinstance(position_grid, b_grd.Grid)

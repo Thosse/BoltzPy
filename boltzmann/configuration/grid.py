@@ -8,10 +8,9 @@ from math import isclose
 
 # Todo how to reference class attributes in numpy style?
 # Todo break line in multi attribute docstring
-# Todo rename attribute self.G -> array? iGrid?
-# Todo create property pGrid?
+# Todo add offset property?
 class Grid:
-    """Basic class for all Grids.
+    r"""Basic class for all Grids.
 
     Notes
     -----
@@ -19,7 +18,7 @@ class Grid:
         does not change the :attr:`spacing`
         or physical values of the :obj:`Grid`.
         It does change the values of
-        :attr:`~Grid.d` and :attr:`~Grid.G`
+        :attr:`~Grid.d` and :attr:`~Grid.iG`
         though.
 
         The purpose of :attr:`Grid.multi` is to allow features
@@ -44,14 +43,16 @@ class Grid:
         Smallest possible step size of the :obj:`Grid`.
     multi : :obj:`int`
         Ratio of :attr:`spacing` / :attr:`d`.
-        Thus all values in :attr:`G` are multiples of :attr:`multi`.
-    G : :obj:`np.ndarray` [:obj:`int`]
-        G[i] denotes the physical value/coordinates of
-        :class:`Grid` point i
-        in multiples of :attr:`d`.
-        Array of shape (:attr:`size`, :attr:`dim`)
+        Thus all values in :attr:`iG` are multiples of :attr:`multi`.
+    iG : :obj:`np.ndarray` [:obj:`int`]
+        The *integer Grid* iG. It describes the
+        position/physical values (:attr:`pG`)
+        of all :class:`Grid` points.
+        All entries are factors, such that
+        :math:`pG = iG \cdot d`.
+        Array of shape (:attr:`size`, :attr:`dim`).
     is_centered : :obj:`bool`
-        True if :attr:`Grid.G` has been centered,
+        True if :attr:`Grid.iG` has been centered,
         i.e. :meth:`center` was called.
         False otherwise.
     """
@@ -78,7 +79,7 @@ class Grid:
         else:
             self.d = None
         self.multi = grid_multiplicator
-        self.G = None   # generated in setup()
+        self.iG = None   # generated in setup()
         # Todo replace by property -> check boundaries[0]? -> problem: offset
         self.is_centered = False
         self.setup()
@@ -89,28 +90,39 @@ class Grid:
     #####################################
     @property
     def spacing(self):
-        """Denotes the (physical) distance between two :class:`Grid` points.
-        :attr:`spacing` = :attr:`d` * :attr:`multi`
+        """:obj:`float` :
+        Denotes the (physical) distance between two :class:`Grid` points.
+        :math:`spacing = d \cdot multi`
          """
         return self.d * self.multi
+
+    @property
+    def pG(self):
+        """:obj:`np.ndarray` [:obj:`float`] :
+        Construct the *physical Grid* (**time intense!**).
+
+            The physical Grid pG denotes the physical values of
+            all :class:`Grid` points.
+
+                :math:`pG := iG \cdot d`
+
+            Array of shape (:attr:`size`, :attr:`dim`).
+         """
+        return self.iG * self.d
 
     # Todo this is not ready for empty inits
     @property
     def boundaries(self):
-        """Denotes the minimum and maximum physical values
-        over all :class:`Grid` points
+        """ :obj:`~numpy.ndarray` of :obj:`float`:
+        Denotes the minimum and maximum physical values
+        / position over all :class:`Grid` points
         in array of shape (2, :attr:`dim`).
-
-        Returns
-        -------
-        :obj:`~numpy.ndarray` of :obj:`float`
-
         """
         # in uninitialized Grids: Min/Max operation raises Errors
         if self.size == 0:
             return np.zeros((2, self.dim), dtype=float)
-        min_val = np.min(self.G, axis=0)
-        max_val = np.max(self.G, axis=0)
+        min_val = np.min(self.iG, axis=0)
+        max_val = np.max(self.iG, axis=0)
         bound = np.array([min_val, max_val]) * self.d
         return bound
 
@@ -119,7 +131,7 @@ class Grid:
     #####################################
     def setup(self):
         """Automatically constructs
-        :attr:`Grid.G` and :attr:`Grid.size`.
+        :attr:`Grid.iG` and :attr:`Grid.size`.
         """
         necessary_params = [self.form, self.dim, self.n, self.d, self.multi]
         if any([val is None for val in necessary_params]):
@@ -137,7 +149,7 @@ class Grid:
         return
 
     def _construct_rectangular_grid(self):
-        """Construct a rectangular :attr:`G`."""
+        """Construct a rectangular :attr:`iG`."""
         assert self.form == 'rectangular'
         grid_shape = (self.size, self.dim)
         # Create list of 1D grids for each dimension
@@ -159,16 +171,16 @@ class Grid:
                       "{}".format(self.dim)
             raise AttributeError(message)
         assert grid.shape == tuple(self.n) + (self.dim,)
-        self.G = grid.reshape(grid_shape)
+        self.iG = grid.reshape(grid_shape)
         return
 
     # Todo remove -> replace by property setter
     def double_multiplicator(self):
         """Double the current :attr:`multi`.
 
-        Also doubles all Entries in :attr:`G` and halves :attr:`d`.
+        Also doubles all Entries in :attr:`iG` and halves :attr:`d`.
         """
-        self.G *= 2
+        self.iG *= 2
         self.d /= 2
         self.multi *= 2
         return
@@ -177,13 +189,13 @@ class Grid:
     def halve_multiplicator(self):
         """Halve the current :attr:`multi`.
 
-        Also halves all Entries in :attr:`G` and doubles :attr:`d`.
+        Also halves all Entries in :attr:`iG` and doubles :attr:`d`.
         """
-        assert self.multi % 2 == 0, "All Entries in :attr:`G`" \
+        assert self.multi % 2 == 0, "All Entries in :attr:`iG`" \
                                     "should be multiples of 2."
-        assert all(self.G % 2 == 0), "All Entries in :attr:`G`" \
+        assert all(self.iG % 2 == 0), "All Entries in :attr:`iG`" \
                                      "should be multiples of 2."
-        self.G /= 2
+        self.iG /= 2
         self.d *= 2
         self.multi /= 2
         return
@@ -191,20 +203,20 @@ class Grid:
 # Todo rename -> centralize
     def center(self):
         """Centers the Grid
-        (:attr:`G`)
+        (:attr:`iG`)
         around zero and sets :attr:`is_centered` to :obj:`True`.
         """
         if self.is_centered:
             return
         alternation = self.multi*(self.n - 1)
         self.double_multiplicator()
-        self.G -= alternation
+        self.iG -= alternation
         self.is_centered = True
         return
 
     # Todo rename -> decentralize
     def revert_center(self):
-        """Reverts the changes to :attr:`G` made in :meth:`center`
+        """Reverts the changes to :attr:`iG` made in :meth:`center`
         and sets :attr:`is_centered` back to :obj:`False`
         """
         if not self.is_centered:
@@ -214,15 +226,15 @@ class Grid:
                                     'The current multiplicator is {}' \
                                     ''. format(self.multi)
         alternation = (self.multi // 2) * (self.n - 1)
-        self.G += alternation
+        self.iG += alternation
         self.is_centered = False
         self.halve_multiplicator()
         return
 
 # Todo remove -> fix dirty hack, for time grid shape
     def reshape(self, shape):
-        """Changes the shape of :attr:`G`."""
-        self.G = self.G.reshape(shape)
+        """Changes the shape of :attr:`iG`."""
+        self.iG = self.iG.reshape(shape)
         return
 
     #####################################
@@ -313,7 +325,7 @@ class Grid:
                               grid_step_size=self.d,
                               grid_multiplicator=self.multi,
                               grid_spacing=self.spacing,
-                              grid_array=self.G,
+                              grid_array=self.iG,
                               flag_is_centered=self.is_centered,
                               complete_check=complete_check)
         # Additional Conditions on instance:
@@ -323,7 +335,7 @@ class Grid:
         # Todo check before, that boundaries can be calculated
         if self.dim is not None \
                 and self.dim is not 1:
-            if self.G is not None and self.d is not None:
+            if self.iG is not None and self.d is not None:
                 assert self.boundaries.shape == (2, self.dim)
         return
 
@@ -452,5 +464,5 @@ class Grid:
         if write_physical_grids:
             description += '\n'
             description += 'Physical Grid:\n\t'
-            description += (self.G*self.d).__str__().replace('\n', '\n\t')
+            description += self.pG.__str__().replace('\n', '\n\t')
         return description

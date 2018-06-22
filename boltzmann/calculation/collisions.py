@@ -136,7 +136,7 @@ class Collisions:
         #              [v_pre_s1, v_post_s1]]
         v = np.zeros((2, 2), dtype=int)
         # physical velocities (in multiples of d[s])
-        # indexed as in v:  pv[i, j] = sv.SVG[ v[i, j] ]
+        # indexed as in v:  pv[i, j] = sv.iMG[ v[i, j] ]
         pv = np.zeros((2, 2, sv.dim), dtype=int)
 
         # For the colliding specimen we keep track of
@@ -159,17 +159,17 @@ class Collisions:
                 slc[1] = sv.range_of_indices(s[1])
                 # v[0, 0] = v_pre_s0
                 for v[0, 0] in range(slc[0, 0], slc[0, 1]):
-                    pv[0, 0] = sv.SVG[v[0, 0]]
+                    pv[0, 0] = sv.iMG[v[0, 0]]
                     # v[0, 1] = v_post_s0
                     for v[0, 1] in range(v[0, 0]+1, slc[0, 1]):
                         # due to range, ignores v=(a,a,X,X) (no effect)
-                        pv[0, 1] = sv.SVG[v[0, 1]]
+                        pv[0, 1] = sv.iMG[v[0, 1]]
                         # Velocity difference (dimensional, multiples of d[1])
                         # dpv_1 = - dpv_0 = pv[0, 0] - pv[0, 1]
                         dpv_1 = pv[0, 0] - pv[0, 1]
                         # v[1, 0] = v_pre_s1
                         for v[1, 0] in range(slc[1, 0], slc[1, 1]):
-                            pv[1, 0] = sv.SVG[v[1, 0]]
+                            pv[1, 0] = sv.iMG[v[1, 0]]
                             # Calculate
                             pv[1, 1] = pv[1, 0] + dpv_1
                             # get index ov v[1, 1]
@@ -317,8 +317,8 @@ class Collisions:
         for col in self._collision_arr:
             assert col[0] < col[1]
             assert col[0] < col[2]
-            di_0 = self._cnf.sv.SVG[col[1]] - self._cnf.sv.SVG[col[0]]
-            di_1 = self._cnf.sv.SVG[col[3]] - self._cnf.sv.SVG[col[2]]
+            di_0 = self._cnf.sv.iMG[col[1]] - self._cnf.sv.iMG[col[0]]
+            di_1 = self._cnf.sv.iMG[col[3]] - self._cnf.sv.iMG[col[2]]
             assert all(np.array(di_1 + di_0) == 0)
             s = [self._cnf.sv.get_specimen(v_col) for v_col in col]
             assert s[0] == s[1] and s[2] == s[3]

@@ -126,7 +126,7 @@ class Animation:
         file = h5py.File(self._cnf.file_address, mode='r')["Results"]
         for specimen in species:
             file_m = file[specimen][moment]
-            for t in self._cnf.t.G:
+            for t in self._cnf.t.iG:
                 i_t = t // self._cnf.t.multi
                 result_t = file_m[i_t]
                 min_val = min(min_val, np.min(result_t))
@@ -219,6 +219,6 @@ class Animation:
             for (i_m, moment) in enumerate(moments):
                 result = file[specimen][moment]
                 result_t = result[time_step]
-                lines[i_m, i_s].set_data(self._cnf.p.G*self._cnf.p.d,
+                lines[i_m, i_s].set_data(self._cnf.p.pG,
                                          result_t)
         return lines

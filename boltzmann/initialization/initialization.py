@@ -240,7 +240,7 @@ class Initialization:
             :attr:`rule_arr`.
         p_min, p_max :  array_like of :obj:`int`
             Boundary points, given as multiples of positional step size
-            (see :attr:`boltzmann.configuration.Grid.G`).
+            (see :attr:`boltzmann.configuration.Grid.iG`).
             Delimit/mark the area where to apply the rule.
         """
         assert 0 <= index_rule < self.block_index[-1]
@@ -283,7 +283,7 @@ class Initialization:
             :attr:`~boltzmann.configuration.Configuration.sv`.size).
         """
         self.check_integrity()
-        shape = (self.cnf.p.G.shape[0], self.cnf.sv.SVG.shape[0])
+        shape = (self.cnf.p.iG.shape[0], self.cnf.sv.iMG.shape[0])
         # Todo Find nicer way to iterate over whole P-Space
         p_flat = self.p_flag.flatten()
         assert p_flat.size == self.cnf.p.size
@@ -297,7 +297,7 @@ class Initialization:
                 rho = r.rho[i_s]
                 temp = r.temp[i_s]
                 [begin, end] = self.cnf.sv.range_of_indices(i_s)
-                v_grid = self.cnf.sv.SVG[begin:end]
+                v_grid = self.cnf.sv.iMG[begin:end]
                 dv = self.cnf.sv.vGrids[i_s].d
                 for (i_v, v) in enumerate(v_grid):
                     # Physical Velocity
@@ -328,7 +328,7 @@ class Initialization:
         # and its submodules
         assert len(self.supported_categories) is 1
         assert self.block_index.shape == (length+1,)
-        assert self.p_flag.size == self.cnf.p.G.shape[0]
+        assert self.p_flag.size == self.cnf.p.iG.shape[0]
         assert self.p_flag.dtype == int
         assert np.min(self.p_flag) >= 0, \
             'Positional Grid is not properly initialized.' \

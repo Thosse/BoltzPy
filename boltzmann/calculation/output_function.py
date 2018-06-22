@@ -82,7 +82,7 @@ class OutputFunction:
                     # Todo make property for shape?
                     # todo this simplifies complete output?
                     shape = (self._cnf.t.n[0],
-                             self._cnf.p.G.shape[0])
+                             self._cnf.p.iG.shape[0])
                     file_s.create_dataset(moment,
                                           shape=shape,
                                           dtype=float)
@@ -158,7 +158,7 @@ class OutputFunction:
             momentum = np.zeros(shape, dtype=float)
             for s in range(s_n):
                 [beg, end] = self.cnf.sv.range_of_indices(s)
-                V_dir = self.cnf.sv.SVG[beg:end, direction]
+                V_dir = self.cnf.sv.iMG[beg:end, direction]
                 momentum[s, :] = np.sum(V_dir * data[..., beg:end],
                                         axis=1)
                 momentum[s, :] *= self.cnf.s.mass[s]
@@ -180,7 +180,7 @@ class OutputFunction:
             for s in range(s_n):
                 [beg, end] = self.cnf.sv.range_of_indices(s)
                 # Todo rename direction into axis or something like that
-                V_dir = np.array(self.cnf.sv.SVG[beg:end, direction])
+                V_dir = np.array(self.cnf.sv.iMG[beg:end, direction])
                 momentum_flow[s, :] = np.sum(V_dir**2 * data[..., beg:end],
                                              axis=1)
                 momentum_flow[s, :] *= self.cnf.s.mass[s]
@@ -201,7 +201,7 @@ class OutputFunction:
             energy = np.zeros(shape, dtype=float)
             for s in range(s_n):
                 [beg, end] = self.cnf.sv.range_of_indices(s)
-                V = np.array(self.cnf.sv.SVG[beg:end, :])
+                V = np.array(self.cnf.sv.iMG[beg:end, :])
                 V_norm = np.sqrt(np.sum(V**2, axis=1))
                 energy[s, :] = np.sum(V_norm * data[..., beg:end],
                                       axis=1)
@@ -223,9 +223,9 @@ class OutputFunction:
             energy_flow = np.zeros(shape, dtype=float)
             for s in range(s_n):
                 [beg, end] = self.cnf.sv.range_of_indices(s)
-                V = np.array(self.cnf.sv.SVG[beg:end, :])
+                V = np.array(self.cnf.sv.iMG[beg:end, :])
                 V_norm = np.sqrt(np.sum(V ** 2, axis=1))
-                V_dir = np.array(self.cnf.sv.SVG[beg:end, direction])
+                V_dir = np.array(self.cnf.sv.iMG[beg:end, direction])
                 energy_flow[s, :] = np.sum(V_norm * V_dir * data[..., beg:end],
                                            axis=1)
                 energy_flow[s, :] *= 0.5 * self.cnf.s.mass[s]
