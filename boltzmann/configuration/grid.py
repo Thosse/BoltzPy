@@ -220,10 +220,11 @@ class Grid:
 
         Also halves all Entries in :attr:`iG` and doubles :attr:`d`.
         """
+        assert isinstance(self.iG, np.ndarray)
         assert self.multi % 2 == 0, "All Entries in :attr:`iG`" \
                                     "should be multiples of 2."
-        assert all(self.iG % 2 == 0), "All Entries in :attr:`iG`" \
-                                     "should be multiples of 2."
+        assert np.all(self.iG % 2 == 0), "All Entries in :attr:`iG`" \
+                                         "should be multiples of 2."
         self.iG /= 2
         self.d *= 2
         self.multi /= 2
@@ -233,6 +234,7 @@ class Grid:
         """Shifts the integer Grid (:attr:`iG`)
         to be centered around zero.
         """
+        assert isinstance(self.iG, np.ndarray)
         if self.is_centered:
             return
         # calculate shift
@@ -246,6 +248,7 @@ class Grid:
     def decentralize(self):
         """Reverts the changes made to :attr:`iG` in :meth:`centralize`.
         """
+        assert isinstance(self.iG, np.ndarray)
         if not self.is_centered:
             return
         assert self.multi % 2 == 0, 'A centered grid must have an even ' \
@@ -472,15 +475,24 @@ class Grid:
             else:
                 assert grid_array.shape == (grid_size, grid_dimension)
 
+        if grid_multiplicator is not None and grid_array is not None:
+            shifted_array = grid_array - grid_array[0]
+            assert np.array_equal(shifted_array % grid_multiplicator,
+                                  np.zeros(grid_array.shape, dtype=int))
+
         if grid_is_centered is not None:
             assert isinstance(grid_is_centered, bool)
 
-        if grid_multiplicator is not None and grid_is_centered is not None:
+        if grid_array is not None and grid_is_centered is not None:
             if grid_is_centered:
+                assert np.array_equal(grid_array[0], -grid_array[-1])
+            else:
+                assert np.array_equal(grid_array[0],
+                                      np.zeros(grid_array[0].shape))
+
+        if grid_multiplicator is not None and grid_is_centered is True:
                 assert grid_multiplicator % 2 == 0
-            elif grid_array is not None:
-                assert np.array_equal(grid_array % grid_multiplicator,
-                                      np.zeros(grid_array.shape, dtype=int))
+
         return
 
     def __str__(self, write_physical_grids=True):
