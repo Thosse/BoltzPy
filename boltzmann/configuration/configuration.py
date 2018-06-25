@@ -230,7 +230,6 @@ class Configuration:
                              grid_shape=[number_time_steps],
                              grid_spacing=step_size,
                              grid_multiplicator=calculations_per_time_step)
-        self.t.reshape((self.t.size,))
         return
 
     def set_position_grid(self,
@@ -316,7 +315,6 @@ class Configuration:
         # load Time Space
         try:
             self._t.load(file_c["Time_Space"])
-            self._t.reshape((self.t.size,))
         except KeyError:
             self._t = b_grd.Grid()
         # load Position Space
@@ -494,7 +492,6 @@ class Configuration:
             assert isinstance(time_grid, b_grd.Grid)
             time_grid.check_integrity(complete_check)
             assert time_grid.dim == 1
-            assert time_grid.iG.shape == (time_grid.size,)
 
         if position_grid is not None:
             assert isinstance(position_grid, b_grd.Grid)

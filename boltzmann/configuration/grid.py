@@ -134,12 +134,7 @@ class Grid:
          """
         # Grid must be properly initialized first
         assert self.iG is not None, "The Grid is not initialized, yet."
-        # Todo remove dirty dimension hack
-        if len(self.iG.shape) == 1:
-            tmp_zero = 0
-        else:
-            tmp_zero = np.zeros(self.dim)
-        if np.array_equal(self.iG[0], tmp_zero):
+        if np.array_equal(self.iG[0], np.zeros(self.dim)):
             return False
         else:
             assert np.array_equal(self.iG[0], -self.iG[-1])
@@ -263,12 +258,6 @@ class Grid:
         self.halve_multiplicator()
         return
 
-# Todo remove -> fix dirty hack, for time grid shape
-    def reshape(self, shape):
-        """Changes the shape of :attr:`iG`."""
-        self.iG = self.iG.reshape(shape)
-        return
-
     #####################################
     #           Serialization           #
     #####################################
@@ -371,12 +360,10 @@ class Grid:
         # Additional Conditions on instance:
         # parameter can be list, instance attributes must be np.ndarray
         assert self.n is None or isinstance(self.n, np.ndarray)
-        # Todo remove dirty dimension hack -> should be uniformly true!
-        # Todo check before, that boundaries can be calculated
-        if self.dim is not None \
-                and self.dim is not 1:
-            if self.iG is not None and self.d is not None:
-                assert self.boundaries.shape == (2, self.dim)
+        if self.iG is not None:
+            assert self.dim is not None
+            assert self.d is not None
+            assert self.boundaries.shape == (2, self.dim)
         return
 
     @staticmethod
@@ -468,12 +455,7 @@ class Grid:
 
         if grid_dimension is not None and grid_size is not None \
                 and grid_array is not None:
-            # Todo remove dirty hack! This should be uniform
-            if grid_array.ndim == 1:
-                assert grid_dimension == 1
-                assert grid_array.shape == (grid_size,)
-            else:
-                assert grid_array.shape == (grid_size, grid_dimension)
+            assert grid_array.shape == (grid_size, grid_dimension)
 
         if grid_multiplicator is not None and grid_array is not None:
             shifted_array = grid_array - grid_array[0]
