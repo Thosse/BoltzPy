@@ -157,7 +157,7 @@ class Grid:
         ----------
         grid_is_centered : :obj:`bool`, optional
             I set to :obj:`True` (non-default),
-            the newly created Grid is :meth:`centralized <center>`.
+            the newly created Grid is :meth:`centralized <centralize>`.
         """
         necessary_params = [self.form, self.dim, self.n, self.d, self.multi]
         if any([val is None for val in necessary_params]):
@@ -173,7 +173,7 @@ class Grid:
             raise NotImplementedError(message)
 
         if grid_is_centered:
-            self.center()
+            self.centralize()
         self.check_integrity()
         return
 
@@ -229,32 +229,34 @@ class Grid:
         self.multi /= 2
         return
 
-# Todo rename -> centralize
-    def center(self):
-        """Centers the Grid
-        (:attr:`iG`)
-        around zero and sets :attr:`is_centered` to :obj:`True`.
+    def centralize(self):
+        """Shifts the integer Grid (:attr:`iG`)
+        to be centered around zero.
         """
         if self.is_centered:
             return
-        alternation = self.multi*(self.n - 1)
+        # calculate shift
+        shift = self.multi*(self.n - 1)
+        # double the multiplicator
         self.double_multiplicator()
-        self.iG -= alternation
+        # shift the integer Grid
+        self.iG -= shift
         return
 
-    # Todo rename -> decentralize
-    def revert_center(self):
-        """Reverts the changes to :attr:`iG` made in :meth:`center`
-        and sets :attr:`is_centered` back to :obj:`False`
+    def decentralize(self):
+        """Reverts the changes made to :attr:`iG` in :meth:`centralize`.
         """
         if not self.is_centered:
             return
-        assert self.multi % 2 == 0, 'A centered grid should have an even' \
-                                    ' multiplicator. ' \
-                                    'The current multiplicator is {}' \
-                                    ''. format(self.multi)
-        alternation = (self.multi // 2) * (self.n - 1)
-        self.iG += alternation
+        assert self.multi % 2 == 0, 'A centered grid must have an even ' \
+                                    'multi. The current multi is ' \
+                                    '{}'. format(self.multi)
+        # calculate shift
+        shift = (self.multi // 2) * (self.n - 1)
+        # shift the integer Grid
+        self.iG += shift
+        # halve the multiplicator
+        assert np.all(self.iG % 2 == 0)
         self.halve_multiplicator()
         return
 

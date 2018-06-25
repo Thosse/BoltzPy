@@ -174,7 +174,7 @@ class SVGrid:
            based on its :class:`Specimens <boltzmann.configuration.Specimen>`
            :attr:`~boltzmann.configuration.Specimen.mass`.
         4. Initialize and
-           :meth:`centralize <boltzmann.configuration.Grid.center>` the
+           :meth:`~boltzmann.configuration.Grid.centralize` the
            :class:`Velocity Grids <boltzmann.configuration.Grid>`
            and  store them into :attr:`vGrids`.
         5. Set up the remaining attributes based on the
@@ -338,7 +338,7 @@ class SVGrid:
         """
         # Todo Throw exception if not a grid entry (instead of None)
         i_flat = 0
-        # get vector-index, by reversing Grid.center() - method
+        # get vector-index, by reversing Grid.centralize() - method
         i_vec = np.array((grid_entry+self.vGrids[specimen_index].n - 1) // 2,
                          dtype=int)
         for _dim in range(self.dim):
