@@ -7,10 +7,11 @@ from datetime import datetime
 
 
 print('Starting Time:\n' + str(datetime.now()) + '\n')
-cnf = b_cnf.Configuration("default")
-cnf.add_specimen(mass=2)               # 2
-cnf.add_specimen(mass=3)               # 3
-cnf.s.collision_rate_matrix *= 50                 # 2
+cnf = b_cnf.Configuration("defaulti")
+if cnf.s.n == 0:
+    cnf.add_specimen(mass=2, collision_rate=[50])               # 2
+    cnf.add_specimen(mass=3, collision_rate=[51, 52])               # 3
+    cnf.coll_substeps *= 50
 cnf.set_time_grid(0.1, 11, 10)      # 20 1001 10
 cnf.set_position_grid(grid_dimension=1,
                       grid_shape=[21],  # 200

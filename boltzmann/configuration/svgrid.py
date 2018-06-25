@@ -4,6 +4,7 @@ from boltzmann.configuration import grid as b_grd
 import boltzmann.constants as b_const
 
 import numpy as np
+import h5py
 
 import math
 
@@ -373,7 +374,81 @@ class SVGrid:
     #####################################
     #           Serialization           #
     #####################################
-    # Todo Add load / save method
+    # Todo read and write all Velocity Grids instead?
+    def load(self,
+             hdf5_group,
+             hdf5_species_group=None):
+        """Sets up the class:`SVGrid` instance,
+        based on the parameters in the given HDF5 group.
+
+        Parameters
+        ----------
+        hdf5_group : h5py.Group
+            :class:`Velocity Grids <SVGrid>` Group
+            in the HDF5 :class:`~boltzmann.Configuration` file.
+        hdf5_species_group : h5py.Group
+            :class:`~boltzmann.configuration.Species` Group
+            in the HDF5 :class:`~boltzmann.Configuration` file.
+        """
+        assert isinstance(hdf5_group, h5py.Group)
+        if hdf5_species_group is not None:
+            assert isinstance(hdf5_species_group, h5py.Group)
+            species = b_spc.Species().load(hdf5_species_group)
+        else:
+            species = None
+
+        # read attributes from file
+        try:
+            self.form = hdf5_group["Form"].value
+        except KeyError:
+            self.form = None
+        try:
+            self.dim = int(hdf5_group["Dimension"].value)
+        except KeyError:
+            self.dim = None
+        try:
+            self._MAX_V = hdf5_group["Maximum Velocity"].value
+        except KeyError:
+            self._MAX_V = None
+        try:
+            self._MIN_N = int(hdf5_group["Minimum Number of Grid Points"].value)
+        except KeyError:
+            self._MIN_N = None
+        try:
+            self.offset = hdf5_group["Velocity Offset"].value
+        except KeyError:
+            self.offset = None
+        self.check_integrity(False)
+        self.setup(species)
+        return
+
+    def save(self, hdf5_group):
+        """Writes the main attributes of the :obj:`Grid` instance
+        into the HDF5 group.
+
+        Parameters
+        ----------
+        hdf5_group : h5py.Group
+            :class:`Velocity Grids <SVGrid>` Group
+            in the HDF5 :class:`~boltzmann.Configuration` file.
+        """
+        self.check_integrity(False)
+        # Clean State of Current group
+        for key in hdf5_group.keys():
+            del hdf5_group[key]
+        # write all set attributes to file
+        if self.form is not None:
+            hdf5_group["Form"] = self.form
+        if self.dim is not None:
+            hdf5_group["Dimension"] = self.dim
+        if self._MAX_V is not None:
+            hdf5_group["Maximum Velocity"] = self._MAX_V
+        if self._MIN_N is not None:
+            hdf5_group["Minimum Number of Grid Points"] = self._MIN_N
+        if self.offset is not None:
+            hdf5_group["Velocity Offset"] = self.offset
+        return
+
     #####################################
     #           Verification            #
     #####################################

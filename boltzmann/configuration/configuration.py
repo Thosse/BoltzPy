@@ -323,6 +323,11 @@ class Configuration:
         except KeyError:
             self._p = b_grd.Grid()
         # TODO self._sv = b_svg.SVGrid() is not implemented so far
+        try:
+            self._sv.load(file_c["Velocity_Space"],
+                          file_c["Species"])
+        except KeyError:
+            self._sv = b_svg.SVGrid()
         # Default Parameters
         try:
             key = "Collision_Selection_Scheme"
@@ -393,10 +398,9 @@ class Configuration:
         # Save Position Space
         file_c.create_group("Position_Space")
         self.p.save(file_c["Position_Space"])
-        # TODO self._sv = b_svg.SVGrid()
         # Save Velocity Space
-        # file_c.create_group("Velocity_Space")
-        # self.p.save(file_c["Velocity_Space"])
+        file_c.create_group("Velocity_Space")
+        self.sv.save(file_c["Velocity_Space"])
         # Save other Parameters
         # Todo only save, if not None?
         file_c["Collision_Selection_Scheme"] = self.coll_select_scheme
