@@ -33,7 +33,7 @@ class Collisions:
         self._weight_arr = np.array([], dtype=float)
         self._n = 0
         self._mat = csr_matrix(np.array([[]]))
-        if self._cnf.collision_steps_per_time_step != 0:
+        if self._cnf.coll_substeps != 0:
             self._setup()
         return
 
@@ -204,7 +204,7 @@ class Collisions:
         This will change in the future.
         """
         col_rate = self._cnf.s.collision_rate_matrix[specimen[0], specimen[1]]
-        n_cols = self._cnf.collision_steps_per_time_step
+        n_cols = self._cnf.coll_substeps
         if n_cols != 0:
             return col_rate / n_cols
         else:
@@ -280,7 +280,7 @@ class Collisions:
         return np.allclose(pre_energy, post_energy)
 
     def generate_collision_matrix(self):
-        if self._cnf.collision_steps_per_time_step == 0:
+        if self._cnf.coll_substeps == 0:
             return None
         gen_mat_time = time()
         print('Generating Collision Matrix...',

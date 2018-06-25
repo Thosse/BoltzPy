@@ -18,7 +18,6 @@ cnf.set_position_grid(grid_dimension=1,
 cnf.set_velocity_grids(grid_dimension=2,
                        min_points_per_axis=4,
                        max_velocity=1.5)
-cnf.collision_steps_per_time_step = 1     # 50
 print(cnf.__str__(write_physical_grids=True))
 cnf.save()
 
