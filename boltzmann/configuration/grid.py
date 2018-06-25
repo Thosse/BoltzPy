@@ -51,10 +51,6 @@ class Grid:
         All entries are factors, such that
         :math:`pG = iG \cdot d`.
         Array of shape (:attr:`size`, :attr:`dim`).
-    create_centered_grid : :obj:`bool`
-        True if :attr:`Grid.iG` has been centered,
-        i.e. :meth:`center` was called.
-        False otherwise.
     """
     def __init__(self,
                  grid_form=None,
@@ -62,13 +58,15 @@ class Grid:
                  grid_shape=None,
                  grid_spacing=None,
                  grid_multiplicator=1,
-                 create_centered_grid=False):
+                 grid_is_centered=False):
         self.check_parameters(grid_form=grid_form,
                               grid_dimension=grid_dimension,
                               grid_shape=grid_shape,
                               grid_spacing=grid_spacing,
-                              grid_multiplicator=grid_multiplicator,
-                              grid_is_centered=create_centered_grid)
+                              # Todo giving in svGrids.setup a Grid.multi=2
+                              # Todo leads to serious errors in Collisions
+                              #grid_multiplicator=grid_multiplicator,
+                              grid_is_centered=grid_is_centered)
         self.form = grid_form
         self.dim = grid_dimension
         if grid_shape is not None:
@@ -82,7 +80,7 @@ class Grid:
             self.d = None
         self.multi = grid_multiplicator
         self.iG = None   # generated in setup()
-        self.setup(create_centered_grid)
+        self.setup(grid_is_centered)
         return
 
     #####################################
@@ -151,13 +149,13 @@ class Grid:
     #           Configuration           #
     #####################################
     def setup(self,
-              create_centered_grid=False):
+              grid_is_centered=False):
         """Automatically constructs
         :attr:`Grid.iG` and :attr:`Grid.size`.
 
         Parameters
         ----------
-        create_centered_grid : :obj:`bool`, optional
+        grid_is_centered : :obj:`bool`, optional
             I set to :obj:`True` (non-default),
             the newly created Grid is :meth:`centralized <center>`.
         """
@@ -174,7 +172,7 @@ class Grid:
                       "{}".format(self.form)
             raise NotImplementedError(message)
 
-        if create_centered_grid:
+        if grid_is_centered:
             self.center()
         self.check_integrity()
         return
@@ -347,6 +345,7 @@ class Grid:
             If True, then all attributes must be set (not None).
             If False, then unassigned attributes are ignored.
         """
+        # Todo add is_setup property
         if self.iG is None:
             grid_is_centered = None
             boundaries = None

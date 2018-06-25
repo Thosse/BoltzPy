@@ -259,11 +259,9 @@ class SVGrid:
         vGrids = [b_grd.Grid(grid_form=self.form,
                              grid_dimension=self.dim,
                              grid_shape=grid_shapes[i],
-                             grid_spacing=spacings[i])
+                             grid_spacing=spacings[i],
+                             grid_is_centered=True)
                   for i in range(species_array.n)]
-        # centralize Grids - Todo add option in Grid.setup to center there
-        for G in vGrids:
-            G.center()
         self.vGrids = np.array(vGrids)
 
         # construct self._index
