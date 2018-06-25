@@ -273,8 +273,8 @@ class SVGrid:
         # construct self.iMG
         self.iMG = np.zeros((self.size, self.dim),
                             dtype=int)
-        # Todo document properly (use  iGrid, if implemented)
-        # store the index grids (vGrid.iG) consecutively in self.iMG
+        # store the integer Grids (vGrid.iG), by writing them
+        # consecutively into the integer Multi-Grid (self.iMG)
         for (i_G, vGrid) in enumerate(self.vGrids):
             [beg, end] = self.range_of_indices(i_G)
             self.iMG[beg: end, :] = vGrid.iG[:, :]
