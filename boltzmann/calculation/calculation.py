@@ -8,31 +8,36 @@ from time import time
 
 
 class Calculation:
-    """Manages calculation process
+    r"""Manages calculation process
 
     For equivalent, straightforward, but less performant Code
     see the CalculationTest Class!
 
     ..todo::
-        - enable writing of complete results (not moments) to sim file, for unittests
+        - enable writing of complete results (not moments) to sim file,
+          for unittests
         - decide on t_arr:
             * is it an integer, or array(int)
             * for higher order transport -> multiple entries?
+            * replace t_arr, and t_w by sparse matrix,
+              such that transport is simple multiplication?
         - Properly implement calculation( switches for Orders, vectorized))
         - Implement Operator Splitting of Order 2 (easy)
         - directly use p_flag? shrink it down
           (only 1 flag(==0) for inner points necessary)?
           Use p_flag as an array of pointers, that point to their
           calculation function (depending on their type)
-        - implement complete output, for testing
         - Implement complex Geometries for P-Grid:
 
             * Each P-Grid Point has a list of Pointers to its Neighbours
-            * For each Velocity there is a list of Pointers to these Pointers
+              (8 in 2D, 26 in 3D)
+            * For each Velocity there is a list of Pointers
+              to these Pointers
               (Which Neighbours to use for Transport-Calculation)
 
         - Implement adaptive P-Grid:
-            * The P-Grid is given as an array of the P-Gris Points - Array_0
+            * The P-Grid is given as an array of the P-Gris Points
+              -> Array_0
             * Each P-Grid Point has several separate lists of Pointers:
 
               * List_0 contains Pointers to the Neighbours in the P-Grid.
@@ -70,6 +75,24 @@ class Calculation:
                 of a finer area,with 'Ghost-Boundary-Points'
               * The total number of Grid-Refinement-Levels should be bound
 
+    Attributes
+    ----------
+    cnf : :obj:`~boltzmann.configuration.Configuration`
+        Points to the :class:`~boltzmann.configuration.Configuration`
+        Instance.
+    data : :obj:`~np.ndarray` [:obj:`float`]
+        Current state of the simulation, such that
+        :math:`f(t_{cur}, p, v) = data[i_p, i_v]`.
+        Array of shape
+        (:attr:`cnf.p.size <boltzmann.configuration.Grid.size>`,
+        :attr:`cnf.sv.size <boltzmann.configuration.SVGrid.size>`).
+    f_out : :obj:`~boltzmann.calculation.OutputFunction`
+        Handles generation and saving of interim results
+    t_cur : :obj:`int`
+        The current time step / index.
+        If t_cur is in :attr:`cnf.t.iG <boltzmann.configuration.Grid>`
+        The current data is written to the sim file.
+
     Parameters
     ----------
     cnf : :class:`~boltzmann.configuration.Configuration`
@@ -78,14 +101,17 @@ class Calculation:
     def __init__(self,
                  cnf,
                  ini):
-        # Visible Properties
-        self._cnf = cnf
-        self._cols = b_col.Collisions(self._cnf)
-        self._data = ini.create_psv_grid()
+        self.cnf = cnf
+        self._cols = b_col.Collisions(self.cnf)
+        self.data = ini.create_psv_grid()
+        # Todo _result might be unnecessary
         self._result = np.copy(self.data)
-        self._p_flag = ini.p_flag
-        self._f_out = b_opf.OutputFunction(cnf)
-        self._t_cur = cnf.t.iG[0, 0]
+        # Todo _p_flag might be unnecessary,
+        # Todo only necessary to set up transport step
+        # Todo possibly useful to decide if to do collision step in position
+        # self._p_flag = ini.p_flag
+        self.f_out = b_opf.OutputFunction(cnf)
+        self.t_cur = cnf.t.iG[0, 0]
         self._cal_time = time()     # to estimate remaining time
         # t_arr: np.ndarray(int)
         # t_arr is used in the ** transport step **.
@@ -99,64 +125,25 @@ class Calculation:
         # Todo self.t_w = np.zeros((0,), dtype=float)
         return
 
-    @property
-    def cnf(self):
-        """:obj:`~boltzmann.configuration.Configuration`:
-        Points at the Configuration"""
-        return self._cnf
-
-    @property
-    def data(self):
-        """:obj:`~numpy.ndarray` of :obj:`float`:
-        Current state of the simulation
-
-        At time step :attr:`t_cur`, position p and velocity v:
-
-            data[p, v] = f(:attr:`t_cur`, p, v).
-
-        Array of shape
-        (:attr:`cnf`.
-        :attr:`~boltzmann.configuration.Configuration.p`.
-        :attr:`~boltzmann.configuration.Grid.size`,
-        :attr:`cnf`.
-        :attr:`~boltzmann.configuration.Configuration.sv`.
-        :attr:`~boltzmann.configuration.SVGrid.index` [-1]).
-        """
-        return self._data
-
-    @property
-    def p_flag(self):
-        """:obj:`~numpy.ndarray` of :obj:`int`:
-        Currently p_flag does nothing.
-
-        In the future:
-
-        For each P-:class:`~boltzmann.configuration.Grid` point :obj:`p`,
-        :attr:`p_flag` [:obj:`p`] describes its category
-        (see
-        :attr:`~boltzmann.initialization.Initialization.supported_categories`).
-
-        :attr:`p_flag` controls the behaviour of each
-        P-:class:`~boltzmann.configuration.Grid` point
-        during :class:`Calculation`.
-        For each different value in :attr:`p_flag`
-        a custom function is generated.
-        """
-        return self._p_flag
-
-    @property
-    def f_out(self):
-        """:obj:`~boltzmann.calculation.OutputFunction`:
-        Handles generation and saving of interim results
-        """
-        return self._f_out
-
-    @property
-    def t_cur(self):
-        """:obj:`int`:
-        The current time step.
-        """
-        return self._t_cur
+    # @property
+    # def p_flag(self):
+    #     """:obj:`~numpy.ndarray` of :obj:`int`:
+    #     Currently p_flag does nothing.
+    #
+    #     In the future:
+    #
+    #     For each P-:class:`~boltzmann.configuration.Grid` point :obj:`p`,
+    #     :attr:`p_flag` [:obj:`p`] describes its category
+    #     (see
+    #     :attr:`~boltzmann.initialization.Initialization.supported_categories`).
+    #
+    #     :attr:`p_flag` controls the behaviour of each
+    #     P-:class:`~boltzmann.configuration.Grid` point
+    #     during :class:`Calculation`.
+    #     For each different value in :attr:`p_flag`
+    #     a custom function is generated.
+    #     """
+    #     return self._p_flag
 
     #####################################
     #            Calculation            #
@@ -165,12 +152,13 @@ class Calculation:
         """Starts the Calculation and writes the interim results
         to the disk
         """
+        # Todo Add check_integrity / stability conditions?
         assert self.check_stability_conditions()
         self._cal_time = time()
         print('Calculating...          ',
               end='\r')
 
-        for (i_w, t_w) in enumerate(self._cnf.t.iG[:, 0]):
+        for (i_w, t_w) in enumerate(self.cnf.t.iG[:, 0]):
             while self.t_cur != t_w:
                 self._calculate_time_step()
             # generate Output and write it to disk
@@ -186,16 +174,16 @@ class Calculation:
         and prints an estimate of the remaining time to the terminal"""
         # executing time step
         self._calculate_transport_step()
-        for _ in range(self._cnf.coll_substeps):
+        for _ in range(self.cnf.coll_substeps):
             self._calculate_collision_step()
-        self._t_cur += 1
+        self.t_cur += 1
         # executing time step
         self._print_time_estimate()
         return
 
     def _print_time_estimate(self):
         """Prints an estimate of the remaining time to the terminal"""
-        remaining_steps = self._cnf.t.iG[-1, 0] - self.t_cur
+        remaining_steps = self.cnf.t.iG[-1, 0] - self.t_cur
         est_step_duration = (time() - self._cal_time) / self.t_cur
         estimated_time = round(remaining_steps * est_step_duration, 1)
         print('Calculating...{}'
@@ -205,30 +193,33 @@ class Calculation:
 
     def _calculate_collision_step(self):
         """Executes a single collision step on complete P-Grid"""
-        for p in range(self._cnf.p.size):
-            u_c0 = self._data[p, self._cols.collision_arr[:, 0]]
-            u_c1 = self._data[p, self._cols.collision_arr[:, 1]]
-            u_c2 = self._data[p, self._cols.collision_arr[:, 2]]
-            u_c3 = self._data[p, self._cols.collision_arr[:, 3]]
+        for p in range(self.cnf.p.size):
+            u_c0 = self.data[p, self._cols.collision_arr[:, 0]]
+            u_c1 = self.data[p, self._cols.collision_arr[:, 1]]
+            u_c2 = self.data[p, self._cols.collision_arr[:, 2]]
+            u_c3 = self.data[p, self._cols.collision_arr[:, 3]]
             col_factor = (np.multiply(u_c0, u_c2) - np.multiply(u_c1, u_c3))
-            self._data[p] += self._cols.mat.dot(col_factor)
+            self.data[p] += self._cols.mat.dot(col_factor)
         return
 
     def _calculate_transport_step(self):
         """Executes single collision step on complete P-Grid"""
-        if self._cnf.p.dim != 1:
+        if self.cnf.p.dim != 1:
             message = 'Transport is currently only implemented ' \
                       'for 1D Problems'
             raise NotImplementedError(message)
-        dt = self._cnf.t.d
-        dp = self._cnf.p.d
-        for s in range(self._cnf.s.n):
-            [beg, end] = self._cnf.sv.range_of_indices(s)
-            dv = self._cnf.sv.vGrids[s].d
-            # Todo removal of boundaries only temporary, until rules for input/output points or boundary points are set
-            for p in range(1, self._cnf.p.size-1):
+        dt = self.cnf.t.d
+        dp = self.cnf.p.d
+        for s in range(self.cnf.s.n):
+            [beg, end] = self.cnf.sv.range_of_indices(s)
+            dv = self.cnf.sv.vGrids[s].d
+            # Todo removal of boundaries (p in range(1, ... -1))
+            # Todo is only temporary,
+            # Todo until rules for input/output points
+            # Todo or boundary points are set
+            for p in range(1, self.cnf.p.size-1):
                 for v in range(beg, end):
-                    pv = dv * self._cnf.sv.iMG[v]
+                    pv = dv * self.cnf.sv.iMG[v]
                     if pv[0] <= 0:
                         new_val = ((1 + pv[0]*dt/dp) * self.data[p, v]
                                    - pv[0]*dt/dp * self.data[p+1, v])
@@ -238,7 +229,7 @@ class Calculation:
                     else:
                         continue
                     self._result[p, v] = new_val
-        self._data[...] = self._result[...]
+        self.data[...] = self._result[...]
         return
 
     def check_stability_conditions(self):
@@ -250,8 +241,8 @@ class Calculation:
             True, if all conditions are satisfied.
             False, otherwise."""
         # check Courant-Friedrichs-Levy-Condition
-        max_v = np.linalg.norm(self._cnf.sv.boundaries, axis=1).max()
-        dt = self._cnf.t.d
-        dp = self._cnf.p.d
+        max_v = np.linalg.norm(self.cnf.sv.boundaries, axis=1).max()
+        dt = self.cnf.t.d
+        dp = self.cnf.p.d
         cfl_condition = max_v * (dt/dp) < 1/2
         return cfl_condition
