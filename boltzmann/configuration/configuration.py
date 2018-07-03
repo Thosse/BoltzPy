@@ -322,7 +322,6 @@ class Configuration:
             self._p.load(file_c["Position_Space"])
         except KeyError:
             self._p = b_grd.Grid()
-        # TODO self._sv = b_svg.SVGrid() is not implemented so far
         try:
             self._sv.load(file_c["Velocity_Space"],
                           file_c["Species"])
@@ -402,19 +401,29 @@ class Configuration:
         file_c.create_group("Velocity_Space")
         self.sv.save(file_c["Velocity_Space"])
         # Save other Parameters
-        # Todo only save, if not None?
-        file_c["Collision_Selection_Scheme"] = self.coll_select_scheme
-        file_c["Collision_Substeps"] = self.coll_substeps
-        file_c["Convergence_Order_Operator_Splitting"] = self.conv_order_os
-        file_c["Convergence_Order_Transport"] = self.conv_order_transp
-        file_c["Convergence_Order_Collision_Operator"] = self.conv_order_coll
+        if self.coll_select_scheme is not None:
+            key = "Collision_Selection_Scheme"
+            file_c[key] = self.coll_select_scheme
+        if self.coll_substeps is not None:
+            key = "Collision_Substeps"
+            file_c[key] = self.coll_substeps
+        if self.conv_order_os is not None:
+            key = "Convergence_Order_Operator_Splitting"
+            file_c[key] = self.conv_order_os
+        if self.conv_order_transp is not None:
+            key = "Convergence_Order_Transport"
+            file_c[key] = self.conv_order_transp
+        if self.conv_order_coll is not None:
+            key = "Convergence_Order_Collision_Operator"
+            file_c[key] = self.conv_order_coll
         # Save Animated Moments (and shape attribute)
-        #  noinspection PyUnresolvedReferences
-        h5py_string_type = h5py.special_dtype(vlen=str)
-        file_c["Animated_Moments"] = np.array(self.animated_moments,
-                                              dtype=h5py_string_type).flatten()
-        _shape = self.animated_moments.shape
-        file_c["Animated_Moments"].attrs["shape"] = _shape
+        if self.animated_moments is not None:
+            #  noinspection PyUnresolvedReferences
+            h5py_string_type = h5py.special_dtype(vlen=str)
+            key = "Animated_Moments"
+            file_c[key] = np.array(self.animated_moments,
+                                   dtype=h5py_string_type).flatten()
+            file_c[key].attrs["shape"] = self.animated_moments.shape
         file.close()
         return
 
