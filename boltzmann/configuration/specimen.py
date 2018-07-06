@@ -3,8 +3,7 @@ import boltzmann.constants as b_const
 
 
 class Specimen:
-    """Encapsulates all data of a single simulated specimen.
-
+    """Contains the data of a single simulated specimen.
 
     This class is only a data structure for the
     :class:`~boltzmann.configuration.Species` class.
@@ -26,7 +25,7 @@ class Specimen:
         :class:`Velocity Grid <boltzmann.configuration.SVGrid>`.
     collision_rate : :obj:`~numpy.ndarray` [:obj:`float`]
         Determines the collision probability between two specimen.
-        Should be a row and column of
+        Points at a row or column of
         :attr:`Species.collision_rate_matrix
         <boltzmann.configuration.Species>`.
     """
