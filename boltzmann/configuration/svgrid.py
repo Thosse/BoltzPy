@@ -477,7 +477,8 @@ class SVGrid:
         if self.vGrids is not None:
             for G in self.vGrids:
                 assert isinstance(G, b_grd.Grid)
-                assert np.array_equal(G.boundaries, self.boundaries)
+                assert np.array_equal(G.boundaries + self.offset,
+                                      self.boundaries)
         return
 
     @staticmethod

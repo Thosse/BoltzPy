@@ -161,6 +161,7 @@ class Calculation:
         for (i_w, t_w) in enumerate(self.cnf.t.iG[:, 0]):
             while self.t_cur != t_w:
                 self._calculate_time_step()
+                self._print_time_estimate()
             # generate Output and write it to disk
             self.f_out.apply(self)
 
@@ -170,15 +171,12 @@ class Calculation:
         return
 
     def _calculate_time_step(self):
-        """Executes a single time step
-        and prints an estimate of the remaining time to the terminal"""
+        """Executes a single time step"""
         # executing time step
         self._calculate_transport_step()
         for _ in range(self.cnf.coll_substeps):
             self._calculate_collision_step()
         self.t_cur += 1
-        # executing time step
-        self._print_time_estimate()
         return
 
     def _print_time_estimate(self):
@@ -208,8 +206,10 @@ class Calculation:
             message = 'Transport is currently only implemented ' \
                       'for 1D Problems'
             raise NotImplementedError(message)
+
         dt = self.cnf.t.d
         dp = self.cnf.p.d
+        offset = self.cnf.sv.offset
         for s in range(self.cnf.s.n):
             [beg, end] = self.cnf.sv.range_of_indices(s)
             dv = self.cnf.sv.vGrids[s].d
@@ -219,7 +219,7 @@ class Calculation:
             # Todo or boundary points are set
             for p in range(1, self.cnf.p.size-1):
                 for v in range(beg, end):
-                    pv = dv * self.cnf.sv.iMG[v]
+                    pv = dv * self.cnf.sv.iMG[v] + offset
                     if pv[0] <= 0:
                         new_val = ((1 + pv[0]*dt/dp) * self.data[p, v]
                                    - pv[0]*dt/dp * self.data[p+1, v])
