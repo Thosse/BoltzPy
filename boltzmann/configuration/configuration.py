@@ -198,13 +198,27 @@ class Configuration:
     #####################################
     #           Configuration           #
     #####################################
-    # TODO properly add docu and parameters
     def add_specimen(self,
-                     **kwargs):
+                     name=None,
+                     color=None,
+                     mass=None,
+                     collision_rate=None):
         """Adds a Specimen to :attr:`~Configuration.s`.
         Directly calls :meth:`Species.add_specimen`
+
+        Parameters
+        ----------
+        name : :obj:`str`, optional
+        color : :obj:`str`, optional
+        mass : int, optional
+        collision_rate : :obj:`list` of :obj:`float`, optional
+            Determines the collision probability between two specimen.
+            Row (and column) of :attr:`collision_rate_matrix`.
         """
-        self.s.add_specimen(**kwargs)
+        self.s.add_specimen(name,
+                            color,
+                            mass,
+                            collision_rate)
 
     # Todo Choose between step size or number of time steps
     def set_time_grid(self,
