@@ -24,6 +24,14 @@ SUPP_OUTPUT = {'Mass',
                'Energy_Flow_Z'
                }
 
+#: :obj:`list` [:obj:`str`]:
+#: List of all currently supported Colors.
+SUPP_COLORS = ['blue', 'red', 'green',
+               'yellow', 'brown', 'gray',
+               'olive', 'purple', 'cyan',
+               'orange', 'pink', 'lime',
+               'black']
+
 #: :obj:`set` [:obj:`str`] :
 #: Set of all currently supported schemes
 #: for the selection of the collision partners.

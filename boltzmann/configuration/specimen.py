@@ -1,18 +1,50 @@
 import numpy as np
-from matplotlib.colors import cnames as mpl_colors
+import boltzmann.constants as b_const
 
 
 class Specimen:
-    """Encapsulates all data of a single simulated specimen."""
+    """Encapsulates all data of a single simulated specimen.
+
+
+    This class is only a data structure for the
+    :class:`~boltzmann.configuration.Species` class.
+    Its only used to encapsulate data
+    and assert its integrity, if necessary.
+
+
+    Attributes
+    ----------
+    name : :obj:`str`
+        Name of the Specimen, mainly used for the legend in the animation.
+        Must be unique.
+    color : :obj:`str`
+        Color of the Specimen in the animation.
+        Must be an element of :const:`~boltzmann.constants.SUPP_COLORS`.
+    mass : :obj:`int`
+        Mass of the Specimen.
+        Strongly influences the size of the Specimens
+        :class:`Velocity Grid <boltzmann.configuration.SVGrid>`.
+    collision_rate : :obj:`~numpy.ndarray` [:obj:`float`]
+        Determines the collision probability between two specimen.
+        Should be a row and column of
+        :attr:`Species.collision_rate_matrix
+        <boltzmann.configuration.Species>`.
+    """
     def __init__(self,
                  name,
                  color,
                  mass,
                  collision_rate
                  ):
+        self.check_parameters(name,
+                              color,
+                              mass,
+                              collision_rate)
         self.name = name
         self.color = color
         self.mass = mass
+        if isinstance(collision_rate, list):
+            collision_rate = np.array(collision_rate)
         self.collision_rate = collision_rate
         self.check_integrity()
         return
@@ -59,9 +91,11 @@ class Specimen:
         name : :obj:`str`, optional
         color : :obj:`str`, optional
         mass : :obj:`int`, optional
-        collision_rate : :obj:`np.ndarray` of :obj:`float`, optional
+        collision_rate : :obj:`~numpy.ndarray` [:obj:`float`], optional
             Determines the collision probability between two specimen.
-            Should be a row or column of :attr:`collision_rate_matrix`.
+            Should be a row and column of
+            :attr:`Species.collision_rate_matrix
+            <boltzmann.configuration.Species>`.
         complete_check : :obj:`bool`, optional
             If True, then all parameters must be set (not None).
             If False, then unassigned parameters are ignored.
@@ -78,7 +112,7 @@ class Specimen:
 
         if color is not None:
             assert isinstance(color, str)
-            assert color in mpl_colors
+            assert color in b_const.SUPP_COLORS
 
         if mass is not None:
             assert type(mass) in [int, np.int64]
@@ -89,7 +123,7 @@ class Specimen:
             if isinstance(collision_rate, list):
                 collision_rate = np.array(collision_rate)
             assert isinstance(collision_rate, np.ndarray)
-            assert len(collision_rate.shape) == 1
+            assert collision_rate.ndim == 1
             assert collision_rate.dtype in [int, float]
             assert np.all(collision_rate >= 0)
         return
