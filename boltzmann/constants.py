@@ -67,3 +67,34 @@ SUPP_GRID_FORMS = {'rectangular'}
 #: for :class:`~boltzmann.configuration.Grid`
 #: dimensions.
 SUPP_GRID_DIMENSIONS = {1, 2}
+
+
+#: :obj:`list` [:obj:`str`] :
+#: List of all currently supported categories
+#: for :class:`Position-Space-Grid <boltzmann.configuration.Grid>` points
+#: (e.g. inner points, boundary points,...).
+#:
+#: Each P-Grid point fits into exactly one of the following categories:
+#:      * **Inner Point (Default)**:
+#:          * both transport and collisions are applied normally
+# TODO add types:
+#      * **Boundary Point**:
+#          * no collision step
+#          * additional reflection step after every transport step
+#      * **Ghost Boundary Point**:
+#          * for higher order transport
+#          * so far undetermined behaviour
+#      * **Constant Input/Output Point**:
+#          * no collision-step
+#          * no transport-step
+#          * Distribution is constant over the whole simulation.
+#      * **Time Variant Input/Output Point**:
+#          * no collision-step,
+#          * no transport-step,
+#          * Distribution is freshly initialized in every time step
+SUPP_GRID_POINT_CATEGORIES = ['Inner Point',
+                              # 'Boundary Point',
+                              # 'Ghost Boundary_Point',
+                              # 'Constant_IO_Point',
+                              # 'Time_Variant_IO_Point'
+                              ]

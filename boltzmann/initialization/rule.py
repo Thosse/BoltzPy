@@ -16,7 +16,8 @@ class Rule:
     Furthermore the behaviour of p during
     :class:`~boltzmann.calculation.Calculation`
     depends on its Category
-    (see :attr:`cat` and :attr:`Initialization.supported_categories`).
+    (see :attr:`cat` and
+    :const:`~boltzmann.constants.SUPP_GRID_POINT_CATEGORIES`).
 
 
     Parameters
@@ -53,7 +54,7 @@ class Rule:
         Specifies the behavior in the
         :class:`~boltzmann.calculation.Calculation`.
         Index of an element in
-        :attr:`Initialization.supported_categories`.
+        :const:`~boltzmann.constants.SUPP_GRID_POINT_CATEGORIES`.
         """
         return self._cat
 

@@ -1,6 +1,7 @@
 
 from boltzmann.configuration import configuration as b_cnf
 from boltzmann.initialization import rule as b_rul
+import boltzmann.constants as b_const
 
 import numpy as np
 import math
@@ -69,7 +70,7 @@ class Initialization:
                  cnf=b_cnf.Configuration()):
         self._cnf = cnf
         self._rule_arr = np.empty(shape=(0,), dtype=b_rul.Rule)
-        n_categories = len(self.supported_categories)
+        n_categories = len(b_const.SUPP_GRID_POINT_CATEGORIES)
         self._block_index = np.zeros(shape=(n_categories + 1,),
                                      dtype=int)
         p_shape = tuple(self.cnf.p.n)
@@ -83,20 +84,6 @@ class Initialization:
         """:obj:`~boltzmann.configuration.Configuration`:
         Points to the :obj:`~boltzmann.configuration.Configuration`."""
         return self._cnf
-
-    @property
-    def supported_categories(self):
-        """List of all supported Categories of
-        P-:class:`~boltzmann.configuration.Grid` points.
-        Each Category behaves differently in
-        :class:`~boltzmann.calculation.Calculation`."""
-        supported_categories = ['Inner Point',
-                                # 'Boundary Point',
-                                # 'Ghost Boundary_Point',
-                                # 'Constant_IO_Point',
-                                # 'Time_Variant_IO_Point',
-                                ]
-        return supported_categories
 
     @property
     def block_index(self):
@@ -131,7 +118,8 @@ class Initialization:
     def rule_arr(self):
         """:obj:`~numpy.ndarray` of :obj:`Rule` :
         Array of all specified construction Rules (see :class:`Rule` ).
-        Sorted by Rule Category (see :attr:`supported_categories`).
+        Sorted by Rule Category (see
+        :const:`~boltzmann.constants.SUPP_GRID_POINT_CATEGORIES`).
         """
         return self._rule_arr
 
@@ -164,7 +152,7 @@ class Initialization:
             Specifies the Category
             of the new :obj:`Rule`.
             Must be an element of
-            :attr:`supported_categories`.
+            :const:`~boltzmann.constants.SUPP_GRID_POINT_CATEGORIES`.
         rho_list : :obj:`array` or :obj:`list`
             List of the parameter rho, for each specimen.
             See :attr:`Rule.rho`.
@@ -179,7 +167,7 @@ class Initialization:
             P-:class:`~boltzmann.configuration.Grid` points
             on which it's applied.
         """
-        assert category in self.supported_categories
+        assert category in b_const.SUPP_GRID_POINT_CATEGORIES
         # Construct new_rule -> Depending on Category
         if category == 'Inner Point':
             category = 0
@@ -323,11 +311,11 @@ class Initialization:
             assert i_r >= self.block_index[r.cat]
             assert i_r < self.block_index[r.cat+1]
         assert self.rule_arr.shape == (self.block_index[-1],)
-        length = len(self.supported_categories)
         # A change of this length needs several changes in this module
         # and its submodules
-        assert len(self.supported_categories) is 1
-        assert self.block_index.shape == (length+1,)
+        assert len(b_const.SUPP_GRID_POINT_CATEGORIES) is 1
+        n_categories = len(b_const.SUPP_GRID_POINT_CATEGORIES)
+        assert self.block_index.size == n_categories + 1
         assert self.p_flag.size == self.cnf.p.iG.shape[0]
         assert self.p_flag.dtype == int
         assert np.min(self.p_flag) >= 0, \
@@ -349,15 +337,15 @@ class Initialization:
         print('Block Indices = '
               '{}'.format(self.block_index))
 
-        for (i_c, c) in enumerate(self.supported_categories):
+        for (i_c, category) in enumerate(b_const.SUPP_GRID_POINT_CATEGORIES):
             if self.block_index[i_c] < self.block_index[i_c+1]:
                 print('\n{} Rules'
-                      ''.format(self.supported_categories[i_c]))
-                line_length = len(self.supported_categories[i_c]) + 6
+                      ''.format(category))
+                line_length = len(category) + 6
                 print('-'*line_length)
             for r in self.rule_arr[self.block_index[i_c]:
                                    self.block_index[i_c+1]]:
-                r.print(self.supported_categories)
+                r.print(b_const.SUPP_GRID_POINT_CATEGORIES)
         if physical_grid:
             print('Flag-Grid of P-Space:')
             print(self.p_flag)

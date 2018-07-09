@@ -7,33 +7,36 @@ from datetime import datetime
 
 
 print('Starting Time:\n' + str(datetime.now()) + '\n')
-cnf = b_cnf.Configuration("defaulti")
+cnf = b_cnf.Configuration()
 if cnf.s.n == 0:
-    cnf.add_specimen(mass=2, collision_rate=[50])               # 2
-    cnf.add_specimen(mass=3, collision_rate=[51, 52])               # 3
-    cnf.coll_substeps *= 50
-cnf.set_time_grid(0.1, 11, 10)      # 20 1001 10
-cnf.set_position_grid(grid_dimension=1,
-                      grid_shape=[21],  # 200
-                      grid_spacing=0.1)   # 0.1
-cnf.set_velocity_grids(grid_dimension=2,
-                       min_points_per_axis=4,
-                       max_velocity=1.5)
+    cnf.add_specimen(mass=2, collision_rate=[50])
+    cnf.add_specimen(mass=3, collision_rate=[50, 50])
+    cnf.coll_substeps = 5000
+    cnf.set_time_grid(max_time=1,
+                      number_time_steps=101,
+                      calculations_per_time_step=10)      # 20 1001 10
+    cnf.set_position_grid(grid_dimension=1,
+                          grid_shape=[21],  # 200
+                          grid_spacing=0.5)   # 0.1
+    cnf.set_velocity_grids(grid_dimension=2,
+                           min_points_per_axis=4,
+                           max_velocity=1.5,
+                           velocity_offset=[-0.2, 0])
 print(cnf.__str__(write_physical_grids=True))
 cnf.save()
 
 ini = b_ini.Initialization(cnf)
 ini.add_rule('Inner Point',
-             [2, 1, 1],
-             [[0, 0], [0, 0], [0, 0]],
-             [1, 1, 1],
-             name='foo')
+             [2.0, 1.0],
+             [[0, 0], [0, 0]],
+             [1, 1],
+             name='High Pressure')
 ini.apply_rule(0, [0], [10])
 ini.add_rule('Inner Point',
-             [4, 2, 1],
-             [[0, 0], [0, 0], [0, 0]],
-             [1, 1, 1],
-             name='bar')
+             [1, 1],
+             [[0, 0], [0, 0]],
+             [1, 1],
+             name='Low Pressure')
 ini.apply_rule(1, [10], [21])
 ini.print(True)
 
