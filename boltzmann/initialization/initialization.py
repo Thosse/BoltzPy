@@ -128,11 +128,11 @@ class Initialization:
     #####################################
     def add_rule(self,
                  category,
-                 rho_list,
-                 drift_list,
-                 temp_list,
-                 TMP_OPTIONAL_STUFF=None,
-                 name=''):
+                 rho,
+                 drift,
+                 temp,
+                 name=None,
+                 color=None):
         """Adds a new initialization
         :class:`Rule` to  :attr:`rule_arr`.
 
@@ -149,40 +149,36 @@ class Initialization:
         Parameters
         ----------
         category : :obj:`str`
-            Specifies the Category
-            of the new :obj:`Rule`.
-            Must be an element of
+            Category of the :class:`P-Grid <boltzmann.configuration.Grid>`
+            point.
+            Must be in
             :const:`~boltzmann.constants.SUPP_GRID_POINT_CATEGORIES`.
-        rho_list : :obj:`array` or :obj:`list`
-            List of the parameter rho, for each specimen.
-            See :attr:`Rule.rho`.
-        drift_list : :obj:`array` or :obj:`list`
-            List of the parameter drift, for each specimen.
-            See :attr:`Rule.drift`.
-        temp_list : :obj:`array` or :obj:`list`
-            List of the parameter temp, for each specimen.
-            See :attr:`Rule.temp`.
-        name : :obj:`str`, optional
-            Sets a name to this rule and the
-            P-:class:`~boltzmann.configuration.Grid` points
-            on which it's applied.
+        rho : :obj:`list` [:obj:`float`]
+            Is converted into :class:`~numpy.ndarray` :attr:`rho`.
+        drift : :obj:`list` [:obj:`float`]
+            Is converted into :class:`~numpy.ndarray` :attr:`drift`.
+        temp : :obj:`list` [:obj:`float`]
+            Is converted into :class:`~numpy.ndarray` :attr:`temp`.
+        name : str, optional
+            Displayed in the GUI to visualize the initialization.
+        color : str, optional
+            Displayed in the GUI to visualize the initialization.
         """
         assert category in b_const.SUPP_GRID_POINT_CATEGORIES
+        i_cat = b_const.SUPP_GRID_POINT_CATEGORIES.index(category)
         # Construct new_rule -> Depending on Category
         if category == 'Inner Point':
-            category = 0
             new_rule = b_rul.Rule(category,
-                                  rho_list,
-                                  drift_list,
-                                  temp_list,
-                                  name)
+                                  rho,
+                                  drift,
+                                  temp,
+                                  name,
+                                  color)
         else:
-            print('Unspecified Category: {}'
-                  ''.format(category))
-            # Todo throw exception
-            assert False
+            msg = 'Unspecified Category: {}'.format(category)
+            raise NotImplementedError(msg)
 
-        pos_of_rule = self.block_index[category+1]
+        pos_of_rule = self.block_index[i_cat+1]
         # Insert new rule into rule array
         self._rule_arr = np.insert(self.rule_arr,
                                    pos_of_rule,
@@ -308,8 +304,8 @@ class Initialization:
         assert self.rule_arr.dtype == b_rul.Rule
         for (i_r, r) in enumerate(self.rule_arr):
             r.check_integrity()
-            assert i_r >= self.block_index[r.cat]
-            assert i_r < self.block_index[r.cat+1]
+            assert i_r >= self.block_index[r.i_cat]
+            assert i_r < self.block_index[r.i_cat+1]
         assert self.rule_arr.shape == (self.block_index[-1],)
         # A change of this length needs several changes in this module
         # and its submodules
