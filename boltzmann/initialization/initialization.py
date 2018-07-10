@@ -158,10 +158,7 @@ class Initialization:
             if val >= pos_of_rule:
                 self.init_arr[idx] += 1
         # Adjust block_index entries to new rule_arr indices
-        # Todo this should be more pythonic
-        n_categories = len(b_const.SUPP_GRID_POINT_CATEGORIES)
-        for idx in range(i_cat+1, n_categories + 1):
-            self._block_index[idx] += 1
+        self._block_index[i_cat+1:] += 1
         return
 
     def apply_rule(self,
@@ -249,6 +246,95 @@ class Initialization:
         return psv
 
     #####################################
+    #           Serialization           #
+    #####################################
+    def load(self,
+             file_address,
+             configuration=None):
+        """Sets all attributes of the :obj:`Initialization` instance
+        to the ones specified in the given HDF5-file.
+
+        Parameters
+        ----------
+        file_address : :obj:`str`
+            Complete path to the HDF5-file.
+        configuration : :class:`~boltzmann.configuration.Configuration`, optional
+            Necessary parameter for :class:`Initialization`.
+            Will be :meth:`read <boltzmann.configuration.Configuration.load>`
+            from file, if None is given.
+        """
+        # Open file
+        file = h5py.File(file_address, mode='r')
+
+        # Check if Initialization Group exists
+        if "Initialization" not in file.keys():
+            msg = 'No group "Initialization" found in file:\n' \
+                  '{}'.format(file_address)
+            raise KeyError(msg)
+        file_i = file["Initialization"]
+
+        # Todo check, what to do, if self is not empty?
+        # Todo replace the fresh initialization by something smarter
+        # Todo check, if the instance is empty first -> give Warning?
+        # Do fresh initialization
+        if configuration is not None:
+            assert isinstance(configuration, b_cnf.Configuration)
+        else:
+            configuration = b_cnf.Configuration(file_address)
+            configuration.load()
+        self.__init__(configuration)
+
+        # Todo implement something to use existing(freshly loaded) Rules
+        n_rules = int(file_i.attrs["Number of Rules"])
+        for i_r in range(n_rules):
+            rule = b_rul.Rule()
+            rule.load(file_i["Rule_{}".format(i_r)])
+            category = b_const.SUPP_GRID_POINT_CATEGORIES[rule.i_cat]
+            self.add_rule(category,
+                          rule.rho,
+                          rule.drift,
+                          rule.temp,
+                          rule.name,
+                          rule.color)
+
+        self.init_arr = file_i["Initialization Array"].value
+
+        self.check_integrity()
+        return
+
+    def save(self, file_address):
+        """Writes all attributes of the :class:`Initialization` instance
+        to the given HDF5-file.
+
+        Parameters
+        ----------
+        file_address : str
+            Complete path to a simulation file (.sim).
+        """
+        self.check_integrity()
+        # Open file
+        file = h5py.File(file_address, mode='a')
+
+        # Clear currently saved Initialization, if any
+        if "Initialization" in file.keys():
+            del file["Initialization"]
+
+        # Create and open empty "Initialization" group
+        file.create_group("Initialization")
+        file_i = file["Initialization"]
+
+        # Save all Rules
+        file_i.attrs["Number of Rules"] = self.n_rules
+        for (i_r, rule) in enumerate(self.rule_arr):
+            file_i.create_group("Rule_{}".format(i_r))
+            hdf5_subgroup = file_i["Rule_{}".format(i_r)]
+            rule.save(hdf5_subgroup)
+
+        # Save Initialization Array
+        file_i["Initialization Array"] = self.init_arr
+        return
+
+    #####################################
     #           Verification            #
     #####################################
     def check_integrity(self):
@@ -267,6 +353,7 @@ class Initialization:
             assert i_r >= self.block_index[rule.i_cat]
             assert i_r < self.block_index[rule.i_cat+1]
 
+        assert isinstance(self.init_arr, np.ndarray)
         assert self.init_arr.size == self._cnf.p.size
         assert self.init_arr.dtype == int
         assert np.min(self.init_arr) >= 0, \

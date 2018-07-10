@@ -1,6 +1,7 @@
 import boltzmann.constants as b_const
 
 import numpy as np
+import h5py
 
 
 class Rule:
@@ -39,42 +40,42 @@ class Rule:
 
     Attributes
     ----------
-    i_cat : :obj:`int`
+    i_cat : :obj:`int`, optional
         Specifies the behavior in the
         :class:`~boltzmann.calculation.Calculation`.
         Denotes the index of an element of
         :const:`~boltzmann.constants.SUPP_GRID_POINT_CATEGORIES`.
-    rho : :obj:`~numpy.ndarray` [:obj:`float`]
+    rho : :obj:`~numpy.ndarray` [:obj:`float`], optional
         Array of the rho parameters for each specimen.
         Correlates to the total weight/amount of particles in
         the area of the
         :class:`P-Grid <boltzmann.configuration.Grid>` point.
-    drift : :obj:`~numpy.ndarray` [:obj:`float`]
+    drift : :obj:`~numpy.ndarray` [:obj:`float`], optional
         Array of the drift parameters for each specimen.
         Describes the mean velocity,
         i.e. the first moment (expectancy value) of the
         velocity distribution.
-    temp : :obj:`~numpy.ndarray` [:obj:`float`]
+    temp : :obj:`~numpy.ndarray` [:obj:`float`], optional
         Array of the temperature parameters for each specimen.
         Correlates to the Energy,
         i.e. the second moment (variance) of the
         velocity distribution.
-    name : :obj:`str`
+    name : :obj:`str`, optional
         Displayed in the GUI to visualize the initialization.
-    color : :obj:`str`
+    color : :obj:`str`, optional
         Displayed in the GUI to visualize the initialization.
     """
     # Todo get a clear understanding of the meaning of temperature
 
-    # todo Drift and temperature should be equal for all specimen?
+    # todo Ask Hans Drift and temperature should be equal for all specimen?
 
     # Todo add attribute and setup method to create initial state
 
     def __init__(self,
-                 category,
-                 rho,
-                 drift,
-                 temp,
+                 category=None,
+                 rho=None,
+                 drift=None,
+                 temp=None,
                  name=None,
                  color=None):
         self.check_parameters(category=category,
@@ -83,22 +84,26 @@ class Rule:
                               temp=temp,
                               name=name,
                               color=color)
-        self.i_cat = b_const.SUPP_GRID_POINT_CATEGORIES.index(category)
-        self.rho = np.array(rho,
-                            dtype=float)
-        self.drift = np.array(drift,
-                              dtype=float)
-        self.temp = np.array(temp,
-                             dtype=float)
-        if name is None:
-            self.name = ''
+        if category is not None:
+            self.i_cat = b_const.SUPP_GRID_POINT_CATEGORIES.index(category)
         else:
+            self.i_cat = None
+
+        self.rho = rho
+        self.drift = drift
+        self.temp = temp
+
+        if name is not None:
             self.name = name
-        if color is None:
-            self.color = 'gray'
         else:
+            self.name = ''
+
+        if color is not None:
             self.color = color
-        self.check_integrity()
+        else:
+            self.color = 'black'
+
+        self.check_integrity(False)
         return
 
     #####################################
@@ -112,17 +117,19 @@ class Rule:
         ----------
         hdf5_group : :obj:`h5py.Group`
             Opened HDF5 :obj:`Rule` Group.
-
-        Returns
-        -------
-        :obj:`Rule`
         """
         # read attributes from file
         category = hdf5_group["Category"].value
         index = b_const.SUPP_GRID_POINT_CATEGORIES.index(category)
         self.i_cat = int(index)
-        self.name = hdf5_group["Name"].value
-        self.color = hdf5_group["Color"].value
+        try:
+            self.name = hdf5_group["Name"].value
+        except KeyError:
+            self.name = ''
+        try:
+            self.color = hdf5_group["Color"].value
+        except KeyError:
+            self.color = 'black'
         self.rho = hdf5_group["Mass"].value
         self.drift = hdf5_group["Mean Velocity"].value
         self.temp = hdf5_group["Energy"].value
@@ -138,25 +145,21 @@ class Rule:
         hdf5_group : h5py.Group
             Opened HDF5 :obj:`Rule` group.
         """
+        self.check_integrity(True)
         # clear any existing elements in the group
         for key in hdf5_group.keys():
             del hdf5_group[key]
 
-        # Set special data type for String-Arrays
-        #  noinspection PyUnresolvedReferences
-        h5py_string_type = h5py.special_dtype(vlen=str)
         # Write Attributes
         category = b_const.SUPP_GRID_POINT_CATEGORIES[self.i_cat]
-        hdf5_group["Category"] = np.array(category,
-                                          dtype=h5py_string_type)
-        hdf5_group["Name"] = np.array(self.name,
-                                      dtype=h5py_string_type)
-        hdf5_group["Color"] = np.array(self.color,
-                                       dtype=h5py_string_type)
-
+        hdf5_group["Category"] = category
+        if self.name != '':
+            hdf5_group["Name"] = self.name
+        if self.color != 'black':
+            hdf5_group["Color"] = self.color
         hdf5_group["Mass"] = self.rho
         hdf5_group["Mean Velocity"] = self.drift
-        hdf5_group["Energy"] = self.rho
+        hdf5_group["Energy"] = self.temp
         return
 
     #####################################
@@ -173,7 +176,10 @@ class Rule:
             If True, then all attributes must be set (not None).
             If False, then unassigned attributes are ignored.
         """
-        category = b_const.SUPP_GRID_POINT_CATEGORIES[self.i_cat]
+        if self.i_cat is not None:
+            category = b_const.SUPP_GRID_POINT_CATEGORIES[self.i_cat]
+        else:
+            category = None
         self.check_parameters(category=category,
                               category_index=self.i_cat,
                               rho=self.rho,
@@ -182,17 +188,6 @@ class Rule:
                               name=self.name,
                               color=self.color,
                               complete_check=complete_check)
-        # Additional Conditions on instance:
-        # parameters can also be a list,
-        # instance attributes must be ndarray
-        assert isinstance(self.rho, np.ndarray)
-        assert isinstance(self.drift, np.ndarray)
-        assert isinstance(self.temp, np.ndarray)
-        # parameters can also be list/array of ints,
-        # instance attribute must be ndarray of floats
-        assert self.rho.dtype == float
-        assert self.drift.dtype == float
-        assert self.temp.dtype == float
         return
 
     @staticmethod
@@ -239,10 +234,8 @@ class Rule:
             assert category_index in range(n_categories)
 
         if rho is not None:
-            if isinstance(rho, list):
-                rho = np.array(rho)
             assert isinstance(rho, np.ndarray)
-            assert rho.dtype in [int, float]
+            assert rho.dtype == float
             assert rho.ndim == 1
             assert np.min(rho) > 0
             if n_species is not None:
@@ -250,10 +243,8 @@ class Rule:
             n_species = rho.shape[0]
 
         if drift is not None:
-            if isinstance(drift, list):
-                drift = np.array(drift)
             assert isinstance(drift, np.ndarray)
-            assert drift.dtype in [int, float]
+            assert drift.dtype == float
             assert drift.ndim == 2
             if n_species is not None:
                 assert drift.shape[0] == n_species
@@ -261,10 +252,8 @@ class Rule:
             assert drift.shape[1] in [2, 3]
 
         if temp is not None:
-            if isinstance(temp, list):
-                temp = np.array(temp)
             assert isinstance(temp, np.ndarray)
-            assert temp.dtype in [int, float]
+            assert temp.dtype == float
             assert temp.ndim == 1
             np.min(temp) > 0
             if n_species is not None:

@@ -378,7 +378,7 @@ class Configuration:
         return
 
     def save(self, file_address=None):
-        """Writes all parameters of the :obj:`Configuration` object
+        """Writes all attributes of the :class:`Configuration` instance
         to the given HDF5-file.
 
         Parameters
@@ -395,7 +395,7 @@ class Configuration:
             # Check if file exists, don't overwrite existing files!
             raise NotImplementedError
         # Open file
-        file = h5py.File(file_address, mode='w')
+        file = h5py.File(file_address, mode='a')
         # Clear currently saved Configuration, if any
         if "Configuration" in file.keys():
             del file["Configuration"]

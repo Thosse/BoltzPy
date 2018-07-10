@@ -8,7 +8,7 @@ import numpy as np
 
 
 print('Starting Time:\n' + str(datetime.now()) + '\n')
-cnf = b_cnf.Configuration()
+cnf = b_cnf.Configuration("def_1")
 if cnf.s.n == 0:
     cnf.add_specimen(mass=2, collision_rate=[50])
     cnf.add_specimen(mass=3, collision_rate=[50, 50])
@@ -27,19 +27,21 @@ print(cnf.__str__(write_physical_grids=True))
 cnf.save()
 
 ini = b_ini.Initialization(cnf)
+# ini.load(cnf.file_address)
 ini.add_rule('Inner Point',
-             [2.0, 1.0],
-             [[0, 0], [0, 0]],
-             [1, 1],
+             np.array([2.0, 1.0]),
+             np.array([[0.0, 0.0], [0.0, 0.0]]),
+             np.array([1.0, 1.0]),
              name='High Pressure')
 ini.apply_rule(np.arange(0, 10), 0)
 ini.add_rule('Inner Point',
-             [1, 1],
-             [[0, 0], [0, 0]],
-             [1, 1],
+             np.array([1.0, 1.0]),
+             np.array([[0.0, 0.0], [0.0, 0.0]]),
+             np.array([1.0, 1.0]),
              name='Low Pressure')
 ini.apply_rule(np.arange(10, 21), 1)
 ini.print(True)
+ini.save(cnf.file_address)
 
 cal = b_cal.Calculation(cnf, ini)
 cal.run()
