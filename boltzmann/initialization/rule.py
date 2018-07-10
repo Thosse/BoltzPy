@@ -19,8 +19,8 @@ class Rule:
           velocity space at the
           :class:`P-Grid <boltzmann.configuration.Grid>` point point.
 
-    The initialization values are chosen
-    to match the conserved quantities
+    The initial values are chosen
+    according to the conserved quantities
     mass (:attr:`rho`),
     mean velocity (:attr:`drift`)
     and temperature (:attr:`temp`).

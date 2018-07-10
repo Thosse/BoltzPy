@@ -4,6 +4,7 @@ import boltzmann.initialization as b_ini
 import boltzmann.calculation as b_cal
 import boltzmann.animation as b_ani
 from datetime import datetime
+import numpy as np
 
 
 print('Starting Time:\n' + str(datetime.now()) + '\n')
@@ -11,7 +12,7 @@ cnf = b_cnf.Configuration()
 if cnf.s.n == 0:
     cnf.add_specimen(mass=2, collision_rate=[50])
     cnf.add_specimen(mass=3, collision_rate=[50, 50])
-    cnf.coll_substeps = 5000
+    cnf.coll_substeps = 5
     cnf.set_time_grid(max_time=1,
                       number_time_steps=101,
                       calculations_per_time_step=10)      # 20 1001 10
@@ -31,13 +32,13 @@ ini.add_rule('Inner Point',
              [[0, 0], [0, 0]],
              [1, 1],
              name='High Pressure')
-ini.apply_rule(0, [0], [10])
+ini.apply_rule(np.arange(0, 10), 0)
 ini.add_rule('Inner Point',
              [1, 1],
              [[0, 0], [0, 0]],
              [1, 1],
              name='Low Pressure')
-ini.apply_rule(1, [10], [21])
+ini.apply_rule(np.arange(10, 21), 1)
 ini.print(True)
 
 cal = b_cal.Calculation(cnf, ini)

@@ -4,20 +4,25 @@ from boltzmann.initialization import rule as b_rul
 import boltzmann.constants as b_const
 
 import numpy as np
+
 import math
+import h5py
 
 
 class Initialization:
-    """Handles initialization instructions and creates
-    PSV-Grids and :attr:`p_flag`.
+    """Handles :class:`initialization instructions<Rule>`, creates
+    PSV-Grids and :attr:`init_arr`.
 
-    * Collects initialization Rules in :attr:`rule_arr`.
-    * Categorizes each P-Grid point in :attr:`p_flag`,
-      to specify its initial state and behavior in the simulation.
+    * Collects :class:`initialization rules <Rule>` in :attr:`rule_arr`.
+    * Assigns each :class:`P-Grid <boltzmann.configuration.Grid>` point
+      its :class:`initialization rule <Rule>`
+      in :attr:`init_arr`.
+    * Each :class:`initialization rule <Rule>`
+      specifies the initial state and behavior in the simulation.
     * Creates the initialized PSV-Grids
-      (:attr:`~boltzmann.calculation.Calculation.data`,
+      (:attr:`~boltzmann.calculation.Calculation.data` and
       :attr:`~boltzmann.calculation.Calculation.result`)
-      for :class:`~boltzmann.calculation.Calculation`.
+      for the :class:`Calculation <boltzmann.calculation.Calculation>`.
 
     .. todo::
         - Figure out nice way to implement boundary points
@@ -26,64 +31,52 @@ class Initialization:
           (e.g. a line with specified width,
           a ball with specified radius/diameter, ..).
           Switch between convex hull and span?
-        - sphinx: link PSV-Grid to Calculation.data
-          and p_flag to Calculation.p_flag
+        - sphinx: link PSV-Grid to Calculation.data?
+          link init_arr to Calculation.init_arr? No?
           in Initialization-Docstring
 
     Parameters
     ----------
-    cnf : :class:`~boltzmann.configuration.Configuration`
+    configuration : :class:`~boltzmann.configuration.Configuration`, optional
 
-    Notes
-    -----
-    Each P-Grid point fits
-    into exactly one of the following Categories:
+    Attributes
+    ----------
+    rule_arr : :obj:`~numpy.ndarray` [:class:`Rule`]
+        Array of all specified :class:`initialization rules <Rule>` ).
+        Rules are sorted by their 
+        :const:`category <boltzmann.constants.SUPP_GRID_POINT_CATEGORIES>`.
+    init_arr : :obj:`~numpy.ndarray` [:obj:`int`]
+        Controls which :class:`Rule` applies to which
+        :class:`P-Grid <boltzmann.configuration.Grid>` point
 
-        * **Inner Point (Default)**:
-
-          * both transport and collisions are applied normally
-
-        * **Boundary Point**:
-
-          * no collision step
-          * additional reflection step after every transport step
-
-        * **Ghost Boundary Point**:
-
-          * for higher order transport
-          * so far undetermined behaviour
-
-        * **Constant Input/Output Point**:
-
-          * no collision-step
-          * no transport-step
-          * Distribution is constant over the whole simulation.
-
-        * **Time Variant Input/Output Point**:
-
-          * no collision-step,
-          * no transport-step,
-          * Distribution is freshly initialized in every time step
-
+        For each :class:`P-Grid <boltzmann.configuration.Grid>` point p,
+        :attr:`init_arr` [p] is the index of its
+        :class:`initialization rule <Rule>` in :attr:`rule_arr`.
     """
     def __init__(self,
-                 cnf=b_cnf.Configuration()):
-        self._cnf = cnf
-        self._rule_arr = np.empty(shape=(0,), dtype=b_rul.Rule)
+                 configuration=None):
+        if configuration is not None:
+            assert isinstance(configuration, b_cnf.Configuration)
+            configuration.check_integrity(complete_check=False)
+            self._cnf = configuration
+        else:
+            self._cnf = None
+
+        self.rule_arr = np.empty(shape=(0,), dtype=b_rul.Rule)
+
+        # Todo _block_index is ugly. This should be simpler
+        # Todo block_index can probably be removed
         n_categories = len(b_const.SUPP_GRID_POINT_CATEGORIES)
         self._block_index = np.zeros(shape=(n_categories + 1,),
                                      dtype=int)
-        p_shape = tuple(self.cnf.p.n)
-        self._p_flag = np.full(shape=p_shape,
-                               fill_value=-1,
-                               dtype=int)
+        # initialize initialization array for P-Grid
+        # default value -1 means no initialization rule applies to the point
+        self.init_arr = np.full(shape=self._cnf.p.size,
+                                fill_value=-1,
+                                dtype=int)
+        # Todo be very careful, when adding more categories
+        assert len(b_const.SUPP_GRID_POINT_CATEGORIES) is 1
         return
-
-    @property
-    def cnf(self):
-        """:obj:`~boltzmann.configuration.Configuration`:
-        Points to the :obj:`~boltzmann.configuration.Configuration`."""
-        return self._cnf
 
     @property
     def block_index(self):
@@ -100,32 +93,17 @@ class Initialization:
         return self._block_index
 
     @property
-    def p_flag(self):
-        """:obj:`~numpy.ndarray` of :obj:`int`:
-        Controls the behavior of each
-        P-:class:`~boltzmann.configuration.Grid` point
-        during
-        :class:`~boltzmann.calculation.Calculation`
-        and its initial values.
-
-        For each P-:class:`~boltzmann.configuration.Grid` point p,
-        :attr:`p_flag` [p] is the index of its
-        Initialization :class:`Rule` in :attr:`rule_arr`.
+    def n_rules(self):
+        """:obj:`int` :
+        Total number of :class:`Rules <Rule>` set up so far.
         """
-        return self._p_flag
-
-    @property
-    def rule_arr(self):
-        """:obj:`~numpy.ndarray` of :obj:`Rule` :
-        Array of all specified construction Rules (see :class:`Rule` ).
-        Sorted by Rule Category (see
-        :const:`~boltzmann.constants.SUPP_GRID_POINT_CATEGORIES`).
-        """
-        return self._rule_arr
+        return self.rule_arr.size
 
     #####################################
     #           Configuration           #
     #####################################
+    # Todo check here and in Rule that all conserved quantities are np.ndarrays
+    # Todo => Don't allow lists
     def add_rule(self,
                  category,
                  rho,
@@ -133,156 +111,130 @@ class Initialization:
                  temp,
                  name=None,
                  color=None):
-        """Adds a new initialization
-        :class:`Rule` to  :attr:`rule_arr`.
-
-        The added :class:`Rule`
-        initializes the velocity space of each specimen
-        (see :obj:`~boltzmann.configuration.Species`,
-        :obj:`~boltzmann.configuration.SVGrid`)
-        based on the conserved quantities
-
-            * Mass (:attr:`Rule.rho`),
-            * Mean Velocity (:attr:`Rule.drift`)
-            * Temperature (:attr:`Rule.temp`)
+        """Adds a new :class:`initialization rules <Rule>`
+        to  :attr:`rule_arr`.
 
         Parameters
         ----------
         category : :obj:`str`
             Category of the :class:`P-Grid <boltzmann.configuration.Grid>`
-            point.
-            Must be in
+            point. Must be in
             :const:`~boltzmann.constants.SUPP_GRID_POINT_CATEGORIES`.
-        rho : :obj:`list` [:obj:`float`]
-            Is converted into :class:`~numpy.ndarray` :attr:`rho`.
-        drift : :obj:`list` [:obj:`float`]
-            Is converted into :class:`~numpy.ndarray` :attr:`drift`.
-        temp : :obj:`list` [:obj:`float`]
-            Is converted into :class:`~numpy.ndarray` :attr:`temp`.
+        rho : :obj:`~numpy.ndarray` [:obj:`float`]
+        drift : :obj:`~numpy.ndarray` [:obj:`float`]
+        temp : :obj:`~numpy.ndarray` [:obj:`float`]
         name : str, optional
             Displayed in the GUI to visualize the initialization.
         color : str, optional
             Displayed in the GUI to visualize the initialization.
         """
-        assert category in b_const.SUPP_GRID_POINT_CATEGORIES
-        i_cat = b_const.SUPP_GRID_POINT_CATEGORIES.index(category)
+        # Todo move into check parameters method
+        # Assert correct types
+        assert isinstance(rho, np.ndarray)
+        assert isinstance(drift, np.ndarray)
+        assert isinstance(temp, np.ndarray)
+        # Assert conserved quantities have correct shape
+        assert np.array(rho).shape == (self._cnf.s.n,)
+        assert np.array(drift).shape == (self._cnf.s.n, self._cnf.sv.dim)
+        assert np.array(temp).shape == (self._cnf.s.n,)
         # Construct new_rule -> Depending on Category
-        if category == 'Inner Point':
-            new_rule = b_rul.Rule(category,
-                                  rho,
-                                  drift,
-                                  temp,
-                                  name,
-                                  color)
-        else:
-            msg = 'Unspecified Category: {}'.format(category)
-            raise NotImplementedError(msg)
+        i_cat = b_const.SUPP_GRID_POINT_CATEGORIES.index(category)
+        new_rule = b_rul.Rule(category,
+                              rho,
+                              drift,
+                              temp,
+                              name,
+                              color)
 
+        # Put new rule in right position
+        # rule array is ordered in blocks of rule_categories
         pos_of_rule = self.block_index[i_cat+1]
         # Insert new rule into rule array
-        self._rule_arr = np.insert(self.rule_arr,
-                                   pos_of_rule,
-                                   [new_rule])
-        # Adjust p_flag entries to new rule_arr
-        for _val in np.nditer(self._p_flag,
-                              op_flags=['readwrite']):
-            if _val >= pos_of_rule:
-                _val += 1
-        # Adjust block_index to new rule_arr
-        for _val in np.nditer(self._block_index[1:],
-                              op_flags=['readwrite']):
-            if _val >= pos_of_rule:
-                _val += 1
+        self.rule_arr = np.insert(self.rule_arr,
+                                  pos_of_rule,
+                                  [new_rule])
+        # Adjust init_arr entries to new rule_arr indices
+        for (idx, val) in enumerate(self.init_arr):
+            if val >= pos_of_rule:
+                self.init_arr[idx] += 1
+        # Adjust block_index entries to new rule_arr indices
+        # Todo this should be more pythonic
+        n_categories = len(b_const.SUPP_GRID_POINT_CATEGORIES)
+        for idx in range(i_cat+1, n_categories + 1):
+            self._block_index[idx] += 1
         return
 
     def apply_rule(self,
-                   index_rule,
-                   p_min,
-                   p_max):
-        """Applies an initialization :obj:`Rule` from
-        :attr:`rule_arr`
-        to the specified points of the
-        P-:class:`~boltzmann.configuration.Grid`.
+                   array_of_grid_point_indices,
+                   rule_index):
+        """The specified
+        :class:`P-Grid <boltzmann.configuration.Grid>` points
+        will be initialized with the specified
+        :class:`initialization rule <Rule>`.
 
-        Sets the :attr:`p_flag` entry
-        of the specified
-        P-:class:`~boltzmann.configuration.Grid` points to index_rule.
-        Both their initial values and behaviour during
-        :class:`~boltzmann.calculation.Calculation`
-        is defined by that :obj:`Rule`.
-
-        Note that the :obj:`Rule` is applied to all
-        P-:class:`~boltzmann.configuration.Grid` points p,
-        such that
-        all(p_min <= p < p_max).
-        Indices are in vector form (not flattened).
+        This is done by setting the :attr:`init_arr` entries
+        of the  :class:`P-Grid <boltzmann.configuration.Grid>`
+        points in *array_of_grid_point_indices* to *rule_index*.
 
         Parameters
         ----------
-        index_rule : :obj:`int`
-            Index of the to be applied :obj:`Rule` in
-            :attr:`rule_arr`.
-        p_min, p_max :  array_like of :obj:`int`
-            Boundary points, given as multiples of positional step size
-            (see :attr:`boltzmann.configuration.Grid.iG`).
-            Delimit/mark the area where to apply the rule.
+        array_of_grid_point_indices : :obj:`~numpy.ndarray` [:obj:`int`]
+            Indices (1D) of all :class:`P-Grid <boltzmann.configuration.Grid>`
+            points on which the :class:`initialization rule <Rule>`
+            should be applied.
+        rule_index : :obj:`int`
+            Index of the :class:`initialization rule <Rule>`
+            in :attr:`rule_arr`.
         """
-        assert 0 <= index_rule < self.block_index[-1]
-        dim = self.cnf.p.dim
-        p_min = np.array(p_min)
-        p_max = np.array(p_max)
-        assert p_min.shape == (dim,) and p_max.shape == (dim,)
-        assert p_min.dtype == int and p_max.dtype == int
-        assert all(np.zeros(p_min.shape) <= p_min)
-        assert all(p_min <= p_max)
-        assert all(p_max <= self.cnf.p.n)
+        assert isinstance(array_of_grid_point_indices, np.ndarray)
+        assert array_of_grid_point_indices.dtype == int
+        assert np.min(array_of_grid_point_indices) >= 0
+        assert np.max(array_of_grid_point_indices) < self._cnf.p.size
 
-        if dim is 1:
-            self._p_flag[p_min[0]:p_max[0]] = index_rule
-        elif dim is 2:
-            self._p_flag[p_min[0]:p_max[0],
-                         p_min[1]:p_max[1]] = index_rule
-        elif dim is 3:
-            self._p_flag[p_min[0]:p_max[0],
-                         p_min[1]:p_max[1],
-                         p_min[2]:p_max[2]] = index_rule
+        assert isinstance(rule_index, int)
+        assert 0 <= rule_index < self.n_rules
+
+        for p in array_of_grid_point_indices:
+            self.init_arr[p] = rule_index
         return
 
+    # Todo link PSV Grid to Calculation.data -> explain what psv grid is there
+    # Todo Alternatively rename psv-Grid into data_array
     def create_psv_grid(self):
         """Generates and returns an initialized PSV-Grid
         (:attr:`~boltzmann.calculation.Calculation.data`,
         :attr:`~boltzmann.calculation.Calculation.result`).
 
-        Checks the entry of :attr:`p_flag` and gets the
-        initialization :obj:`Rule` for every P-Grid point p.
-        Initializes the Distribution
-        in the Velocity-Space of p as defined in the :obj:`Rule`.
+        Checks the entries of :attr:`init_arr` and uses that
+        :class:`initialization rule <Rule>` to initialize the
+        :class:`P-Grid <boltzmann.configuration.Grid>` points
+        velocity Grid.
 
         Returns
         -------
-        psv : :class:`~numpy.ndarray` of :obj:`float`
+        psv : :class:`~numpy.ndarray` [:obj:`float`]
             The initialized PSV-Grid.
             Array of shape
-            (:attr:`~boltzmann.configuration.Configuration.p`.size,
-            :attr:`~boltzmann.configuration.Configuration.sv`.size).
+            (:attr:`cnf.p.size
+            <boltzmann.configuration.Grid.size>`,
+            :attr:`cnf.sv.size
+            <boltzmann.configuration.SVGrid.size>`).
         """
         self.check_integrity()
-        shape = (self.cnf.p.iG.shape[0], self.cnf.sv.iMG.shape[0])
-        # Todo Find nicer way to iterate over whole P-Space
-        p_flat = self.p_flag.flatten()
-        assert p_flat.size == self.cnf.p.size
-        psv = np.zeros(shape=shape, dtype=float)
+        assert self.init_arr.size == self._cnf.p.size
+        psv = np.zeros(shape=(self._cnf.p.size, self._cnf.sv.size),
+                       dtype=float)
         # set Velocity Grids for all specimen
-        for i_p in range(p_flat.size):
+        for (i_p, i_rule) in enumerate(self.init_arr):
             # get active rule
-            r = self.rule_arr[p_flat[i_p]]
+            r = self.rule_arr[i_rule]
             # Todo - simply call r_apply method?
-            for i_s in range(self.cnf.s.n):
+            for i_s in range(self._cnf.s.n):
                 rho = r.rho[i_s]
                 temp = r.temp[i_s]
-                [begin, end] = self.cnf.sv.range_of_indices(i_s)
-                v_grid = self.cnf.sv.iMG[begin:end]
-                dv = self.cnf.sv.vGrids[i_s].d
+                [begin, end] = self._cnf.sv.range_of_indices(i_s)
+                v_grid = self._cnf.sv.iMG[begin:end]
+                dv = self._cnf.sv.vGrids[i_s].d
                 for (i_v, v) in enumerate(v_grid):
                     # Physical Velocity
                     pv = dv * v
@@ -301,32 +253,39 @@ class Initialization:
     #####################################
     def check_integrity(self):
         """Sanity Check"""
-        assert self.rule_arr.dtype == b_rul.Rule
-        for (i_r, r) in enumerate(self.rule_arr):
-            r.check_integrity()
-            assert i_r >= self.block_index[r.i_cat]
-            assert i_r < self.block_index[r.i_cat+1]
-        assert self.rule_arr.shape == (self.block_index[-1],)
-        # A change of this length needs several changes in this module
-        # and its submodules
-        assert len(b_const.SUPP_GRID_POINT_CATEGORIES) is 1
-        n_categories = len(b_const.SUPP_GRID_POINT_CATEGORIES)
-        assert self.block_index.size == n_categories + 1
-        assert self.p_flag.size == self.cnf.p.iG.shape[0]
-        assert self.p_flag.dtype == int
-        assert np.min(self.p_flag) >= 0, \
+        assert isinstance(self.rule_arr, np.ndarray)
+        assert self.rule_arr.ndim == 1
+        assert self.n_rules == self.block_index[-1]
+        for (i_r, rule) in enumerate(self.rule_arr):
+            assert isinstance(rule, b_rul.Rule)
+            rule.check_integrity()
+            # assert right shape of conserved quantities
+            assert rule.rho.shape == (self._cnf.s.n,)
+            assert rule.drift.shape == (self._cnf.s.n, self._cnf.sv.dim)
+            assert rule.temp.shape == (self._cnf.s.n,)
+            # Todo this could be removed if block_index is obsolete
+            assert i_r >= self.block_index[rule.i_cat]
+            assert i_r < self.block_index[rule.i_cat+1]
+
+        assert self.init_arr.size == self._cnf.p.size
+        assert self.init_arr.dtype == int
+        assert np.min(self.init_arr) >= 0, \
             'Positional Grid is not properly initialized.' \
             'Some Grid points have no initialization rule!'
-        assert np.max(self.p_flag) <= self.rule_arr.size - 1, \
+        assert np.max(self.init_arr) < self.n_rules, \
             'Undefined Rule! A P-Grid point is set ' \
             'to be initialized by an undefined initialization rule. ' \
             'Either add the respective rule, or choose an existing rule.'
+
+        n_categories = len(b_const.SUPP_GRID_POINT_CATEGORIES)
+        assert self.block_index.size == n_categories + 1
         return
 
+    # Todo change into __str__ method
     def print(self, physical_grid=False):
         """Prints all Properties for Debugging Purposes
 
-        If physical_grid is True, then :attr:`p_flag` is printed."""
+        If physical_grid is True, then :attr:`init_arr` is printed."""
         print('\n=======INITIALIZATION=======\n')
         print('Number of Rules = '
               '{}'.format(self.rule_arr.shape[0]))
@@ -344,5 +303,5 @@ class Initialization:
                 r.print(b_const.SUPP_GRID_POINT_CATEGORIES)
         if physical_grid:
             print('Flag-Grid of P-Space:')
-            print(self.p_flag)
+            print(self.init_arr)
         return
