@@ -165,9 +165,10 @@ class Calculation:
             # generate Output and write it to disk
             self.f_out.apply(self)
 
-        print("Calculating...Done                      \n"
-              "Time taken =  {} seconds"
-              "".format(round(time() - self._cal_time, 3)))
+        time_taken_in_seconds = int(time() - self._cal_time)
+        # large number of spaces necessary to overwrite the old terminal lines
+        print('Calculating... Done' + 40*' ' + '\n'
+              'Time taken = ' + self._format_time(time_taken_in_seconds))
         return
 
     def _calculate_time_step(self):
@@ -181,13 +182,25 @@ class Calculation:
 
     def _print_time_estimate(self):
         """Prints an estimate of the remaining time to the terminal"""
-        remaining_steps = self.cnf.t.iG[-1, 0] - self.t_cur
+        rem_steps = self.cnf.t.iG[-1, 0] - self.t_cur
         est_step_duration = (time() - self._cal_time) / self.t_cur
-        estimated_time = round(remaining_steps * est_step_duration, 1)
-        print('Calculating...{}'
-              ''.format(estimated_time),
+        est_time_in_seconds = int(rem_steps * est_step_duration)
+        print('Calculating... '
+              + self._format_time(est_time_in_seconds)
+              + ' remaining',
               end='\r')
         return
+
+    @staticmethod
+    def _format_time(t_in_seconds):
+        (days, t_in_seconds) = divmod(t_in_seconds, 86400)
+        (hours, t_in_seconds) = divmod(t_in_seconds, 3600)
+        (minutes, t_in_seconds) = divmod(t_in_seconds, 60)
+        t_string = '{:2d}d {:2d}h {:2d}m {:2d}s'.format(days,
+                                                        hours,
+                                                        minutes,
+                                                        t_in_seconds)
+        return t_string
 
     def _calculate_collision_step(self):
         """Executes a single collision step on complete P-Grid"""
