@@ -31,6 +31,68 @@ class Animation:
         self._writer = mpl_ani.writers['ffmpeg'](fps=15, bitrate=1800)
         return
 
+    def snapshot(self,
+                 time_step,
+                 moment_array=None,
+                 specimen_array=None,
+                 file_name=None,
+                 # Todo p_space -> cut of boundary effects,
+                 # Todo color -> color some Specimen differently,
+                 # Todo legend -> setup legend in the image?
+                 ):
+        """Creates a vector plot of the simulation
+        at the desired time_step.
+        Saves the file as *file_name*.eps in the Simulation folder.
+
+        Parameters
+        ----------
+        time_step : :obj:`int`
+        specimen_array : :obj:`~numpy.ndarray`  [:class:`~boltzmann.configuration.Specimen`], optional
+        moment_array : :obj:`~numpy.ndarray` [:obj:`str`], optional
+        file_name : :obj:`str`, optional
+            File name of the vector image.
+        """
+        # Todo Reasonable asserts for time_step
+        if specimen_array is None:
+            specimen_array = self._cnf.s.specimen_array
+        assert isinstance(specimen_array, np.ndarray)
+        assert specimen_array.ndim == 1
+        assert all([isinstance(specimen, b_spm.Specimen)
+                    for specimen in specimen_array])
+        if moment_array is None:
+            moment_array = self._cnf.animated_moments
+        else:
+            assert isinstance(moment_array, np.ndarray)
+            assert all([moment in self._cnf.animated_moments.flatten()
+                        for moment in moment_array])
+        if file_name is None:
+            file_name = (self._cnf.file_address[0:-4]
+                         + '_t={}.eps'.format(time_step))
+        else:
+            # Todo are the reasonable checks?
+            pass
+        # Set up the figure, subplots and lines
+        figure = self.setup_figure()
+        axes = self.setup_axes(figure, moment_array)
+        lines = self.setup_lines(axes,
+                                 specimen_array)
+        self.setup_legend(figure,
+                          lines,
+                          specimen_array)
+
+        # Get data from the hdf5-file and set up the lines
+        species_names = [specimen.name for specimen in specimen_array]
+        moments_flat = moment_array.flatten()
+        hdf_group = h5py.File(self._cnf.file_address, mode='r')["Results"]
+        for (s_idx, specimen) in enumerate(species_names):
+            for (m_idx, moment) in enumerate(moments_flat):
+                result_t = hdf_group[specimen][moment][time_step]
+                lines[m_idx, s_idx].set_data(self._cnf.p.pG,
+                                             result_t)
+        # save the plot
+        figure.savefig(file_name, format='eps')
+        return
+
     def animate(self,
                 moment_array=None,
                 specimen_array=None):
@@ -57,6 +119,7 @@ class Animation:
         ani_time = time()
         print('Animating....',
               end='\r')
+        # Set up the figure, subplots and lines
         figure = self.setup_figure()
         axes = self.setup_axes(figure, moment_array)
         lines = self.setup_lines(axes,
@@ -330,41 +393,3 @@ class Animation:
                       mode='expand',
                       borderaxespad=0.5)
         return
-
-# Todo Add Snapshot functionality
-    # def snapshot(self,
-    #              file_name_snapshot,
-    #              time_step,
-    #              species_list,
-    #              moment_array,
-    #              # Todo p_space -> cut of boundary effects,
-    #              # Todo color -> color some Specimen differently,
-    #              # Todo legend -> setup legend in the image?
-    #              ):
-    #     """Creates a vector plot of the simulation aof the desired parameters.
-    #     Saves the file as *file_name*.eps in the Simulation folder.
-    #
-    #     Parameters
-    #     ----------
-    #     file_name_snapshot : :obj:`str`
-    #         File name of the vector image.
-    #     time_step : :obj:`int`
-    #     species_list : :list: [:class:`~boltzmann.configuration.Specimen`]
-    #     moment_array : :obj:`~numpy.ndarray` [:obj:`str`]
-    #     """
-    #     # self._setup_figure()
-    #     # self._setup_axes()
-    #     # self._setup_lines()
-    #     # self._setup_legend()
-    #     assert isinstance(species_list, list)
-    #     assert all([isinstance(specimen, b_spm.Specimen)
-    #                 for specimen in species_list])
-    #     assert isinstance(moment_array, np.ndarray)
-    #     assert all([moment in b_const.SUPP_OUTPUT
-    #                 for moment in moment_array.flatten()])
-    #     species_names = [specimen.name for specimen in species_list]
-    #     moments = moment_array.flatten()
-    #     hdf_group = h5py.File(self._cnf.file_address, mode='r')["Results"]
-    #     for specimen in species_names:
-    #         for moment in moments:
-    #             result = hdf_group[specimen][moment][time_step]
