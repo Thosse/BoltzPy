@@ -35,7 +35,6 @@ class Animation:
         self._cnf = cnf
         self._save_animation = save_animation
         self._writer = mpl_ani.writers['ffmpeg'](fps=15, bitrate=1800)
-        self._axes = np.zeros((0,), dtype=object)
         self._lines = np.zeros((0,), dtype=object)
         return
 
@@ -46,8 +45,8 @@ class Animation:
         print('Animating....',
               end='\r')
         figure = self.create_figure()
-        self._setup_axes(figure)
-        self._setup_lines()
+        axes = self.create_axes(figure, self._cnf.animated_moments)
+        self._setup_lines(axes)
         self._setup_legend(figure)
         self._animate(figure)
         print('Animating....Done\n'
@@ -86,36 +85,58 @@ class Animation:
                             dpi=dpi)
         return figure
 
-    def _setup_axes(self,
-                    figure):
-        """Sets up Subplots (Position and Preferences)
+    def create_axes(self,
+                    figure,
+                    moments_array):
+        """
+        Sets up the subplots, their position in the *figure* and basic
+        preferences for all moments in *moments_array*.
 
-        For each animated moment there is a separate coordinate system (axes)
-        in which that moment is animated for all specimen.
-        This Method specifies the position, the range of values
-        and the title for each of these axes.
+        * Creates separate coordinate systems (axes) for all moments.
+          Each coordinate systems contains the lines of all :class:`Specimen`.
+        * Specifies the position, the range of values
+          and the title for each of each subplot / ax.
+
+        Parameters
+        ----------
+        figure : :obj:`matplotlib.pyplot.figure`
+        moments_array : :obj:`~numpy.ndarray` [:obj:`str`]
+
+        Returns
+        -------
+        :obj:`~numpy.ndarray` [:obj:`matplotlib.axes._subplots.AxesSubplot`]
         """
         if self._cnf.p.dim is not 1:
             message = 'Animation is currently only implemented ' \
                       'for 1D Problems'
             raise NotImplementedError(message)
-        # list of all subplots
-        axes = []
-        moments = self._cnf.animated_moments.flatten()
-        shape = self._cnf.animated_moments.shape
-        for (i_m, moment) in enumerate(moments):
+        assert isinstance(figure, plt.Figure)
+        assert isinstance(moments_array, np.ndarray)
+        assert all([moment in self._cnf.animated_moments.flatten()
+                    for moment in moments_array.flatten()])
+        # array of all subplots
+        axes = np.empty(shape=moments_array.size,
+                        dtype=object)
+        moments_flat = moments_array.flatten()
+        shape = moments_array.shape
+        for (i_m, moment) in enumerate(moments_flat):
+            # subplot are placed in a matrix grid
+            (rows, columns) = shape
             # subplots begin counting at 1
-            ax = figure.add_subplot(shape[0], shape[1], i_m + 1)
+            # flat index in the matrix grid, iterates over rows
+            place = i_m + 1
+            ax = figure.add_subplot(rows,
+                                    columns,
+                                    place)
             # set range of X-axis
             self._set_range(ax)
             # set range of Y-axis, based on occurring values in data
             self._set_val_limits(ax, moment)
-            # give subplots titles
+            # add Titles to subplot
             ax.set_title(moment)
             self._set_tick_labels(ax, i_m)
-            axes.append(ax)
-        self._axes = np.array(axes)
-        return
+            axes[i_m] = ax
+        return axes
 
     def _set_range(self, ax):
         if self._cnf.p.dim != 1:
@@ -174,7 +195,8 @@ class Animation:
             ax.set_xticklabels([])
         return
 
-    def _setup_lines(self):
+    def _setup_lines(self,
+                     axes):
         """ Sets up Plot lines
 
         For each pair of (animated moment, specimen)
@@ -194,11 +216,11 @@ class Animation:
             moment_lines = []
             for s in range(self._cnf.s.n):
                 # initialize line without any data
-                line = self._axes[m].plot([],
-                                          [],
-                                          linestyle='-',
-                                          color=self._cnf.s.colors[s],
-                                          linewidth=2)
+                line = axes[m].plot([],
+                                    [],
+                                    linestyle='-',
+                                    color=self._cnf.s.colors[s],
+                                    linewidth=2)
                 # plot returns a tuple, we only need the first element
                 line = line[0]
                 moment_lines.append(line)
@@ -251,3 +273,41 @@ class Animation:
                 lines[i_m, i_s].set_data(self._cnf.p.pG,
                                          result_t)
         return lines
+
+# Todo Add Snapshot functionality
+    # def snapshot(self,
+    #              file_name_snapshot,
+    #              time_step,
+    #              species_list,
+    #              moments_array,
+    #              # Todo p_space -> cut of boundary effects,
+    #              # Todo color -> color some Specimen differently,
+    #              # Todo legend -> setup legend in the image?
+    #              ):
+    #     """Creates a vector plot of the simulation aof the desired parameters.
+    #     Saves the file as *file_name*.eps in the Simulation folder.
+    #
+    #     Parameters
+    #     ----------
+    #     file_name_snapshot : :obj:`str`
+    #         File name of the vector image.
+    #     time_step : :obj:`int`
+    #     species_list : :list: [:class:`~boltzmann.configuration.Specimen`]
+    #     moments_array : :obj:`~numpy.ndarray` [:obj:`str`]
+    #     """
+    #     # self._setup_figure()
+    #     # self._setup_axes()
+    #     # self._setup_lines()
+    #     # self._setup_legend()
+    #     assert isinstance(species_list, list)
+    #     assert all([isinstance(specimen, b_spm.Specimen)
+    #                 for specimen in species_list])
+    #     assert isinstance(moments_array, np.ndarray)
+    #     assert all([moment in b_const.SUPP_OUTPUT
+    #                 for moment in moments_array.flatten()])
+    #     species_names = [specimen.name for specimen in species_list]
+    #     moments = moments_array.flatten()
+    #     hdf_group = h5py.File(self._cnf.file_address, mode='r')["Results"]
+    #     for specimen in species_names:
+    #         for moment in moments:
+    #             result = hdf_group[specimen][moment][time_step]

@@ -6,10 +6,12 @@
 #: If only a file name is given, then the file will be located in this folder.
 DEFAULT_SIMULATION_PATH = __file__[:-22] + 'Simulations/'
 
-#: :obj:`tuple` [:obj:`int`] : Default ratio for plots in :class:`~boltzmann.animation.Animation`.
+#: :obj:`tuple` [:obj:`int`] : Default aspect ratio for plots in
+#: :class:`~boltzmann.animation.Animation`.
 DEFAULT_FIGSIZE = (16, 9)
 
-#: :obj:`int` : Default Resolution for plots in :class:`~boltzmann.animation.Animation`.
+#: :obj:`int` : Default Resolution for plots in
+#: :class:`~boltzmann.animation.Animation`.
 DEFAULT_DPI = 300
 
 # TODO SUPPORTED_SHAPE_OF_ANIMATION_GRID
