@@ -4,6 +4,8 @@ from boltzmann.configuration import specimen as b_spm
 import boltzmann.constants as b_const
 
 from time import time
+import matplotlib.axes as mpl_axes
+import matplotlib.lines as mpl_lines
 import matplotlib.pyplot as plt
 import matplotlib.animation as mpl_ani
 import h5py
@@ -35,7 +37,6 @@ class Animation:
         self._cnf = cnf
         self._save_animation = save_animation
         self._writer = mpl_ani.writers['ffmpeg'](fps=15, bitrate=1800)
-        self._lines = np.zeros((0,), dtype=object)
         return
 
     def run(self):
@@ -46,9 +47,10 @@ class Animation:
               end='\r')
         figure = self.create_figure()
         axes = self.create_axes(figure, self._cnf.animated_moments)
-        self._setup_lines(axes)
-        self._setup_legend(figure)
-        self._animate(figure)
+        lines = self.create_lines(axes,
+                                  self._cnf.s.specimen_array)
+        self._setup_legend(figure, lines)
+        self._animate(figure, lines)
         print('Animating....Done\n'
               'Time taken =  {} seconds'
               '\n'.format(round(time() - ani_time, 3)))
@@ -104,7 +106,7 @@ class Animation:
 
         Returns
         -------
-        :obj:`~numpy.ndarray` [:obj:`matplotlib.axes._subplots.AxesSubplot`]
+        :obj:`~numpy.ndarray` [:obj:`matplotlib.axes.Axes`]
         """
         if self._cnf.p.dim is not 1:
             message = 'Animation is currently only implemented ' \
@@ -128,6 +130,7 @@ class Animation:
             ax = figure.add_subplot(rows,
                                     columns,
                                     place)
+            # Todo properly document / remove submethods
             # set range of X-axis
             self._set_range(ax)
             # set range of Y-axis, based on occurring values in data
@@ -195,48 +198,63 @@ class Animation:
             ax.set_xticklabels([])
         return
 
-    def _setup_lines(self,
-                     axes):
-        """ Sets up Plot lines
+    def create_lines(self,
+                     axes_array,
+                     specimen_array):
+        """Sets up the plot lines.
 
-        For each pair of (animated moment, specimen)
-        there is a separate line to be plotted.
-        Since ach one of those lines is a separate plot,
-        it contains data which is updated for each new frame.
-        This date is located in :attr:`_lines`.
+        Creates a plot-line for each :class:`~boltzmann.configuration.Specimen`
+        in each ax of *axes_array*.
+        Each line is a separate plot containing data,
+        which can be updated if necessary
+        (:meth:`animated plot <run>`).
+
+        Parameters
+        ----------
+        axes_array : :obj:`~numpy.ndarray` [:obj:`matplotlib.axes.Axes`]
+        specimen_array : :obj:`~numpy.ndarray` [:class:`~boltzmann.configuration.Specimen`]
+
+        Returns
+        -------
+        :obj:`~numpy.ndarray` [:obj:`matplotlib.lines.Line2D`]
         """
         if self._cnf.p.dim is not 1:
             message = 'Animation is currently only implemented ' \
                       'for 1D Problems' \
                       'This needs to be done for 3D plots'
             raise NotImplementedError(message)
-        lines = []
-        moments = self._cnf.animated_moments.flatten()
-        for (m, moment) in enumerate(moments):
-            moment_lines = []
-            for s in range(self._cnf.s.n):
+        assert isinstance(axes_array, np.ndarray)
+        assert all([isinstance(ax, mpl_axes.Axes)
+                    for ax in axes_array])
+        assert isinstance(specimen_array, np.ndarray)
+        assert specimen_array.ndim == 1
+        assert all([isinstance(specimen, b_spm.Specimen)
+                    for specimen in specimen_array])
+        lines = np.empty(shape=(axes_array.size, specimen_array.size),
+                         dtype=object)
+        for (ax_idx, ax) in enumerate(axes_array):
+            for (s_idx, specimen) in enumerate(specimen_array):
                 # initialize line without any data
-                line = axes[m].plot([],
-                                    [],
-                                    linestyle='-',
-                                    color=self._cnf.s.colors[s],
-                                    linewidth=2)
-                # plot returns a tuple, we only need the first element
-                line = line[0]
-                moment_lines.append(line)
-            lines.append(moment_lines)
-        self._lines = np.array(lines)
-        return
+                line = ax.plot([],
+                               [],
+                               linestyle='-',
+                               color=specimen.color,
+                               linewidth=2)
+                # plot returns a tuple of lines
+                # in this case its a tuple with only one element
+                lines[ax_idx, s_idx] = line[0]
+        return lines
 
     def _setup_legend(self,
-                      figure):
+                      figure,
+                      lines):
         # List of Species-Names
         names = self._cnf.s.names
         # Position of the Legend in the figure
         location = 'lower center'
         # number of columns in Legend
         n_columns = self._cnf.s.n
-        figure.legend(self._lines[0, :],
+        figure.legend(lines[0, :],
                       names,
                       loc=location,
                       ncol=n_columns,
@@ -246,10 +264,10 @@ class Animation:
         return
 
     # Todo Move back into run method
-    def _animate(self, figure):
+    def _animate(self, figure, lines):
         ani = mpl_ani.FuncAnimation(figure,
                                     self._update_data,
-                                    fargs=(self._lines,),
+                                    fargs=(lines,),
                                     # Todo speed up!
                                     # init_func=init
                                     frames=self._cnf.t.size,
