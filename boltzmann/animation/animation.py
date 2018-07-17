@@ -1,4 +1,8 @@
 
+
+from boltzmann.configuration import specimen as b_spm
+import boltzmann.constants as b_const
+
 from time import time
 import matplotlib.pyplot as plt
 import matplotlib.animation as mpl_ani
@@ -7,8 +11,15 @@ import h5py
 import numpy as np
 
 
+# Todo Check what happens if animation is not saved / snapshot is taken
+# Todo may need specific DPI for snapshots. un-saved animation is not important
+# if self._save_animation:
+#     self.dpi = 300
+# else:
+#     self.dpi = 100
+# Todo remove _save_animation -> always save animation
 class Animation:
-    """Handles Animation of the Results
+    """Handles the visualization of the results.
 
     Sets up :obj:`matplotlib.animation` object
     with a separate subplot for each animated moment
@@ -23,13 +34,7 @@ class Animation:
                  save_animation=True):
         self._cnf = cnf
         self._save_animation = save_animation
-        self.fig_size = (16, 9)
-        if self._save_animation:
-            self.dpi = 300
-        else:
-            self.dpi = 100
         self._writer = mpl_ani.writers['ffmpeg'](fps=15, bitrate=1800)
-        self._figure = plt.figure()
         self._axes = np.zeros((0,), dtype=object)
         self._lines = np.zeros((0,), dtype=object)
         return
@@ -40,26 +45,49 @@ class Animation:
         ani_time = time()
         print('Animating....',
               end='\r')
-        self._setup_figure()
-        self._setup_axes()
+        figure = self.create_figure()
+        self._setup_axes(figure)
         self._setup_lines()
-        self._setup_legend()
-        self._animate()
+        self._setup_legend(figure)
+        self._animate(figure)
         print('Animating....Done\n'
               'Time taken =  {} seconds'
               '\n'.format(round(time() - ani_time, 3)))
         return
 
-    def _setup_figure(self):
+    def create_figure(self, figsize=None, dpi=None):
+        """Creates a :obj:`matplotlib.pyplot.figure` object and sets up its
+        basic attributes (figsize, dpi).
+
+        Parameters
+        ----------
+        figsize : :obj:`tuple` [:obj:`int`], optional
+        dpi : :obj:`int`, optional
+
+        Returns
+        -------
+        :obj:`matplotlib.pyplot.figure`
+        """
         if self._cnf.p.dim is not 1:
             message = 'Animation is currently only implemented ' \
                       'for 1D Problems'
             raise NotImplementedError(message)
-        self._figure = plt.figure(figsize=self.fig_size,
-                                  dpi=self.dpi)
-        return
+        if figsize is None:
+            figsize = b_const.DEFAULT_FIGSIZE
+        else:
+            assert isinstance(figsize, tuple)
+            assert all([isinstance(_, int) and _ > 0
+                        for _ in figsize])
+            assert len(figsize) == 2
+        if dpi is None:
+            dpi = b_const.DEFAULT_DPI
+            assert isinstance(dpi, int)
+        figure = plt.figure(figsize=figsize,
+                            dpi=dpi)
+        return figure
 
-    def _setup_axes(self):
+    def _setup_axes(self,
+                    figure):
         """Sets up Subplots (Position and Preferences)
 
         For each animated moment there is a separate coordinate system (axes)
@@ -77,7 +105,7 @@ class Animation:
         shape = self._cnf.animated_moments.shape
         for (i_m, moment) in enumerate(moments):
             # subplots begin counting at 1
-            ax = self._figure.add_subplot(shape[0], shape[1], i_m + 1)
+            ax = figure.add_subplot(shape[0], shape[1], i_m + 1)
             # set range of X-axis
             self._set_range(ax)
             # set range of Y-axis, based on occurring values in data
@@ -178,24 +206,26 @@ class Animation:
         self._lines = np.array(lines)
         return
 
-    def _setup_legend(self):
+    def _setup_legend(self,
+                      figure):
         # List of Species-Names
         names = self._cnf.s.names
         # Position of the Legend in the figure
         location = 'lower center'
         # number of columns in Legend
         n_columns = self._cnf.s.n
-        self._figure.legend(self._lines[0, :],
-                            names,
-                            loc=location,
-                            ncol=n_columns,
-                            # expand legend horizontally
-                            mode='expand',
-                            borderaxespad=0.5)
+        figure.legend(self._lines[0, :],
+                      names,
+                      loc=location,
+                      ncol=n_columns,
+                      # expand legend horizontally
+                      mode='expand',
+                      borderaxespad=0.5)
         return
 
-    def _animate(self, ):
-        ani = mpl_ani.FuncAnimation(self._figure,
+    # Todo Move back into run method
+    def _animate(self, figure):
+        ani = mpl_ani.FuncAnimation(figure,
                                     self._update_data,
                                     fargs=(self._lines,),
                                     # Todo speed up!
@@ -206,7 +236,7 @@ class Animation:
         if self._save_animation:
             ani.save(self._cnf.file_address[0:-4] + '.mp4',
                      self._writer,
-                     dpi=self.dpi)
+                     dpi=figure.dpi)
         else:
             plt.show()
         return
@@ -217,8 +247,7 @@ class Animation:
         file = h5py.File(self._cnf.file_address, mode='r')["Results"]
         for (i_s, specimen) in enumerate(species):
             for (i_m, moment) in enumerate(moments):
-                result = file[specimen][moment]
-                result_t = result[time_step]
+                result_t = file[specimen][moment][time_step]
                 lines[i_m, i_s].set_data(self._cnf.p.pG,
                                          result_t)
         return lines
