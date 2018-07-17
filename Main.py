@@ -8,7 +8,7 @@ import numpy as np
 
 
 print('Starting Time:\n' + str(datetime.now()) + '\n')
-cnf = b_cnf.Configuration("def_1")
+cnf = b_cnf.Configuration()
 if cnf.s.n == 0:
     cnf.add_specimen(mass=2, collision_rate=[50])
     cnf.add_specimen(mass=3, collision_rate=[50, 50])
@@ -40,7 +40,7 @@ ini.add_rule('Inner Point',
              np.array([1.0, 1.0]),
              name='Low Pressure')
 ini.apply_rule(np.arange(10, 21), 1)
-ini.print(True)
+ini.print()
 ini.save(cnf.file_address)
 
 cal = b_cal.Calculation(cnf, ini)
@@ -48,4 +48,5 @@ cal.run()
 
 ani = b_ani.Animation(cnf)
 
-ani.run()
+ani.animate(np.array([['Mass']]),
+            cnf.s.specimen_array[0:1])

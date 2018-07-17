@@ -22,42 +22,86 @@ import numpy as np
 class Animation:
     """Handles the visualization of the results.
 
-    Sets up :obj:`matplotlib.animation` object
-    with a separate subplot for each animated moment
-    and a separate line per specimen and moment.
-
     Parameters
     ----------
     cnf : :class:`~boltzmann.configuration.Configuration`
     """
-    def __init__(self,
-                 cnf,
-                 save_animation=True):
+    def __init__(self, cnf):
         self._cnf = cnf
-        self._save_animation = save_animation
         self._writer = mpl_ani.writers['ffmpeg'](fps=15, bitrate=1800)
         return
 
-    def run(self):
-        """Sets up Figure, creates animated plot
-        and either shows it or saves it to disk."""
+    def animate(self,
+                moment_array=None,
+                specimen_array=None):
+        """Creates animated plot and saves it to disk.
+
+        Sets up :obj:`matplotlib.animation.FuncAnimation` instance
+        based on a figure with separate subplots
+        for every moment in *moment_array*
+        and separate lines for every specimen and moment.
+        """
+        if moment_array is None:
+            moment_array = self._cnf.animated_moments
+        else:
+            assert isinstance(moment_array, np.ndarray)
+            assert all([moment in self._cnf.animated_moments.flatten()
+                        for moment in moment_array.flatten()])
+        if specimen_array is None:
+            specimen_array = self._cnf.s.specimen_array
+        else:
+            assert isinstance(specimen_array, np.ndarray)
+            assert specimen_array.ndim == 1
+            assert all([isinstance(specimen, b_spm.Specimen)
+                        for specimen in specimen_array])
         ani_time = time()
         print('Animating....',
               end='\r')
-        figure = self.create_figure()
-        axes = self.create_axes(figure, self._cnf.animated_moments)
-        lines = self.create_lines(axes,
-                                  self._cnf.s.specimen_array)
-        self.configure_legend(figure,
-                              lines,
-                              self._cnf.s.specimen_array)
-        self._animate(figure, lines)
+        figure = self.setup_figure()
+        axes = self.setup_axes(figure, moment_array)
+        lines = self.setup_lines(axes,
+                                 specimen_array)
+        self.setup_legend(figure,
+                          lines,
+                          specimen_array)
+        # Create Animation
+        ani = mpl_ani.FuncAnimation(figure,
+                                    self._update_data,
+                                    fargs=(lines,
+                                           specimen_array,
+                                           moment_array),
+                                    # Todo speed up!
+                                    # init_func=init
+                                    frames=self._cnf.t.size,
+                                    interval=1,
+                                    blit=False)
+        ani.save(self._cnf.file_address[0:-4] + '.mp4',
+                 self._writer,
+                 dpi=figure.dpi)
+
         print('Animating....Done\n'
               'Time taken =  {} seconds'
               '\n'.format(round(time() - ani_time, 3)))
         return
 
-    def create_figure(self, figsize=None, dpi=None):
+    def _update_data(self,
+                     time_step,
+                     lines,
+                     specimen_array,
+                     moment_array):
+        specimen_names = [specimen.name for specimen in specimen_array]
+        moments = moment_array.flatten()
+        file = h5py.File(self._cnf.file_address, mode='r')["Results"]
+        for (i_s, specimen) in enumerate(specimen_names):
+            for (i_m, moment) in enumerate(moments):
+                result_t = file[specimen][moment][time_step]
+                lines[i_m, i_s].set_data(self._cnf.p.pG,
+                                         result_t)
+        return lines
+
+    def setup_figure(self,
+                     figsize=None,
+                     dpi=None):
         """Creates a :obj:`matplotlib.pyplot.figure` object and sets up its
         basic attributes (figsize, dpi).
 
@@ -88,9 +132,9 @@ class Animation:
                             dpi=dpi)
         return figure
 
-    def create_axes(self,
-                    figure,
-                    moment_array):
+    def setup_axes(self,
+                   figure,
+                   moment_array):
         """
         Sets up the subplots, their position in the *figure* and basic
         preferences for all moments in *moment_array*.
@@ -132,6 +176,7 @@ class Animation:
                                       columns,
                                       place)
             # Todo properly document / remove submethods
+            # Todo Wait for this after implementing 2D Transport / P-Grids
             # set range of X-axis
             self._set_range(axes)
             # set range of Y-axis, based on occurring values in data
@@ -175,6 +220,8 @@ class Animation:
             raise NotImplementedError(message)
         min_val = 0
         max_val = 0
+        # Todo This should depend only on Specimen_array, not on cnf.s
+        # Todo Go to definition-> fix this
         species = self._cnf.s.names
         file = h5py.File(self._cnf.file_address, mode='r')["Results"]
         for specimen in species:
@@ -193,15 +240,17 @@ class Animation:
                       'for 1D Problems' \
                       'This needs to be done for 3D plots'
             raise NotImplementedError(message)
+        # Todo This should depend only on moment_array, not on cnf.s
+        # Todo Go to definition-> fix this
         shape = self._cnf.animated_moments.shape
         last_row = (shape[0]-1) * shape[1]
         if i_m < last_row:
             axes.set_xticklabels([])
         return
 
-    def create_lines(self,
-                     axes_array,
-                     specimen_array):
+    def setup_lines(self,
+                    axes_array,
+                    specimen_array):
         """Sets up the plot lines.
 
         Creates a plot-line for each :class:`~boltzmann.configuration.Specimen`
@@ -247,10 +296,10 @@ class Animation:
         return lines
 
     @staticmethod
-    def configure_legend(figure,
-                         line_array,
-                         specimen_array,
-                         loc='lower center'):
+    def setup_legend(figure,
+                     line_array,
+                     specimen_array,
+                     loc='lower center'):
         """Configures the legend of *figure*.
 
         Parameters
@@ -281,35 +330,6 @@ class Animation:
                       mode='expand',
                       borderaxespad=0.5)
         return
-
-    # Todo Move back into run method
-    def _animate(self, figure, lines):
-        ani = mpl_ani.FuncAnimation(figure,
-                                    self._update_data,
-                                    fargs=(lines,),
-                                    # Todo speed up!
-                                    # init_func=init
-                                    frames=self._cnf.t.size,
-                                    interval=1,
-                                    blit=False)
-        if self._save_animation:
-            ani.save(self._cnf.file_address[0:-4] + '.mp4',
-                     self._writer,
-                     dpi=figure.dpi)
-        else:
-            plt.show()
-        return
-
-    def _update_data(self, time_step, lines):
-        species = self._cnf.s.names
-        moments = self._cnf.animated_moments.flatten()
-        file = h5py.File(self._cnf.file_address, mode='r')["Results"]
-        for (i_s, specimen) in enumerate(species):
-            for (i_m, moment) in enumerate(moments):
-                result_t = file[specimen][moment][time_step]
-                lines[i_m, i_s].set_data(self._cnf.p.pG,
-                                         result_t)
-        return lines
 
 # Todo Add Snapshot functionality
     # def snapshot(self,
