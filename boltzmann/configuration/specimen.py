@@ -69,7 +69,7 @@ class Specimen:
                               complete_check=complete_check)
         # Additional Conditions on instance:
         # parameter can also be a list,
-        # instance attributes must be nd.array
+        # instance attributes must be ndarray
         assert isinstance(self.collision_rate, np.ndarray)
         # parameter can also be list/array of ints,
         # instance attribute must be nd.array of floats

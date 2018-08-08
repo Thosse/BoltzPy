@@ -477,7 +477,7 @@ class Grid:
 
         return
 
-    def __str__(self, write_physical_grids=True):
+    def __str__(self, write_physical_grids=False):
         """Converts the instance to a string, describing all attributes."""
         description = ''
         description += "Dimension = {}\n".format(self.dim)

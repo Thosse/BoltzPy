@@ -177,6 +177,7 @@ class Calculation:
         self._calculate_transport_step()
         for _ in range(self.cnf.coll_substeps):
             self._calculate_collision_step()
+        assert np.all(self.data > 0)
         self.t_cur += 1
         return
 

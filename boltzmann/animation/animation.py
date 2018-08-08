@@ -12,13 +12,9 @@ import h5py
 import numpy as np
 
 
-# Todo Check what happens if animation is not saved / snapshot is taken
-# Todo may need specific DPI for snapshots. un-saved animation is not important
-# if self._save_animation:
-#     self.dpi = 300
-# else:
-#     self.dpi = 100
-# Todo remove _save_animation -> always save animation
+# Todo add custom colors custom linewidth,... for animate and snapshot
+# Todo option to not show moment name for snapshot and animate
+# todo change order of params for snapshot / animate -> moment before species
 class Animation:
     """Handles the visualization of the results.
 

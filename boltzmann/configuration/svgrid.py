@@ -571,6 +571,7 @@ class SVGrid:
 
         for (i_G, vGrid) in enumerate(self.vGrids):
             description += 'Specimen_{}:\n\t'.format(i_G)
-            description += vGrid.__str__().replace('\n', '\n\t')
+            grid_str = vGrid.__str__(write_physical_grid).replace('\n', '\n\t')
+            description += grid_str
             description += '\n'
         return description[:-1]
