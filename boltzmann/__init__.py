@@ -1,45 +1,38 @@
 r"""
 BoltzPy
-======================
+=======
 
-The BoltzPy package is a deterministic solver for the boltzmann equation
-to simulate rarefied gases with multiple specimen of
-varying masses.
-It's based on new results in Kinetic gas theory and on discrete velocity models.
-ADD SOURCES -> [Bernhoffpaper], [Brechtken, Sasse].
+The BoltzPy package is a solver for the boltzmann equation.
 
-Motivation:
+    * We uses discrete velocity models (DVM) to model rarefied gases.
+    * The collision operator is deterministically approximated,
+      see ADD SOURCES -> [Bernhoffpaper], [Brechtken, Sasse].
+    * We support multiple specimen of varying masses.
 
-Currently known and used algorithms assume all gases to be mono atomic.
-We seek to develop, implement, test and compare our numerical approaches
-for the simulation of the boltzmann equation for gas mixtures.
 
-Features:
+Basic Structure of the Code:
+----------------------------
 
- * Basic Configuration
- * Implementation of 1D geometries
- * Basic Initialization
- * Basic Calculation
- * Animation of several characteristic variables
- * Generate all possible collisions
+ Any simulation is essentially an instance of 
+ :py:class:`boltzmann.simulation.Simulation`.
+ 
+ Almost all complex functionalities are delegated to one of the submodules.
+ This class mainly acts as a mediator between these submodules.
 
-Planned:
-
- * Automatic reduction of collisions (BRECHTKEN/SASSE)
- * Plan and Implement (small-sized) config file
- * Implement 2D and 3D geometries
- * add more complex geometries to grid (setting and generation)
- * Simple GUI for configuration (DARIUS)
-
-Classes:
+Submodules:
+-----------
 
  * :py:mod:`boltzmann.configuration`
  * :py:mod:`boltzmann.initialization`
+ * :py:mod:`boltzmann.collisions`
  * :py:mod:`boltzmann.calculation`
  * :py:mod:`boltzmann.animation`
 """
 
+from .simulation import Simulation
+
 import boltzmann.configuration
 import boltzmann.initialization
+import boltzmann.collisions
 import boltzmann.calculation
 import boltzmann.animation

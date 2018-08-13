@@ -6,7 +6,7 @@ from time import time
 
 
 # Todo rework this, using new SVGrid
-class Collisions:
+class CollisionRelations:
     """Generates and Stores Collision Relations.
 
     .. todo::
@@ -26,23 +26,20 @@ class Collisions:
         - Check if its faster to switch v[0, 1] and v[1, 0]?
         - @generate: replace for loops by numpy.apply_along_axis
           (this probably needs several additional functions).
+
+    Parameters
+    ----------
+    simulation : :class:`~boltzmann.Simulation`
+
+
     """
-    def __init__(self, cnf):
-        self._cnf = cnf
+    def __init__(self, simulation):
+        self._sim = simulation
         self._collision_arr = np.array([], dtype=int)
         self._weight_arr = np.array([], dtype=float)
         self._n = 0
         self._mat = csr_matrix(np.array([[]]))
-        if self._cnf.coll_substeps != 0:
-            self._setup()
         return
-
-    @property
-    def cnf(self):
-        """:obj:`~boltzmann.configuration.Configuration` :
-        Points at the Configuration
-        """
-        return self._cnf
 
     @property
     def collision_arr(self):
@@ -92,22 +89,22 @@ class Collisions:
     #####################################
     #           Configuration           #
     #####################################
-    def _setup(self):
+    def setup(self):
         """Generates the :obj:`collision_arr`,
         based on the
         :attr:`~boltzmann.configuration.Configuration.coll_select_scheme`
         """
         gen_col_time = time()
         print('Generating Collision Array...', end='\r')
-        if self.cnf.coll_select_scheme == 'Complete':
-            if self.cnf.sv.form == 'rectangular':
+        if self._sim.configuration.coll_select_scheme == 'Complete':
+            if self._sim.configuration.sv.form == 'rectangular':
                 self._generate_collisions_complete()
             else:
                 raise AttributeError('Currently, only rectangular '
                                      'grids are supported')
         else:
             message = 'Unsupported Selection Scheme:' \
-                      '{}'.format(self.cnf.coll_select_scheme)
+                      '{}'.format(self._sim.configuration.coll_select_scheme)
             raise AttributeError(message)
         print('Generating Collision Array...Done\n'
               'Time taken =  {} seconds\n'
@@ -122,14 +119,14 @@ class Collisions:
     # noinspection PyAssignmentToLoopOrWithParameter
     def _generate_collisions_complete(self):
         """Generate all possible, non-useless collisions."""
-        assert self.cnf.coll_select_scheme == 'Complete'
+        assert self._sim.configuration.coll_select_scheme == 'Complete'
         # collect collisions in these lists
         col_arr = []
         weight_arr = []
 
         # Abbreviations
-        species = self.cnf.s
-        sv = self.cnf.sv
+        species = self._sim.configuration.s
+        sv = self._sim.configuration.sv
 
         # Each collision is an array of 4 Velocity-Indices
         # Ordered as: [[v_pre_s0, v_post_s0],
@@ -203,8 +200,9 @@ class Collisions:
         Currently only depends on the colliding Specimen .
         This will change in the future.
         """
-        col_rate = self._cnf.s.collision_rate_matrix[specimen[0], specimen[1]]
-        n_cols = self._cnf.coll_substeps
+        col_rate = self._sim.configuration.s.collision_rate_matrix[specimen[0],
+                                                                   specimen[1]]
+        n_cols = self._sim.configuration.coll_substeps
         if n_cols != 0:
             return col_rate / n_cols
         else:
@@ -239,7 +237,7 @@ class Collisions:
         elif np.allclose(pv[0, 0] * d[0], pv[1, 0] * d[1]):
             return False
         # Ignore Collisions not fulfilling law of conservation of energy
-        elif not Collisions._meets_energy_conservation(d, pv):
+        elif not CollisionRelations._meets_energy_conservation(d, pv):
             return False
         # Accept this Collision
         else:
@@ -280,13 +278,13 @@ class Collisions:
         return np.allclose(pre_energy, post_energy)
 
     def generate_collision_matrix(self):
-        if self._cnf.coll_substeps == 0:
+        if self._sim.configuration.coll_substeps == 0:
             return None
         gen_mat_time = time()
         print('Generating Collision Matrix...',
               end='\r')
         # Size of complete velocity grid
-        rows = self._cnf.sv.size
+        rows = self._sim.configuration.sv.size
         # Number of different collisions
         columns = self.n
         col_matrix = np.zeros(shape=(rows, columns),
@@ -296,7 +294,7 @@ class Collisions:
             # => necessary for stability
             #   v[i]*v[j] - v[k]*v[l] is used as collision term
             #   => v'[*] = ... - X*u[*]
-            col_weight = self._cnf.t.d * self.weight_arr[i_col]
+            col_weight = self._sim.configuration.t.d * self.weight_arr[i_col]
             col_matrix[col, i_col] = [-1, 1, -1, 1]
             col_matrix[col, i_col] *= col_weight
         col_mat = csr_matrix(col_matrix)
@@ -317,10 +315,13 @@ class Collisions:
         for col in self._collision_arr:
             assert col[0] < col[1]
             assert col[0] < col[2]
-            di_0 = self._cnf.sv.iMG[col[1]] - self._cnf.sv.iMG[col[0]]
-            di_1 = self._cnf.sv.iMG[col[3]] - self._cnf.sv.iMG[col[2]]
+            di_0 = (self._sim.configuration.sv.iMG[col[1]]
+                    - self._sim.configuration.sv.iMG[col[0]])
+            di_1 = (self._sim.configuration.sv.iMG[col[3]]
+                    - self._sim.configuration.sv.iMG[col[2]])
             assert all(np.array(di_1 + di_0) == 0)
-            s = [self._cnf.sv.get_specimen(v_col) for v_col in col]
+            s = [self._sim.configuration.sv.get_specimen(v_col)
+                 for v_col in col]
             assert s[0] == s[1] and s[2] == s[3]
         assert type(self._weight_arr) == np.ndarray
         assert self._weight_arr.dtype == float

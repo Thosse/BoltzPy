@@ -8,8 +8,14 @@
 Class Index
 ===========
 
-The Configuration submodule
----------------------------
+The Simulation Class
+--------------------
+
+.. autoclass:: boltzmann.Simulation
+    :members:
+
+The Configuration  Module
+-------------------------
 
 .. autoclass:: boltzmann.configuration.Configuration
     :members:
@@ -23,27 +29,29 @@ The Configuration submodule
     :members:
 
 
-The Initialization submodule
-----------------------------
+The Initialization Module
+-------------------------
 
 .. autoclass:: boltzmann.initialization.Initialization
     :members:
 .. autoclass:: boltzmann.initialization.Rule
     :members:
 
+The Collision Module
+--------------------
+.. autoclass:: boltzmann.collisions.CollisionRelations
+    :members:
 
-The Calculation submodule
--------------------------
+The Calculation Module
+----------------------
 
 .. autoclass:: boltzmann.calculation.Calculation
     :members:
 .. autoclass:: boltzmann.calculation.OutputFunction
     :members:
-.. autoclass:: boltzmann.calculation.Collisions
-    :members:
 
-The Animation submodule
------------------------
+The Animation Module
+--------------------
 
 .. autoclass:: boltzmann.animation.Animation
     :members:

@@ -1,9 +1,9 @@
 
-from . import collisions as b_col
+from boltzmann import simulation as b_sim
+import boltzmann.collisions.collision_relations as b_rel
 from . import output_function as b_opf
 
 import numpy as np
-
 from time import time
 
 
@@ -75,11 +75,12 @@ class Calculation:
                 of a finer area,with 'Ghost-Boundary-Points'
               * The total number of Grid-Refinement-Levels should be bound
 
+    Parameters
+    ----------
+    simulation : :class:`~boltzmann.Simulation`
+
     Attributes
     ----------
-    cnf : :obj:`~boltzmann.configuration.Configuration`
-        Points to the :class:`~boltzmann.configuration.Configuration`
-        Instance.
     data : :obj:`~np.ndarray` [:obj:`float`]
         Current state of the simulation, such that
         :math:`f(t_{cur}, p, v) = data[i_p, i_v]`.
@@ -92,26 +93,34 @@ class Calculation:
         The current time step / index.
         If t_cur is in :attr:`cnf.t.iG <boltzmann.configuration.Grid>`
         The current data is written to the sim file.
-
-    Parameters
-    ----------
-    cnf : :class:`~boltzmann.configuration.Configuration`
-    ini : :class:`~boltzmann.initialization.Initialization`
     """
-    def __init__(self,
-                 cnf,
-                 ini):
-        self.cnf = cnf
-        self._cols = b_col.Collisions(self.cnf)
-        self.data = ini.create_psv_grid()
-        # Todo _result might be unnecessary
-        self._result = np.copy(self.data)
+    def __init__(self, simulation):
+        assert isinstance(simulation, b_sim.Simulation)
+        # Todo simulation.check_integrity(complete_check=False)
+        self._sim = simulation
+        self._cols = b_rel.CollisionRelations(self._sim)
+
+        # Todo possibly better to do with np.full
+        if (self._sim.configuration.p.size is None
+                or self._sim.configuration.sv.size is None):
+            self.data = None
+            # Todo _result might be unnecessary
+            self._result = None
+        else:
+            self.data = np.empty(shape=(self._sim.configuration.p.size,
+                                        self._sim.configuration.sv.size),
+                                 dtype=float)
+            self._result = np.copy(self.data)
+
         # Todo _p_flag might be unnecessary,
         # Todo only necessary to set up transport step
         # Todo possibly useful to decide if to do collision step in position
         # self._p_flag = ini.p_flag
-        self.f_out = b_opf.OutputFunction(cnf)
-        self.t_cur = cnf.t.iG[0, 0]
+        self.f_out = b_opf.OutputFunction(self._sim)
+        if self._sim.configuration.t.iG is None:
+            self.t_cur = None
+        else:
+            self.t_cur = self._sim.configuration.t.iG[0, 0]
         self._cal_time = time()     # to estimate remaining time
         # t_arr: np.ndarray(int)
         # t_arr is used in the ** transport step **.
@@ -154,11 +163,27 @@ class Calculation:
         """
         # Todo Add check_integrity / stability conditions?
         assert self.check_stability_conditions()
+        # Todo Move this part into setup block?
+        # Initialize PSV-Grids
+        self.data = self._sim.initialization.create_psv_grid()
+        self._result = np.copy(self.data)
+
+        # Generate collision relations
+        if self._sim.configuration.coll_substeps != 0:
+            self._cols.setup()
+
+        # Prepare Output functions
+        self.f_out.setup_f_arr()
+        self.f_out.setup_hdf5_subgroups()
+
+        # set start time
+        self.t_cur = self._sim.configuration.t.iG[0, 0]
+
         self._cal_time = time()
         print('Calculating...          ',
               end='\r')
 
-        for (i_w, t_w) in enumerate(self.cnf.t.iG[:, 0]):
+        for (i_w, t_w) in enumerate(self._sim.configuration.t.iG[:, 0]):
             while self.t_cur != t_w:
                 self._calculate_time_step()
                 self._print_time_estimate()
@@ -175,7 +200,7 @@ class Calculation:
         """Executes a single time step"""
         # executing time step
         self._calculate_transport_step()
-        for _ in range(self.cnf.coll_substeps):
+        for _ in range(self._sim.configuration.coll_substeps):
             self._calculate_collision_step()
         assert np.all(self.data > 0)
         self.t_cur += 1
@@ -183,7 +208,7 @@ class Calculation:
 
     def _print_time_estimate(self):
         """Prints an estimate of the remaining time to the terminal"""
-        rem_steps = self.cnf.t.iG[-1, 0] - self.t_cur
+        rem_steps = self._sim.configuration.t.iG[-1, 0] - self.t_cur
         est_step_duration = (time() - self._cal_time) / self.t_cur
         est_time_in_seconds = int(rem_steps * est_step_duration)
         print('Calculating... '
@@ -205,7 +230,7 @@ class Calculation:
 
     def _calculate_collision_step(self):
         """Executes a single collision step on complete P-Grid"""
-        for p in range(self.cnf.p.size):
+        for p in range(self._sim.configuration.p.size):
             u_c0 = self.data[p, self._cols.collision_arr[:, 0]]
             u_c1 = self.data[p, self._cols.collision_arr[:, 1]]
             u_c2 = self.data[p, self._cols.collision_arr[:, 2]]
@@ -216,24 +241,24 @@ class Calculation:
 
     def _calculate_transport_step(self):
         """Executes single collision step on complete P-Grid"""
-        if self.cnf.p.dim != 1:
+        if self._sim.configuration.p.dim != 1:
             message = 'Transport is currently only implemented ' \
                       'for 1D Problems'
             raise NotImplementedError(message)
 
-        dt = self.cnf.t.d
-        dp = self.cnf.p.d
-        offset = self.cnf.sv.offset
-        for s in range(self.cnf.s.n):
-            [beg, end] = self.cnf.sv.range_of_indices(s)
-            dv = self.cnf.sv.vGrids[s].d
+        dt = self._sim.configuration.t.d
+        dp = self._sim.configuration.p.d
+        offset = self._sim.configuration.sv.offset
+        for s in range(self._sim.configuration.s.n):
+            [beg, end] = self._sim.configuration.sv.range_of_indices(s)
+            dv = self._sim.configuration.sv.vGrids[s].d
             # Todo removal of boundaries (p in range(1, ... -1))
             # Todo is only temporary,
             # Todo until rules for input/output points
             # Todo or boundary points are set
-            for p in range(1, self.cnf.p.size-1):
+            for p in range(1, self._sim.configuration.p.size-1):
                 for v in range(beg, end):
-                    pv = dv * self.cnf.sv.iMG[v] + offset
+                    pv = dv * self._sim.configuration.sv.iMG[v] + offset
                     if pv[0] <= 0:
                         new_val = ((1 + pv[0]*dt/dp) * self.data[p, v]
                                    - pv[0]*dt/dp * self.data[p+1, v])
@@ -255,8 +280,9 @@ class Calculation:
             True, if all conditions are satisfied.
             False, otherwise."""
         # check Courant-Friedrichs-Levy-Condition
-        max_v = np.linalg.norm(self.cnf.sv.boundaries, axis=1).max()
-        dt = self.cnf.t.d
-        dp = self.cnf.p.d
+        max_v = np.linalg.norm(self._sim.configuration.sv.boundaries,
+                               axis=1).max()
+        dt = self._sim.configuration.t.d
+        dp = self._sim.configuration.p.d
         cfl_condition = max_v * (dt/dp) < 1/2
         return cfl_condition

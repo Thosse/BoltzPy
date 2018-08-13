@@ -15,4 +15,3 @@ submodule provides the following functionalities:
 
 from .calculation import Calculation
 from .output_function import OutputFunction
-from .collisions import Collisions

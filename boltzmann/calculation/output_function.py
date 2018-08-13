@@ -17,21 +17,15 @@ class OutputFunction:
 
     Parameters
     ----------
-    cnf : :class:`~boltzmann.configuration.Configuration`
+    simulation : :class:`~boltzmann.Simulation`
     """
-    def __init__(self,
-                 cnf):
-        self._cnf = cnf
+    def __init__(self, simulation):
+        self._sim = simulation
         self._f_arr = np.array([], dtype=object)
-        self._setup_f_arr()
-        self._setup_hdf5_subgroups()
+        # Todo This must be changed -> call setup method separately, not t initialization
+        # self._setup_f_arr()
+        # self._setup_hdf5_subgroups()
         return
-
-    @property
-    def cnf(self):
-        """:obj:`~boltzmann.configuration.Configuration`:
-        Points at the Configuration"""
-        return self._cnf
 
     @property
     def f_arr(self):
@@ -56,10 +50,10 @@ class OutputFunction:
         ----------
         calc : :obj:`Calculation`
         """
-        moments = self._cnf.animated_moments.flatten()
-        species = self._cnf.s.names
-        time_index = calc.t_cur // self._cnf.t.multi
-        file = h5py.File(self._cnf.file_address)["Results"]
+        moments = self._sim.configuration.animated_moments.flatten()
+        species = self._sim.configuration.s.names
+        time_index = calc.t_cur // self._sim.configuration.t.multi
+        file = h5py.File(self._sim.file_address)["Results"]
         for (i_m, moment) in enumerate(moments):
             result = self.f_arr[i_m](calc.data)
             for (i_s, specimen) in enumerate(species):
@@ -67,31 +61,31 @@ class OutputFunction:
                 file_m[time_index] = result[i_s]
         return
 
-    def _setup_hdf5_subgroups(self):
-        file = h5py.File(self._cnf.file_address)
+    def setup_hdf5_subgroups(self):
+        file = h5py.File(self._sim.file_address)
         # Todo don't overwrite existing results!
         if "Results" not in file.keys():
             file.create_group("Results")
         file_r = file["Results"]
-        for specimen in self._cnf.s.names:
+        for specimen in self._sim.configuration.s.names:
             if specimen not in file_r.keys():
                 file_r.create_group(specimen)
             file_s = file_r[specimen]
-            for moment in self._cnf.animated_moments.flatten():
+            for moment in self._sim.configuration.animated_moments.flatten():
                 if moment not in file_s.keys():
                     # Todo make property for shape?
                     # todo this simplifies complete output?
-                    shape = (self._cnf.t.n[0],
-                             self._cnf.p.iG.shape[0])
+                    shape = (self._sim.configuration.t.n[0],
+                             self._sim.configuration.p.iG.shape[0])
                     file_s.create_dataset(moment,
                                           shape=shape,
                                           dtype=float)
         return
 
-    def _setup_f_arr(self):
+    def setup_f_arr(self):
         """Sets up :attr:`f_arr`"""
         f_arr = []
-        for mom in self.cnf.animated_moments.flatten():
+        for mom in self._sim.configuration.animated_moments.flatten():
             if mom == 'Mass':
                 f = self._get_f_mass()
             # Todo Mass_Flow == Momentum? Ask Hans
@@ -126,8 +120,8 @@ class OutputFunction:
 
     def _get_f_mass(self):
         """Generates and returns generating function for Mass"""
-        p_shape = (self.cnf.p.size,)
-        s_n = self.cnf.s.n
+        p_shape = (self._sim.configuration.p.size,)
+        s_n = self._sim.configuration.s.n
         shape = (s_n,) + p_shape
 
         def f_mass(data):
@@ -137,7 +131,7 @@ class OutputFunction:
             """
             mass = np.zeros(shape, dtype=float)
             for i_s in range(s_n):
-                [beg, end] = self.cnf.sv.range_of_indices(i_s)
+                [beg, end] = self._sim.configuration.sv.range_of_indices(i_s)
                 # mass = sum over velocity grid of specimen (last axis)
                 mass[i_s, :] = np.sum(data[..., beg:end], axis=-1)
             return mass
@@ -146,8 +140,8 @@ class OutputFunction:
     def _get_f_momentum(self, direction):
         """Generates and returns generating function for Momentum"""
         assert direction in [0, 1, 2]
-        p_shape = (self.cnf.p.size,)
-        s_n = self.cnf.s.n
+        p_shape = (self._sim.configuration.p.size,)
+        s_n = self._sim.configuration.s.n
         shape = (s_n,) + p_shape
 
         def f_momentum(data):
@@ -157,18 +151,18 @@ class OutputFunction:
             """
             momentum = np.zeros(shape, dtype=float)
             for s in range(s_n):
-                [beg, end] = self.cnf.sv.range_of_indices(s)
-                V_dir = self.cnf.sv.iMG[beg:end, direction]
+                [beg, end] = self._sim.configuration.sv.range_of_indices(s)
+                V_dir = self._sim.configuration.sv.iMG[beg:end, direction]
                 momentum[s, :] = np.sum(V_dir * data[..., beg:end],
                                         axis=1)
-                momentum[s, :] *= self.cnf.s.mass[s]
+                momentum[s, :] *= self._sim.configuration.s.mass[s]
             return momentum
         return f_momentum
 
     def _get_f_momentum_flow(self, direction):
         """Generates and returns generating function for Momentum Flow"""
-        p_shape = (self.cnf.p.size,)
-        s_n = self.cnf.s.n
+        p_shape = (self._sim.configuration.p.size,)
+        s_n = self._sim.configuration.s.n
         shape = (s_n,) + p_shape
 
         def f_momentum_flow(data):
@@ -178,19 +172,19 @@ class OutputFunction:
             """
             momentum_flow = np.zeros(shape, dtype=float)
             for s in range(s_n):
-                [beg, end] = self.cnf.sv.range_of_indices(s)
+                [beg, end] = self._sim.configuration.sv.range_of_indices(s)
                 # Todo rename direction into axis or something like that
-                V_dir = np.array(self.cnf.sv.iMG[beg:end, direction])
+                V_dir = np.array(self._sim.configuration.sv.iMG[beg:end, direction])
                 momentum_flow[s, :] = np.sum(V_dir**2 * data[..., beg:end],
                                              axis=1)
-                momentum_flow[s, :] *= self.cnf.s.mass[s]
+                momentum_flow[s, :] *= self._sim.configuration.s.mass[s]
             return momentum_flow
         return f_momentum_flow
 
     def _get_f_energy(self):
         """Generates and returns generating function for Energy"""
-        p_shape = (self.cnf.p.size,)
-        s_n = self.cnf.s.n
+        p_shape = (self._sim.configuration.p.size,)
+        s_n = self._sim.configuration.s.n
         shape = (s_n,) + p_shape
 
         def f_energy(data):
@@ -200,19 +194,19 @@ class OutputFunction:
             """
             energy = np.zeros(shape, dtype=float)
             for s in range(s_n):
-                [beg, end] = self.cnf.sv.range_of_indices(s)
-                V = np.array(self.cnf.sv.iMG[beg:end, :])
+                [beg, end] = self._sim.configuration.sv.range_of_indices(s)
+                V = np.array(self._sim.configuration.sv.iMG[beg:end, :])
                 V_norm = np.sqrt(np.sum(V**2, axis=1))
                 energy[s, :] = np.sum(V_norm * data[..., beg:end],
                                       axis=1)
-                energy[s, :] *= 0.5 * self.cnf.s.mass[s]
+                energy[s, :] *= 0.5 * self._sim.configuration.s.mass[s]
             return energy
         return f_energy
 
     def _get_f_energy_flow(self, direction):
         """Generates and returns generating function for Energy Flow"""
-        p_shape = (self.cnf.p.size,)
-        s_n = self.cnf.s.n
+        p_shape = (self._sim.configuration.p.size,)
+        s_n = self._sim.configuration.s.n
         shape = (s_n,) + p_shape
 
         def f_energy_flow(data):
@@ -222,13 +216,13 @@ class OutputFunction:
             """
             energy_flow = np.zeros(shape, dtype=float)
             for s in range(s_n):
-                [beg, end] = self.cnf.sv.range_of_indices(s)
-                V = np.array(self.cnf.sv.iMG[beg:end, :])
+                [beg, end] = self._sim.configuration.sv.range_of_indices(s)
+                V = np.array(self._sim.configuration.sv.iMG[beg:end, :])
                 V_norm = np.sqrt(np.sum(V ** 2, axis=1))
-                V_dir = np.array(self.cnf.sv.iMG[beg:end, direction])
+                V_dir = np.array(self._sim.configuration.sv.iMG[beg:end, direction])
                 energy_flow[s, :] = np.sum(V_norm * V_dir * data[..., beg:end],
                                            axis=1)
-                energy_flow[s, :] *= 0.5 * self.cnf.s.mass[s]
+                energy_flow[s, :] *= 0.5 * self._sim.configuration.s.mass[s]
             return energy_flow
 
         return f_energy_flow

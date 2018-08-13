@@ -2,9 +2,14 @@
 # Todo Everything might move into enum.Enum classes, for more structure
 
 
-#: :obj:`str` : Default path for simulation files.
-#: If only a file name is given, then the file will be located in this folder.
-DEFAULT_SIMULATION_PATH = __file__[:-22] + 'Simulations/'
+#: :obj:`str` : Default directory for simulation files.
+#: If no full path is given,
+#: then the file will be located in this directory.
+DEFAULT_DIRECTORY = __file__[:-22] + 'Simulations/'
+
+#: :obj:`str` : Default file root for simulation files.
+#: If no file name is given at all, then the file root will be this.
+DEFAULT_FILE_ROOT = "_unnamed_"
 
 #: :obj:`tuple` [:obj:`int`] : Default aspect ratio for plots in
 #: :class:`~boltzmann.animation.Animation`.

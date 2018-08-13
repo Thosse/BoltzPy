@@ -1,10 +1,10 @@
 
-from boltzmann.configuration import configuration as b_cnf
+from boltzmann import simulation as b_sim
 from boltzmann.initialization import rule as b_rul
 import boltzmann.constants as b_const
 
 import numpy as np
-
+import os
 import math
 import h5py
 
@@ -37,7 +37,8 @@ class Initialization:
 
     Parameters
     ----------
-    configuration : :class:`~boltzmann.configuration.Configuration`, optional
+    simulation : :class:`~boltzmann.Simulation`
+    file_name : :obj:`str`, optional
 
     Attributes
     ----------
@@ -53,14 +54,10 @@ class Initialization:
         :attr:`init_arr` [p] is the index of its
         :class:`initialization rule <Rule>` in :attr:`rule_arr`.
     """
-    def __init__(self,
-                 configuration=None):
-        if configuration is not None:
-            assert isinstance(configuration, b_cnf.Configuration)
-            configuration.check_integrity(complete_check=False)
-            self._cnf = configuration
-        else:
-            self._cnf = None
+    def __init__(self, simulation, file_name=None):
+        # Todo simulation.check_integrity(complete_check=False)
+        assert isinstance(simulation, b_sim.Simulation)
+        self._sim = simulation
 
         self.rule_arr = np.empty(shape=(0,), dtype=b_rul.Rule)
 
@@ -71,7 +68,7 @@ class Initialization:
                                      dtype=int)
         # initialize initialization array for P-Grid
         # default value -1 means no initialization rule applies to the point
-        self.init_arr = np.full(shape=self._cnf.p.size,
+        self.init_arr = np.full(shape=self._sim.configuration.p.size,
                                 fill_value=-1,
                                 dtype=int)
         # Todo be very careful, when adding more categories
@@ -134,9 +131,10 @@ class Initialization:
         assert isinstance(drift, np.ndarray)
         assert isinstance(temp, np.ndarray)
         # Assert conserved quantities have correct shape
-        assert np.array(rho).shape == (self._cnf.s.n,)
-        assert np.array(drift).shape == (self._cnf.s.n, self._cnf.sv.dim)
-        assert np.array(temp).shape == (self._cnf.s.n,)
+        assert np.array(rho).shape == (self._sim.configuration.s.n,)
+        assert np.array(drift).shape == (self._sim.configuration.s.n,
+                                         self._sim.configuration.sv.dim)
+        assert np.array(temp).shape == (self._sim.configuration.s.n,)
         # Construct new_rule -> Depending on Category
         i_cat = b_const.SUPP_GRID_POINT_CATEGORIES.index(category)
         new_rule = b_rul.Rule(category,
@@ -186,8 +184,8 @@ class Initialization:
         assert isinstance(array_of_grid_point_indices, np.ndarray)
         assert array_of_grid_point_indices.dtype == int
         assert np.min(array_of_grid_point_indices) >= 0
-        assert np.max(array_of_grid_point_indices) < self._cnf.p.size
-
+        assert (np.max(array_of_grid_point_indices)
+                < self._sim.configuration.p.size)
         assert isinstance(rule_index, int)
         assert 0 <= rule_index < self.n_rules
 
@@ -218,20 +216,21 @@ class Initialization:
             <boltzmann.configuration.SVGrid.size>`).
         """
         self.check_integrity()
-        assert self.init_arr.size == self._cnf.p.size
-        psv = np.zeros(shape=(self._cnf.p.size, self._cnf.sv.size),
+        assert self.init_arr.size == self._sim.configuration.p.size
+        psv = np.zeros(shape=(self._sim.configuration.p.size,
+                              self._sim.configuration.sv.size),
                        dtype=float)
         # set Velocity Grids for all specimen
         for (i_p, i_rule) in enumerate(self.init_arr):
             # get active rule
             r = self.rule_arr[i_rule]
             # Todo - simply call r_apply method?
-            for i_s in range(self._cnf.s.n):
+            for i_s in range(self._sim.configuration.s.n):
                 rho = r.rho[i_s]
                 temp = r.temp[i_s]
-                [begin, end] = self._cnf.sv.range_of_indices(i_s)
-                v_grid = self._cnf.sv.iMG[begin:end]
-                dv = self._cnf.sv.vGrids[i_s].d
+                [begin, end] = self._sim.configuration.sv.range_of_indices(i_s)
+                v_grid = self._sim.configuration.sv.iMG[begin:end]
+                dv = self._sim.configuration.sv.vGrids[i_s].d
                 for (i_v, v) in enumerate(v_grid):
                     # Physical Velocity
                     pv = dv * v
@@ -249,21 +248,21 @@ class Initialization:
     #           Serialization           #
     #####################################
     def load(self,
-             file_address,
-             configuration=None):
-        """Sets all attributes of the :obj:`Initialization` instance
+             file_address=None):
+        """Sets all parameters of the :obj:`Initialization` instance
         to the ones specified in the given HDF5-file.
 
         Parameters
         ----------
         file_address : :obj:`str`
-            Complete path to the HDF5-file.
-        configuration : :class:`~boltzmann.configuration.Configuration`, optional
-            Necessary parameter for :class:`Initialization`.
-            Will be :meth:`read <boltzmann.configuration.Configuration.load>`
-            from file, if None is given.
+            Full path to a :class:`~boltzmann.Simulation` file.
         """
         # Open file
+        if file_address is None:
+            file_address = self._sim.file_address
+        else:
+            assert os.path.exists(file_address)
+        # Todo Assert it is a simulation file!
         file = h5py.File(file_address, mode='r')
 
         # Check if Initialization Group exists
@@ -277,12 +276,7 @@ class Initialization:
         # Todo replace the fresh initialization by something smarter
         # Todo check, if the instance is empty first -> give Warning?
         # Do fresh initialization
-        if configuration is not None:
-            assert isinstance(configuration, b_cnf.Configuration)
-        else:
-            configuration = b_cnf.Configuration(file_address)
-            configuration.load()
-        self.__init__(configuration)
+        self.__init__(self._sim)
 
         # Todo implement something to use existing(freshly loaded) Rules
         n_rules = int(file_i.attrs["Number of Rules"])
@@ -302,16 +296,22 @@ class Initialization:
         self.check_integrity()
         return
 
-    def save(self, file_address):
+    def save(self, file_address=None):
         """Writes all attributes of the :class:`Initialization` instance
         to the given HDF5-file.
 
         Parameters
         ----------
-        file_address : str
-            Complete path to a simulation file (.sim).
+        file_address : str, optional
+            Full path to a :class:`~boltzmann.Simulation` HDF5-file.
         """
         self.check_integrity()
+        if file_address is None:
+            file_address = self._sim.file_address
+        else:
+            # Todo assert the directory exists and check the rights
+            pass
+
         # Open file
         file = h5py.File(file_address, mode='a')
 
@@ -346,15 +346,16 @@ class Initialization:
             assert isinstance(rule, b_rul.Rule)
             rule.check_integrity()
             # assert right shape of conserved quantities
-            assert rule.rho.shape == (self._cnf.s.n,)
-            assert rule.drift.shape == (self._cnf.s.n, self._cnf.sv.dim)
-            assert rule.temp.shape == (self._cnf.s.n,)
+            assert rule.rho.shape == (self._sim.configuration.s.n,)
+            assert rule.drift.shape == (self._sim.configuration.s.n,
+                                        self._sim.configuration.sv.dim)
+            assert rule.temp.shape == (self._sim.configuration.s.n,)
             # Todo this could be removed if block_index is obsolete
             assert i_r >= self.block_index[rule.i_cat]
             assert i_r < self.block_index[rule.i_cat+1]
 
         assert isinstance(self.init_arr, np.ndarray)
-        assert self.init_arr.size == self._cnf.p.size
+        assert self.init_arr.size == self._sim.configuration.p.size
         assert self.init_arr.dtype == int
         assert np.min(self.init_arr) >= 0, \
             'Positional Grid is not properly initialized.' \

@@ -3,6 +3,7 @@ from . import species as b_spc
 from . import grid as b_grd
 from . import svgrid as b_svg
 import boltzmann.constants as b_const
+import boltzmann as b_sim
 
 import numpy as np
 import h5py
@@ -14,11 +15,8 @@ class Configuration:
     r"""Handles User Input and sets up the Simulation Parameters
 
     .. todo::
-        - implement save/load for SVGrids
         - write __isequal__ magic methods for configuration (and subclasses)
-        - write unittests for save/load methods
-        - allow save/load functions for incompletely initialized
-          Configurations / Initializations
+        - write unittests for save/load(__init__) methods
         - Add Knudsen Number Attribute or Property?
 
             * Add method to get candidate for characteristic length
@@ -59,7 +57,9 @@ class Configuration:
 
     Parameters
     ----------
-    file_name : :obj:`str`, optional
+    simulation : :class:`~boltzmann.Simulation`
+    file_address : :obj:`str`, optional
+        Can be either a full path, a base file name or a file root.
 
     Attributes
     ----------
@@ -82,9 +82,13 @@ class Configuration:
         Must be in
         :const:`~boltzmann.constants.SUPP_ORDERS_TRANSP`.
     """
-    # Todo Give Warning, when Specifically using "default"
-    # Todo move into constant? Change to None?
-    def __init__(self, file_name="default"):
+    def __init__(self, simulation, file_name=None):
+        # Todo assert parameters (sim + file_name -> path + root)
+        assert isinstance(simulation, b_sim.Simulation)
+        # Todo simulation.check_integrity(complete_check=False)
+        self._sim = simulation
+
+        # Todo get file to load data from file_name  or _sim.file_address
         # Most Attributes are Private and set up separately
         # Read Only Properties
         self._s = b_spc.Species()
@@ -105,20 +109,6 @@ class Configuration:
                                             'Momentum_Flow_X'],
                                            ['Energy',
                                             'Energy_Flow_X']])
-        # Setup HDF5 File (stores all Configuration Data)
-        self._file_address = ''
-        self.file_address = file_name
-
-        # Load non-default file, if it exists
-        if file_name != "default" and os.path.exists(self.file_address):
-            self.load()
-        # Todo this should be changed
-        # -> compare the current configuration, to the saved one.
-        # If its equal, then there is no need to run the calculation again
-        # Clear default file, if it exists
-        elif file_name == "default" and os.path.exists(self.file_address):
-            os.remove(self.file_address)
-        # Todo Add optional Description of Simulation -> very long String
         return
 
     @property
@@ -174,25 +164,6 @@ class Configuration:
             array_of_moments = np.array(array_of_moments)
         self.check_parameters(animated_moments=array_of_moments)
         self._animated_moments = array_of_moments
-        return
-
-    @property
-    def file_address(self):
-        """:obj:`str` :
-        Path to this Configuration file.
-        Important for reading and writing to/from HDD.
-        """
-        return self._file_address
-
-    @file_address.setter
-    def file_address(self, new_address):
-        self.check_parameters(file_address=new_address)
-        # if no path given, add default path
-        if new_address.rfind('/') == -1:
-            new_address = b_const.DEFAULT_SIMULATION_PATH + new_address
-        if new_address[-4:] != '.sim':
-            new_address += '.sim'
-        self._file_address = new_address
         return
 
     #####################################
@@ -267,6 +238,10 @@ class Configuration:
                              grid_dimension=grid_dimension,
                              grid_shape=grid_shape,
                              grid_spacing=grid_spacing)
+        # Update initialization_array
+        self._sim.initialization.init_arr = np.full(shape=self.p.size,
+                                                    fill_value=-1,
+                                                    dtype=int)
         return
 
     def set_velocity_grids(self,
@@ -275,12 +250,13 @@ class Configuration:
                            max_velocity,
                            grid_form='rectangular',
                            velocity_offset=None):
-        """Sets up :attr:`~Configuration.sv`.
+        """Sets up attribute
+        :class:`sv <boltzmann.configuration.SVGrid>`.
 
-        1. Generates a default Velocity :class:`Grid`
+        1. Generates a minimal :class:`Grid` for the Velocities.
         2. Calls :meth:`SVGrid.setup`
            with the newly generated Velocity :class:`Grid`
-           as a parameter
+           as a parameter.
 
         Parameters
         ----------
@@ -308,17 +284,20 @@ class Configuration:
         Parameters
         ----------
         file_address : str
-            Complete path to the HDF5-file.
+            Full path to a :class:`~boltzmann.Simulation` file.
         """
+        # Open file
         if file_address is None:
-            file_address = self.file_address
-        elif file_address != self.file_address:
-            # Todo change file_address of self? IS this useful/harmful?
-            raise NotImplementedError
+            file_address = self._sim.file_address
+        else:
+            assert os.path.exists(file_address)
+        # Todo Assert it is a simulation file!
         file = h5py.File(file_address, mode='r')
+
+        # Check if Configuration Group exists
         if "Configuration" not in file.keys():
             msg = 'No group "Configuration" found in file:\n' \
-                  '{}'.format(self.file_address)
+                  '{}'.format(file_address)
             raise KeyError(msg)
         file_c = file["Configuration"]
         # load Species
@@ -378,42 +357,48 @@ class Configuration:
         return
 
     def save(self, file_address=None):
-        """Writes all attributes of the :class:`Configuration` instance
+        """Writes all parameters of the :class:`Configuration` instance
         to the given HDF5-file.
 
         Parameters
         ----------
         file_address : str, optional
-            Complete path to a :class:`Configuration` (.sim)
-            :attr:`~Configuration.file`.
+            Full path to a :class:`~boltzmann.Simulation` HDF5-file.
         """
-        # Todo Add Overwrite Protection
         self.check_integrity()
         if file_address is None:
-            file_address = self.file_address
+            file_address = self._sim.file_address
         else:
-            # Check if file exists, don't overwrite existing files!
-            raise NotImplementedError
+            # Todo assert the directory exists and check the rights
+            pass
+
         # Open file
         file = h5py.File(file_address, mode='a')
+
         # Clear currently saved Configuration, if any
         if "Configuration" in file.keys():
             del file["Configuration"]
+
         # Create and open empty "Configuration" group
         file.create_group("Configuration")
         file_c = file["Configuration"]
+
         # Save Species
         file_c.create_group("Species")
         self.s.save(file_c["Species"])
+
         # Save Time Space
         file_c.create_group("Time_Space")
         self.t.save(file_c["Time_Space"])
+
         # Save Position Space
         file_c.create_group("Position_Space")
         self.p.save(file_c["Position_Space"])
+
         # Save Velocity Space
         file_c.create_group("Velocity_Space")
         self.sv.save(file_c["Velocity_Space"])
+
         # Save other Parameters
         if self.coll_select_scheme is not None:
             key = "Collision_Selection_Scheme"
@@ -430,6 +415,7 @@ class Configuration:
         if self.conv_order_coll is not None:
             key = "Convergence_Order_Collision_Operator"
             file_c[key] = self.conv_order_coll
+
         # Save Animated Moments (and shape attribute)
         if self.animated_moments is not None:
             #  noinspection PyUnresolvedReferences
@@ -459,7 +445,7 @@ class Configuration:
                               time_grid=self._t,
                               position_grid=self._p,
                               species_velocity_grid=self._sv,
-                              file_address=self.file_address,
+                              file_address=self._sim.file_address,
                               animated_moments=self.animated_moments,
                               coll_select_scheme=self.coll_select_scheme,
                               coll_substeps=self.coll_substeps,
@@ -540,8 +526,8 @@ class Configuration:
         if file_address is not None:
             assert isinstance(file_address, str)
             # remove ending, if any
-            if file_address[-4:] == '.sim':
-                file_address = file_address[:-4]
+            if file_address[-5:] == '.hdf5':
+                file_address = file_address[:-5]
             # find separator of file_path and file_name
             sep_pos = file_address.rfind('/')
             # isolate file_name
@@ -560,7 +546,7 @@ class Configuration:
             # isolate file_path
             path = file_address[0:sep_pos + 1]
             if path == "":
-                path = b_const.DEFAULT_SIMULATION_PATH
+                path = b_const.DEFAULT_DIRECTORY
             # Assert file path exists
             assert os.path.exists(path), \
                 'The specified file path does not exist.' \
@@ -608,9 +594,6 @@ class Configuration:
         """Converts the instance to a string, describing all attributes."""
         description = ''
         description += '========CONFIGURATION========\n'
-        description += 'Configuration File Address:\n '
-        description += '\t' + self.file_address
-        description += '\n'
         description += 'Animated Moments:\n'
         moment_string = self.animated_moments.__str__()
         description += '\t' + moment_string.replace('\n', '\n\t')
