@@ -98,7 +98,7 @@ class Calculation:
         assert isinstance(simulation, b_sim.Simulation)
         # Todo simulation.check_integrity(complete_check=False)
         self._sim = simulation
-        self._cols = b_rel.CollisionRelations(self._sim)
+        self._cols = self._sim.collision_relations
 
         # Todo possibly better to do with np.full
         if (self._sim.configuration.p.size is None
@@ -169,6 +169,7 @@ class Calculation:
         self._result = np.copy(self.data)
 
         # Generate collision relations
+        # Todo coll_select_scheme = "free_flow"
         if self._sim.configuration.coll_substeps != 0:
             self._cols.setup()
 

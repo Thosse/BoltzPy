@@ -14,16 +14,24 @@ class Grid:
 
     Notes
     -----
-        Note that changing :attr:`~Grid.multi`
-        does not change the :attr:`spacing`
-        or physical values of the :obj:`Grid`.
-        It does change the values of
-        :attr:`~Grid.d` and :attr:`~Grid.iG`
-        though.
+    Note that changing :attr:`~Grid.multi`
+    does not change the :attr:`spacing`
+    or physical values of the :obj:`Grid`.
+    It does change the values of
+    :attr:`~Grid.d` and :attr:`~Grid.iG`
+    though.
 
-        The purpose of :attr:`Grid.multi` is to allow features
-        like adaptive (Positional- or Time-) Grids ,
-        or write intervals for Time-Grids.
+    The purpose of :attr:`Grid.multi` is to allow features
+    like adaptive (Positional- or Time-) Grids ,
+    or write intervals for Time-Grids.
+
+    .. todo::
+        - Add unit tests
+        - Add Circular shape
+        - Add rotation of grid (useful for velocities)
+        - Enable non-uniform/adaptive Grids
+          (see :class:`~boltzmann.calculation.Calculation`)
+        - Add Plotting-function to grids
 
     Attributes
     ----------
@@ -93,7 +101,10 @@ class Grid:
         It holds
         :math:`spacing = d \cdot multi`.
          """
-        return self.d * self.multi
+        try:
+            return self.d * self.multi
+        except TypeError:
+            return None
 
     @property
     def pG(self):
@@ -107,7 +118,10 @@ class Grid:
 
             Array of shape (:attr:`size`, :attr:`dim`).
          """
-        return self.iG * self.d
+        try:
+            return self.iG * self.d
+        except TypeError:
+            return None
 
     @property
     def boundaries(self):
@@ -116,14 +130,13 @@ class Grid:
         / position over all :class:`Grid` points
         in array of shape (2, :attr:`dim`).
         """
-        # in uninitialized Grids: Min/Max operation raises Errors
-        assert self.iG is not None, "The Grid is not initialized, yet." \
-                                    "Boundaries can not be computed!"
-        pG = self.pG
-        min_val = np.min(pG, axis=0)
-        max_val = np.max(pG, axis=0)
-        bound = np.array([min_val, max_val])
-        return bound
+        # if Grid is not initialized -> None
+        if self.pG is None:
+            return None
+        min_val = np.min(self.pG, axis=0)
+        max_val = np.max(self.pG, axis=0)
+        boundaries = np.array([min_val, max_val])
+        return boundaries
 
     @property
     def is_centered(self):
@@ -132,13 +145,16 @@ class Grid:
 
         Checks the first and last integer Grid points.
          """
-        # Grid must be properly initialized first
-        assert self.iG is not None, "The Grid is not initialized, yet."
-        if np.array_equal(self.iG[0], np.zeros(self.dim)):
+        try:
+            is_not_centered = np.array_equal(self.iG[0], np.zeros(self.dim))
+        except TypeError:   # iG is None
+            return None
+        if is_not_centered:
             return False
         else:
             assert np.array_equal(self.iG[0], -self.iG[-1])
             return True
+
 
     #####################################
     #           Configuration           #

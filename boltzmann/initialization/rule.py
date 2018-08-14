@@ -181,7 +181,7 @@ class Rule:
         else:
             category = None
         self.check_parameters(category=category,
-                              category_index=self.i_cat,
+                              category_idx=self.i_cat,
                               rho=self.rho,
                               drift=self.drift,
                               temp=self.temp,
@@ -192,7 +192,7 @@ class Rule:
 
     @staticmethod
     def check_parameters(category=None,
-                         category_index=None,
+                         category_idx=None,
                          rho=None,
                          drift=None,
                          temp=None,
@@ -205,7 +205,7 @@ class Rule:
         Parameters
         ----------
         category : :obj:`str`, optional
-        category_index : :obj:`int`, optional
+        category_idx : :obj:`int`, optional
         rho : :obj:`list` [:obj:`float`], optional
         drift : :obj:`list` [:obj:`float`], optional
         temp : :obj:`list` [:obj:`float`], optional
@@ -228,10 +228,22 @@ class Rule:
         if category is not None:
             assert isinstance(category, str)
             assert category in b_const.SUPP_GRID_POINT_CATEGORIES
+            if category_idx is None:
+                category_list = b_const.SUPP_GRID_POINT_CATEGORIES
+                category_idx = category_list.index(category)
+            else:
+                category_list = b_const.SUPP_GRID_POINT_CATEGORIES
+                assert category_idx == category_list.index(category)
 
-        if category_index is not None:
-            assert isinstance(category_index, int)
-            assert category_index in range(n_categories)
+        if category_idx is not None:
+            assert isinstance(category_idx, int)
+            assert category_idx in range(n_categories)
+            if category is None:
+                category_list = b_const.SUPP_GRID_POINT_CATEGORIES
+                category = category_list[category_idx]
+            else:
+                category_list = b_const.SUPP_GRID_POINT_CATEGORIES
+                assert category == category_list[category_idx]
 
         if rho is not None:
             assert isinstance(rho, np.ndarray)
@@ -269,19 +281,16 @@ class Rule:
         return
 
     # Todo replace by __str__ method
-    def print(self, list_of_category_names=None):
+    def print(self):
         """Prints all Properties for Debugging Purposes
 
         If a list of category names is given,
         then the category of the :class:`Rule` is printed.
         Otherwise the category index
         (:attr:`cat`) is printed"""
-        print('Name of Rule = {}'.format(self.name))
-        if list_of_category_names is not None:
-            print('Category = {}'
-                  ''.format(list_of_category_names[self.i_cat]))
-        else:
-            print('Category index = {}'.format(self.i_cat))
+        print('Rule = {}'.format(self.name))
+        category = b_const.SUPP_GRID_POINT_CATEGORIES[self.i_cat]
+        print('Category = ' + category)
         print('Rho: '
               '{}'.format(self.rho))
         print('Drift:\n'

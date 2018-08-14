@@ -114,7 +114,10 @@ class SVGrid:
         Denotes the number of different
         :class:`Velocity Grids <boltzmann.configuration.Grid>`.
         """
-        return self.vGrids.size
+        try:
+            return self.vGrids.size
+        except AttributeError:
+            return None
 
     @property
     def pMG(self):
@@ -569,9 +572,10 @@ class SVGrid:
         description += "Total Size = {}\n".format(self.size)
         description += "Offset = {}\n".format(self.offset)
 
-        for (i_G, vGrid) in enumerate(self.vGrids):
-            description += 'Specimen_{}:\n\t'.format(i_G)
-            grid_str = vGrid.__str__(write_physical_grid).replace('\n', '\n\t')
-            description += grid_str
-            description += '\n'
+        if self.vGrids is not None:
+            for (i_G, vGrid) in enumerate(self.vGrids):
+                description += 'Specimen_{}:\n\t'.format(i_G)
+                grid_str = vGrid.__str__(write_physical_grid)
+                description += grid_str.replace('\n', '\n\t')
+                description += '\n'
         return description[:-1]

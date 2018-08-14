@@ -34,26 +34,12 @@ class Configuration:
           * after any change -> check flags of depending classes
           * main classes need to be linked for that!
 
-
-
-        :class:`Grid`
-
-        - Add unit tests
-        - Add Circular shape
-        - Add rotation of grid (useful for velocities)
-        - Enable non-uniform/adaptive Grids
-          (see :class:`~boltzmann.calculation.Calculation`)
-        - Add Plotting-function to grids
-
-        :class:`Species` and :class:`Specimen`
-
-        - add attribute parent/parent_array to specimen
-            - add index attribute to specimen
-            - move most integrity checks from species to specimen
-            - move editing of collision_rate to specimen
-            - if index is None, collision_rate is stored locally (for init)
-            - if index is int, collision rate is read from matrix from parent
-            - when adding specimen to species -> give index and add coll_rate
+    Notes
+    -----
+        * :attr:`t.iG` denotes the time steps
+          when the results are written to the HDF5 file.
+        * :attr:`t.multi` denotes the number of calculation steps
+          between two writes.
 
     Parameters
     ----------
@@ -63,6 +49,18 @@ class Configuration:
 
     Attributes
     ----------
+    s : :class:`Species`
+        The simulated Specimen.
+    t : :class:`Grid`
+        The Time Grid.
+    p : :class:`Grid`
+        Position-Space Grid
+    sv : :class:`SVGrid`
+        Velocity-Space Grids of all Specimen.
+    animated_moments : :obj:`~numpy.ndarray` [:obj:`str`]
+        Output/Results of the Simulation.
+        Each element must be in :const:`~boltzmann.constants.SUPP_OUTPUT`.
+        Must be a 2D array.
     coll_select_scheme : :obj:`str`
         Selection scheme for the collision partners.
         Must be an element of
@@ -70,100 +68,116 @@ class Configuration:
     coll_substeps : :obj:`int`
         Number of collision substeps per time step.
     conv_order_os : :obj:`int`
-        Convergence Order of Operator Splitting.
+        Numerical order of Operator Splitting.
         Must be in :const:`~boltzmann.constants.SUPP_ORDERS_OS`.
     conv_order_coll : :obj:`int`
-        Convergence Order of Quadrature Formula
-        for Approximation of the Collision Operator.
+        Numerical order of approximation of the Collision Operator.
         Must be in
         :const:`~boltzmann.constants.SUPP_ORDERS_COLL`.
-    conv_order_transp : :obj:`int` :
-        Convergence Order of Transport Step (PDE).
+    conv_order_transp : :obj:`int`
+        Numerical order of transport solver.
         Must be in
         :const:`~boltzmann.constants.SUPP_ORDERS_TRANSP`.
     """
-    def __init__(self, simulation, file_name=None):
+    def __init__(self, simulation, file_address=None):
         # Todo assert parameters (sim + file_name -> path + root)
         assert isinstance(simulation, b_sim.Simulation)
         # Todo simulation.check_integrity(complete_check=False)
         self._sim = simulation
+        # Assert write access rights and that file exists
+        if file_address is None:
+            file_address = self._sim.file_address
+        else:
+            assert os.path.exists(file_address), \
+                "File does not exist: {}".format(file_address)
+            assert os.access(file_address, os.W_OK), \
+                "No write access to {}".format(file_address)
 
-        # Todo get file to load data from file_name  or _sim.file_address
-        # Most Attributes are Private and set up separately
-        # Read Only Properties
-        self._s = b_spc.Species()
-        self._t = b_grd.Grid()
-        self._p = b_grd.Grid()
-        self._sv = b_svg.SVGrid()
-        # Todo remove default parameters -> None
-        # Default Parameters
-        # Todo Move parameters into small Numerical_Scheme class?
-        self.coll_select_scheme = 'Complete'
-        self.coll_substeps = 1
-        self.conv_order_os = 1
-        self.conv_order_transp = 1
-        self.conv_order_coll = 1
-        self._animated_moments = np.array([['Mass',
-                                            'Momentum_X'],
-                                           ['Momentum_X',
-                                            'Momentum_Flow_X'],
-                                           ['Energy',
-                                            'Energy_Flow_X']])
-        return
+        # Open HDF5 file
+        # Todo Assert it is a simulation file!
+        if os.path.exists(file_address):
+            file = h5py.File(file_address, mode='r')
+        else:
+            file = h5py.File(file_address, mode='w-')
 
-    @property
-    def s(self):
-        """:obj:`Species` :
-        Contains all data about the simulated Specimen.
-        """
-        return self._s
+        #####################
+        #   Configuration   #
+        #####################
+        # load Species
+        try:
+            key = "Configuration/Species"
+            self.s = b_spc.Species.load(file[key])
+        except KeyError:
+            self.s = b_spc.Species()
+        # load Time Grid
+        try:
+            key = "Configuration/Time_Space"
+            # Todo make static
+            self.t = b_grd.Grid()
+            self.t.load(file[key])
+        except KeyError:
+            self.t = b_grd.Grid()
+            self.t.dim = 1
+        # load Position Grid
+        try:
+            key = "Configuration/Position_Space"
+            # Todo make static
+            self.p = b_grd.Grid()
+            self.p.load(file[key])
+        except KeyError:
+            self.p = b_grd.Grid()
+        # load Velocity Grids
+        try:
+            key = "Configuration/Velocity_Space"
+            # Todo do this better (no multiple arguments)
+            # Todo make static
+            self.sv = b_svg.SVGrid()
+            self.sv.load(file[key],
+                         file["Configuration/Species"])
+        except KeyError:
+            self.sv = b_svg.SVGrid()
 
-    @property
-    def t(self):
-        """:obj:`Grid` :
-        Contains all data about simulation time and time step size.
-
-        * :attr:`Grid.iG` denotes the time steps
-          at which the results are written out to HDD
-        * :attr:`Grid.multi` denotes the number of calculation steps
-          between two writes.
-
-        """
-        return self._t
-
-    @property
-    def p(self):
-        """:obj:`Grid` :
-        Contains all data about Position-Space.
-        """
-        return self._p
-
-    @property
-    def sv(self):
-        """:obj:`SVGrid` :
-        Contains all data about the Velocity-Space of each Specimen.
-        V-Spaces of distinct Specimen differ in step size
-        and number of grid points.
-        Maximum physical values may differ slightly between specimen.
-        """
-        return self._sv
-
-    @property
-    def animated_moments(self):
-        """:obj:`~numpy.ndarray` of :obj:`str` :
-        Array of the moments to be stored and animated.
-
-        Each moment is an element of
-        :const:`~boltzmann.constants.SUPP_OUTPUT`.
-        """
-        return self._animated_moments
-
-    @animated_moments.setter
-    def animated_moments(self, array_of_moments):
-        if type(array_of_moments) is list:
-            array_of_moments = np.array(array_of_moments)
-        self.check_parameters(animated_moments=array_of_moments)
-        self._animated_moments = array_of_moments
+        #########################
+        #   Numerical Schemes   #
+        #########################
+        try:
+            key = "Configuration/Collision_Selection_Scheme"
+            self.coll_select_scheme = file[key].value
+        except KeyError:
+            self.coll_select_scheme = 'Complete'
+        try:
+            key = "Configuration/Collision_Substeps"
+            self.coll_substeps = int(file[key].value)
+        except KeyError:
+            self.coll_substeps = 1
+        try:
+            key = "Configuration/Convergence_Order_Operator_Splitting"
+            self.conv_order_os = int(file[key].value)
+        except KeyError:
+            self.conv_order_os = 1
+        try:
+            key = "Configuration/Convergence_Order_Transport"
+            self.conv_order_transp = int(file[key].value)
+        except KeyError:
+            self.conv_order_transp = 1
+        try:
+            key = "Configuration/Convergence_Order_Collision_Operator"
+            self.conv_order_coll = int(file[key].value)
+        except KeyError:
+            self.conv_order_coll = 1
+        try:
+            key = "Configuration/Animated_Moments"
+            shape = file[key].attrs["shape"]
+            self.animated_moments = file[key].value.reshape(shape)
+        except KeyError:
+            self.animated_moments = np.array([['Mass',
+                                               'Momentum_X'],
+                                              ['Momentum_X',
+                                               'Momentum_Flow_X'],
+                                              ['Energy',
+                                               'Energy_Flow_X']])
+        file.close()
+        self.check_integrity(complete_check=False)
         return
 
     #####################################
@@ -210,11 +224,11 @@ class Configuration:
         calculations_per_time_step : :obj:`int`
         """
         step_size = max_time / (number_time_steps - 1)
-        self._t = b_grd.Grid(grid_form='rectangular',
-                             grid_dimension=1,
-                             grid_shape=[number_time_steps],
-                             grid_spacing=step_size,
-                             grid_multiplicator=calculations_per_time_step)
+        self.t = b_grd.Grid(grid_form='rectangular',
+                            grid_dimension=1,
+                            grid_shape=[number_time_steps],
+                            grid_spacing=step_size,
+                            grid_multiplicator=calculations_per_time_step)
         return
 
     def set_position_grid(self,
@@ -234,10 +248,10 @@ class Configuration:
         if isinstance(grid_shape, int):
             assert grid_dimension == 1
             grid_shape = [grid_shape]
-        self._p = b_grd.Grid(grid_form='rectangular',
-                             grid_dimension=grid_dimension,
-                             grid_shape=grid_shape,
-                             grid_spacing=grid_spacing)
+        self.p = b_grd.Grid(grid_form='rectangular',
+                            grid_dimension=grid_dimension,
+                            grid_shape=grid_shape,
+                            grid_spacing=grid_spacing)
         # Update initialization_array
         self._sim.initialization.init_arr = np.full(shape=self.p.size,
                                                     fill_value=-1,
@@ -266,96 +280,17 @@ class Configuration:
         grid_form : :obj:`str`, optional
         velocity_offset : :obj:`np.ndarray` [:obj:`float`], optional
         """
-        self._sv = b_svg.SVGrid(grid_form=grid_form,
-                                grid_dimension=grid_dimension,
-                                min_points_per_axis=min_points_per_axis,
-                                max_velocity=max_velocity,
-                                velocity_offset=velocity_offset,
-                                species_array=self.s)
+        self.sv = b_svg.SVGrid(grid_form=grid_form,
+                               grid_dimension=grid_dimension,
+                               min_points_per_axis=min_points_per_axis,
+                               max_velocity=max_velocity,
+                               velocity_offset=velocity_offset,
+                               species_array=self.s)
         return
 
     #####################################
     #           Serialization           #
     #####################################
-    def load(self, file_address=None):
-        """Sets all parameters of the :obj:`Configuration` instance
-        to the ones specified in the given HDF5-file.
-
-        Parameters
-        ----------
-        file_address : str
-            Full path to a :class:`~boltzmann.Simulation` file.
-        """
-        # Open file
-        if file_address is None:
-            file_address = self._sim.file_address
-        else:
-            assert os.path.exists(file_address)
-        # Todo Assert it is a simulation file!
-        file = h5py.File(file_address, mode='r')
-
-        # Check if Configuration Group exists
-        if "Configuration" not in file.keys():
-            msg = 'No group "Configuration" found in file:\n' \
-                  '{}'.format(file_address)
-            raise KeyError(msg)
-        file_c = file["Configuration"]
-        # load Species
-        try:
-            self._s = b_spc.Species.load(file_c["Species"])
-        except KeyError:
-            self._s = b_spc.Species()
-        # load Time Space
-        try:
-            self._t.load(file_c["Time_Space"])
-        except KeyError:
-            self._t = b_grd.Grid()
-        # load Position Space
-        try:
-            self._p.load(file_c["Position_Space"])
-        except KeyError:
-            self._p = b_grd.Grid()
-        try:
-            self._sv.load(file_c["Velocity_Space"],
-                          file_c["Species"])
-        except KeyError:
-            self._sv = b_svg.SVGrid()
-        # Default Parameters
-        try:
-            key = "Collision_Selection_Scheme"
-            self.coll_select_scheme = file_c[key].value
-        except KeyError:
-            self.coll_select_scheme = None
-        try:
-            key = "Collision_Substeps"
-            self.coll_substeps = int(file_c[key].value)
-        except KeyError:
-            self.coll_substeps = None
-        try:
-            key = "Convergence_Order_Operator_Splitting"
-            self.conv_order_os = int(file_c[key].value)
-        except KeyError:
-            self.conv_order_os = None
-        try:
-            key = "Convergence_Order_Transport"
-            self.conv_order_transp = int(file_c[key].value)
-        except KeyError:
-            self.conv_order_transp = None
-        try:
-            key = "Convergence_Order_Collision_Operator"
-            self.conv_order_coll = int(file_c[key].value)
-        except KeyError:
-            self.conv_order_coll = None
-        try:
-            key = "Animated_Moments"
-            shape = file_c[key].attrs["shape"]
-            self.animated_moments = file_c[key].value.reshape(shape)
-        except KeyError:
-            self._animated_moments = None
-        file.close()
-        self.check_integrity(complete_check=False)
-        return
-
     def save(self, file_address=None):
         """Writes all parameters of the :class:`Configuration` instance
         to the given HDF5-file.
@@ -441,10 +376,10 @@ class Configuration:
             If True, then all attributes must be set (not None).
             If False, then unassigned attributes are ignored.
         """
-        self.check_parameters(species=self._s,
-                              time_grid=self._t,
-                              position_grid=self._p,
-                              species_velocity_grid=self._sv,
+        self.check_parameters(species=self.s,
+                              time_grid=self.t,
+                              position_grid=self.p,
+                              species_velocity_grid=self.sv,
                               file_address=self._sim.file_address,
                               animated_moments=self.animated_moments,
                               coll_select_scheme=self.coll_select_scheme,
@@ -509,7 +444,9 @@ class Configuration:
         if position_grid is not None:
             assert isinstance(position_grid, b_grd.Grid)
             position_grid.check_integrity(complete_check)
-            if position_grid.dim is not 1:
+            # Todo Remove this, when implementing 2D Transport
+            if position_grid.dim is not None\
+                    and position_grid.dim is not 1:
                 msg = "Currently only 1D Simulations are supported!"
                 raise NotImplementedError(msg)
 
@@ -517,11 +454,16 @@ class Configuration:
             assert isinstance(species_velocity_grid, b_svg.SVGrid)
             species_velocity_grid.check_integrity(complete_check)
 
-        if position_grid is not None and species_velocity_grid is not None:
-            assert species_velocity_grid.dim >= position_grid.dim
+        if position_grid is not None \
+                and species_velocity_grid is not None:
+            if position_grid.dim is not None\
+                    and species_velocity_grid.dim is not None:
+                assert species_velocity_grid.dim >= position_grid.dim
 
-        if species is not None and species_velocity_grid is not None:
-            assert species_velocity_grid.n_grids == species.n
+        if species is not None \
+                and species_velocity_grid is not None:
+            if species_velocity_grid.n_grids is not None:
+                assert species_velocity_grid.n_grids == species.n
 
         if file_address is not None:
             assert isinstance(file_address, str)

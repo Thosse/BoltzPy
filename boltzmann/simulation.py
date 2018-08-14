@@ -44,6 +44,10 @@ class Simulation:
 
         # Todo assert proper file name, user has writing rights
         # Todo check_parameters (allow ".temp" name!)
+
+        # Todo Asserts: assert if file exists, that its a sim file (hash?)
+        # Todo Asserts: assert if a file exists,
+        # Todo          that it contains the basic directories
         if file_name is None:
             # choose hidden filename in default directory
             self._file_directory = b_const.DEFAULT_DIRECTORY
@@ -69,8 +73,8 @@ class Simulation:
         # Todo self.description = ... String that describes the simulation
         self.configuration = b_cnf.Configuration(self)
         self.initialization = b_ini.Initialization(self)
-        # Todo self.schemes = ... Enum should be enough -> extra file
         self.collision_relations = b_rel.CollisionRelations(self)
+        # Todo self.schemes, get from configuration
         self.calculation = b_cal.Calculation(self)
         self.animation = b_ani.Animation(self)
         # Todo check_integrity (basic version)

@@ -1,13 +1,18 @@
 
+import boltzmann as b_sim
+import boltzmann.constants as b_const
+
 import numpy as np
 from scipy.sparse import csr_matrix
-
 from time import time
+import os
+import h5py
 
 
+# Todo Add Collision Scheme "Free_Flow"
 # Todo rework this, using new SVGrid
 class CollisionRelations:
-    """Generates and Stores Collision Relations.
+    r"""Generates and Stores Collision Relations.
 
     .. todo::
         - check integrity (non neg weights,
@@ -30,54 +35,79 @@ class CollisionRelations:
     Parameters
     ----------
     simulation : :class:`~boltzmann.Simulation`
+    file_address : :obj:`str`, optional
+        Can be either a full path, a base file name or a file root.
 
-
+    Attributes
+    ----------
+    collision_arr : :obj:`~numpy.array` [:obj:`int`]
+        Contains the active collisions.
+        Each collision is a 4-tuple of indices in :attr:`sv.iG`
+        and is in the form
+        :math:`\left[ v_{s_1}^{pre}, v_{s_1}^{post},
+                      v_{s_2}^{pre}, v_{s_2}^{post}
+               \right]`.
+    weight_arr : :obj:`~numpy.array` [:obj:`float`]
+        Contains the numeric integration weights
+        of the respective collision in :attr:`collision_arr`.
     """
-    def __init__(self, simulation):
+    def __init__(self, simulation, file_address=None):
+        # Todo simulation.check_integrity(complete_check=False)
+        assert isinstance(simulation, b_sim.Simulation)
         self._sim = simulation
-        self._collision_arr = np.array([], dtype=int)
-        self._weight_arr = np.array([], dtype=float)
-        self._n = 0
+
+        # Assert write access rights and that file exists
+        if file_address is None:
+            file_address = self._sim.file_address
+        else:
+            assert os.path.exists(file_address), \
+                "File does not exist: {}".format(file_address)
+            assert os.access(file_address, os.W_OK), \
+                "No write access to {}".format(file_address)
+
+        # Open HDF5 file
+        # Todo Assert it is a simulation file!
+        if os.path.exists(file_address):
+            file = h5py.File(file_address, mode='r')
+        else:
+            file = h5py.File(file_address, mode='w-')
+
+        ###########################
+        #   Collision Relations   #
+        ###########################
+        # load Collisions Array
+        try:
+            key = ("Collisions/"
+                   + self._sim.configuration.coll_select_scheme
+                   + "/Collisions")
+            self.collision_arr = file[key].value
+        except (KeyError, TypeError) as e:
+            if isinstance(e, TypeError):
+                assert self._sim.configuration.coll_select_scheme is None
+            self.collision_arr = np.array([], dtype=int)
+        # load Weight Array
+        try:
+            key = ("Collisions/"
+                   + self._sim.configuration.coll_select_scheme
+                   + "/Weights")
+            self.weight_arr = file[key].value
+        except (KeyError, TypeError) as e:
+            if isinstance(e, TypeError):
+                assert self._sim.configuration.coll_select_scheme is None
+            self.weight_arr = np.array([], dtype=float)
+
+        # Todo Move this into Collision/calc_XXX method
         self._mat = csr_matrix(np.array([[]]))
+        assert self.n == self.collision_arr.shape[0]
+        assert self.n == self.weight_arr.size
         return
 
     @property
-    def collision_arr(self):
-        """:obj:`~numpy.ndarray` of :obj:`int` :
-        Array of all simulated collisions
-
-        Each collision :obj:`c` is described by the 4-tuple
-        :attr:`collision_arr` [ :obj:`c`, :].
-        It is an array of 4 indices of the
-        :obj:`~boltzmann.configuration.SVGrid`,
-        ordered is as follows:
-
-            * :obj:`collision_arr` [c, 0]`
-              = pre collision velocity of Specimen 1
-            * :obj:`collision_arr` [c, 1]`
-              = post collision velocity of Specimen 1
-            * :obj:`collision_arr` [c, 2]`
-              = pre collision velocity of Specimen 2
-            * :obj:`collision_arr` [c, 3]`
-              = post collision velocity of Specimen 2
-        """
-        return self._collision_arr
-
-    @property
-    def weight_arr(self):
-        """:obj:`~numpy.ndarray` of :obj:`float` :
-        Array of numeric integration weights
-        for each collision in
-        :obj:`collision_arr`.
-        Array of shape=(:attr:`n`,)
-        """
-        return self._weight_arr
-
-    @property
     def n(self):
-        """:obj:`int` : Total number of Collisions"""
-        return self._n
+        """:obj:`int` : Total number of active collisions."""
+        return self.collision_arr.shape[0]
 
+    # Todo Move this into Collision/calc_XXX method
     @property
     def mat(self):
         """:obj:`~scipy.sparse.csr.csr_matrix` :
@@ -97,15 +127,11 @@ class CollisionRelations:
         gen_col_time = time()
         print('Generating Collision Array...', end='\r')
         if self._sim.configuration.coll_select_scheme == 'Complete':
-            if self._sim.configuration.sv.form == 'rectangular':
-                self._generate_collisions_complete()
-            else:
-                raise AttributeError('Currently, only rectangular '
-                                     'grids are supported')
+            self._generate_collisions_complete()
         else:
-            message = 'Unsupported Selection Scheme:' \
+            msg = 'Unsupported Selection Scheme:' \
                       '{}'.format(self._sim.configuration.coll_select_scheme)
-            raise AttributeError(message)
+            raise NotImplementedError(msg)
         print('Generating Collision Array...Done\n'
               'Time taken =  {} seconds\n'
               'Total Number of Collisions = {}\n'
@@ -113,6 +139,7 @@ class CollisionRelations:
 
         self.generate_collision_matrix()
         self.check_integrity()
+        self.save()
         return
 
     # Todo Simplify - Looks horrible
@@ -120,6 +147,9 @@ class CollisionRelations:
     def _generate_collisions_complete(self):
         """Generate all possible, non-useless collisions."""
         assert self._sim.configuration.coll_select_scheme == 'Complete'
+        if self._sim.configuration.sv.form != 'rectangular':
+            raise NotImplementedError('Currently, only rectangular '
+                                      'grids are supported')
         # collect collisions in these lists
         col_arr = []
         weight_arr = []
@@ -189,9 +219,8 @@ class CollisionRelations:
                             weight = self.compute_weight_arr(s)
                             weight_arr.append(weight)
         assert len(col_arr) == len(weight_arr)
-        self._collision_arr = np.array(col_arr, dtype=int)
-        self._weight_arr = np.array(weight_arr, dtype=float)
-        self._n = self._collision_arr.shape[0]
+        self.collision_arr = np.array(col_arr, dtype=int)
+        self.weight_arr = np.array(weight_arr, dtype=float)
         return
 
     def compute_weight_arr(self, specimen):
@@ -243,6 +272,7 @@ class CollisionRelations:
         else:
             return True
 
+    # Todo Check if its pv or iG - d * pv makes no sense
     @staticmethod
     def _meets_energy_conservation(d, pv):
         """Checks if the collision denoted by pv
@@ -261,6 +291,8 @@ class CollisionRelations:
             True if collision fulfills energy conservation law,
             False otherwise.
         """
+        assert isinstance(pv, np.ndarray)
+        assert isinstance(d, np.ndarray)
         # TODO Add nicely to Docstring
         # Energy Conservation law:
         #    m[0]*(d[0]*pv[0, 0])**2 + m[1]*(d[1]*pv[1, 0])**2
@@ -269,11 +301,11 @@ class CollisionRelations:
         # => can be canceled in Equation:
         #    d[0]*pv[0, 0]**2 + d[1]*pv[1, 0]**2
         # == d[0]*pv[0, 1]**2 + d[1]*pv[1, 1]**2
-        pre_energy = np.array(d[0] * (pv[0, 0]**2)
-                              + d[1] * (pv[1, 0]**2))
+        pre_energy = d[0] * pv[0, 0]**2 + d[1] * pv[1, 0]**2
+        assert isinstance(pre_energy, np.ndarray)
         pre_energy = pre_energy.sum()
-        post_energy = np.array(d[0] * (pv[0, 1]**2)
-                               + d[1] * (pv[1, 1]**2))
+        post_energy = d[0] * pv[0, 1]**2 + d[1] * pv[1, 1]**2
+        assert isinstance(post_energy, np.ndarray)
         post_energy = post_energy.sum()
         return np.allclose(pre_energy, post_energy)
 
@@ -304,15 +336,63 @@ class CollisionRelations:
               "".format(round(time() - gen_mat_time, 2)))
         return
 
+        #####################################
+        #           Serialization           #
+        #####################################
+    # Todo Move this save to bottom of generate collisions method
+    def save(self, file_address=None):
+        """Writes all attributes of the :class:`CollisionRelations` instance
+        to the given HDF5-file.
+
+        Parameters
+        ----------
+        file_address : str, optional
+            Full path to a :class:`~boltzmann.Simulation` HDF5-file.
+        """
+        assert (self._sim.configuration.coll_select_scheme
+                in b_const.SUPP_COLL_SELECTION_SCHEMES)
+        self.check_integrity()
+
+        if file_address is None:
+            file_address = self._sim.file_address
+        else:
+            assert os.path.exists(file_address), \
+                "File does not exist: {}".format(file_address)
+            assert os.access(file_address, os.W_OK), \
+                "No write access to {}".format(file_address)
+
+        # Open file
+        file = h5py.File(file_address, mode='a')
+
+        # Key to HDF5 directory
+        key = ("Collisions/"
+               + self._sim.configuration.coll_select_scheme)
+        # Remove previous CollisionRelations, if any
+        if key in file.keys():
+            del file[key]
+        # Create fresh/empty subgroup
+        if key not in file.keys():
+            file.create_group(key)
+
+        # save Collision Array
+        file[key + "/Collisions"] = self.collision_arr
+
+        # save Initialization Array
+        file[key + "/Weights"] = self.weight_arr
+
+        # Save Number of Collisions as attribute
+        file[key].attrs["Number_of_Collisions"] = self.n
+        return
+
     #####################################
     #           Verification            #
     #####################################
     def check_integrity(self):
         """Sanity Check"""
-        assert type(self._collision_arr) == np.ndarray
-        assert self._collision_arr.dtype == int
-        assert self._collision_arr.shape == (self._n, 4)
-        for col in self._collision_arr:
+        assert type(self.collision_arr) == np.ndarray
+        assert self.collision_arr.dtype == int
+        assert self.collision_arr.shape == (self.n, 4)
+        for col in self.collision_arr:
             assert col[0] < col[1]
             assert col[0] < col[2]
             di_0 = (self._sim.configuration.sv.iMG[col[1]]
@@ -323,10 +403,10 @@ class CollisionRelations:
             s = [self._sim.configuration.sv.get_specimen(v_col)
                  for v_col in col]
             assert s[0] == s[1] and s[2] == s[3]
-        assert type(self._weight_arr) == np.ndarray
-        assert self._weight_arr.dtype == float
-        assert self._weight_arr.shape == (self._n,)
-        assert type(self._n) is int
+        assert type(self.weight_arr) == np.ndarray
+        assert self.weight_arr.dtype == float
+        assert self.weight_arr.shape == (self.n,)
+        assert type(self.n) is int
         return
 
 # Todo Keep for testing

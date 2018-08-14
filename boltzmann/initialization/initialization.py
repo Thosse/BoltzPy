@@ -1,7 +1,6 @@
 
 from boltzmann import simulation as b_sim
 from boltzmann.initialization import rule as b_rul
-import boltzmann.constants as b_const
 
 import numpy as np
 import os
@@ -34,11 +33,17 @@ class Initialization:
         - sphinx: link PSV-Grid to Calculation.data?
           link init_arr to Calculation.init_arr? No?
           in Initialization-Docstring
+        - Add former block_index functionality for boundary points again
+            * sort rule_arr and init_arr
+            * set up reflection methods -> depends on position
+                -> multiplies number of boundary rules
+            * move into initialization module
 
     Parameters
     ----------
     simulation : :class:`~boltzmann.Simulation`
-    file_name : :obj:`str`, optional
+    file_address : :obj:`str`, optional
+        Can be either a full path, a base file name or a file root.
 
     Attributes
     ----------
@@ -54,40 +59,54 @@ class Initialization:
         :attr:`init_arr` [p] is the index of its
         :class:`initialization rule <Rule>` in :attr:`rule_arr`.
     """
-    def __init__(self, simulation, file_name=None):
+    def __init__(self, simulation, file_address=None):
         # Todo simulation.check_integrity(complete_check=False)
         assert isinstance(simulation, b_sim.Simulation)
         self._sim = simulation
 
-        self.rule_arr = np.empty(shape=(0,), dtype=b_rul.Rule)
+        # Assert write access rights and that file exists
+        if file_address is None:
+            file_address = self._sim.file_address
+        else:
+            assert os.path.exists(file_address), \
+                "File does not exist: {}".format(file_address)
+            assert os.access(file_address, os.W_OK), \
+                "No write access to {}".format(file_address)
 
-        # Todo _block_index is ugly. This should be simpler
-        # Todo block_index can probably be removed
-        n_categories = len(b_const.SUPP_GRID_POINT_CATEGORIES)
-        self._block_index = np.zeros(shape=(n_categories + 1,),
-                                     dtype=int)
-        # initialize initialization array for P-Grid
-        # default value -1 means no initialization rule applies to the point
-        self.init_arr = np.full(shape=self._sim.configuration.p.size,
-                                fill_value=-1,
-                                dtype=int)
-        # Todo be very careful, when adding more categories
-        assert len(b_const.SUPP_GRID_POINT_CATEGORIES) is 1
+        # Open HDF5 file
+        # Todo Assert it is a simulation file!
+        if os.path.exists(file_address):
+            file = h5py.File(file_address, mode='r')
+        else:
+            file = h5py.File(file_address, mode='w-')
+
+        ######################
+        #   Initialization   #
+        ######################
+        # load initialization rules
+        try:
+            self.rule_arr = np.empty(shape=(0,), dtype=b_rul.Rule)
+            n_rules = int(file["Initialization"].attrs["Number of Rules"])
+            for rule_idx in range(n_rules):
+                key = "Initialization/Rule_{}".format(rule_idx)
+                # Todo make Rule load static!
+                rule = b_rul.Rule()
+                rule.load(file[key])
+                self.rule_arr = np.append(self.rule_arr, [rule])
+        except KeyError:
+            self.rule_arr = np.empty(shape=(0,), dtype=b_rul.Rule)
+
+        # load initialization array
+        # default value -1 <=> no initialization rule applies to the point
+        try:
+            key = "Initialization/Initialization Array"
+            self.init_arr = file[key].value
+        except KeyError:
+            self.init_arr = np.full(shape=self._sim.configuration.p.size,
+                                    fill_value=-1,
+                                    dtype=int)
+        self.check_integrity()
         return
-
-    @property
-    def block_index(self):
-        """:obj:`~numpy.ndarray` of :obj:`int`:
-        Marks the range of each Category block in :attr:`rule_arr`.
-
-        For each Category c,
-        :attr:`rule_arr`
-        [:attr:`block_index` [c] : :attr:`block_index` [c+1]]
-        denotes the range of Category c Rules (see :class:`Rule`)
-        in :attr:`rule_arr`.
-        Note that the last entry marks the total length of
-        :attr:`rule_arr`."""
-        return self._block_index
 
     @property
     def n_rules(self):
@@ -99,8 +118,7 @@ class Initialization:
     #####################################
     #           Configuration           #
     #####################################
-    # Todo check here and in Rule that all conserved quantities are np.ndarrays
-    # Todo => Don't allow lists
+    # Todo Write add and edit methods? For easier GUI?
     def add_rule(self,
                  category,
                  rho,
@@ -108,7 +126,7 @@ class Initialization:
                  temp,
                  name=None,
                  color=None):
-        """Adds a new :class:`initialization rules <Rule>`
+        """Add a new :class:`initialization rule <Rule>`
         to  :attr:`rule_arr`.
 
         Parameters
@@ -135,50 +153,34 @@ class Initialization:
         assert np.array(drift).shape == (self._sim.configuration.s.n,
                                          self._sim.configuration.sv.dim)
         assert np.array(temp).shape == (self._sim.configuration.s.n,)
-        # Construct new_rule -> Depending on Category
-        i_cat = b_const.SUPP_GRID_POINT_CATEGORIES.index(category)
+
         new_rule = b_rul.Rule(category,
                               rho,
                               drift,
                               temp,
                               name,
                               color)
-
-        # Put new rule in right position
-        # rule array is ordered in blocks of rule_categories
-        pos_of_rule = self.block_index[i_cat+1]
-        # Insert new rule into rule array
-        self.rule_arr = np.insert(self.rule_arr,
-                                  pos_of_rule,
-                                  [new_rule])
-        # Adjust init_arr entries to new rule_arr indices
-        for (idx, val) in enumerate(self.init_arr):
-            if val >= pos_of_rule:
-                self.init_arr[idx] += 1
-        # Adjust block_index entries to new rule_arr indices
-        self._block_index[i_cat+1:] += 1
+        self.rule_arr = np.append(self.rule_arr, [new_rule])
         return
 
     def apply_rule(self,
                    array_of_grid_point_indices,
                    rule_index):
-        """The specified
-        :class:`P-Grid <boltzmann.configuration.Grid>` points
-        will be initialized with the specified
+        """Mark :class:`P-Grid <boltzmann.configuration.Grid>` points
+        to be initialized with the specified
         :class:`initialization rule <Rule>`.
 
-        This is done by setting the :attr:`init_arr` entries
-        of the  :class:`P-Grid <boltzmann.configuration.Grid>`
-        points in *array_of_grid_point_indices* to *rule_index*.
+        Sets the :attr:`init_arr` entries
+        of all  :class:`P-Grid <boltzmann.configuration.Grid>` points
+        in *array_of_grid_point_indices* to *rule_index*.
 
         Parameters
         ----------
         array_of_grid_point_indices : :obj:`~numpy.ndarray` [:obj:`int`]
-            Indices (1D) of all :class:`P-Grid <boltzmann.configuration.Grid>`
-            points on which the :class:`initialization rule <Rule>`
-            should be applied.
+            Contains flat indices of
+            :class:`P-Grid <boltzmann.configuration.Grid>` points.
         rule_index : :obj:`int`
-            Index of the :class:`initialization rule <Rule>`
+            Index of a :class:`initialization rule <Rule>`
             in :attr:`rule_arr`.
         """
         assert isinstance(array_of_grid_point_indices, np.ndarray)
@@ -193,8 +195,7 @@ class Initialization:
             self.init_arr[p] = rule_index
         return
 
-    # Todo link PSV Grid to Calculation.data -> explain what psv grid is there
-    # Todo Alternatively rename psv-Grid into data_array
+    # Todo move into initialization module
     def create_psv_grid(self):
         """Generates and returns an initialized PSV-Grid
         (:attr:`~boltzmann.calculation.Calculation.data`,
@@ -247,57 +248,8 @@ class Initialization:
     #####################################
     #           Serialization           #
     #####################################
-    def load(self,
-             file_address=None):
-        """Sets all parameters of the :obj:`Initialization` instance
-        to the ones specified in the given HDF5-file.
-
-        Parameters
-        ----------
-        file_address : :obj:`str`
-            Full path to a :class:`~boltzmann.Simulation` file.
-        """
-        # Open file
-        if file_address is None:
-            file_address = self._sim.file_address
-        else:
-            assert os.path.exists(file_address)
-        # Todo Assert it is a simulation file!
-        file = h5py.File(file_address, mode='r')
-
-        # Check if Initialization Group exists
-        if "Initialization" not in file.keys():
-            msg = 'No group "Initialization" found in file:\n' \
-                  '{}'.format(file_address)
-            raise KeyError(msg)
-        file_i = file["Initialization"]
-
-        # Todo check, what to do, if self is not empty?
-        # Todo replace the fresh initialization by something smarter
-        # Todo check, if the instance is empty first -> give Warning?
-        # Do fresh initialization
-        self.__init__(self._sim)
-
-        # Todo implement something to use existing(freshly loaded) Rules
-        n_rules = int(file_i.attrs["Number of Rules"])
-        for i_r in range(n_rules):
-            rule = b_rul.Rule()
-            rule.load(file_i["Rule_{}".format(i_r)])
-            category = b_const.SUPP_GRID_POINT_CATEGORIES[rule.i_cat]
-            self.add_rule(category,
-                          rule.rho,
-                          rule.drift,
-                          rule.temp,
-                          rule.name,
-                          rule.color)
-
-        self.init_arr = file_i["Initialization Array"].value
-
-        self.check_integrity()
-        return
-
     def save(self, file_address=None):
-        """Writes all attributes of the :class:`Initialization` instance
+        """Writes all parameters of the :class:`Initialization` instance
         to the given HDF5-file.
 
         Parameters
@@ -309,8 +261,10 @@ class Initialization:
         if file_address is None:
             file_address = self._sim.file_address
         else:
-            # Todo assert the directory exists and check the rights
-            pass
+            assert os.path.exists(file_address), \
+                "File does not exist: {}".format(file_address)
+            assert os.access(file_address, os.W_OK), \
+                "No write access to {}".format(file_address)
 
         # Open file
         file = h5py.File(file_address, mode='a')
@@ -341,7 +295,6 @@ class Initialization:
         """Sanity Check"""
         assert isinstance(self.rule_arr, np.ndarray)
         assert self.rule_arr.ndim == 1
-        assert self.n_rules == self.block_index[-1]
         for (i_r, rule) in enumerate(self.rule_arr):
             assert isinstance(rule, b_rul.Rule)
             rule.check_integrity()
@@ -350,23 +303,23 @@ class Initialization:
             assert rule.drift.shape == (self._sim.configuration.s.n,
                                         self._sim.configuration.sv.dim)
             assert rule.temp.shape == (self._sim.configuration.s.n,)
-            # Todo this could be removed if block_index is obsolete
-            assert i_r >= self.block_index[rule.i_cat]
-            assert i_r < self.block_index[rule.i_cat+1]
 
         assert isinstance(self.init_arr, np.ndarray)
-        assert self.init_arr.size == self._sim.configuration.p.size
+        # Todo Check this in unit tests, compare before and after save + load
+        if self._sim.configuration.p.size is not None:
+            assert self.init_arr.size == self._sim.configuration.p.size
+        else:
+            assert self.init_arr.size == 1
         assert self.init_arr.dtype == int
-        assert np.min(self.init_arr) >= 0, \
-            'Positional Grid is not properly initialized.' \
-            'Some Grid points have no initialization rule!'
+        assert np.min(self.init_arr) >= -1
+        # Todo Check this, before Calculation -> complete check
+        # assert np.min(self.init_arr) >= 0, \
+        #     'Positional Grid is not properly initialized.' \
+        #     'Some Grid points have no initialization rule!'
         assert np.max(self.init_arr) < self.n_rules, \
             'Undefined Rule! A P-Grid point is set ' \
             'to be initialized by an undefined initialization rule. ' \
             'Either add the respective rule, or choose an existing rule.'
-
-        n_categories = len(b_const.SUPP_GRID_POINT_CATEGORIES)
-        assert self.block_index.size == n_categories + 1
         return
 
     # Todo change into __str__ method
@@ -377,18 +330,11 @@ class Initialization:
         print('\n=======INITIALIZATION=======\n')
         print('Number of Rules = '
               '{}'.format(self.rule_arr.shape[0]))
-        print('Block Indices = '
-              '{}'.format(self.block_index))
 
-        for (i_c, category) in enumerate(b_const.SUPP_GRID_POINT_CATEGORIES):
-            if self.block_index[i_c] < self.block_index[i_c+1]:
-                print('\n{} Rules'
-                      ''.format(category))
-                line_length = len(category) + 6
-                print('-'*line_length)
-            for r in self.rule_arr[self.block_index[i_c]:
-                                   self.block_index[i_c+1]]:
-                r.print(b_const.SUPP_GRID_POINT_CATEGORIES)
+        print('\nInitialization Rules')
+        print('-' * 20)
+        for rule in self.rule_arr:
+            rule.print()
         if physical_grid:
             print('Flag-Grid of P-Space:')
             print(self.init_arr)

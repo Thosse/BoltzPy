@@ -12,6 +12,16 @@ class Species:
     Can be subscripted by an index of a :class:`Specimen`
     in the :attr:`specimen_array`.
 
+    ..todo::
+        - add attribute parent/parent_array to specimen
+        - add index attribute to specimen
+        - move most integrity checks from species to specimen
+        - move editing of collision_rate to specimen
+        - if index is None, collision_rate is stored locally (for init)
+        - if index is int, collision rate is read from matrix from parent
+        - when adding specimen to species -> give index and add coll_rate
+
+
     Attributes
     ----------
     specimen_array : :obj:`~numpy.ndarray` [:class:`Specimen`]
