@@ -1,6 +1,6 @@
 
-import boltzmann as b_sim
-import boltzmann.constants as b_const
+import boltzpy as b_sim
+import boltzpy.constants as b_const
 
 import numpy as np
 from scipy.sparse import csr_matrix
@@ -34,7 +34,7 @@ class CollisionRelations:
 
     Parameters
     ----------
-    simulation : :class:`~boltzmann.Simulation`
+    simulation : :class:`~boltzpy.Simulation`
     file_address : :obj:`str`, optional
         Can be either a full path, a base file name or a file root.
 
@@ -78,22 +78,22 @@ class CollisionRelations:
         # load Collisions Array
         try:
             key = ("Collisions/"
-                   + self._sim.configuration.coll_select_scheme
+                   + self._sim.coll_select_scheme
                    + "/Collisions")
             self.collision_arr = file[key].value
         except (KeyError, TypeError) as e:
             if isinstance(e, TypeError):
-                assert self._sim.configuration.coll_select_scheme is None
+                assert self._sim.coll_select_scheme is None
             self.collision_arr = np.array([], dtype=int)
         # load Weight Array
         try:
             key = ("Collisions/"
-                   + self._sim.configuration.coll_select_scheme
+                   + self._sim.coll_select_scheme
                    + "/Weights")
             self.weight_arr = file[key].value
         except (KeyError, TypeError) as e:
             if isinstance(e, TypeError):
-                assert self._sim.configuration.coll_select_scheme is None
+                assert self._sim.coll_select_scheme is None
             self.weight_arr = np.array([], dtype=float)
 
         # Todo Move this into Collision/calc_XXX method
@@ -122,15 +122,15 @@ class CollisionRelations:
     def setup(self):
         """Generates the :obj:`collision_arr`,
         based on the
-        :attr:`~boltzmann.configuration.Configuration.coll_select_scheme`
+        :attr:`~boltzpy.Simulation.coll_select_scheme`
         """
         gen_col_time = time()
         print('Generating Collision Array...', end='\r')
-        if self._sim.configuration.coll_select_scheme == 'Complete':
+        if self._sim.coll_select_scheme == 'Complete':
             self._generate_collisions_complete()
         else:
             msg = 'Unsupported Selection Scheme:' \
-                      '{}'.format(self._sim.configuration.coll_select_scheme)
+                      '{}'.format(self._sim.coll_select_scheme)
             raise NotImplementedError(msg)
         print('Generating Collision Array...Done\n'
               'Time taken =  {} seconds\n'
@@ -146,8 +146,8 @@ class CollisionRelations:
     # noinspection PyAssignmentToLoopOrWithParameter
     def _generate_collisions_complete(self):
         """Generate all possible, non-useless collisions."""
-        assert self._sim.configuration.coll_select_scheme == 'Complete'
-        if self._sim.configuration.sv.form != 'rectangular':
+        assert self._sim.coll_select_scheme == 'Complete'
+        if self._sim.sv.form != 'rectangular':
             raise NotImplementedError('Currently, only rectangular '
                                       'grids are supported')
         # collect collisions in these lists
@@ -155,8 +155,8 @@ class CollisionRelations:
         weight_arr = []
 
         # Abbreviations
-        species = self._sim.configuration.s
-        sv = self._sim.configuration.sv
+        species = self._sim.s
+        sv = self._sim.sv
 
         # Each collision is an array of 4 Velocity-Indices
         # Ordered as: [[v_pre_s0, v_post_s0],
@@ -229,9 +229,9 @@ class CollisionRelations:
         Currently only depends on the colliding Specimen .
         This will change in the future.
         """
-        col_rate = self._sim.configuration.s.collision_rate_matrix[specimen[0],
-                                                                   specimen[1]]
-        n_cols = self._sim.configuration.coll_substeps
+        col_rate = self._sim.s.collision_rate_matrix[specimen[0],
+                                                     specimen[1]]
+        n_cols = self._sim.coll_substeps
         if n_cols != 0:
             return col_rate / n_cols
         else:
@@ -310,13 +310,13 @@ class CollisionRelations:
         return np.allclose(pre_energy, post_energy)
 
     def generate_collision_matrix(self):
-        if self._sim.configuration.coll_substeps == 0:
+        if self._sim.coll_substeps == 0:
             return None
         gen_mat_time = time()
         print('Generating Collision Matrix...',
               end='\r')
         # Size of complete velocity grid
-        rows = self._sim.configuration.sv.size
+        rows = self._sim.sv.size
         # Number of different collisions
         columns = self.n
         col_matrix = np.zeros(shape=(rows, columns),
@@ -326,7 +326,7 @@ class CollisionRelations:
             # => necessary for stability
             #   v[i]*v[j] - v[k]*v[l] is used as collision term
             #   => v'[*] = ... - X*u[*]
-            col_weight = self._sim.configuration.t.d * self.weight_arr[i_col]
+            col_weight = self._sim.t.d * self.weight_arr[i_col]
             col_matrix[col, i_col] = [-1, 1, -1, 1]
             col_matrix[col, i_col] *= col_weight
         col_mat = csr_matrix(col_matrix)
@@ -347,9 +347,9 @@ class CollisionRelations:
         Parameters
         ----------
         file_address : str, optional
-            Full path to a :class:`~boltzmann.Simulation` HDF5-file.
+            Full path to a :class:`~boltzpy.Simulation` HDF5-file.
         """
-        assert (self._sim.configuration.coll_select_scheme
+        assert (self._sim.coll_select_scheme
                 in b_const.SUPP_COLL_SELECTION_SCHEMES)
         self.check_integrity()
 
@@ -366,7 +366,7 @@ class CollisionRelations:
 
         # Key to HDF5 directory
         key = ("Collisions/"
-               + self._sim.configuration.coll_select_scheme)
+               + self._sim.coll_select_scheme)
         # Remove previous CollisionRelations, if any
         if key in file.keys():
             del file[key]
@@ -395,12 +395,12 @@ class CollisionRelations:
         for col in self.collision_arr:
             assert col[0] < col[1]
             assert col[0] < col[2]
-            di_0 = (self._sim.configuration.sv.iMG[col[1]]
-                    - self._sim.configuration.sv.iMG[col[0]])
-            di_1 = (self._sim.configuration.sv.iMG[col[3]]
-                    - self._sim.configuration.sv.iMG[col[2]])
+            di_0 = (self._sim.sv.iMG[col[1]]
+                    - self._sim.sv.iMG[col[0]])
+            di_1 = (self._sim.sv.iMG[col[3]]
+                    - self._sim.sv.iMG[col[2]])
             assert all(np.array(di_1 + di_0) == 0)
-            s = [self._sim.configuration.sv.get_specimen(v_col)
+            s = [self._sim.sv.get_specimen(v_col)
                  for v_col in col]
             assert s[0] == s[1] and s[2] == s[3]
         assert type(self.weight_arr) == np.ndarray

@@ -11,7 +11,7 @@
    submodules
 
 
-.. automodule:: boltzmann
+.. automodule:: boltzpy
 
 Links
 -----

@@ -1,14 +1,15 @@
 
-from boltzmann import simulation as b_sim
-import boltzmann.collisions.collision_relations as b_rel
-from . import output_function as b_opf
+import boltzpy as b_sim
+import boltzpy.collisions.collision_relations as b_rel
+import boltzpy.initialization as b_ini
+import boltzpy.output_functions as b_opf
 
 import numpy as np
 from time import time
 
 
 class Calculation:
-    r"""Manages calculation process
+    r"""Manages computation process
 
     For equivalent, straightforward, but less performant Code
     see the CalculationTest Class!
@@ -21,12 +22,12 @@ class Calculation:
             * for higher order transport -> multiple entries?
             * replace t_arr, and t_w by sparse matrix,
               such that transport is simple multiplication?
-        - Properly implement calculation( switches for Orders, vectorized))
+        - Properly implement computation( switches for Orders, vectorized))
         - Implement Operator Splitting of Order 2 (easy)
         - directly use p_flag? shrink it down
           (only 1 flag(==0) for inner points necessary)?
           Use p_flag as an array of pointers, that point to their
-          calculation function (depending on their type)
+          computation function (depending on their type)
         - Implement complex Geometries for P-Grid:
 
             * Each P-Grid Point has a list of Pointers to its Neighbours
@@ -77,7 +78,7 @@ class Calculation:
 
     Parameters
     ----------
-    simulation : :class:`~boltzmann.Simulation`
+    simulation : :class:`~boltzpy.Simulation`
 
     Attributes
     ----------
@@ -85,30 +86,30 @@ class Calculation:
         Current state of the simulation, such that
         :math:`f(t_{cur}, p, v) = data[i_p, i_v]`.
         Array of shape
-        (:attr:`cnf.p.size <boltzmann.configuration.Grid.size>`,
-        :attr:`cnf.sv.size <boltzmann.configuration.SVGrid.size>`).
-    f_out : :obj:`~boltzmann.calculation.OutputFunction`
+        (:attr:`cnf.p.size <boltzpy.Grid.size>`,
+        :attr:`cnf.sv.size <boltzpy.SVGrid.size>`).
+    f_out : :obj:`~boltzpy.computation.OutputFunction`
         Handles generation and saving of interim results
     t_cur : :obj:`int`
         The current time step / index.
-        If t_cur is in :attr:`cnf.t.iG <boltzmann.configuration.Grid>`
+        If t_cur is in :attr:`cnf.t.iG <boltzpy.Grid>`
         The current data is written to the sim file.
     """
     def __init__(self, simulation):
         assert isinstance(simulation, b_sim.Simulation)
         # Todo simulation.check_integrity(complete_check=False)
         self._sim = simulation
-        self._cols = self._sim.collision_relations
+        self._cols = b_rel.CollisionRelations(self._sim)
 
         # Todo possibly better to do with np.full
-        if (self._sim.configuration.p.size is None
-                or self._sim.configuration.sv.size is None):
+        if (self._sim.p.size is None
+                or self._sim.sv.size is None):
             self.data = None
             # Todo _result might be unnecessary
             self._result = None
         else:
-            self.data = np.empty(shape=(self._sim.configuration.p.size,
-                                        self._sim.configuration.sv.size),
+            self.data = np.empty(shape=(self._sim.p.size,
+                                        self._sim.sv.size),
                                  dtype=float)
             self._result = np.copy(self.data)
 
@@ -117,16 +118,16 @@ class Calculation:
         # Todo possibly useful to decide if to do collision step in position
         # self._p_flag = ini.p_flag
         self.f_out = b_opf.OutputFunction(self._sim)
-        if self._sim.configuration.t.iG is None:
+        if self._sim.t.iG is None:
             self.t_cur = None
         else:
-            self.t_cur = self._sim.configuration.t.iG[0, 0]
+            self.t_cur = self._sim.t.iG[0, 0]
         self._cal_time = time()     # to estimate remaining time
         # t_arr: np.ndarray(int)
         # t_arr is used in the ** transport step **.
         # Each t_arr[i_v, _] denotes an index difference in P - Space,
         # such that data[p + t_arr[i_v, _], i_v] is used
-        # for the calculation of result[p, i_v].
+        # for the computation of result[p, i_v].
         # Todo self.t_arr = np.zeros((0,), dtype=int)
         # t_w : np.ndarray(float)
         # t_w[i_t, :] denotes the weight for t_arr[i_t, :]
@@ -141,13 +142,13 @@ class Calculation:
     #
     #     In the future:
     #
-    #     For each P-:class:`~boltzmann.configuration.Grid` point :obj:`p`,
+    #     For each P-:class:`~boltzpy.Grid` point :obj:`p`,
     #     :attr:`p_flag` [:obj:`p`] describes its category
     #     (see
-    #     :attr:`~boltzmann.initialization.Initialization.supported_categories`).
+    #     :attr:`~boltzpy.initialization.Initialization.supported_categories`).
     #
     #     :attr:`p_flag` controls the behaviour of each
-    #     P-:class:`~boltzmann.configuration.Grid` point
+    #     P-:class:`~boltzpy.Grid` point
     #     during :class:`Calculation`.
     #     For each different value in :attr:`p_flag`
     #     a custom function is generated.
@@ -165,12 +166,12 @@ class Calculation:
         assert self.check_stability_conditions()
         # Todo Move this part into setup block?
         # Initialize PSV-Grids
-        self.data = self._sim.initialization.create_psv_grid()
+        self.data = b_ini.create_psv_grid(self._sim)
         self._result = np.copy(self.data)
 
         # Generate collision relations
         # Todo coll_select_scheme = "free_flow"
-        if self._sim.configuration.coll_substeps != 0:
+        if self._sim.coll_substeps != 0:
             self._cols.setup()
 
         # Prepare Output functions
@@ -178,13 +179,13 @@ class Calculation:
         self.f_out.setup_hdf5_subgroups()
 
         # set start time
-        self.t_cur = self._sim.configuration.t.iG[0, 0]
+        self.t_cur = self._sim.t.iG[0, 0]
 
         self._cal_time = time()
         print('Calculating...          ',
               end='\r')
 
-        for (i_w, t_w) in enumerate(self._sim.configuration.t.iG[:, 0]):
+        for (i_w, t_w) in enumerate(self._sim.t.iG[:, 0]):
             while self.t_cur != t_w:
                 self._calculate_time_step()
                 self._print_time_estimate()
@@ -201,7 +202,7 @@ class Calculation:
         """Executes a single time step"""
         # executing time step
         self._calculate_transport_step()
-        for _ in range(self._sim.configuration.coll_substeps):
+        for _ in range(self._sim.coll_substeps):
             self._calculate_collision_step()
         assert np.all(self.data > 0)
         self.t_cur += 1
@@ -209,7 +210,7 @@ class Calculation:
 
     def _print_time_estimate(self):
         """Prints an estimate of the remaining time to the terminal"""
-        rem_steps = self._sim.configuration.t.iG[-1, 0] - self.t_cur
+        rem_steps = self._sim.t.iG[-1, 0] - self.t_cur
         est_step_duration = (time() - self._cal_time) / self.t_cur
         est_time_in_seconds = int(rem_steps * est_step_duration)
         print('Calculating... '
@@ -231,7 +232,7 @@ class Calculation:
 
     def _calculate_collision_step(self):
         """Executes a single collision step on complete P-Grid"""
-        for p in range(self._sim.configuration.p.size):
+        for p in range(self._sim.p.size):
             u_c0 = self.data[p, self._cols.collision_arr[:, 0]]
             u_c1 = self.data[p, self._cols.collision_arr[:, 1]]
             u_c2 = self.data[p, self._cols.collision_arr[:, 2]]
@@ -242,24 +243,24 @@ class Calculation:
 
     def _calculate_transport_step(self):
         """Executes single collision step on complete P-Grid"""
-        if self._sim.configuration.p.dim != 1:
+        if self._sim.p.dim != 1:
             message = 'Transport is currently only implemented ' \
                       'for 1D Problems'
             raise NotImplementedError(message)
 
-        dt = self._sim.configuration.t.d
-        dp = self._sim.configuration.p.d
-        offset = self._sim.configuration.sv.offset
-        for s in range(self._sim.configuration.s.n):
-            [beg, end] = self._sim.configuration.sv.range_of_indices(s)
-            dv = self._sim.configuration.sv.vGrids[s].d
+        dt = self._sim.t.d
+        dp = self._sim.p.d
+        offset = self._sim.sv.offset
+        for s in range(self._sim.s.n):
+            [beg, end] = self._sim.sv.range_of_indices(s)
+            dv = self._sim.sv.vGrids[s].d
             # Todo removal of boundaries (p in range(1, ... -1))
             # Todo is only temporary,
             # Todo until rules for input/output points
             # Todo or boundary points are set
-            for p in range(1, self._sim.configuration.p.size-1):
+            for p in range(1, self._sim.p.size-1):
                 for v in range(beg, end):
-                    pv = dv * self._sim.configuration.sv.iMG[v] + offset
+                    pv = dv * self._sim.sv.iMG[v] + offset
                     if pv[0] <= 0:
                         new_val = ((1 + pv[0]*dt/dp) * self.data[p, v]
                                    - pv[0]*dt/dp * self.data[p+1, v])
@@ -281,9 +282,9 @@ class Calculation:
             True, if all conditions are satisfied.
             False, otherwise."""
         # check Courant-Friedrichs-Levy-Condition
-        max_v = np.linalg.norm(self._sim.configuration.sv.boundaries,
+        max_v = np.linalg.norm(self._sim.sv.boundaries,
                                axis=1).max()
-        dt = self._sim.configuration.t.d
-        dp = self._sim.configuration.p.d
+        dt = self._sim.t.d
+        dp = self._sim.p.d
         cfl_condition = max_v * (dt/dp) < 1/2
         return cfl_condition

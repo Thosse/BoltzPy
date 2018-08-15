@@ -1,7 +1,7 @@
 r"""
 Animation Submodule
 ===================
-The :py:class:`~boltzmann.animation.Animation`
+The :py:class:`~boltzpy.animation.Animation`
 handles the generation of the animated plots.
 """
 

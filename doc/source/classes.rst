@@ -10,54 +10,31 @@ Class Index
 
 The Simulation Class
 --------------------
-
-.. autoclass:: boltzmann.Simulation
+.. autoclass:: boltzpy.Simulation
     :members:
 
-The Configuration  Module
--------------------------
-
-.. autoclass:: boltzmann.configuration.Configuration
-    :members:
-.. autoclass:: boltzmann.configuration.Specimen
-    :members:
-.. autoclass:: boltzmann.configuration.Species
-    :members:
-.. autoclass:: boltzmann.configuration.Grid
-    :members:
-.. autoclass:: boltzmann.configuration.SVGrid
+The Specimen Class
+------------------
+.. autoclass:: boltzpy.Specimen
     :members:
 
-
-The Initialization Module
--------------------------
-
-.. autoclass:: boltzmann.initialization.Initialization
+The Species Class
+-----------------
+.. autoclass:: boltzpy.Species
     :members:
-.. autoclass:: boltzmann.initialization.Rule
-    :members:
-
-The Collision Module
---------------------
-.. autoclass:: boltzmann.collisions.CollisionRelations
+        
+The Grid Class
+--------------
+.. autoclass:: boltzpy.Grid
     :members:
 
-The Calculation Module
-----------------------
-
-.. autoclass:: boltzmann.calculation.Calculation
-    :members:
-.. autoclass:: boltzmann.calculation.OutputFunction
+The SVGrid Class
+----------------
+.. autoclass:: boltzpy.SVGrid
     :members:
 
-The Animation Module
---------------------
 
-.. autoclass:: boltzmann.animation.Animation
-    :members:
-
-Constants
----------
-
-.. automodule:: boltzmann.constants
+The Rule Class
+--------------
+.. autoclass:: boltzpy.Rule
     :members:

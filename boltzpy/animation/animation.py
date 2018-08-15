@@ -1,16 +1,15 @@
 
-from boltzmann import simulation as b_sim
-from boltzmann.configuration import specimen as b_spm
-import boltzmann.constants as b_const
+import boltzpy as b_sim
+import boltzpy.constants as b_const
+import boltzpy.specimen as b_spm
 
-from time import time
+import numpy as np
+import h5py
+import matplotlib.animation as mpl_ani
 import matplotlib.axes as mpl_axes
 import matplotlib.lines as mpl_lines
 import matplotlib.pyplot as plt
-import matplotlib.animation as mpl_ani
-import h5py
-
-import numpy as np
+from time import time
 
 
 # Todo add custom colors custom linewidth,... for animate and snapshot
@@ -21,7 +20,7 @@ class Animation:
 
     Parameters
     ----------
-    simulation : :class:`~boltzmann.Simulation`
+    simulation : :class:`~boltzpy.Simulation`
     """
     def __init__(self, simulation):
         assert isinstance(simulation, b_sim.Simulation)
@@ -32,9 +31,9 @@ class Animation:
 
     def snapshot(self,
                  time_step,
-                 moment_array=None,
-                 specimen_array=None,
-                 file_name=None,
+                 moment_array,
+                 specimen_array,
+                 file_name,
                  # Todo p_space -> cut of boundary effects,
                  # Todo color -> color some Specimen differently,
                  # Todo legend -> setup legend in the image?
@@ -46,31 +45,12 @@ class Animation:
         Parameters
         ----------
         time_step : :obj:`int`
-        specimen_array : :obj:`~numpy.ndarray`  [:class:`~boltzmann.configuration.Specimen`], optional
+        specimen_array : :obj:`~numpy.ndarray`  [:class:`~boltzpy.Specimen`], optional
         moment_array : :obj:`~numpy.ndarray` [:obj:`str`], optional
         file_name : :obj:`str`, optional
             File name of the vector image.
         """
         # Todo Reasonable asserts for time_step
-        if specimen_array is None:
-            specimen_array = self._sim.configuration.s.specimen_array
-        assert isinstance(specimen_array, np.ndarray)
-        assert specimen_array.ndim == 1
-        assert all([isinstance(specimen, b_spm.Specimen)
-                    for specimen in specimen_array])
-        if moment_array is None:
-            moment_array = self._sim.configuration.animated_moments
-        else:
-            assert isinstance(moment_array, np.ndarray)
-            assert all([moment
-                        in self._sim.configuration.animated_moments.flatten()
-                        for moment in moment_array])
-        if file_name is None:
-            file_name = (self._sim.configuration.file_address[0:-5]
-                         + '_t={}.eps'.format(time_step))
-        else:
-            # Todo are the reasonable checks?
-            pass
         # Set up the figure, subplots and lines
         figure = self.setup_figure()
         axes = self.setup_axes(figure, moment_array)
@@ -83,19 +63,20 @@ class Animation:
         # Get data from the hdf5-file and set up the lines
         species_names = [specimen.name for specimen in specimen_array]
         moments_flat = moment_array.flatten()
-        hdf_group = h5py.File(self._sim.file_address, mode='r')["Results"]
+        file = h5py.File(self._sim.file_address + '.hdf5', mode='r')
+        hdf5_group = file["Computation"]
         for (s_idx, specimen) in enumerate(species_names):
             for (m_idx, moment) in enumerate(moments_flat):
-                result_t = hdf_group[specimen][moment][time_step]
-                lines[m_idx, s_idx].set_data(self._sim.configuration.p.pG,
+                result_t = hdf5_group[specimen][moment][time_step]
+                lines[m_idx, s_idx].set_data(self._sim.p.pG,
                                              result_t)
         # save the plot
         figure.savefig(file_name, format='eps')
         return
 
     def animate(self,
-                moment_array=None,
-                specimen_array=None):
+                moment_array,
+                specimen_array):
         """Creates animated plot and saves it to disk.
 
         Sets up :obj:`matplotlib.animation.FuncAnimation` instance
@@ -103,20 +84,7 @@ class Animation:
         for every moment in *moment_array*
         and separate lines for every specimen and moment.
         """
-        if moment_array is None:
-            moment_array = self._sim.configuration.animated_moments
-        else:
-            assert isinstance(moment_array, np.ndarray)
-            assert all([moment
-                        in self._sim.configuration.animated_moments.flatten()
-                        for moment in moment_array.flatten()])
-        if specimen_array is None:
-            specimen_array = self._sim.configuration.s.specimen_array
-        else:
-            assert isinstance(specimen_array, np.ndarray)
-            assert specimen_array.ndim == 1
-            assert all([isinstance(specimen, b_spm.Specimen)
-                        for specimen in specimen_array])
+
         ani_time = time()
         print('Animating....',
               end='\r')
@@ -136,10 +104,10 @@ class Animation:
                                            moment_array),
                                     # Todo speed up!
                                     # init_func=init
-                                    frames=self._sim.configuration.t.size,
+                                    frames=self._sim.t.size,
                                     interval=1,
                                     blit=False)
-        ani.save(self._sim.file_address[0:-5] + '.mp4',
+        ani.save(self._sim.file_address + '.mp4',
                  self._writer,
                  dpi=figure.dpi)
 
@@ -155,11 +123,12 @@ class Animation:
                      moment_array):
         specimen_names = [specimen.name for specimen in specimen_array]
         moments = moment_array.flatten()
-        file = h5py.File(self._sim.file_address, mode='r')["Results"]
+        file = h5py.File(self._sim.file_address + '.hdf5', mode='r')
+        hdf5_group = file["Computation"]
         for (i_s, specimen) in enumerate(specimen_names):
             for (i_m, moment) in enumerate(moments):
-                result_t = file[specimen][moment][time_step]
-                lines[i_m, i_s].set_data(self._sim.configuration.p.pG,
+                result_t = hdf5_group[specimen][moment][time_step]
+                lines[i_m, i_s].set_data(self._sim.p.pG,
                                          result_t)
         return lines
 
@@ -178,7 +147,7 @@ class Animation:
         -------
         :obj:`matplotlib.pyplot.figure`
         """
-        if self._sim.configuration.p.dim is not 1:
+        if self._sim.p.dim is not 1:
             message = 'Animation is currently only implemented ' \
                       'for 1D Problems'
             raise NotImplementedError(message)
@@ -217,14 +186,14 @@ class Animation:
         -------
         :obj:`~numpy.ndarray` [:obj:`matplotlib.axes.Axes`]
         """
-        if self._sim.configuration.p.dim is not 1:
+        if self._sim.p.dim is not 1:
             message = 'Animation is currently only implemented ' \
                       'for 1D Problems'
             raise NotImplementedError(message)
         assert isinstance(figure, plt.Figure)
         assert isinstance(moment_array, np.ndarray)
         assert all([moment
-                    in self._sim.configuration.animated_moments.flatten()
+                    in self._sim.output_parameters.flatten()
                     for moment in moment_array.flatten()])
         # array of all subplots
         axes_array = np.empty(shape=moment_array.size,
@@ -253,11 +222,11 @@ class Animation:
         return axes_array
 
     def _set_range(self, axes):
-        if self._sim.configuration.p.dim != 1:
+        if self._sim.p.dim != 1:
             message = 'Animation is currently only implemented ' \
                       'for 1D Problems'
             raise NotImplementedError(message)
-        x_boundaries = self._sim.configuration.p.boundaries
+        x_boundaries = self._sim.p.boundaries
         x_min = x_boundaries[0, 0]
         x_max = x_boundaries[1, 0]
         axes.set_xlim(x_min, x_max)
@@ -278,7 +247,7 @@ class Animation:
         moment : str
             Name of the moment
         """
-        if self._sim.configuration.p.dim != 1:
+        if self._sim.p.dim != 1:
             message = 'Animation is currently only implemented ' \
                       'for 1D Problems' \
                       'This needs to be done for 3D plots'
@@ -287,12 +256,13 @@ class Animation:
         max_val = 0
         # Todo This should depend only on Specimen_array, not on cnf.s
         # Todo Go to definition-> fix this
-        species = self._sim.configuration.s.names
-        file = h5py.File(self._sim.file_address, mode='r')["Results"]
+        species = self._sim.s.names
+        file = h5py.File(self._sim.file_address + '.hdf5', mode='r')
+        hdf5_group = file["Computation"]
         for specimen in species:
-            file_m = file[specimen][moment]
-            for t in self._sim.configuration.t.iG[:, 0]:
-                i_t = t // self._sim.configuration.t.multi
+            file_m = hdf5_group[specimen][moment]
+            for t in self._sim.t.iG[:, 0]:
+                i_t = t // self._sim.t.multi
                 result_t = file_m[i_t]
                 min_val = min(min_val, np.min(result_t))
                 max_val = max(max_val, np.max(result_t))
@@ -300,14 +270,14 @@ class Animation:
         return
 
     def _set_tick_labels(self, axes, i_m):
-        if self._sim.configuration.p.dim is not 1:
+        if self._sim.p.dim is not 1:
             message = 'Animation is currently only implemented ' \
                       'for 1D Problems' \
                       'This needs to be done for 3D plots'
             raise NotImplementedError(message)
         # Todo This should depend only on moment_array, not on cnf.s
         # Todo Go to definition-> fix this
-        shape = self._sim.configuration.animated_moments.shape
+        shape = self._sim.output_parameters.shape
         last_row = (shape[0]-1) * shape[1]
         if i_m < last_row:
             axes.set_xticklabels([])
@@ -318,7 +288,7 @@ class Animation:
                     specimen_array):
         """Sets up the plot lines.
 
-        Creates a plot-line for each :class:`~boltzmann.configuration.Specimen`
+        Creates a plot-line for each :class:`~boltzpy.Specimen`
         in each axes of *axes_array*.
         Each line is a separate plot containing data,
         which can be updated if necessary
@@ -327,13 +297,13 @@ class Animation:
         Parameters
         ----------
         axes_array : :obj:`~numpy.ndarray` [:obj:`matplotlib.axes.Axes`]
-        specimen_array : :obj:`~numpy.ndarray` [:class:`~boltzmann.configuration.Specimen`]
+        specimen_array : :obj:`~numpy.ndarray` [:class:`~boltzpy.Specimen`]
 
         Returns
         -------
         :obj:`~numpy.ndarray` [:obj:`matplotlib.lines.Line2D`]
         """
-        if self._sim.configuration.p.dim is not 1:
+        if self._sim.p.dim is not 1:
             message = 'Animation is currently only implemented ' \
                       'for 1D Problems' \
                       'This needs to be done for 3D plots'
@@ -371,7 +341,7 @@ class Animation:
         ----------
         figure : :obj:`matplotlib.pyplot.figure`
         line_array : :obj:`~numpy.ndarray` [:class:`matplotlib.lines.Line2D`]
-        specimen_array : :obj:`~numpy.ndarray` [:class:`~boltzmann.configuration.Specimen`]
+        specimen_array : :obj:`~numpy.ndarray` [:class:`~boltzpy.Specimen`]
         loc : :obj:`str`, optional
             Location of the legend in *figure*
         """

@@ -1,18 +1,17 @@
 
-from boltzmann.configuration import species as b_spc
-from boltzmann.configuration import grid as b_grd
-import boltzmann.constants as b_const
+import boltzpy.constants as b_const
+import boltzpy.grid as b_grd
+import boltzpy.species as b_spc
 
 import numpy as np
 import h5py
-
 import math
 
 
 class SVGrid:
     """Manages the Velocity Grids of all
-    :class:`~boltzmann.configuration.Species` /
-    :class:`~boltzmann.configuration.Specimen`.
+    :class:`~boltzpy.Species` /
+    :class:`~boltzpy.Specimen`.
 
     .. todo::
         - add method for physical velocities (offset + iMG*d).
@@ -26,21 +25,21 @@ class SVGrid:
     Attributes
     ----------
     form : :obj:`str`
-        Geometric form of all Velocity :class:`Grids <configuration.Grid>`.
+        Geometric form of all Velocity :class:`Grids <boltzpy.Grid>`.
         Must be an element of
-        :const:`~boltzmann.constants.SUPP_GRID_FORMS`.
+        :const:`~boltzpy.constants.SUPP_GRID_FORMS`.
     dim : :obj:`int`
-        Dimensionality of all Velocity :class:`Grids <configuration.Grid>`.
-        Must be in :const:`~boltzmann.constants.SUPP_GRID_DIMENSIONS`.
-    vGrids : :obj:`np.ndarray` [:class:`~boltzmann.configuration.Grid`]
-        Array of all Velocity :class:`Grids <boltzmann.configuration.Grid`>.
+        Dimensionality of all Velocity :class:`Grids <boltzpy.Grid>`.
+        Must be in :const:`~boltzpy.constants.SUPP_GRID_DIMENSIONS`.
+    vGrids : :obj:`np.ndarray` [:class:`~boltzpy.Grid`]
+        Array of all Velocity :class:`Grids <boltzpy.Grid>`.
         Each Velocity Grids attribute
-        :attr:`Grid.iG <boltzmann.configuration.Grid.iG>`
+        :attr:`Grid.iG <boltzpy.Grid.iG>`
         links to its respective slice of :attr:`iMG`.
     iMG : :obj:`np.ndarray` [:obj:`int`]
         The *integer Multi-Grid*. It is a concatenation of the
         Velocity integer Grids
-        (:attr:`Grid.iG <boltzmann.configuration.Grid>`) of all
+        (:attr:`Grid.iG <boltzpy.Grid>`) of all
         :class:`Species`.
         It describes the
         position/physical values (:attr:`pG`)
@@ -48,7 +47,7 @@ class SVGrid:
         All entries are factors, such that
         :math:`pG = offset + iG \cdot d`.
         Note that some V-Grid points occur in multiple
-        :class:`Velocity Grids <boltzmann.configuration.Grid>`.
+        :class:`Velocity Grids <boltzpy.Grid>`.
         Array of shape (:attr:`size`, :attr:`dim`).
     offset : :obj:`np.ndarray` [:obj:`float`]
         Shifts the physical velocities, to be centered around :attr:`offset`.
@@ -74,11 +73,10 @@ class SVGrid:
         self._MIN_N = min_points_per_axis
         if velocity_offset is not None:
             self.offset = np.array(velocity_offset)
+        elif grid_dimension is not None:
+            self.offset = np.zeros(grid_dimension, dtype=float)
         else:
-            if grid_dimension is not None:
-                self.offset = np.zeros(grid_dimension, dtype=float)
-            else:
-                self.offset = None
+            self.offset = None
 
         # The remaining attributes are calculated in setup() method
         # _index[i] denotes the beginning of the i-th velocity Grid in iMG
@@ -89,10 +87,8 @@ class SVGrid:
         self.setup(species_array)
         return
 
-    # Todo figure out whats useful - this currently is not
-    # def __getitem__(self, specimen_index):
-    #     """Returns the indexed :obj:`~boltzmann.configuration.Grid`."""
-    #     return self.vGrids[specimen_index]
+    # TODO figure out whats useful
+    # def __getitem__(self, specimen_idx=None, velocity_idx=None):
 
     #####################################
     #           Properties              #
@@ -100,8 +96,8 @@ class SVGrid:
     @property
     def size(self):
         """:obj:`int` :
-        Denotes the total number of Velocity-Grid points
-        over all :class:`~boltzmann.configuration.Specimen`.
+        The total number of Velocity-Grid points
+        over all :class:`~boltzpy.Species`.
         """
         if self._index is None:
             return None
@@ -111,21 +107,22 @@ class SVGrid:
     @property
     def n_grids(self):
         """:obj:`int` :
-        Denotes the number of different
-        :class:`Velocity Grids <boltzmann.configuration.Grid>`.
+        The number of different
+        :class:`Velocity Grids <boltzpy.Grid>`.
         """
         try:
             return self.vGrids.size
         except AttributeError:
             return None
 
+    # Todo can be replaced by pv method?
     @property
     def pMG(self):
         """:obj:`np.ndarray` [:obj:`float`] :
-        Construct the *physical Multi-Grid* (**time intense!**).
+        Construct the *physical Multi-Grid* (**computationally heavy!**).
 
             The physical Multi-Grid pG denotes the physical values /
-            position of all :class:`Velocity Grid` points.
+            position of all grid points.
 
                 :math:`pG := offset + iG \cdot d`
 
@@ -137,15 +134,17 @@ class SVGrid:
             pMG[beg: end] += G.pG
         return pMG
 
+    # Todo def pv(specimen_icd, velocity_idx) -> implement in Grid as well
+
     @property
     def boundaries(self):
         """:obj:`np.ndarray` [:obj:`float`] :
-        Denotes the minimum and maximum physical values
-        in the :class:`Velocity Grids <boltzmann.configuration.Grid>`.
+        Minimum and maximum physical values
+        in all :class:`Velocity Grids <boltzpy.Grid>`.
 
-            All :class:`~boltzmann.configuration.Specimen`
-            have equal boundaries. Thus it is calculated based on
-            an arbitrary :class:`~boltzmann.configuration.Specimen`.
+        All :class:`~boltzpy.Specimen`
+        have equal boundaries. Thus it is calculated based on
+        an arbitrary :class:`~boltzpy.Specimen`.
         """
         if self.vGrids is None:
             return None
@@ -156,33 +155,27 @@ class SVGrid:
     #           Configuration           #
     #####################################
     def setup(self, species_array):
-        r"""Automatically constructs the
-        :class:`Velocity Grids <boltzmann.configuration.Grid>`
+        r"""Construct the
+        :class:`Velocity Grids <boltzpy.Grid>` :attr:`vGrids`
         for the given
-        :class:`species_array <boltzmann.configuration.Species>`
-        and initializes the related attributes:
-        :attr:`~SVGrid.vGrids`, :attr:`~SVGrid.iMG`,
-        :attr:`~SVGrid._index` and :attr:`~SVGrid.size`
-
+        :class:`species_array <boltzpy.Species>`
+        and store their index Grids in :attr:`iMG`.
 
         1. Calculate the minimum number of :ref:`segments <segment>` any
-           :class:`Velocity Grids <boltzmann.configuration.Grid>`
-           should have on any axis.
+           :class:`Velocity Grids <boltzpy.Grid>`
+           must have.
         2. Calculate the number of
            :ref:`complete segments <complete_segment>`, such that
-           any :class:`Velocity Grids <boltzmann.configuration.Grid>`
-           has at least the minimum number of :ref:`segments <segment>`
-           on any axis.
+           every :class:`Velocity Grids <boltzpy.Grid>`
+           has at least the minimum number of :ref:`segments <segment>`.
         3. Calculate the shape and spacing of each
-           :class:`Velocity Grids <boltzmann.configuration.Grid>`,
-           based on its :class:`Specimens <boltzmann.configuration.Specimen>`
-           :attr:`~boltzmann.configuration.Specimen.mass`.
+           :class:`Velocity Grids <boltzpy.Grid>`,
+           based on its :class:`Specimens <boltzpy.Specimen>`
+           :attr:`~boltzpy.Specimen.mass`.
         4. Initialize and
-           :meth:`~boltzmann.configuration.Grid.centralize` the
-           :class:`Velocity Grids <boltzmann.configuration.Grid>`
-           and  store them into :attr:`vGrids`.
-        5. Set up the remaining attributes based on the
-           :class:`Velocity Grids <boltzmann.configuration.Grid>`.
+           :meth:`~boltzpy.Grid.centralize` the
+           :class:`Velocity Grids <boltzpy.Grid>`
+           and store them in :attr:`vGrids` and :attr:`iMG`
 
         Notes
         -----
@@ -197,46 +190,46 @@ class SVGrid:
           * A **complete segment** is the smallest union of connected
             :ref:`segments <segment>`,
             beginning and ending with a shared grid point for all
-            :class:`Velocity Grids <boltzmann.configuration.Grid>`.
-            In the :class:`Velocity Grid <boltzmann.configuration.Grid>`
-            of any :class:`~boltzmann.configuration.Specimen`,
+            :class:`Velocity Grids <boltzpy.Grid>`.
+            In the :class:`Velocity Grid <boltzpy.Grid>`
+            of any :class:`~boltzpy.Specimen`,
             a single complete segment consists of exactly
-            :attr:`~boltzmann.configuration.Specimen.mass` segments.
-            Thus for any :class:`~boltzmann.configuration.Specimen`:
+            :attr:`~boltzpy.Specimen.mass` segments.
+            Thus for any :class:`~boltzpy.Specimen`:
 
               :math:`n_{Segments} = n_{complete \: Segments} \cdot mass`
 
 
-          * Heavier :class:`~boltzmann.configuration.Specimen`
+          * Heavier :class:`~boltzpy.Specimen`
             are more inert and move less.
             Thus, for any
-            :class:`~boltzmann.configuration.Specimen` the
-            :attr:`~boltzmann.configuration.Grid.spacing`
-            of its :class:`Velocity Grid <boltzmann.configuration.Grid>`
+            :class:`~boltzpy.Specimen` the
+            :attr:`~boltzpy.Grid.spacing`
+            of its :class:`Velocity Grid <boltzpy.Grid>`
             is inversely proportional to its
-            :attr:`~boltzmann.configuration.Specimen.mass` :
+            :attr:`~boltzpy.Specimen.mass` :
 
               :math:`spacing[i] \sim \frac{1}{mass[i]}.`
 
-          * A smaller :attr:`~boltzmann.configuration.Grid.spacing`
+          * A smaller :attr:`~boltzpy.Grid.spacing`
             leads to larger grids.
             Thus for any
-            :class:`~boltzmann.configuration.Specimen` the size of its
-            :class:`Velocity Grid <boltzmann.configuration.Grid>`
-            grows cubic in its :attr:`~boltzmann.configuration.Specimen.mass`.
+            :class:`~boltzpy.Specimen` the size of its
+            :class:`Velocity Grid <boltzpy.Grid>`
+            grows cubic in its :attr:`~boltzpy.Specimen.mass`.
 
               :math:`size \sim n^{dim} \sim mass^{dim}`.
 
         Parameters
         ----------
-        species_array : :obj:`~boltzmann.configuration.Species`
+        species_array : :obj:`~boltzpy.Species`
         """
+        # only run setup, if all necessary parameters are set
         necessary_params = [self.form,
                             self.dim,
                             self._MAX_V,
                             self._MIN_N,
                             species_array]
-        # only run setup, if all necessary parameters are set
         if any([val is None for val in necessary_params]):
             return
 
@@ -290,14 +283,11 @@ class SVGrid:
     #####################################
     #               Indexing            #
     #####################################
-
     def range_of_indices(self, specimen_index):
-        """ Returns the beginning and end delimiters
-        of the indexed
-        :class:`Specimens <boltzmann.configuration.Specimen>`
-        Velocity integer
-        :class:`Grid <boltzmann.configuration.Grid>`
-        in :class:`iMG <boltzmann.configuration.SVGrid>`.
+        """Get beginning and end delimiters
+        of the indexed :class:`Specimens <boltzpy.Specimen>`
+        Velocity :class:`Grid <boltzpy.Grid>`
+        in :class:`iMG <boltzpy.SVGrid>`.
 
         Parameters
         ----------
@@ -307,11 +297,7 @@ class SVGrid:
 
         Returns
         -------
-        :obj:`np.ndarray` [:obj:`int`] :
-            Delimiters of the indexed
-            :class:`Specimens <boltzmann.configuration.Specimen>`
-            Velocity integer :class:`~boltzmann.configuration.Grid`
-            in :attr:`iMG`.
+        :obj:`np.ndarray` [:obj:`int`]
         """
         return self._index[specimen_index: specimen_index+2]
 
@@ -319,15 +305,12 @@ class SVGrid:
     def get_index(self,
                   specimen_index,
                   grid_entry):
-        """Returns position of given grid_entry in :attr:`SVGrid.iMG`
+        """Get position of given grid_entry in :attr:`iMG`
 
-        Firstly, we assume the given grid_entry is an element
-        of the given Specimens Velocity-Grid.
-        Under this condition we generate its index in attr:`SVGrid.iMG`.
-        Secondly, we counter-check if the indexed value matches the given
-        value.
-        If this is true, we return the index,
-        otherwise we return None.
+            1. Generate *grid_entries* index in attr:`SVGrid.iMG`,
+               assuming it is an element of the given Specimens Velocity-Grid.
+            2. Counter-check if the indexed value matches the given value.
+               If this is true, return the index, otherwise return None.
 
         Parameters
         ----------
@@ -338,7 +321,7 @@ class SVGrid:
         Returns
         -------
         int
-            Index/Position of grid_entry in :attr:`~SVGrid.iMG`.
+            Index of *grid_entry* in :attr:`~SVGrid.iMG`.
         """
         # Todo Throw exception if not a grid entry (instead of None)
         i_flat = 0
@@ -356,17 +339,18 @@ class SVGrid:
             return None
 
     def get_specimen(self, velocity_index):
-        """Returns Specimen (index) of given velocity index.
+        """Get :class:`boltzpy.Specimen` index
+        of given velocity in :attr:`iMG`.
 
         Parameters
         ----------
-        velocity_index : int
+        velocity_index : :obj:`int`
 
         Returns
         -------
         int
-            Index of Specimen.
         """
+        # Todo this should be faster with bisection
         for i in range(self._index.size):
             if self._index[i] <= velocity_index < self._index[i+1]:
                 return i
@@ -378,67 +362,69 @@ class SVGrid:
     #           Serialization           #
     #####################################
     # Todo read and write all Velocity Grids instead?
-    def load(self,
-             hdf5_group,
-             hdf5_species_group=None):
-        """Sets up the class:`SVGrid` instance,
+    @staticmethod
+    def load(hdf5_group):
+        """Set up and return a :class:`SVGrid` instance
         based on the parameters in the given HDF5 group.
 
         Parameters
         ----------
-        hdf5_group : h5py.Group
-            :class:`Velocity Grids <SVGrid>` Group
-            in the HDF5 :class:`~boltzmann.Configuration` file.
-        hdf5_species_group : h5py.Group
-            :class:`~boltzmann.configuration.Species` Group
-            in the HDF5 :class:`~boltzmann.Configuration` file.
+        hdf5_group : :obj:`h5py.Group`
+
+        Returns
+        -------
+        :class:`SVGrid`
         """
         assert isinstance(hdf5_group, h5py.Group)
-        if hdf5_species_group is not None:
-            assert isinstance(hdf5_species_group, h5py.Group)
-            species = b_spc.Species().load(hdf5_species_group)
-        else:
-            species = None
+        assert hdf5_group.attrs["class"] == "SVGrid"
+        self = SVGrid()
 
         # read attributes from file
         try:
-            self.form = hdf5_group["Form"].value
+            key = "Form"
+            self.form = hdf5_group[key].value
         except KeyError:
             self.form = None
         try:
-            self.dim = int(hdf5_group["Dimension"].value)
+            key = "Dimension"
+            self.dim = int(hdf5_group[key].value)
         except KeyError:
             self.dim = None
         try:
-            self._MAX_V = hdf5_group["Maximum Velocity"].value
+            key = "Maximum Velocity"
+            self._MAX_V = hdf5_group[key].value
         except KeyError:
             self._MAX_V = None
         try:
-            self._MIN_N = int(hdf5_group["Minimum Number of Grid Points"].value)
+            key = "Minimum Number of Grid Points"
+            self._MIN_N = int(hdf5_group[key].value)
         except KeyError:
             self._MIN_N = None
         try:
-            self.offset = hdf5_group["Velocity Offset"].value
+            key = "Velocity Offset"
+            self.offset = hdf5_group[key].value
         except KeyError:
             self.offset = None
+
         self.check_integrity(False)
-        self.setup(species)
-        return
+        return self
 
     def save(self, hdf5_group):
-        """Writes the main attributes of the :obj:`Grid` instance
+        """Write the main parameters of the :class:`SVGrid` instance
         into the HDF5 group.
 
         Parameters
         ----------
-        hdf5_group : h5py.Group
-            :class:`Velocity Grids <SVGrid>` Group
-            in the HDF5 :class:`~boltzmann.Configuration` file.
+        hdf5_group : :obj:`h5py.Group`
         """
+        assert isinstance(hdf5_group, h5py.Group)
         self.check_integrity(False)
+
         # Clean State of Current group
         for key in hdf5_group.keys():
             del hdf5_group[key]
+        hdf5_group.attrs["class"] = "SVGrid"
+
         # write all set attributes to file
         if self.form is not None:
             hdf5_group["Form"] = self.form
@@ -457,13 +443,13 @@ class SVGrid:
     #####################################
     def check_integrity(self, complete_check=True):
         """Sanity Check.
-        Besides asserting all conditions in :meth:`check_parameters`
-        it asserts the correct type of all attributes of the instance.
+        Assert all conditions in :meth:`check_parameters`
+        and the correct type of all attributes of the instance.
 
         Parameters
         ----------
         complete_check : :obj:`bool`, optional
-            If True, then all attributes must be set (not None).
+            If True, then all attributes must be assigned (not None).
             If False, then unassigned attributes are ignored.
         """
         self.check_parameters(grid_form=self.form,
@@ -484,6 +470,7 @@ class SVGrid:
                                       self.boundaries)
         return
 
+    # Todo add Parameters to Docu
     @staticmethod
     def check_parameters(grid_form=None,
                          grid_dimension=None,
@@ -495,7 +482,16 @@ class SVGrid:
                          velocity_offset=None,
                          complete_check=False):
         """Sanity Check.
-        Checks integrity of given parameters and their interactions."""
+        Checks integrity of given parameters and their interactions.
+
+        Parameters
+        ----------
+        grid_form : :obj:`str`, optional
+        grid_dimension : :obj:`int`, optional
+        complete_check : :obj:`bool`, optional
+            If True, then all parameters must be set (not None).
+            If False, then unassigned parameters are ignored.
+        """
         assert isinstance(complete_check, bool)
         if complete_check is True:
             assert all([param is not None for param in locals().values()])
@@ -565,7 +561,7 @@ class SVGrid:
 
     def __str__(self,
                 write_physical_grid=False):
-        """Converts the instance to a string, describing all attributes."""
+        """Convert the instance to a string, describing all attributes."""
         description = ''
         description += "Dimension = {}\n".format(self.dim)
         description += "Geometric Form = {}\n".format(self.form)
