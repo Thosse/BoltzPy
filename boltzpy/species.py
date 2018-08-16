@@ -1,9 +1,9 @@
 
-from . import specimen as b_spm
-import boltzmann.constants as b_const
+import boltzpy.constants as b_const
+import boltzpy.specimen as b_spm
 
-import numpy as np
 import h5py
+import numpy as np
 
 
 class Species:
@@ -12,13 +12,23 @@ class Species:
     Can be subscripted by an index of a :class:`Specimen`
     in the :attr:`specimen_array`.
 
+    ..todo::
+        - add attribute parent/parent_array to specimen
+        - add index attribute to specimen
+        - move most integrity checks from species to specimen
+        - move editing of collision_rate to specimen
+        - if index is None, collision_rate is stored locally (for init)
+        - if index is int, collision rate is read from matrix from parent
+        - when adding specimen to species -> give index and add coll_rate
+
+
     Attributes
     ----------
     specimen_array : :obj:`~numpy.ndarray` [:class:`Specimen`]
         Array of all simulated :class:`Specimen`.
     collision_rate_matrix : :obj:`~numpy.ndarray` [:obj:`float`]
         Determines the collision probability between two specimen.
-        The :attr:`Specimen.collision_rates <boltzmann.configuration.Specimen>`
+        The :attr:`Specimen.collision_rates <boltzpy.configuration.Specimen>`
         of the :class:`Specimen` are the rows of this matrix.
     """
     def __init__(self):
@@ -42,10 +52,10 @@ class Species:
 
     def index(self, specimen_name):
         """
-        Return the index of the :class:`~boltzmann.configuration.Specimen`,
+        Return the index of the :class:`~boltzpy.configuration.Specimen`,
         whose name is specimen_name.
         It is an error if there is no such
-        :class:`~boltzmann.configuration.Specimen`.
+        :class:`~boltzpy.configuration.Specimen`.
 
         Parameters
         ----------
@@ -238,59 +248,70 @@ class Species:
     #           Serialization           #
     #####################################
     @staticmethod
-    def load(hdf5_file):
-        """Creates and Returns a :obj:`Species` object,
-        based on the parameters in the given file.
+    def load(hdf5_group):
+        """Set up and return a :obj:`Species` instance
+        based on the parameters in the given HDF5 group.
 
         Parameters
         ----------
-        hdf5_file : h5py.File
-            Opened HDF5 :obj:`Configuration` file.
+        hdf5_group : :obj:`h5py.Group`
 
         Returns
         -------
-        :obj:`Species`
+        :class:`Species`
         """
-        s = Species()
-        # read data from file
-        names = hdf5_file["Names"]
-        colors = hdf5_file["Colors"].value
-        masses = hdf5_file["Masses"].value
-        col_rate = hdf5_file["Collision_Rate_Matrix"].value
-        assert len(names.shape) is 1 and len(col_rate.shape) is 2
-        assert names.shape == colors.shape == masses.shape
-        assert col_rate.shape == (names.size, names.size)
-        # setup s iteratively
-        for i in range(names.size):
-            s.add_specimen(name=names[i],
-                           color=colors[i],
-                           mass=masses[i],
-                           collision_rate=col_rate[i, 0:i+1])
-        s.check_integrity()
-        return s
+        assert isinstance(hdf5_group, h5py.Group)
+        assert hdf5_group.attrs["class"] == "Species"
+        self = Species()
 
-    def save(self, hdf5_file):
-        """Writes the parameters of the :obj:`Species` object
-        to the given file.
+        try:
+            # read data from file
+            names = hdf5_group["Names"]
+            colors = hdf5_group["Colors"].value
+            masses = hdf5_group["Masses"].value
+            col_rate = hdf5_group["Collision_Rate_Matrix"].value
+            assert len(names.shape) is 1 and len(col_rate.shape) is 2
+            assert names.shape == colors.shape == masses.shape
+            assert col_rate.shape == (names.size, names.size)
+            # setup s iteratively
+            for i in range(names.size):
+                self.add_specimen(name=names[i],
+                                  color=colors[i],
+                                  mass=masses[i],
+                                  collision_rate=col_rate[i, 0:i+1])
+        except KeyError:
+            pass
+        self.check_integrity()
+        return self
+
+    def save(self, hdf5_group):
+        """Write the parameters of the :obj:`Species` instance
+        into the given HDF5 group.
+
 
         Parameters
         ----------
-        hdf5_file : h5py.File
-            Opened HDF5 :obj:`Configuration` file.
+        hdf5_group : :obj:`h5py.Group`
         """
+        assert isinstance(hdf5_group, h5py.Group)
         self.check_integrity()
-        for key in hdf5_file.keys():
-            del hdf5_file[key]
-        # Set special data type for String-Arrays
-        #  noinspection PyUnresolvedReferences
+
+        # Clean State of Current group
+        for key in hdf5_group.keys():
+            del hdf5_group[key]
+        hdf5_group.attrs["class"] = "Species"
+
+        # Define special data type for String-Arrays
+        # noinspection PyUnresolvedReferences
         h5py_string_type = h5py.special_dtype(vlen=str)
+
         # Write Attributes
-        hdf5_file["Names"] = np.array(self.names,
-                                      dtype=h5py_string_type)
-        hdf5_file["Colors"] = np.array(self.colors,
+        hdf5_group["Names"] = np.array(self.names,
                                        dtype=h5py_string_type)
-        hdf5_file["Masses"] = self.mass
-        hdf5_file["Collision_Rate_Matrix"] = self.collision_rate_matrix
+        hdf5_group["Colors"] = np.array(self.colors,
+                                        dtype=h5py_string_type)
+        hdf5_group["Masses"] = self.mass
+        hdf5_group["Collision_Rate_Matrix"] = self.collision_rate_matrix
         return
 
     #####################################

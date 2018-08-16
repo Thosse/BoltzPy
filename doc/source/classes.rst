@@ -8,48 +8,33 @@
 Class Index
 ===========
 
-The Configuration submodule
----------------------------
-
-.. autoclass:: boltzmann.configuration.Configuration
-    :members:
-.. autoclass:: boltzmann.configuration.Specimen
-    :members:
-.. autoclass:: boltzmann.configuration.Species
-    :members:
-.. autoclass:: boltzmann.configuration.Grid
-    :members:
-.. autoclass:: boltzmann.configuration.SVGrid
+The Simulation Class
+--------------------
+.. autoclass:: boltzpy.Simulation
     :members:
 
-
-The Initialization submodule
-----------------------------
-
-.. autoclass:: boltzmann.initialization.Initialization
-    :members:
-.. autoclass:: boltzmann.initialization.Rule
+The Specimen Class
+------------------
+.. autoclass:: boltzpy.Specimen
     :members:
 
-
-The Calculation submodule
--------------------------
-
-.. autoclass:: boltzmann.calculation.Calculation
+The Species Class
+-----------------
+.. autoclass:: boltzpy.Species
     :members:
-.. autoclass:: boltzmann.calculation.OutputFunction
-    :members:
-.. autoclass:: boltzmann.calculation.Collisions
-    :members:
-
-The Animation submodule
------------------------
-
-.. autoclass:: boltzmann.animation.Animation
+        
+The Grid Class
+--------------
+.. autoclass:: boltzpy.Grid
     :members:
 
-Constants
----------
+The SVGrid Class
+----------------
+.. autoclass:: boltzpy.SVGrid
+    :members:
 
-.. automodule:: boltzmann.constants
+
+The Rule Class
+--------------
+.. autoclass:: boltzpy.Rule
     :members:

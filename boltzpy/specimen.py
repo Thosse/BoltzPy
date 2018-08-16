@@ -1,12 +1,12 @@
 import numpy as np
-import boltzmann.constants as b_const
+import boltzpy.constants as b_const
 
 
 class Specimen:
     """Contains the data of a single simulated specimen.
 
     This class is only a data structure for the
-    :class:`~boltzmann.configuration.Species` class.
+    :class:`~boltzpy.configuration.Species` class.
     Its only used to encapsulate data
     and assert its integrity, if necessary.
 
@@ -18,16 +18,16 @@ class Specimen:
         Must be unique.
     color : :obj:`str`
         Color of the Specimen in the animation.
-        Must be an element of :const:`~boltzmann.constants.SUPP_COLORS`.
+        Must be an element of :const:`~boltzpy.constants.SUPP_COLORS`.
     mass : :obj:`int`
         Mass of the Specimen.
         Strongly influences the size of the Specimens
-        :class:`Velocity Grid <boltzmann.configuration.SVGrid>`.
+        :class:`Velocity Grid <boltzpy.configuration.SVGrid>`.
     collision_rate : :obj:`~numpy.ndarray` [:obj:`float`]
         Determines the collision probability between two specimen.
         Points at a row or column of
         :attr:`Species.collision_rate_matrix
-        <boltzmann.configuration.Species>`.
+        <boltzpy.configuration.Species>`.
     """
     def __init__(self,
                  name,
@@ -94,7 +94,7 @@ class Specimen:
             Determines the collision probability between two specimen.
             Should be a row and column of
             :attr:`Species.collision_rate_matrix
-            <boltzmann.configuration.Species>`.
+            <boltzpy.configuration.Species>`.
         complete_check : :obj:`bool`, optional
             If True, then all parameters must be set (not None).
             If False, then unassigned parameters are ignored.

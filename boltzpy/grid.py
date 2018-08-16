@@ -1,8 +1,8 @@
 
-import boltzmann.constants as b_const
+import boltzpy.constants as b_const
 
 import numpy as np
-
+import h5py
 from math import isclose
 
 
@@ -14,31 +14,37 @@ class Grid:
 
     Notes
     -----
-        Note that changing :attr:`~Grid.multi`
-        does not change the :attr:`spacing`
-        or physical values of the :obj:`Grid`.
-        It does change the values of
-        :attr:`~Grid.d` and :attr:`~Grid.iG`
-        though.
+    Note that changing :attr:`~Grid.multi`
+    does not change the :attr:`spacing`
+    or physical values of the :obj:`Grid`.
+    It does change the values of
+    :attr:`~Grid.d` and :attr:`~Grid.iG`
+    though.
 
-        The purpose of :attr:`Grid.multi` is to allow features
-        like adaptive (Positional- or Time-) Grids ,
-        or write intervals for Time-Grids.
+    The purpose of :attr:`Grid.multi` is to allow features
+    like adaptive (Positional- or Time-) Grids ,
+    or write intervals for Time-Grids.
+
+    .. todo::
+        - Add unit tests
+        - Add Circular shape
+        - Add rotation of grid (useful for velocities)
+        - Enable non-uniform/adaptive Grids
+          (see :class:`~boltzpy.computation.Calculation`)
+        - Add Plotting-function to grids
 
     Attributes
     ----------
     form : :obj:`str`
         Geometric form of the :class:`Grid`.
         Must be an element of
-        :const:`~boltzmann.constants.SUPP_GRID_FORMS`.
+        :const:`~boltzpy.constants.SUPP_GRID_FORMS`.
     dim : :obj:`int`
         The :obj:`Grid` dimensionality. Must be in
-        :const:`~boltzmann.constants.SUPP_GRID_DIMENSIONS`.
+        :const:`~boltzpy.constants.SUPP_GRID_DIMENSIONS`.
     n : :obj:`np.ndarray` [:obj:`int`]
         Number of :obj:`Grid` points per dimension.
         Array of shape (:attr:`dim`,).
-    size : :obj:`int`
-        Total number of :obj:`Grid` points.
     d : :obj:`float`
         Smallest possible step size of the :obj:`Grid`.
     multi : :obj:`int`
@@ -73,7 +79,6 @@ class Grid:
             self.n = np.array(grid_shape, dtype=int)
         else:
             self.n = None
-        self.size = None    # calculated in setup()
         if grid_spacing is not None:
             self.d = grid_spacing / grid_multiplicator
         else:
@@ -87,18 +92,34 @@ class Grid:
     #           Properties              #
     #####################################
     @property
+    def size(self):
+        """:obj:`int` :
+        The total number of grid points.
+        """
+        if self.form is None:
+            return None
+        if self.form == 'rectangular':
+            return int(self.n.prod())
+        else:
+            message = "This Grid form is not implemented yet: " \
+                      "{}".format(self.form)
+            raise NotImplementedError(message)
+
+    @property
     def spacing(self):
         """:obj:`float` :
-        Denotes the (physical) distance between two :class:`Grid` points.
-        It holds
-        :math:`spacing = d \cdot multi`.
-         """
-        return self.d * self.multi
+        The (physical) distance between two :class:`Grid` points.
+        It holds :math:`spacing = d \cdot multi`.
+        """
+        try:
+            return self.d * self.multi
+        except TypeError:
+            return None
 
     @property
     def pG(self):
         """:obj:`np.ndarray` [:obj:`float`] :
-        Construct the *physical Grid* (**time intense!**).
+        Construct the *physical Grid* (**computationally heavy!**).
 
             The physical Grid pG denotes the physical values of
             all :class:`Grid` points.
@@ -107,23 +128,25 @@ class Grid:
 
             Array of shape (:attr:`size`, :attr:`dim`).
          """
-        return self.iG * self.d
+        try:
+            return self.iG * self.d
+        except TypeError:
+            return None
 
     @property
     def boundaries(self):
         """ :obj:`~numpy.ndarray` of :obj:`float`:
-        Denotes the minimum and maximum physical values
-        / position over all :class:`Grid` points
+        Minimum and maximum physical values
+        of all :class:`Grid` points
         in array of shape (2, :attr:`dim`).
         """
-        # in uninitialized Grids: Min/Max operation raises Errors
-        assert self.iG is not None, "The Grid is not initialized, yet." \
-                                    "Boundaries can not be computed!"
-        pG = self.pG
-        min_val = np.min(pG, axis=0)
-        max_val = np.max(pG, axis=0)
-        bound = np.array([min_val, max_val])
-        return bound
+        # if Grid is not initialized -> None
+        if self.pG is None:
+            return None
+        min_val = np.min(self.pG, axis=0)
+        max_val = np.max(self.pG, axis=0)
+        boundaries = np.array([min_val, max_val])
+        return boundaries
 
     @property
     def is_centered(self):
@@ -132,9 +155,11 @@ class Grid:
 
         Checks the first and last integer Grid points.
          """
-        # Grid must be properly initialized first
-        assert self.iG is not None, "The Grid is not initialized, yet."
-        if np.array_equal(self.iG[0], np.zeros(self.dim)):
+        try:
+            is_not_centered = np.array_equal(self.iG[0], np.zeros(self.dim))
+        except TypeError:   # iG is None
+            return None
+        if is_not_centered:
             return False
         else:
             assert np.array_equal(self.iG[0], -self.iG[-1])
@@ -145,8 +170,7 @@ class Grid:
     #####################################
     def setup(self,
               grid_is_centered=False):
-        """Automatically constructs
-        :attr:`Grid.iG` and :attr:`Grid.size`.
+        """Construct :attr:`Grid.iG` and :attr:`Grid.size`.
 
         Parameters
         ----------
@@ -160,7 +184,6 @@ class Grid:
         self.check_integrity(False)
 
         if self.form == 'rectangular':
-            self.size = int(self.n.prod())
             self._construct_rectangular_grid()
         else:
             message = "This Grid form is not implemented yet: " \
@@ -226,8 +249,7 @@ class Grid:
         return
 
     def centralize(self):
-        """Shifts the integer Grid (:attr:`iG`)
-        to be centered around zero.
+        """Shift the integer Grid (:attr:`iG`) to be centered around zero.
         """
         assert isinstance(self.iG, np.ndarray)
         if self.is_centered:
@@ -261,68 +283,77 @@ class Grid:
     #####################################
     #           Serialization           #
     #####################################
-    def load(self, hdf5_file):
-        """Creates and Returns a :obj:`Grid` object,
-        based on the parameters in the given file.
+    @staticmethod
+    def load(hdf5_group):
+        """Set up and return a :class:`Grid` instance
+        based on the parameters in the given HDF5 group.
 
         Parameters
         ----------
-        hdf5_file : h5py.File
-            Opened HDF5 :obj:`Configuration` file.
+        hdf5_group : :obj:`h5py.Group`
 
         Returns
         -------
-        :obj:`Grid`
+        :class:`Grid`
         """
+        assert isinstance(hdf5_group, h5py.Group)
+        assert hdf5_group.attrs["class"] == "Grid"
+        self = Grid()
+
         # read attributes from file
         try:
-            self.form = hdf5_file["Form"].value
+            self.form = hdf5_group["Form"].value
         except KeyError:
             self.form = None
         try:
-            self.dim = int(hdf5_file["Dimension"].value)
+            self.dim = int(hdf5_group["Dimension"].value)
         except KeyError:
             self.dim = None
         try:
-            self.n = hdf5_file["Points_per_Dimension"].value
+            self.n = hdf5_group["Points_per_Dimension"].value
         except KeyError:
             self.n = None
         try:
-            self.d = hdf5_file["Step_Size"].value
+            self.d = hdf5_group["Step_Size"].value
         except KeyError:
             self.d = None
         try:
-            self.multi = int(hdf5_file["Multiplicator"].value)
+            self.multi = int(hdf5_group["Multiplicator"].value)
         except KeyError:
             self.multi = None
+
         self.check_integrity(False)
         self.setup()
-        return
+        self.check_integrity(False)
+        return self
 
-    def save(self, hdf5_file):
-        """Writes the main attributes of the :obj:`Grid` instance
-        to the given file.
+    def save(self, hdf5_group):
+        """Write the main parameters of the :obj:`Grid` instance
+        into the HDF5 group.
 
         Parameters
         ----------
-        hdf5_file : h5py.File
-            Opened HDF5 :obj:`Configuration` file.
+        hdf5_group : :obj:`h5py.Group`
         """
+        assert isinstance(hdf5_group, h5py.Group)
         self.check_integrity(False)
+
         # Clean State of Current group
-        for key in hdf5_file.keys():
-            del hdf5_file[key]
+        for key in hdf5_group.keys():
+            del hdf5_group[key]
+        hdf5_group.attrs["class"] = "Grid"
+
         # write all set attributes to file
         if self.dim is not None:
-            hdf5_file["Dimension"] = self.dim
+            hdf5_group["Dimension"] = self.dim
         if self.n is not None:
-            hdf5_file["Points_per_Dimension"] = self.n
+            hdf5_group["Points_per_Dimension"] = self.n
         if self.d is not None:
-            hdf5_file["Step_Size"] = self.d
+            hdf5_group["Step_Size"] = self.d
         if self.form is not None:
-            hdf5_file["Form"] = self.form
+            hdf5_group["Form"] = self.form
         if self.multi is not None:
-            hdf5_file["Multiplicator"] = self.multi
+            hdf5_group["Multiplicator"] = self.multi
         return
 
     #####################################
@@ -330,13 +361,13 @@ class Grid:
     #####################################
     def check_integrity(self, complete_check=True):
         """Sanity Check.
-        Besides asserting all conditions in :meth:`check_parameters`
-        it asserts the correct type of all attributes of the instance.
+        Assert all conditions in :meth:`check_parameters`
+        and the correct type of all attributes of the instance.
 
         Parameters
         ----------
         complete_check : :obj:`bool`, optional
-            If True, then all attributes must be set (not None).
+            If True, then all attributes must be assigned (not None).
             If False, then unassigned attributes are ignored.
         """
         # Todo add is_setup property
@@ -478,7 +509,7 @@ class Grid:
         return
 
     def __str__(self, write_physical_grids=False):
-        """Converts the instance to a string, describing all attributes."""
+        """Convert the instance to a string, describing all attributes."""
         description = ''
         description += "Dimension = {}\n".format(self.dim)
         description += "Geometric Form = {}\n".format(self.form)

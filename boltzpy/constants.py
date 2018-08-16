@@ -2,16 +2,21 @@
 # Todo Everything might move into enum.Enum classes, for more structure
 
 
-#: :obj:`str` : Default path for simulation files.
-#: If only a file name is given, then the file will be located in this folder.
-DEFAULT_SIMULATION_PATH = __file__[:-22] + 'Simulations/'
+#: :obj:`str` : Default directory for simulation files.
+#: If no full path is given,
+#: then the file will be located in this directory.
+DEFAULT_DIRECTORY = __file__[:-20] + 'Simulations/'
+
+#: :obj:`str` : Default file root for simulation files.
+#: If no file name is given at all, then the file root will be this.
+DEFAULT_FILE_ROOT = "_unnamed_"
 
 #: :obj:`tuple` [:obj:`int`] : Default aspect ratio for plots in
-#: :class:`~boltzmann.animation.Animation`.
+#: :class:`~boltzpy.animation.Animation`.
 DEFAULT_FIGSIZE = (16, 9)
 
 #: :obj:`int` : Default Resolution for plots in
-#: :class:`~boltzmann.animation.Animation`.
+#: :class:`~boltzpy.animation.Animation`.
 DEFAULT_DPI = 300
 
 # TODO SUPPORTED_SHAPE_OF_ANIMATION_GRID
@@ -67,19 +72,19 @@ INVALID_CHARACTERS = {'.', '"', "'", '/', '§', '$', '&',
 
 #: :obj:`set` [:obj:`str`] :
 #: Set of all currently supported geometric forms
-#: for :class:`Grids <boltzmann.configuration.Grid>`.
+#: for :class:`Grids <boltzpy.Grid>`.
 SUPP_GRID_FORMS = {'rectangular'}
 
 #: :obj:`set` [:obj:`int`] :
 #: Set of all currently supported
-#: for :class:`~boltzmann.configuration.Grid`
+#: for :class:`~boltzpy.Grid`
 #: dimensions.
 SUPP_GRID_DIMENSIONS = {1, 2}
 
 
 #: :obj:`list` [:obj:`str`] :
 #: List of all currently supported categories
-#: for :class:`Position-Space-Grid <boltzmann.configuration.Grid>` points
+#: for :class:`Position-Space-Grid <boltzpy.Grid>` points
 #: (e.g. inner points, boundary points,...).
 #:
 #: Each P-Grid point fits into exactly one of the following categories:
@@ -106,3 +111,4 @@ SUPP_GRID_POINT_CATEGORIES = ['Inner Point',
                               # 'Constant_IO_Point',
                               # 'Time_Variant_IO_Point'
                               ]
+

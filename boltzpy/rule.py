@@ -1,37 +1,30 @@
-import boltzmann.constants as b_const
+import boltzpy.constants as b_const
 
 import numpy as np
 import h5py
 
 
+# Todo What exactly is rho? drift and temperature? divided by rho?
 class Rule:
-    """Encapsulates all data of  a single :class:`Initialization` Rule.
+    """Encapsulates all data to initialize a :class:`~boltzpy.Grid` point.
 
-    An initialization Rule must be applied to every point of the
-    :class:`P-Grid <boltzmann.configuration.Grid>`.
+    An initialization rule must be applied to every point of the
+    :attr:`simulation.p <boltzpy.Simulation>`
+    :class:`boltzpy.Grid`.
     It determines:
 
+        * the initial distribution in the velocity space
+          based on :attr:`rho`, :attr:`drift`, and :attr:`temp`.
         * the
-          :const:`category <boltzmann.constants.SUPP_GRID_POINT_CATEGORIES>`
-          of the :class:`P-Grid <boltzmann.configuration.Grid>` point
-          and thus its behaviour during the simulation
-        * the initial values of each
-          :class:`specimens <boltzmann.configuration.Specimen>`
-          velocity space at the
-          :class:`P-Grid <boltzmann.configuration.Grid>` point point.
-
-    The initial values are chosen
-    according to the conserved quantities
-    mass (:attr:`rho`),
-    mean velocity (:attr:`drift`)
-    and temperature (:attr:`temp`).
-
+          :const:`category <boltzpy.constants.SUPP_GRID_POINT_CATEGORIES>`
+          of the :class:`P-Grid <boltzpy.configuration.Grid>` point
+          which determines the behaviour during the :mod:`computation`
 
     Parameters
     ----------
     category : :obj:`str`
-        Category of the :class:`P-Grid <boltzmann.configuration.Grid>` point.
-        Must be in :const:`~boltzmann.constants.SUPP_GRID_POINT_CATEGORIES`.
+        Category of the :class:`P-Grid <boltzpy.Grid>` point.
+        Must be in :const:`~boltzpy.constants.SUPP_GRID_POINT_CATEGORIES`.
     rho : :obj:`list` [:obj:`float`]
     drift : :obj:`list` [:obj:`float`]
     temp : :obj:`list` [:obj:`float`]
@@ -41,29 +34,24 @@ class Rule:
     Attributes
     ----------
     i_cat : :obj:`int`, optional
-        Specifies the behavior in the
-        :class:`~boltzmann.calculation.Calculation`.
+        determines the behaviour during the simulation
         Denotes the index of an element of
-        :const:`~boltzmann.constants.SUPP_GRID_POINT_CATEGORIES`.
+        :const:`~boltzpy.constants.SUPP_GRID_POINT_CATEGORIES`.
     rho : :obj:`~numpy.ndarray` [:obj:`float`], optional
-        Array of the rho parameters for each specimen.
-        Correlates to the total weight/amount of particles in
-        the area of the
-        :class:`P-Grid <boltzmann.configuration.Grid>` point.
+        Correlates to the total amount of particles in
+        the area of the :class:`P-Grid <boltzpy.Grid>` point.
     drift : :obj:`~numpy.ndarray` [:obj:`float`], optional
-        Array of the drift parameters for each specimen.
         Describes the mean velocity,
         i.e. the first moment (expectancy value) of the
         velocity distribution.
     temp : :obj:`~numpy.ndarray` [:obj:`float`], optional
-        Array of the temperature parameters for each specimen.
         Correlates to the Energy,
         i.e. the second moment (variance) of the
         velocity distribution.
     name : :obj:`str`, optional
-        Displayed in the GUI to visualize the initialization.
+        Is displayed in the GUI to visualize the initialization.
     color : :obj:`str`, optional
-        Displayed in the GUI to visualize the initialization.
+        Is Displayed in the GUI to visualize the initialization.
     """
     # Todo get a clear understanding of the meaning of temperature
 
@@ -109,19 +97,42 @@ class Rule:
     #####################################
     #           Serialization           #
     #####################################
-    def load(self, hdf5_group):
-        """Creates the :class:`Rule` instance,
-        based on the parameters in the given group.
+    @staticmethod
+    def load(hdf5_group):
+        """Set up and return a :class:`Rule` instance
+        based on the parameters in the given HDF5 group.
 
         Parameters
         ----------
         hdf5_group : :obj:`h5py.Group`
-            Opened HDF5 :obj:`Rule` Group.
+
+        Returns
+        -------
+        :class:`Rule`
         """
+        assert isinstance(hdf5_group, h5py.Group)
+        assert hdf5_group.attrs["class"] == "Rule"
+        self = Rule()
+
         # read attributes from file
-        category = hdf5_group["Category"].value
-        index = b_const.SUPP_GRID_POINT_CATEGORIES.index(category)
-        self.i_cat = int(index)
+        try:
+            category = hdf5_group["Category"].value
+            category_idx = b_const.SUPP_GRID_POINT_CATEGORIES.index(category)
+            self.i_cat = int(category_idx)
+        except KeyError:
+            self.i_cat = None
+        try:
+            self.rho = hdf5_group["Mass"].value
+        except KeyError:
+            self.rho = None
+        try:
+            self.drift = hdf5_group["Mean Velocity"].value
+        except KeyError:
+            self.drift = None
+        try:
+            self.temp = hdf5_group["Temperature"].value
+        except KeyError:
+            self.temp = None
         try:
             self.name = hdf5_group["Name"].value
         except KeyError:
@@ -130,36 +141,39 @@ class Rule:
             self.color = hdf5_group["Color"].value
         except KeyError:
             self.color = 'black'
-        self.rho = hdf5_group["Mass"].value
-        self.drift = hdf5_group["Mean Velocity"].value
-        self.temp = hdf5_group["Energy"].value
-        self.check_integrity(True)
-        return
+        self.check_integrity(False)
+        return self
 
     def save(self, hdf5_group):
-        """Writes the parameters of the :obj:`Rule` instance
-        into the given group.
+        """Write the main parameters of the :class:`Rule` instance
+        into the HDF5 group.
 
         Parameters
         ----------
-        hdf5_group : h5py.Group
-            Opened HDF5 :obj:`Rule` group.
+        hdf5_group : :obj:`h5py.Group`
         """
-        self.check_integrity(True)
-        # clear any existing elements in the group
+        assert isinstance(hdf5_group, h5py.Group)
+        self.check_integrity(False)
+
+        # Clean State of Current group
         for key in hdf5_group.keys():
             del hdf5_group[key]
+        hdf5_group.attrs["class"] = "Rule"
 
-        # Write Attributes
-        category = b_const.SUPP_GRID_POINT_CATEGORIES[self.i_cat]
-        hdf5_group["Category"] = category
+        # write all set attributes to file
+        if self.i_cat is not None:
+            category = b_const.SUPP_GRID_POINT_CATEGORIES[self.i_cat]
+            hdf5_group["Category"] = category
+        if self.rho is not None:
+            hdf5_group["Mass"] = self.rho
+        if self.drift is not None:
+            hdf5_group["Mean Velocity"] = self.drift
+        if self.temp is not None:
+            hdf5_group["Temperature"] = self.temp
         if self.name != '':
             hdf5_group["Name"] = self.name
         if self.color != 'black':
             hdf5_group["Color"] = self.color
-        hdf5_group["Mass"] = self.rho
-        hdf5_group["Mean Velocity"] = self.drift
-        hdf5_group["Energy"] = self.temp
         return
 
     #####################################
@@ -167,13 +181,13 @@ class Rule:
     #####################################
     def check_integrity(self, complete_check=True):
         """Sanity Check.
-        Besides asserting all conditions in :meth:`check_parameters`
-        it asserts the correct type of all attributes of the instance.
+        Assert all conditions in :meth:`check_parameters`
+        and the correct type of all attributes of the instance.
 
         Parameters
         ----------
         complete_check : :obj:`bool`, optional
-            If True, then all attributes must be set (not None).
+            If True, then all attributes must be assigned (not None).
             If False, then unassigned attributes are ignored.
         """
         if self.i_cat is not None:
@@ -181,7 +195,7 @@ class Rule:
         else:
             category = None
         self.check_parameters(category=category,
-                              category_index=self.i_cat,
+                              category_idx=self.i_cat,
                               rho=self.rho,
                               drift=self.drift,
                               temp=self.temp,
@@ -192,7 +206,7 @@ class Rule:
 
     @staticmethod
     def check_parameters(category=None,
-                         category_index=None,
+                         category_idx=None,
                          rho=None,
                          drift=None,
                          temp=None,
@@ -205,10 +219,10 @@ class Rule:
         Parameters
         ----------
         category : :obj:`str`, optional
-        category_index : :obj:`int`, optional
-        rho : :obj:`list` [:obj:`float`], optional
-        drift : :obj:`list` [:obj:`float`], optional
-        temp : :obj:`list` [:obj:`float`], optional
+        category_idx : :obj:`int`, optional
+        rho : :obj:`~numpy.array` [:obj:`float`], optional
+        drift : :obj:`~numpy.array` [:obj:`float`], optional
+        temp : :obj:`~numpy.array` [:obj:`float`], optional
         name : :obj:`str`, optional
         color : :obj:`str`, optional
         complete_check : :obj:`bool`, optional
@@ -228,10 +242,22 @@ class Rule:
         if category is not None:
             assert isinstance(category, str)
             assert category in b_const.SUPP_GRID_POINT_CATEGORIES
+            if category_idx is None:
+                category_list = b_const.SUPP_GRID_POINT_CATEGORIES
+                category_idx = category_list.index(category)
+            else:
+                category_list = b_const.SUPP_GRID_POINT_CATEGORIES
+                assert category_idx == category_list.index(category)
 
-        if category_index is not None:
-            assert isinstance(category_index, int)
-            assert category_index in range(n_categories)
+        if category_idx is not None:
+            assert isinstance(category_idx, int)
+            assert category_idx in range(n_categories)
+            if category is None:
+                category_list = b_const.SUPP_GRID_POINT_CATEGORIES
+                category = category_list[category_idx]
+            else:
+                category_list = b_const.SUPP_GRID_POINT_CATEGORIES
+                assert category == category_list[category_idx]
 
         if rho is not None:
             assert isinstance(rho, np.ndarray)
@@ -268,25 +294,19 @@ class Rule:
             assert color in b_const.SUPP_COLORS
         return
 
-    # Todo replace by __str__ method
-    def print(self, list_of_category_names=None):
-        """Prints all Properties for Debugging Purposes
-
-        If a list of category names is given,
-        then the category of the :class:`Rule` is printed.
-        Otherwise the category index
-        (:attr:`cat`) is printed"""
-        print('Name of Rule = {}'.format(self.name))
-        if list_of_category_names is not None:
-            print('Category = {}'
-                  ''.format(list_of_category_names[self.i_cat]))
+    def __str__(self, idx=None):
+        """Convert the instance to a string, describing all attributes."""
+        description = ''
+        if idx is None:
+            description += 'Rule = {}\n'.format(self.name)
         else:
-            print('Category index = {}'.format(self.i_cat))
-        print('Rho: '
-              '{}'.format(self.rho))
-        print('Drift:\n'
-              '{}'.format(self.drift))
-        print('Temperature: '
-              '{}'.format(self.temp))
-        print('')
-        return
+            description += 'Rule_{} = {}\n'.format(idx, self.name)
+        category = b_const.SUPP_GRID_POINT_CATEGORIES[self.i_cat]
+        description += 'Category = ' + category + '\n'
+        description += 'Rho:\n\t'
+        description += self.rho.__str__() + '\n'
+        description += 'Drift:\n\t'
+        description += self.drift.__str__().replace('\n', '\n\t') + '\n'
+        description += 'Temperature: \n\t'
+        description += self.temp.__str__() + '\n'
+        return description
