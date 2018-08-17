@@ -58,7 +58,7 @@ class CollisionRelations:
 
         # Assert write access rights and that file exists
         if file_address is None:
-            file_address = self._sim.file_address
+            file_address = self._sim.file_address + '.hdf5'
         else:
             assert os.path.exists(file_address), \
                 "File does not exist: {}".format(file_address)
@@ -176,14 +176,14 @@ class CollisionRelations:
         # the slices in the sv_grid, slc[spc, :] = [start, end+1]
         slc = np.zeros((2, 2), dtype=int)
 
-        for s[0] in range(species.n):
+        for s[0] in range(species.size):
             m[0] = species.mass[s[0]]
             d[0] = sv.vGrids[s[0]].d
-            slc[0] = sv.range_of_indices(s[0])
-            for s[1] in range(s[0], species.n):
+            slc[0] = sv.idx_range(s[0])
+            for s[1] in range(s[0], species.size):
                 m[1] = species.mass[s[1]]
                 d[1] = sv.vGrids[s[1]].d
-                slc[1] = sv.range_of_indices(s[1])
+                slc[1] = sv.idx_range(s[1])
                 # v[0, 0] = v_pre_s0
                 for v[0, 0] in range(slc[0, 0], slc[0, 1]):
                     pv[0, 0] = sv.iMG[v[0, 0]]
@@ -200,10 +200,9 @@ class CollisionRelations:
                             # Calculate
                             pv[1, 1] = pv[1, 0] + dpv_1
                             # get index ov v[1, 1]
-                            _v11 = sv.get_index(s[1], pv[1, 1])
-                            if _v11 is not None:
-                                v[1, 1] = _v11
-                            else:
+                            try:
+                                v[1, 1] = sv.get_index(s[1], pv[1, 1])
+                            except ValueError:
                                 continue
                             # if v[1, 1] < v[0, 0], then the collision was
                             # already found before
@@ -354,7 +353,7 @@ class CollisionRelations:
         self.check_integrity()
 
         if file_address is None:
-            file_address = self._sim.file_address
+            file_address = self._sim.file_address + '.hdf5'
         else:
             assert os.path.exists(file_address), \
                 "File does not exist: {}".format(file_address)

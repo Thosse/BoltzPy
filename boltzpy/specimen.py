@@ -2,11 +2,13 @@ import numpy as np
 import boltzpy.constants as b_const
 
 
+# Todo how to reference class attributes in numpy style?
+# Todo break line in multi attribute docstring
 class Specimen:
     """Contains the data of a single simulated specimen.
 
     This class is only a data structure for the
-    :class:`~boltzpy.configuration.Species` class.
+    :class:`~boltzpy.Species` class.
     Its only used to encapsulate data
     and assert its integrity, if necessary.
 
@@ -22,12 +24,12 @@ class Specimen:
     mass : :obj:`int`
         Mass of the Specimen.
         Strongly influences the size of the Specimens
-        :class:`Velocity Grid <boltzpy.configuration.SVGrid>`.
-    collision_rate : :obj:`~numpy.ndarray` [:obj:`float`]
+        :class:`Velocity Grid <boltzpy.SVGrid>`.
+    collision_rate : :obj:`~numpy.array` [:obj:`float`]
         Determines the collision probability between two specimen.
         Points at a row or column of
         :attr:`Species.collision_rate_matrix
-        <boltzpy.configuration.Species>`.
+        <boltzpy.Species>`.
     """
     def __init__(self,
                  name,
@@ -53,8 +55,7 @@ class Specimen:
     #####################################
     def check_integrity(self, complete_check=True):
         """Sanity Check.
-        Besides asserting all conditions in :meth:`check_parameters`
-        it asserts the correct type of all attributes of the instance.
+        Asserts all conditions in :meth:`check_parameters`.
 
         Parameters
         ----------
@@ -67,13 +68,6 @@ class Specimen:
                               mass=self.mass,
                               collision_rate=self.collision_rate,
                               complete_check=complete_check)
-        # Additional Conditions on instance:
-        # parameter can also be a list,
-        # instance attributes must be ndarray
-        assert isinstance(self.collision_rate, np.ndarray)
-        # parameter can also be list/array of ints,
-        # instance attribute must be nd.array of floats
-        assert self.collision_rate.dtype == float
         return
 
     @staticmethod
@@ -90,11 +84,8 @@ class Specimen:
         name : :obj:`str`, optional
         color : :obj:`str`, optional
         mass : :obj:`int`, optional
-        collision_rate : :obj:`~numpy.ndarray` [:obj:`float`], optional
+        collision_rate : :obj:`~numpy.array` [:obj:`float`], optional
             Determines the collision probability between two specimen.
-            Should be a row and column of
-            :attr:`Species.collision_rate_matrix
-            <boltzpy.configuration.Species>`.
         complete_check : :obj:`bool`, optional
             If True, then all parameters must be set (not None).
             If False, then unassigned parameters are ignored.
@@ -118,12 +109,9 @@ class Specimen:
             assert mass > 0
 
         if collision_rate is not None:
-            # lists are also accepted as parameters
-            if isinstance(collision_rate, list):
-                collision_rate = np.array(collision_rate)
             assert isinstance(collision_rate, np.ndarray)
             assert collision_rate.ndim == 1
-            assert collision_rate.dtype in [int, float]
+            assert collision_rate.dtype == float
             assert np.all(collision_rate >= 0)
         return
 

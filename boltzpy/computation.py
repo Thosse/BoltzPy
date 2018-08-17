@@ -251,8 +251,8 @@ class Calculation:
         dt = self._sim.t.d
         dp = self._sim.p.d
         offset = self._sim.sv.offset
-        for s in range(self._sim.s.n):
-            [beg, end] = self._sim.sv.range_of_indices(s)
+        for s in range(self._sim.s.size):
+            [beg, end] = self._sim.sv.idx_range(s)
             dv = self._sim.sv.vGrids[s].d
             # Todo removal of boundaries (p in range(1, ... -1))
             # Todo is only temporary,

@@ -261,19 +261,19 @@ class Simulation:
                      color=None,
                      mass=None,
                      collision_rate=None):
-        """Add a Specimen to :attr:`s`.
-
-        See :meth:`Species.add_specimen`
+        """Add a Specimen to :attr:`s`. See :meth:`Species.add_specimen`
 
         Parameters
         ----------
         name : :obj:`str`, optional
         color : :obj:`str`, optional
         mass : int, optional
-        collision_rate : :obj:`list` of :obj:`float`, optional
-            Determines the collision probability between two specimen.
-            Row (and column) of :attr:`collision_rate_matrix`.
+        collision_rate : :obj:`~numpy.array` [:obj:`float`] or :obj:`list` [:obj:`int`], optional
+            Correlates to the collision probability between two specimen.
         """
+        if isinstance(collision_rate, list):
+            assert all([isinstance(item, int) for item in collision_rate])
+            collision_rate = np.array(collision_rate, dtype=float)
         self.s.add_specimen(name,
                             color,
                             mass,
@@ -288,7 +288,7 @@ class Simulation:
                         calculations_per_time_step=1):
         """Set up :attr:`t`.
 
-        Calculate step size and call :class:`Grid` constructor.
+        Calculate step size and call :class:`Grid() <Grid>`.
 
         Parameters
         ----------
@@ -299,7 +299,7 @@ class Simulation:
         step_size = max_time / (number_time_steps - 1)
         self.t = b_grd.Grid(grid_form='rectangular',
                             grid_dimension=1,
-                            grid_shape=[number_time_steps],
+                            grid_shape=np.array([number_time_steps]),
                             grid_spacing=step_size,
                             grid_multiplicator=calculations_per_time_step)
         return
@@ -309,18 +309,17 @@ class Simulation:
                             grid_shape,
                             grid_spacing):
         """Set up :attr:`p` and adjust :attr:`init_arr` to the new shape.
-
-        See :class:`Grid`
+        See :class:`Grid() <Grid>`
 
         Parameters
         ----------
         grid_dimension : :obj:`int`
-        grid_shape : :obj:`list` [:obj:`int`]
+        grid_shape : :obj:`~numpy.array`  [:obj:`int`] or :obj:`list` [:obj:`int`]
         grid_spacing : :obj:`float`
         """
-        if isinstance(grid_shape, int):
-            assert grid_dimension == 1
-            grid_shape = [grid_shape]
+        if isinstance(grid_shape, list):
+            assert all([isinstance(item, int) for item in grid_shape])
+            grid_shape = np.array(grid_shape, dtype=int)
         self.p = b_grd.Grid(grid_form='rectangular',
                             grid_dimension=grid_dimension,
                             grid_shape=grid_shape,
@@ -351,7 +350,7 @@ class Simulation:
         min_points_per_axis : :obj:`int`
         max_velocity : :obj:`float`
         grid_form : :obj:`str`, optional
-        velocity_offset : :obj:`np.ndarray` [:obj:`float`], optional
+        velocity_offset : :obj:`~numpy.array` [:obj:`float`], optional
         """
         self.sv = b_svg.SVGrid(grid_form=grid_form,
                                grid_dimension=grid_dimension,
@@ -436,7 +435,7 @@ class Simulation:
     ###########################
     # Todo rework computation module
     def run_computation(self):
-        """Run the fully configured Simulation"""
+        """Compute the fully configured Simulation"""
         self.check_integrity()
         # Todo write hash function in Computation folder
         try:
@@ -452,10 +451,10 @@ class Simulation:
         return
 
     # Todo rework animation module
-    def animate(self,
-                output_arr=None,
-                specimen_arr=None):
-        """Creates animated plot and saves it to disk.
+    def create_animation(self,
+                         output_arr=None,
+                         specimen_arr=None):
+        """Create animated plot and saves it to disk.
 
         Sets up :obj:`matplotlib.animation.FuncAnimation` instance
         based on a figure with separate subplots
@@ -483,28 +482,28 @@ class Simulation:
         animation.animate(output_arr, specimen_arr)
         return
 
-    def snapshot(self,
-                 time_step,
-                 output_arr=None,
-                 specimen_arr=None,
-                 snapshot_name=None,
-                 # Todo p_space -> cut of boundary effects,
-                 # Todo color -> color some Specimen differently,
-                 # Todo legend -> setup legend in the image?
-                 ):
+    # Todo choose proper parameters
+    def create_snapshot(self,
+                        time_step,
+                        output_arr=None,
+                        specimen_arr=None,
+                        snapshot_name=None,
+                        # Todo p_space -> cut of boundary effects,
+                        # Todo color -> color some Specimen differently,
+                        # Todo legend -> setup legend in the image?
+                        ):
         """Creates a vector plot of the simulation
-                at the desired time_step.
-                Saves the file as *file_name*.eps in the Simulation folder.
+        at the desired time_step.
+        Saves the file as *snapshot_name*.eps in the Simulation folder.
 
-                Parameters
-                ----------
-                time_step : :obj:`int`
-                output_arr : :obj:`~numpy.ndarray` [:obj:`str`], optional
-                specimen_arr : :obj:`~numpy.array`[:class:`~boltzpy.Specimen`], optional
-
-                snapshot_name : :obj:`str`, optional
-                    File name of the vector image.
-                """
+        Parameters
+        ----------
+        time_step : :obj:`int`
+        output_arr : :obj:`~numpy.array` [:obj:`str`], optional
+        specimen_arr : :obj:`~numpy.array` [:class:`~boltzpy.Specimen`], optional
+        snapshot_name : :obj:`str`, optional
+            File name of the vector image.
+        """
         # Todo Reasonable asserts for time_step
 
         if output_arr is None:
@@ -546,11 +545,11 @@ class Simulation:
 
         Parameters
         ----------
-        file_address : str, optional
-            Address of a simulation file.
-            Can be either a full path, a base file name or a file root.
-            If no full path is given, then the file is placed in the
-            :attr:`boltzpy.constants.DEFAULT_DIRECTORY`.
+        file_address : :obj:`str`, optional
+            Either a full path, a base file name or a file root.
+            If a base file name or a file root is given,
+            then the file is placed in the
+            :attr:`~boltzpy.constants.DEFAULT_DIRECTORY`.
         """
         # Prepare file_address
         if file_address is None:
@@ -639,7 +638,6 @@ class Simulation:
         """Sanity Check.
 
         Assert all conditions in :meth:`check_parameters`.
-        Assert the correct type of all attributes of the instance.
 
         Parameters
         ----------
@@ -661,9 +659,6 @@ class Simulation:
                               order_transp=self.order_transp,
                               order_coll=self.order_coll,
                               complete_check=complete_check)
-        # Additional Conditions on instance:
-        # parameter can be list, instance attributes must be np.ndarray
-        assert isinstance(self.output_parameters, np.ndarray)
         return
 
     @staticmethod
@@ -774,7 +769,7 @@ class Simulation:
         if species is not None \
                 and species_velocity_grid is not None:
             if species_velocity_grid.n_grids is not None:
-                assert species_velocity_grid.n_grids == species.n
+                assert species_velocity_grid.n_grids == species.size
 
         if initialization_rules is not None:
             assert isinstance(initialization_rules, np.ndarray)
@@ -784,14 +779,14 @@ class Simulation:
                 assert isinstance(rule, b_rul.Rule)
                 rule.check_integrity(complete_check)
                 if rule.rho is not None and species is not None:
-                    assert rule.rho.shape == (species.n,)
+                    assert rule.rho.shape == (species.size,)
                 if (rule.drift is not None
                         and species is not None
                         and species_velocity_grid is not None):
-                    assert rule.drift.shape == (species.n,
+                    assert rule.drift.shape == (species.size,
                                                 species_velocity_grid.dim)
                 if rule.temp is not None and species is not None:
-                    assert rule.temp.shape == (species.n,)
+                    assert rule.temp.shape == (species.size,)
 
         if initialization_array is not None:
             assert isinstance(initialization_array, np.ndarray)
@@ -814,9 +809,6 @@ class Simulation:
                     'Some Grid points have no initialization rule!'
 
         if output_parameters is not None:
-            # lists are also accepted as parameters
-            if isinstance(output_parameters, list):
-                output_parameters = np.array(output_parameters)
             assert isinstance(output_parameters, np.ndarray)
             assert len(output_parameters.shape) is 2
             assert all([mom in b_const.SUPP_OUTPUT

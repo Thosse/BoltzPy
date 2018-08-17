@@ -6,9 +6,6 @@ import h5py
 from math import isclose
 
 
-# Todo how to reference class attributes in numpy style?
-# Todo break line in multi attribute docstring
-# Todo add offset property?
 class Grid:
     r"""Basic class for all Grids.
 
@@ -42,15 +39,14 @@ class Grid:
     dim : :obj:`int`
         The :obj:`Grid` dimensionality. Must be in
         :const:`~boltzpy.constants.SUPP_GRID_DIMENSIONS`.
-    n : :obj:`np.ndarray` [:obj:`int`]
+    n : :obj:`~numpy.array` [:obj:`int`]
         Number of :obj:`Grid` points per dimension.
-        Array of shape (:attr:`dim`,).
     d : :obj:`float`
         Smallest possible step size of the :obj:`Grid`.
     multi : :obj:`int`
         Ratio of :attr:`spacing` / :attr:`d`.
         Thus all values in :attr:`iG` are multiples of :attr:`multi`.
-    iG : :obj:`np.ndarray` [:obj:`int`]
+    iG : :obj:`~numpy.array` [:obj:`int`]
         The *integer Grid* iG. It describes the
         position/physical values (:attr:`pG`)
         of all :class:`Grid` points.
@@ -65,14 +61,14 @@ class Grid:
                  grid_spacing=None,
                  grid_multiplicator=1,
                  grid_is_centered=False):
-        self.check_parameters(grid_form=grid_form,
-                              grid_dimension=grid_dimension,
-                              grid_shape=grid_shape,
-                              grid_spacing=grid_spacing,
+        self.check_parameters(form=grid_form,
+                              dimension=grid_dimension,
+                              shape=grid_shape,
+                              spacing=grid_spacing,
                               # Todo giving in svGrids.setup a Grid.multi=2
                               # Todo leads to serious errors in Collisions
                               #grid_multiplicator=grid_multiplicator,
-                              grid_is_centered=grid_is_centered)
+                              is_centered=grid_is_centered)
         self.form = grid_form
         self.dim = grid_dimension
         if grid_shape is not None:
@@ -84,7 +80,8 @@ class Grid:
         else:
             self.d = None
         self.multi = grid_multiplicator
-        self.iG = None   # generated in setup()
+        # self.iG is generated in setup()
+        self.iG = None
         self.setup(grid_is_centered)
         return
 
@@ -118,7 +115,7 @@ class Grid:
 
     @property
     def pG(self):
-        """:obj:`np.ndarray` [:obj:`float`] :
+        """:obj:`~numpy.array` [:obj:`float`] :
         Construct the *physical Grid* (**computationally heavy!**).
 
             The physical Grid pG denotes the physical values of
@@ -135,19 +132,21 @@ class Grid:
 
     @property
     def boundaries(self):
-        """ :obj:`~numpy.ndarray` of :obj:`float`:
+        """ :obj:`~numpy.array` of :obj:`float`:
         Minimum and maximum physical values
         of all :class:`Grid` points
         in array of shape (2, :attr:`dim`).
         """
         # if Grid is not initialized -> None
-        if self.pG is None:
+        if self.iG is None:
             return None
         min_val = np.min(self.pG, axis=0)
         max_val = np.max(self.pG, axis=0)
         boundaries = np.array([min_val, max_val])
         return boundaries
 
+    # Todo Move is_centered, centralize and decentralize to svgrid?
+    # Todo      -> time or position grids don't need to be centered
     @property
     def is_centered(self):
         """:obj:`bool` :
@@ -157,13 +156,15 @@ class Grid:
          """
         try:
             is_not_centered = np.array_equal(self.iG[0], np.zeros(self.dim))
-        except TypeError:   # iG is None
+            if is_not_centered:
+                return False
+            else:
+                assert np.array_equal(self.iG[0], -self.iG[-1])
+                return True
+        except TypeError:
+            # iG is None
+            assert self.iG is None
             return None
-        if is_not_centered:
-            return False
-        else:
-            assert np.array_equal(self.iG[0], -self.iG[-1])
-            return True
 
     #####################################
     #           Configuration           #
@@ -222,7 +223,7 @@ class Grid:
         return
 
     # Todo remove -> replace by property setter
-    def double_multiplicator(self):
+    def double_multi(self):
         """Double the current :attr:`multi`.
 
         Also doubles all Entries in :attr:`iG` and halves :attr:`d`.
@@ -233,7 +234,7 @@ class Grid:
         return
 
     # Todo remove -> replace by property setter
-    def halve_multiplicator(self):
+    def halve_multi(self):
         """Halve the current :attr:`multi`.
 
         Also halves all Entries in :attr:`iG` and doubles :attr:`d`.
@@ -257,7 +258,7 @@ class Grid:
         # calculate shift
         shift = self.multi*(self.n - 1)
         # double the multiplicator
-        self.double_multiplicator()
+        self.double_multi()
         # shift the integer Grid
         self.iG -= shift
         return
@@ -277,7 +278,7 @@ class Grid:
         self.iG += shift
         # halve the multiplicator
         assert np.all(self.iG % 2 == 0)
-        self.halve_multiplicator()
+        self.halve_multi()
         return
 
     #####################################
@@ -361,8 +362,8 @@ class Grid:
     #####################################
     def check_integrity(self, complete_check=True):
         """Sanity Check.
-        Assert all conditions in :meth:`check_parameters`
-        and the correct type of all attributes of the instance.
+
+        Assert all conditions in :meth:`check_parameters`.
 
         Parameters
         ----------
@@ -370,58 +371,47 @@ class Grid:
             If True, then all attributes must be assigned (not None).
             If False, then unassigned attributes are ignored.
         """
-        # Todo add is_setup property
-        if self.iG is None:
-            grid_is_centered = None
-            boundaries = None
-        else:
-            grid_is_centered = self.is_centered
-            boundaries = self.boundaries
-        # todo properly assert boundaries
-        self.check_parameters(grid_form=self.form,
-                              grid_dimension=self.dim,
-                              grid_shape=self.n,
-                              grid_size=self.size,
-                              grid_step_size=self.d,
-                              grid_multiplicator=self.multi,
-                              grid_spacing=self.spacing,
-                              grid_array=self.iG,
-                              grid_is_centered=grid_is_centered,
+        self.check_parameters(form=self.form,
+                              dimension=self.dim,
+                              shape=self.n,
+                              size=self.size,
+                              step_size=self.d,
+                              multi=self.multi,
+                              spacing=self.spacing,
+                              idx_grid=self.iG,
+                              boundaries=self.boundaries,
+                              is_centered=self.is_centered,
                               complete_check=complete_check)
-        # Additional Conditions on instance:
-        # parameter can be list, instance attributes must be np.ndarray
-        assert self.n is None or isinstance(self.n, np.ndarray)
-        if self.iG is not None:
-            assert self.dim is not None
-            assert self.d is not None
-            assert self.boundaries.shape == (2, self.dim)
         return
 
     @staticmethod
-    def check_parameters(grid_form=None,
-                         grid_dimension=None,
-                         grid_shape=None,
-                         grid_size=None,
-                         grid_step_size=None,
-                         grid_multiplicator=None,
-                         grid_spacing=None,
-                         grid_array=None,
-                         grid_is_centered=None,
+    def check_parameters(form=None,
+                         dimension=None,
+                         shape=None,
+                         size=None,
+                         step_size=None,
+                         multi=None,
+                         spacing=None,
+                         idx_grid=None,
+                         boundaries=None,
+                         is_centered=None,
                          complete_check=False):
         """Sanity Check.
+
         Checks integrity of given parameters and their interactions.
 
         Parameters
         ----------
-        grid_form : :obj:`str`, optional
-        grid_dimension : :obj:`int`, optional
-        grid_shape : :obj:`list` [:obj:`int`], optional
-        grid_size : :obj:`int`, optional
-        grid_step_size : :obj:`float`, optional
-        grid_multiplicator : :obj:`int`, optional
-        grid_spacing : :obj:`float`, optional
-        grid_array : :obj:`np.ndarray` [:obj:`int`], optional
-        grid_is_centered : :obj:`bool`, optional
+        form : :obj:`str`, optional
+        dimension : :obj:`int`, optional
+        shape : :obj:`~numpy.array` [:obj:`int`], optional
+        size : :obj:`int`, optional
+        step_size : :obj:`float`, optional
+        multi : :obj:`int`, optional
+        spacing : :obj:`float`, optional
+        idx_grid : :obj:`~numpy.array` [:obj:`int`], optional
+        boundaries : :obj:`~numpy.array` [:obj:`float`], optional
+        is_centered : :obj:`bool`, optional
         complete_check : :obj:`bool`, optional
             If True, then all parameters must be set (not None).
             If False, then unassigned parameters are ignored.
@@ -432,80 +422,73 @@ class Grid:
             assert all([param is not None for param in locals().values()])
 
         # check all parameters, if set
-        if grid_form is not None:
-            assert isinstance(grid_form, str)
-            assert grid_form in b_const.SUPP_GRID_FORMS
+        if form is not None:
+            assert isinstance(form, str)
+            assert form in b_const.SUPP_GRID_FORMS
 
-        if grid_dimension is not None:
-            assert isinstance(grid_dimension, int)
-            assert grid_dimension in b_const.SUPP_GRID_DIMENSIONS
+        if dimension is not None:
+            assert isinstance(dimension, int)
+            assert dimension in b_const.SUPP_GRID_DIMENSIONS
 
-        if grid_shape is not None:
-            if isinstance(grid_shape, list):
-                grid_shape = np.array(grid_shape,
-                                      dtype=int)
-            assert isinstance(grid_shape, np.ndarray)
-            assert grid_shape.dtype == int
-            assert all(grid_shape >= 2)
+        if shape is not None:
+            assert isinstance(shape, np.ndarray)
+            assert shape.dtype == int
+            assert all(shape >= 2)
+            if dimension is not None:
+                assert shape.shape == (dimension,)
 
-        if grid_dimension is not None \
-                and grid_shape is not None:
-            assert grid_shape.shape == (grid_dimension,)
+        if size is not None:
+            assert isinstance(size, int)
+            assert size >= 2
+            if form is not None and shape is not None:
+                if form == 'rectangular':
+                    assert shape.prod() == size
+                else:
+                    raise NotImplementedError
 
-        if grid_size is not None:
-            assert isinstance(grid_size, int)
-            assert grid_size >= 2
+        if step_size is not None:
+            assert isinstance(step_size, float)
+            assert step_size > 0
 
-        if grid_form is not None \
-                and grid_shape is not None \
-                and grid_size is not None:
-            if grid_form == 'rectangular':
-                assert grid_shape.prod() == grid_size
+        if multi is not None:
+            assert isinstance(multi, int)
+            assert multi >= 1
 
-        if grid_step_size is not None:
-            assert isinstance(grid_step_size, float)
-            assert grid_step_size > 0
+        if spacing is not None:
+            assert isinstance(spacing, float)
+            assert spacing > 0
+            if step_size is not None and multi is not None:
+                assert isclose(spacing, multi * step_size)
 
-        if grid_multiplicator is not None:
-            assert isinstance(grid_multiplicator, int)
-            assert grid_multiplicator >= 1
+        if idx_grid is not None:
+            assert isinstance(idx_grid, np.ndarray)
+            assert idx_grid.dtype == int
+            assert idx_grid.ndim in b_const.SUPP_GRID_DIMENSIONS
+            if dimension is not None and size is not None:
+                assert idx_grid.shape == (size, dimension)
+            if multi is not None:
+                shifted_array = idx_grid - idx_grid[0]
+                assert np.array_equal(shifted_array % multi,
+                                      np.zeros(idx_grid.shape, dtype=int))
 
-        if grid_spacing is not None:
-            assert isinstance(grid_spacing, float)
-            assert grid_spacing > 0
+        if boundaries is not None:
+            assert isinstance(boundaries, np.ndarray)
+            assert boundaries.dtype == float
+            assert boundaries.ndim == 2
+            assert boundaries.shape[0] == 2
+            if dimension is not None:
+                assert boundaries.shape == (2, dimension)
 
-        if grid_step_size is not None \
-                and grid_multiplicator is not None \
-                and grid_spacing is not None:
-            assert isclose(grid_spacing, grid_multiplicator*grid_step_size)
-
-        if grid_array is not None:
-            assert isinstance(grid_array, np.ndarray)
-            assert grid_array.dtype == int
-            assert grid_array.ndim in b_const.SUPP_GRID_DIMENSIONS
-
-        if grid_dimension is not None and grid_size is not None \
-                and grid_array is not None:
-            assert grid_array.shape == (grid_size, grid_dimension)
-
-        if grid_multiplicator is not None and grid_array is not None:
-            shifted_array = grid_array - grid_array[0]
-            assert np.array_equal(shifted_array % grid_multiplicator,
-                                  np.zeros(grid_array.shape, dtype=int))
-
-        if grid_is_centered is not None:
-            assert isinstance(grid_is_centered, bool)
-
-        if grid_array is not None and grid_is_centered is not None:
-            if grid_is_centered:
-                assert np.array_equal(grid_array[0], -grid_array[-1])
-            else:
-                assert np.array_equal(grid_array[0],
-                                      np.zeros(grid_array[0].shape))
-
-        if grid_multiplicator is not None and grid_is_centered is True:
-                assert grid_multiplicator % 2 == 0
-
+        if is_centered is not None:
+            assert isinstance(is_centered, bool)
+            if is_centered and multi is not None:
+                    assert multi % 2 == 0
+            if idx_grid is not None:
+                if is_centered:
+                    assert np.array_equal(idx_grid[0], -idx_grid[-1])
+                else:
+                    assert np.array_equal(idx_grid[0],
+                                          np.zeros(idx_grid[0].shape))
         return
 
     def __str__(self, write_physical_grids=False):

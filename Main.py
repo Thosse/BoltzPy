@@ -4,7 +4,7 @@ import boltzpy as b_sim
 import numpy as np
 
 sim = b_sim.Simulation()
-if sim.s.n == 0:
+if sim.s.size == 0:
     sim.add_specimen(mass=2, collision_rate=[50])
     sim.add_specimen(mass=3, collision_rate=[50, 50])
     sim.coll_substeps = 5
@@ -12,12 +12,13 @@ if sim.s.n == 0:
                         number_time_steps=101,
                         calculations_per_time_step=10)
     sim.setup_position_grid(grid_dimension=1,
-                            grid_shape=[21],  # 200
-                            grid_spacing=0.5)  # 0.1
+                            grid_shape=[21],
+                            grid_spacing=0.5)
     sim.set_velocity_grids(grid_dimension=2,
                            min_points_per_axis=4,
                            max_velocity=1.5,
                            velocity_offset=[-0.2, 0])
+print(sim.s["Specimen_1"])
 sim.save()
 
 # ini.load(cnf.file_address)
@@ -38,5 +39,6 @@ sim.save()
 
 sim.run_computation()
 
-sim.animate(np.array([['Mass']]),
-            sim.s.specimen_array[0:1])
+sim.create_animation()
+# sim.create_animation(np.array([['Mass']]),
+#                      sim.s.specimen_array[0:1])

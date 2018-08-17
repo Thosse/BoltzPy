@@ -31,12 +31,12 @@ class SVGrid:
     dim : :obj:`int`
         Dimensionality of all Velocity :class:`Grids <boltzpy.Grid>`.
         Must be in :const:`~boltzpy.constants.SUPP_GRID_DIMENSIONS`.
-    vGrids : :obj:`np.ndarray` [:class:`~boltzpy.Grid`]
+    vGrids : :obj:`~numpy.array` [:class:`~boltzpy.Grid`]
         Array of all Velocity :class:`Grids <boltzpy.Grid>`.
         Each Velocity Grids attribute
         :attr:`Grid.iG <boltzpy.Grid.iG>`
         links to its respective slice of :attr:`iMG`.
-    iMG : :obj:`np.ndarray` [:obj:`int`]
+    iMG : :obj:`~numpy.array` [:obj:`int`]
         The *integer Multi-Grid*. It is a concatenation of the
         Velocity integer Grids
         (:attr:`Grid.iG <boltzpy.Grid>`) of all
@@ -49,7 +49,7 @@ class SVGrid:
         Note that some V-Grid points occur in multiple
         :class:`Velocity Grids <boltzpy.Grid>`.
         Array of shape (:attr:`size`, :attr:`dim`).
-    offset : :obj:`np.ndarray` [:obj:`float`]
+    offset : :obj:`~numpy.array` [:obj:`float`]
         Shifts the physical velocities, to be centered around :attr:`offset`.
         The physical value of any Velocity-Grid point v_i of Specimen S
         is :math:`offset + d[S] \cdot SVG[i]`.
@@ -62,8 +62,8 @@ class SVGrid:
                  max_velocity=None,
                  velocity_offset=None,
                  species_array=None):
-        self.check_parameters(grid_form=grid_form,
-                              grid_dimension=grid_dimension,
+        self.check_parameters(form=grid_form,
+                              dimension=grid_dimension,
                               max_velocity=max_velocity,
                               min_points_per_axis=min_points_per_axis,
                               velocity_offset=velocity_offset)
@@ -118,7 +118,7 @@ class SVGrid:
     # Todo can be replaced by pv method?
     @property
     def pMG(self):
-        """:obj:`np.ndarray` [:obj:`float`] :
+        """:obj:`~numpy.array` [:obj:`float`] :
         Construct the *physical Multi-Grid* (**computationally heavy!**).
 
             The physical Multi-Grid pG denotes the physical values /
@@ -130,7 +130,7 @@ class SVGrid:
          """
         pMG = np.zeros(self.iMG.shape, dtype=float) + self.offset
         for (i_G, G) in enumerate(self.vGrids):
-            [beg, end] = self.range_of_indices(i_G)
+            [beg, end] = self.idx_range(i_G)
             pMG[beg: end] += G.pG
         return pMG
 
@@ -138,7 +138,7 @@ class SVGrid:
 
     @property
     def boundaries(self):
-        """:obj:`np.ndarray` [:obj:`float`] :
+        """:obj:`~numpy.array` [:obj:`float`] :
         Minimum and maximum physical values
         in all :class:`Velocity Grids <boltzpy.Grid>`.
 
@@ -255,14 +255,14 @@ class SVGrid:
         # Contains the velocity Grid of each specimen
         vGrids = [b_grd.Grid(grid_form=self.form,
                              grid_dimension=self.dim,
-                             grid_shape=grid_shapes[i],
+                             grid_shape=np.array(grid_shapes[i]),
                              grid_spacing=spacings[i],
                              grid_is_centered=True)
-                  for i in range(species_array.n)]
+                  for i in range(species_array.size)]
         self.vGrids = np.array(vGrids)
 
         # construct self._index
-        self._index = np.zeros(species_array.n + 1,
+        self._index = np.zeros(species_array.size + 1,
                                dtype=int)
         for (i_G, vGrid) in enumerate(vGrids):
             self._index[i_G + 1] = self._index[i_G] + vGrid.size
@@ -273,7 +273,7 @@ class SVGrid:
         # store the integer Grids (vGrid.iG), by writing them
         # consecutively into the integer Multi-Grid (self.iMG)
         for (i_G, vGrid) in enumerate(self.vGrids):
-            [beg, end] = self.range_of_indices(i_G)
+            [beg, end] = self.idx_range(i_G)
             self.iMG[beg: end, :] = vGrid.iG[:, :]
             vGrid.iG = self.iMG[beg: end, :]
 
@@ -283,8 +283,8 @@ class SVGrid:
     #####################################
     #               Indexing            #
     #####################################
-    def range_of_indices(self, specimen_index):
-        """Get beginning and end delimiters
+    def idx_range(self, specimen_index):
+        """Get delimiters [begin, end]
         of the indexed :class:`Specimens <boltzpy.Specimen>`
         Velocity :class:`Grid <boltzpy.Grid>`
         in :class:`iMG <boltzpy.SVGrid>`.
@@ -297,11 +297,12 @@ class SVGrid:
 
         Returns
         -------
-        :obj:`np.ndarray` [:obj:`int`]
+        :obj:`~numpy.array` [:obj:`int`]
         """
         return self._index[specimen_index: specimen_index+2]
 
     # Todo indexing needs to be checked/edited for new SVGrid class
+    # Todo replace by index in respective vGrid?
     def get_index(self,
                   specimen_index,
                   grid_entry):
@@ -314,14 +315,18 @@ class SVGrid:
 
         Parameters
         ----------
-        specimen_index : int
-        grid_entry : array(int)
-            Array of shape=(self.dim,).
+        specimen_index : :obj:`int`
+        grid_entry : :obj:`~numpy.array` [:obj:`int`]
 
         Returns
         -------
-        int
+        :obj:`int`
             Index of *grid_entry* in :attr:`~SVGrid.iMG`.
+
+        Raises
+        ------
+        ValueError
+            If *grid_entry* is not in the Velocity Grid.
         """
         # Todo Throw exception if not a grid entry (instead of None)
         i_flat = 0
@@ -336,27 +341,34 @@ class SVGrid:
         if all(np.array(self.iMG[i_flat] == grid_entry)):
             return i_flat
         else:
-            return None
+            raise ValueError
 
-    def get_specimen(self, velocity_index):
+    # Todo should be faster with next()
+    # Todo change name
+    def get_specimen(self, velocity_idx):
         """Get :class:`boltzpy.Specimen` index
         of given velocity in :attr:`iMG`.
 
         Parameters
         ----------
-        velocity_index : :obj:`int`
+        velocity_idx : :obj:`int`
 
         Returns
         -------
-        int
+        :obj:`int`
+
+        Raises
+        ------
+        IndexError
+            If *velocity_idx* is out of the range of
+            :attr:`SVGrid.iMG`.
         """
-        # Todo this should be faster with bisection
         for i in range(self._index.size):
-            if self._index[i] <= velocity_index < self._index[i+1]:
+            if self._index[i] <= velocity_idx < self._index[i+1]:
                 return i
         msg = 'The given index ({}) points out of the boundaries of ' \
-              'iMG, the concatenated Velocity Grid.'.format(velocity_index)
-        raise KeyError(msg)
+              'iMG, the concatenated Velocity Grid.'.format(velocity_idx)
+        raise IndexError(msg)
 
     #####################################
     #           Serialization           #
@@ -443,8 +455,8 @@ class SVGrid:
     #####################################
     def check_integrity(self, complete_check=True):
         """Sanity Check.
+
         Assert all conditions in :meth:`check_parameters`
-        and the correct type of all attributes of the instance.
 
         Parameters
         ----------
@@ -452,14 +464,14 @@ class SVGrid:
             If True, then all attributes must be assigned (not None).
             If False, then unassigned attributes are ignored.
         """
-        self.check_parameters(grid_form=self.form,
-                              grid_dimension=self.dim,
+        self.check_parameters(form=self.form,
+                              dimension=self.dim,
                               max_velocity=self._MAX_V,
                               min_points_per_axis=self._MIN_N,
+                              idx_helper=self._index,
+                              vgrid_arr=self.vGrids,
+                              idx_multigrid=self.iMG,
                               velocity_offset=self.offset,
-                              multi_grid_indices=self._index,
-                              multi_class_array=self.vGrids,
-                              multi_grid_array=self.iMG,
                               complete_check=complete_check)
         # Additional Conditions on instance:
         # All Velocity Grids must have equal boundaries
@@ -470,15 +482,14 @@ class SVGrid:
                                       self.boundaries)
         return
 
-    # Todo add Parameters to Docu
     @staticmethod
-    def check_parameters(grid_form=None,
-                         grid_dimension=None,
-                         multi_grid_indices=None,
+    def check_parameters(form=None,
+                         dimension=None,
                          max_velocity=None,
                          min_points_per_axis=None,
-                         multi_class_array=None,
-                         multi_grid_array=None,
+                         idx_helper=None,
+                         vgrid_arr=None,
+                         idx_multigrid=None,
                          velocity_offset=None,
                          complete_check=False):
         """Sanity Check.
@@ -486,8 +497,14 @@ class SVGrid:
 
         Parameters
         ----------
-        grid_form : :obj:`str`, optional
-        grid_dimension : :obj:`int`, optional
+        form : :obj:`str`, optional
+        dimension : :obj:`int`, optional
+        max_velocity : :obj:`float`. optional
+        min_points_per_axis : :obj:`int` optional
+        idx_helper : :obj:`~numpy.array` [:obj:`int`], optional
+        vgrid_arr : :obj:`~numpy.array` [:class:`Grid`], optional
+        idx_multigrid : :obj:`~numpy.array` [:obj:`int`], optional
+        velocity_offset : :obj:`~numpy.array` [:obj:`float`], optional
         complete_check : :obj:`bool`, optional
             If True, then all parameters must be set (not None).
             If False, then unassigned parameters are ignored.
@@ -497,13 +514,13 @@ class SVGrid:
             assert all([param is not None for param in locals().values()])
 
         # check all parameters, if set
-        if grid_form is not None:
-            assert isinstance(grid_form, str)
-            assert grid_form in b_const.SUPP_GRID_FORMS
+        if form is not None:
+            assert isinstance(form, str)
+            assert form in b_const.SUPP_GRID_FORMS
 
-        if grid_dimension is not None:
-            assert isinstance(grid_dimension, int)
-            assert grid_dimension in b_const.SUPP_GRID_DIMENSIONS
+        if dimension is not None:
+            assert isinstance(dimension, int)
+            assert dimension in b_const.SUPP_GRID_DIMENSIONS
 
         if max_velocity is not None:
             assert isinstance(max_velocity, float)
@@ -513,49 +530,56 @@ class SVGrid:
             assert isinstance(min_points_per_axis, int)
             assert min_points_per_axis > 1
 
+        # number of specimen, simplifies upcoming checks
+        if idx_helper is not None:
+            assert isinstance(idx_helper, np.ndarray)
+            assert idx_helper.dtype == int
+            assert idx_helper.ndim == 1
+            assert all(0 <= idx for idx in idx_helper)
+            assert all(idx_helper[i + 1] - idx_helper[i] > 0
+                       for i in range(idx_helper.size - 1))
+
+        if vgrid_arr is not None:
+            assert isinstance(vgrid_arr, np.ndarray)
+            assert vgrid_arr.dtype == 'object'
+            assert all(isinstance(grid, b_grd.Grid) for grid in vgrid_arr)
+            for grid in vgrid_arr:
+                grid.check_integrity()
+            assert vgrid_arr.ndim == 1
+            if vgrid_arr.size > 0:
+                if dimension is None:
+                    dimension = vgrid_arr[0].dim
+                    form = vgrid_arr[0].form
+                assert all(grid.dim == dimension
+                           and grid.form == form
+                           for grid in vgrid_arr)
+            if idx_helper is not None:
+                assert vgrid_arr.size == idx_helper.size - 1
+            if min_points_per_axis is not None:
+                for vGrid in vgrid_arr:
+                    assert all(n_i >= min_points_per_axis for n_i in vGrid.n)
+
+        if idx_multigrid is not None:
+            assert isinstance(idx_multigrid, np.ndarray)
+            assert idx_multigrid.dtype == int
+            assert idx_multigrid.ndim == 2
+            if idx_helper is not None:
+                assert idx_multigrid.shape[0] == idx_helper[-1]
+            if vgrid_arr is not None:
+                for (vGrid_idx, vGrid) in enumerate(vgrid_arr):
+                    beg = idx_helper[vGrid_idx]
+                    end = idx_helper[vGrid_idx + 1]
+                    assert vGrid.size == end - beg
+                    assert np.array_equal(vGrid.iG, idx_multigrid[beg: end])
+
         if velocity_offset is not None:
             if type(velocity_offset) in [list, float]:
                 velocity_offset = np.array(velocity_offset,
                                            dtype=float)
             assert velocity_offset.dtype == float
 
-        if grid_dimension is not None and velocity_offset is not None:
-            assert velocity_offset.shape == (grid_dimension,)
-
-        # Todo undo the assert all
-        # Todo -> submitting a single parameter must be allowed
-        multi_grid_params = [multi_grid_indices,
-                             multi_class_array,
-                             multi_grid_array]
-        if any(param is not None for param in multi_grid_params):
-            assert all(param is not None for param in multi_grid_params)
-            assert grid_dimension is not None
-            assert grid_form is not None
-            assert isinstance(multi_grid_indices, np.ndarray)
-            assert isinstance(multi_class_array, np.ndarray)
-            assert isinstance(multi_grid_array, np.ndarray)
-
-            assert multi_grid_indices.dtype == int
-            assert multi_grid_indices.shape == (multi_class_array.size + 1,)
-            assert all(index >= 0 for index in multi_grid_indices)
-            assert all(multi_grid_indices[i + 1] - multi_grid_indices[i] > 0
-                       for i in range(multi_class_array.size))
-            assert multi_class_array.dtype == 'object'
-            assert multi_grid_array.dtype == int
-            assert multi_grid_array.shape == (multi_grid_indices[-1],
-                                              grid_dimension)
-
-            for (i_G, vGrid) in enumerate(multi_class_array):
-                assert isinstance(vGrid, b_grd.Grid)
-                vGrid.check_integrity()
-                assert vGrid.dim == grid_dimension
-                assert vGrid.form == grid_form
-                if min_points_per_axis is not None:
-                    assert all(np.greater_equal(vGrid.n, min_points_per_axis))
-                beg = multi_grid_indices[i_G]
-                end = multi_grid_indices[i_G + 1]
-                assert vGrid.size == end - beg
-                assert np.array_equal(vGrid.iG, multi_grid_array[beg: end])
+        if dimension is not None and velocity_offset is not None:
+            assert velocity_offset.shape == (dimension,)
 
         return
 

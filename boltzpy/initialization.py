@@ -33,10 +33,10 @@ def create_psv_grid(self):
         # get active rule
         r = self.rule_arr[i_rule]
         # Todo - simply call r_apply method?
-        for i_s in range(self.s.n):
+        for i_s in range(self.s.size):
             rho = r.rho[i_s]
             temp = r.temp[i_s]
-            [begin, end] = self.sv.range_of_indices(i_s)
+            [begin, end] = self.sv.idx_range(i_s)
             v_grid = self.sv.iMG[begin:end]
             dv = self.sv.vGrids[i_s].d
             for (i_v, v) in enumerate(v_grid):

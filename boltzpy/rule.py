@@ -17,7 +17,7 @@ class Rule:
           based on :attr:`rho`, :attr:`drift`, and :attr:`temp`.
         * the
           :const:`category <boltzpy.constants.SUPP_GRID_POINT_CATEGORIES>`
-          of the :class:`P-Grid <boltzpy.configuration.Grid>` point
+          of the :class:`P-Grid <boltzpy.Grid>` point
           which determines the behaviour during the :mod:`computation`
 
     Parameters
@@ -33,24 +33,24 @@ class Rule:
 
     Attributes
     ----------
-    i_cat : :obj:`int`, optional
+    i_cat : :obj:`int`
         determines the behaviour during the simulation
         Denotes the index of an element of
         :const:`~boltzpy.constants.SUPP_GRID_POINT_CATEGORIES`.
-    rho : :obj:`~numpy.ndarray` [:obj:`float`], optional
+    rho : :obj:`~numpy.array` [:obj:`float`]
         Correlates to the total amount of particles in
         the area of the :class:`P-Grid <boltzpy.Grid>` point.
-    drift : :obj:`~numpy.ndarray` [:obj:`float`], optional
+    drift : :obj:`~numpy.array` [:obj:`float`]
         Describes the mean velocity,
         i.e. the first moment (expectancy value) of the
         velocity distribution.
-    temp : :obj:`~numpy.ndarray` [:obj:`float`], optional
+    temp : :obj:`~numpy.array` [:obj:`float`]
         Correlates to the Energy,
         i.e. the second moment (variance) of the
         velocity distribution.
-    name : :obj:`str`, optional
+    name : :obj:`str`
         Is displayed in the GUI to visualize the initialization.
-    color : :obj:`str`, optional
+    color : :obj:`str`
         Is Displayed in the GUI to visualize the initialization.
     """
     # Todo get a clear understanding of the meaning of temperature

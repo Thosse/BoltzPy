@@ -77,7 +77,7 @@ class OutputFunction:
                 if moment not in file_s.keys():
                     # Todo make property for shape?
                     # todo this simplifies complete output?
-                    shape = (self._sim.t.n[0],
+                    shape = (self._sim.t.iG.shape[0],
                              self._sim.p.iG.shape[0])
                     file_s.create_dataset(moment,
                                           shape=shape,
@@ -123,7 +123,7 @@ class OutputFunction:
     def _get_f_mass(self):
         """Generates and returns generating function for Mass"""
         p_shape = (self._sim.p.size,)
-        s_n = self._sim.s.n
+        s_n = self._sim.s.size
         shape = (s_n,) + p_shape
 
         def f_mass(data):
@@ -133,7 +133,7 @@ class OutputFunction:
             """
             mass = np.zeros(shape, dtype=float)
             for i_s in range(s_n):
-                [beg, end] = self._sim.sv.range_of_indices(i_s)
+                [beg, end] = self._sim.sv.idx_range(i_s)
                 # mass = sum over velocity grid of specimen (last axis)
                 mass[i_s, :] = np.sum(data[..., beg:end], axis=-1)
             return mass
@@ -143,7 +143,7 @@ class OutputFunction:
         """Generates and returns generating function for Momentum"""
         assert direction in [0, 1, 2]
         p_shape = (self._sim.p.size,)
-        s_n = self._sim.s.n
+        s_n = self._sim.s.size
         shape = (s_n,) + p_shape
 
         def f_momentum(data):
@@ -153,7 +153,7 @@ class OutputFunction:
             """
             momentum = np.zeros(shape, dtype=float)
             for s in range(s_n):
-                [beg, end] = self._sim.sv.range_of_indices(s)
+                [beg, end] = self._sim.sv.idx_range(s)
                 V_dir = self._sim.sv.iMG[beg:end, direction]
                 momentum[s, :] = np.sum(V_dir * data[..., beg:end],
                                         axis=1)
@@ -164,7 +164,7 @@ class OutputFunction:
     def _get_f_momentum_flow(self, direction):
         """Generates and returns generating function for Momentum Flow"""
         p_shape = (self._sim.p.size,)
-        s_n = self._sim.s.n
+        s_n = self._sim.s.size
         shape = (s_n,) + p_shape
 
         def f_momentum_flow(data):
@@ -174,7 +174,7 @@ class OutputFunction:
             """
             momentum_flow = np.zeros(shape, dtype=float)
             for s in range(s_n):
-                [beg, end] = self._sim.sv.range_of_indices(s)
+                [beg, end] = self._sim.sv.idx_range(s)
                 # Todo rename direction into axis or something like that
                 V_dir = np.array(self._sim.sv.iMG[beg:end, direction])
                 momentum_flow[s, :] = np.sum(V_dir**2 * data[..., beg:end],
@@ -186,7 +186,7 @@ class OutputFunction:
     def _get_f_energy(self):
         """Generates and returns generating function for Energy"""
         p_shape = (self._sim.p.size,)
-        s_n = self._sim.s.n
+        s_n = self._sim.s.size
         shape = (s_n,) + p_shape
 
         def f_energy(data):
@@ -196,7 +196,7 @@ class OutputFunction:
             """
             energy = np.zeros(shape, dtype=float)
             for s in range(s_n):
-                [beg, end] = self._sim.sv.range_of_indices(s)
+                [beg, end] = self._sim.sv.idx_range(s)
                 V = np.array(self._sim.sv.iMG[beg:end, :])
                 V_norm = np.sqrt(np.sum(V**2, axis=1))
                 energy[s, :] = np.sum(V_norm * data[..., beg:end],
@@ -208,7 +208,7 @@ class OutputFunction:
     def _get_f_energy_flow(self, direction):
         """Generates and returns generating function for Energy Flow"""
         p_shape = (self._sim.p.size,)
-        s_n = self._sim.s.n
+        s_n = self._sim.s.size
         shape = (s_n,) + p_shape
 
         def f_energy_flow(data):
@@ -218,7 +218,7 @@ class OutputFunction:
             """
             energy_flow = np.zeros(shape, dtype=float)
             for s in range(s_n):
-                [beg, end] = self._sim.sv.range_of_indices(s)
+                [beg, end] = self._sim.sv.idx_range(s)
                 V = np.array(self._sim.sv.iMG[beg:end, :])
                 V_norm = np.sqrt(np.sum(V ** 2, axis=1))
                 V_dir = np.array(self._sim.sv.iMG[beg:end, direction])

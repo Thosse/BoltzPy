@@ -7,10 +7,7 @@ import numpy as np
 
 
 class Species:
-    """Encapsulates all data of all simulated :class:`Specimen`.
-
-    Can be subscripted by an index of a :class:`Specimen`
-    in the :attr:`specimen_array`.
+    """Array of all simulated :class:`Specimen`.
 
     ..todo::
         - add attribute parent/parent_array to specimen
@@ -24,52 +21,49 @@ class Species:
 
     Attributes
     ----------
-    specimen_array : :obj:`~numpy.ndarray` [:class:`Specimen`]
+    specimen_array : :obj:`~numpy.array` [:class:`Specimen`]
         Array of all simulated :class:`Specimen`.
-    collision_rate_matrix : :obj:`~numpy.ndarray` [:obj:`float`]
+    collision_rate_matrix : :obj:`~numpy.array` [:obj:`float`]
         Determines the collision probability between two specimen.
-        The :attr:`Specimen.collision_rates <boltzpy.configuration.Specimen>`
-        of the :class:`Specimen` are the rows of this matrix.
+        The :attr:`Specimen.collision_rates <boltzpy.Specimen>`
+        of the :class:`Specimen` are the rows and columns of this matrix.
     """
     def __init__(self):
-        self.specimen_array = np.ndarray(0, dtype=b_spm.Specimen)
+        self.specimen_array = np.empty(shape=(0,),
+                                       dtype=b_spm.Specimen)
         self.collision_rate_matrix = np.zeros(shape=(0, 0), dtype=float)
         self.check_integrity()
         return
 
-    def __getitem__(self, index):
-        """Returns the indexed :class:`Specimen`.
+    def __getitem__(self, item):
+        """Get a :class:`Specimen` by index or name.
 
         Parameters
         ----------
-        index : :obj:`int`
+        item : :obj:`int` or :obj:`str`
+            Index or :attr:`Specimen.name`
 
         Returns
         -------
         :class:`Specimen`
-        """
-        return self.specimen_array[index]
 
-    def index(self, specimen_name):
+        Raises
+        ------
+        ValueError
+            *item* is an int and out of bounds.
+        ValueError
+            *item* is a string and no Specimen with name *item* exists.
         """
-        Return the index of the :class:`~boltzpy.configuration.Specimen`,
-        whose name is specimen_name.
-        It is an error if there is no such
-        :class:`~boltzpy.configuration.Specimen`.
-
-        Parameters
-        ----------
-        specimen_name : :obj:`str`
-
-        Returns
-        -------
-        :obj:`int`
-        """
-        index = self.names.index(specimen_name)
-        return index
+        try:
+            return self.specimen_array[item]
+        except IndexError:
+            # get specimen by name
+            assert isinstance(item, str)
+            idx = self.names.index(item)
+            return self.specimen_array[idx]
 
     @property
-    def n(self):
+    def size(self):
         """:obj:`int` :
         Total number of :class:`Specimen`.
         """
@@ -77,7 +71,7 @@ class Species:
 
     @property
     def mass(self):
-        """:obj:`~numpy.ndarray` of :obj:`int` :
+        """:obj:`~numpy.array` [:obj:`int`] :
             Array of masses of all :class:`Specimen`.
             """
         mass = np.array([s.mass for s in self.specimen_array], dtype=int)
@@ -85,7 +79,7 @@ class Species:
 
     @property
     def colors(self):
-        """:obj:`list` of :obj:`str` :
+        """:obj:`list` [:obj:`str`] :
         List of colors of all :class:`Specimen`.
         """
         colors = [s.color for s in self.specimen_array]
@@ -93,7 +87,7 @@ class Species:
 
     @property
     def colors_unused(self):
-        """:obj:`list` of :obj:`str`:
+        """:obj:`list` [:obj:`str`]:
         List of all default colors with no
         :obj:`Specimen` of that color.
         """
@@ -105,7 +99,7 @@ class Species:
 
     @property
     def names(self):
-        """:obj:`list` of :obj:`str` :
+        """:obj:`list` [:obj:`str`] :
         List of names of all :class:`Specimen`.
         """
         names = [s.name for s in self.specimen_array]
@@ -129,33 +123,28 @@ class Species:
         name : :obj:`str`, optional
         color : :obj:`str`, optional
         mass : int, optional
-        collision_rate : :obj:`list` of :obj:`float`, optional
+        collision_rate : :obj:`~numpy.array` [:obj:`float`], optional
             Determines the collision probability between two specimen.
             Row (and column) of :attr:`collision_rate_matrix`.
         """
-        if isinstance(item, int):
-            index = item
-        elif isinstance(item, str):
-            index = self.index(item)
-        else:
-            raise TypeError
+        assert isinstance(item, int) or isinstance(item, str)
 
         b_spm.Specimen.check_parameters(name=name,
                                         color=color,
                                         mass=mass,
                                         collision_rate=collision_rate)
         if name is not None:
-            self[index].name = name
+            self[item].name = name
         if color is not None:
-            self[index].color = color
+            self[item].color = color
         if mass is not None:
-            self[index].mass = mass
+            self[item].mass = mass
         if collision_rate is not None:
             if type(collision_rate) is list:
                 collision_rate = np.array(collision_rate, dtype=float)
-            assert collision_rate.size == self.n
-            self.collision_rate_matrix[index, :] = collision_rate
-            self.collision_rate_matrix[:, index] = collision_rate
+            assert collision_rate.size == self.size
+            self.collision_rate_matrix[item, :] = collision_rate
+            self.collision_rate_matrix[:, item] = collision_rate
 
         self.check_integrity()
         return
@@ -171,19 +160,19 @@ class Species:
         ----------
         name : :obj:`str`, optional
         color : :obj:`str`, optional
-        mass : int, optional
-        collision_rate : :obj:`list` of :obj:`float`, optional
+        mass : :obj:`int`, optional
+        collision_rate : :obj:`~numpy.array` [:obj:`float`], optional
             Determines the collision probability between two specimen.
             Row (and column) of :attr:`collision_rate_matrix`.
         """
         # Setup default parameters
-        default_name = 'Specimen_' + str(self.n)
+        default_name = 'Specimen_' + str(self.size)
         default_color = next(iter(self.colors_unused), 'black')
         default_mass = 1
-        default_collision_rate = np.ones(self.n + 1)
+        default_collision_rate = np.ones(self.size + 1)
 
         # Add the new row/column to self.collision_rate_matrix
-        tmp_col_rat_mat = np.zeros(shape=(self.n + 1, self.n + 1),
+        tmp_col_rat_mat = np.zeros(shape=(self.size + 1, self.size + 1),
                                    dtype=float)
         tmp_col_rat_mat[0:-1, 0:-1] = self.collision_rate_matrix
         tmp_col_rat_mat[-1, :] = default_collision_rate
@@ -219,7 +208,7 @@ class Species:
         if isinstance(item, int):
             index = item
         elif isinstance(item, str):
-            index = self.index(item)
+            index = self.names.index(item)
         else:
             raise TypeError
 
@@ -319,8 +308,8 @@ class Species:
     #####################################
     def check_integrity(self):
         """Sanity Check. Checks Integrity of all Attributes"""
-        assert type(self.n) is int
-        assert self.n >= 0
+        assert type(self.size) is int
+        assert self.size >= 0
         for (i_s, specimen) in enumerate(self.specimen_array):
             assert isinstance(specimen, b_spm.Specimen)
             specimen.check_integrity()
@@ -334,12 +323,12 @@ class Species:
             assert isinstance(col_rat_1, np.ndarray)
             assert np.all(col_rat_1 == col_rat_2)
             assert np.all(col_rat_1 == col_rat_3)
-        assert self.collision_rate_matrix.shape == (self.n, self.n)
+        assert self.collision_rate_matrix.shape == (self.size, self.size)
         return
 
     def __str__(self):
         """Converts the instance to a string, describing all attributes."""
-        description = "Number of Specimen = {}\n".format(self.n)
+        description = "Number of Specimen = {}\n".format(self.size)
         for (i_s, specimen) in enumerate(self.specimen_array):
             description += 'Specimen_{}:'.format(i_s)
             description += '\n'
