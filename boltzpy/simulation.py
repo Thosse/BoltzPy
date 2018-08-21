@@ -267,7 +267,7 @@ class Simulation:
         Parameters
         ----------
         name : :obj:`str`, optional
-        mass : int, optional
+        mass : :obj:`int`, optional
         collision_rate : :obj:`~numpy.array` [:obj:`float`] or :obj:`list` [:obj:`int`], optional
             Correlates to the collision probability between two specimen.
         color : :obj:`str`, optional

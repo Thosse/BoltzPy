@@ -5,12 +5,15 @@
 
 .. _classes:
 
-Class Index
-===========
 
 The Simulation Class
 --------------------
 .. autoclass:: boltzpy.Simulation
+    :members:
+
+The Species Class
+-----------------
+.. autoclass:: boltzpy.Species
     :members:
 
 The Specimen Class
@@ -18,11 +21,6 @@ The Specimen Class
 .. autoclass:: boltzpy.Specimen
     :members:
 
-The Species Class
------------------
-.. autoclass:: boltzpy.Species
-    :members:
-        
 The Grid Class
 --------------
 .. autoclass:: boltzpy.Grid
@@ -32,7 +30,6 @@ The SVGrid Class
 ----------------
 .. autoclass:: boltzpy.SVGrid
     :members:
-
 
 The Rule Class
 --------------
