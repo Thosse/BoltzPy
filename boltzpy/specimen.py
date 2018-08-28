@@ -105,7 +105,7 @@ class Specimen:
             assert color in b_const.SUPP_COLORS
 
         if mass is not None:
-            assert type(mass) in [int, np.int64]
+            assert type(mass) == int
             assert mass > 0
 
         if collision_rate is not None:

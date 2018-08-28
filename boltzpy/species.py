@@ -49,18 +49,21 @@ class Species:
 
         Raises
         ------
-        ValueError
+        IndexError
             *item* is an int and out of bounds.
         ValueError
             *item* is a string and no Specimen with name *item* exists.
+        TypeError
+            *name* is neither an :obj:`int` or a :obj:`str`
         """
-        try:
+        if isinstance(item, int):
             return self.specimen_array[item]
-        except IndexError:
-            # get specimen by name
-            assert isinstance(item, str)
-            idx = self.names.index(item)
-            return self.specimen_array[idx]
+        if isinstance(item, str):
+            item_idx = self.index(item)
+            return self.specimen_array[item_idx]
+        else:
+            raise TypeError("item must be either an int or a str,"
+                            "not a {}".format(type(item)))
 
     @property
     def size(self):
@@ -108,6 +111,31 @@ class Species:
     #####################################
     #           Configuration           #
     #####################################
+    def index(self, name):
+        """Find a :class:`Specimen`
+        with :attr:`Specimen.name` == *name*
+        in :attr:`specimen_array`
+        and return its index.
+
+        Parameters
+        ----------
+        name : :obj:`str`
+            The searched for :attr:`Specimen.name`.
+
+        Returns
+        -------
+        :obj:`int`
+
+        Raises
+        ------
+        AssertionError
+            *name* is not a :obj:`str`
+        ValueError
+            No :class:`Specimen` with :attr:`~Specimen.name` *name* exists.
+        """
+        assert isinstance(name, str)
+        return self.names.index(name)
+
     def edit_specimen(self,
                       item,
                       name=None,
@@ -127,24 +155,30 @@ class Species:
             Determines the collision probability between two specimen.
             Row (and column) of :attr:`collision_rate_matrix`.
         """
-        assert isinstance(item, int) or isinstance(item, str)
+        if isinstance(item, int):
+            item_idx = item
+        elif isinstance(item, str):
+            item_idx = self.index(item)
+        else:
+            raise TypeError("item must be either an int or a str, "
+                            "not a {}".format(type(item)))
 
         b_spm.Specimen.check_parameters(name=name,
                                         color=color,
                                         mass=mass,
                                         collision_rate=collision_rate)
         if name is not None:
-            self[item].name = name
+            self[item_idx].name = name
         if color is not None:
-            self[item].color = color
+            self[item_idx].color = color
         if mass is not None:
-            self[item].mass = mass
+            self[item_idx].mass = mass
         if collision_rate is not None:
             if type(collision_rate) is list:
                 collision_rate = np.array(collision_rate, dtype=float)
             assert collision_rate.size == self.size
-            self.collision_rate_matrix[item, :] = collision_rate
-            self.collision_rate_matrix[:, item] = collision_rate
+            self.collision_rate_matrix[item_idx, :] = collision_rate
+            self.collision_rate_matrix[:, item_idx] = collision_rate
 
         self.check_integrity()
         return
@@ -208,7 +242,7 @@ class Species:
         if isinstance(item, int):
             index = item
         elif isinstance(item, str):
-            index = self.names.index(item)
+            index = self.index(item)
         else:
             raise TypeError
 
