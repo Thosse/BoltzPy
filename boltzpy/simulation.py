@@ -258,26 +258,69 @@ class Simulation:
     #############################
     def add_specimen(self,
                      name=None,
-                     color=None,
                      mass=None,
-                     collision_rate=None):
-        """Add a Specimen to :attr:`s`. See :meth:`Species.add_specimen`
+                     collision_rate=None,
+                     color=None):
+        """Add a :class:`Specimen` to :attr:`s`.
+        See :meth:`Species.add`
 
         Parameters
         ----------
         name : :obj:`str`, optional
-        color : :obj:`str`, optional
         mass : int, optional
         collision_rate : :obj:`~numpy.array` [:obj:`float`] or :obj:`list` [:obj:`int`], optional
             Correlates to the collision probability between two specimen.
+        color : :obj:`str`, optional
         """
         if isinstance(collision_rate, list):
             assert all([isinstance(item, int) for item in collision_rate])
             collision_rate = np.array(collision_rate, dtype=float)
-        self.s.add_specimen(name,
-                            color,
-                            mass,
-                            collision_rate)
+        self.s.add(name,
+                   mass,
+                   collision_rate,
+                   color, )
+        return
+
+    def edit_specimen(self,
+                      item,
+                      name=None,
+                      mass=None,
+                      collision_rate=None,
+                      color=None):
+        """Edit the :class:`Specimen`, denoted by *item*, in :attr:`s`.
+        See :meth:`Species.edit`
+
+        Parameters
+        ----------
+        item : :obj:`int` or :obj:`str`
+            Index or name of the :obj:`Specimen` to be edited
+        name : :obj:`str`, optional
+        mass : int, optional
+        collision_rate : :obj:`~numpy.array` [:obj:`float`] or :obj:`list` [:obj:`int`], optional
+            Correlates to the collision probability between two specimen.
+        color : :obj:`str`, optional
+        """
+        if isinstance(collision_rate, list):
+            assert all([isinstance(item, int) for item in collision_rate])
+            collision_rate = np.array(collision_rate, dtype=float)
+        self.s.edit(item,
+                    name,
+                    mass,
+                    collision_rate,
+                    color)
+        return
+
+    def remove_specimen(self, item):
+        """Remove the :class:`Specimen`, denoted by *item*,
+        from :attr:`s`.
+        See :meth:`Species.remove`
+
+        Parameters
+        ----------
+        item : :obj:`int` or :obj:`str`
+            Index or name of the :obj:`Specimen` to be edited
+        """
+        self.s.remove(item)
         return
 
     # Todo Choose between step size or number of time steps
@@ -470,7 +513,7 @@ class Simulation:
             assert all([output in self.output_parameters.flatten()
                         for output in output_arr.flatten()])
         if specimen_arr is None:
-            specimen_arr = self.s.specimen_array
+            specimen_arr = self.s.specimen_arr
         else:
             assert isinstance(specimen_arr, np.ndarray)
             assert specimen_arr.ndim == 1
@@ -513,7 +556,7 @@ class Simulation:
             assert all([output in self.output_parameters.flatten()
                         for output in output_arr])
         if specimen_arr is None:
-            specimen_arr = self.s.specimen_array
+            specimen_arr = self.s.specimen_arr
         else:
             assert isinstance(specimen_arr, np.ndarray)
             assert specimen_arr.ndim == 1

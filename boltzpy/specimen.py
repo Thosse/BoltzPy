@@ -18,29 +18,27 @@ class Specimen:
     name : :obj:`str`
         Name of the Specimen, mainly used for the legend in the animation.
         Must be unique.
-    color : :obj:`str`
-        Color of the Specimen in the animation.
-        Must be an element of :const:`~boltzpy.constants.SUPP_COLORS`.
     mass : :obj:`int`
         Mass of the Specimen.
         Strongly influences the size of the Specimens
         :class:`Velocity Grid <boltzpy.SVGrid>`.
     collision_rate : :obj:`~numpy.array` [:obj:`float`]
         Determines the collision probability between two specimen.
-        Points at a row or column of
-        :attr:`Species.collision_rate_matrix
-        <boltzpy.Species>`.
+        Is a row and a column of
+        :attr:`Species.collision_rates <boltzpy.Species>`.
+    color : :obj:`str`
+        Color of the Specimen in the animation.
+        Must be an element of :const:`~boltzpy.constants.SUPP_COLORS`.
     """
     def __init__(self,
                  name,
-                 color,
                  mass,
-                 collision_rate
-                 ):
-        self.check_parameters(name,
-                              color,
-                              mass,
-                              collision_rate)
+                 collision_rate,
+                 color):
+        self.check_parameters(name=name,
+                              mass=mass,
+                              collision_rate=collision_rate,
+                              color=color)
         self.name = name
         self.color = color
         self.mass = mass
@@ -72,9 +70,9 @@ class Specimen:
 
     @staticmethod
     def check_parameters(name=None,
-                         color=None,
                          mass=None,
                          collision_rate=None,
+                         color=None,
                          complete_check=False):
         """Sanity Check.
         Checks integrity of given parameters and their interactions.
@@ -105,7 +103,7 @@ class Specimen:
             assert color in b_const.SUPP_COLORS
 
         if mass is not None:
-            assert type(mass) in [int, np.int64]
+            assert type(mass) == int
             assert mass > 0
 
         if collision_rate is not None:

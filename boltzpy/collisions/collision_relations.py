@@ -228,8 +228,8 @@ class CollisionRelations:
         Currently only depends on the colliding Specimen .
         This will change in the future.
         """
-        col_rate = self._sim.s.collision_rate_matrix[specimen[0],
-                                                     specimen[1]]
+        col_rate = self._sim.s.collision_rates[specimen[0],
+                                               specimen[1]]
         n_cols = self._sim.coll_substeps
         if n_cols != 0:
             return col_rate / n_cols
