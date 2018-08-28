@@ -21,17 +21,12 @@ class Species:
 
     Attributes
     ----------
-    specimen_array : :obj:`~numpy.array` [:class:`Specimen`]
+    specimen_arr : :obj:`~numpy.array` [:class:`Specimen`]
         Array of all simulated :class:`Specimen`.
-    collision_rate_matrix : :obj:`~numpy.array` [:obj:`float`]
-        Determines the collision probability between two specimen.
-        The :attr:`Specimen.collision_rates <boltzpy.Specimen>`
-        of the :class:`Specimen` are the rows and columns of this matrix.
     """
     def __init__(self):
-        self.specimen_array = np.empty(shape=(0,),
-                                       dtype=b_spm.Specimen)
-        self.collision_rate_matrix = np.zeros(shape=(0, 0), dtype=float)
+        self.specimen_arr = np.empty(shape=(0,),
+                                     dtype=b_spm.Specimen)
         self.check_integrity()
         return
 
@@ -46,38 +41,31 @@ class Species:
         Returns
         -------
         :class:`Specimen`
-
-        Raises
-        ------
-        IndexError
-            *item* is an int and out of bounds.
-        ValueError
-            *item* is a string and no Specimen with name *item* exists.
-        TypeError
-            *name* is neither an :obj:`int` or a :obj:`str`
         """
-        if isinstance(item, int):
-            return self.specimen_array[item]
-        if isinstance(item, str):
-            item_idx = self.index(item)
-            return self.specimen_array[item_idx]
-        else:
-            raise TypeError("item must be either an int or a str,"
-                            "not a {}".format(type(item)))
+        item_idx = self.index(item)
+        return self.specimen_arr[item_idx]
 
     @property
     def size(self):
         """:obj:`int` :
         Total number of :class:`Specimen`.
         """
-        return self.specimen_array.size
+        return self.specimen_arr.size
+
+    @property
+    def names(self):
+        """:obj:`list` [:obj:`str`] :
+        List of names of all :class:`Specimen`.
+        """
+        names = [s.name for s in self.specimen_arr]
+        return names
 
     @property
     def mass(self):
         """:obj:`~numpy.array` [:obj:`int`] :
             Array of masses of all :class:`Specimen`.
             """
-        mass = np.array([s.mass for s in self.specimen_array], dtype=int)
+        mass = np.array([s.mass for s in self.specimen_arr], dtype=int)
         return mass
 
     @property
@@ -85,7 +73,7 @@ class Species:
         """:obj:`list` [:obj:`str`] :
         List of colors of all :class:`Specimen`.
         """
-        colors = [s.color for s in self.specimen_array]
+        colors = [s.color for s in self.specimen_arr]
         return colors
 
     @property
@@ -101,26 +89,36 @@ class Species:
         return unused_colors
 
     @property
-    def names(self):
-        """:obj:`list` [:obj:`str`] :
-        List of names of all :class:`Specimen`.
+    def collision_rates(self):
+        """:obj:`~numpy.array` [:obj:`float`]
+        Determines the collision probability between two specimen.
+        The :attr:`Specimen.collision_rates <boltzpy.Specimen>`
+        of the :class:`Specimen` are the rows and columns
+        of this symmetric matrix.
         """
-        names = [s.name for s in self.specimen_array]
-        return names
+        # fill collision_rates with -1.0,
+        # this way uninitialized rows may be found
+        collision_rates = np.full(shape=(self.size, self.size),
+                                  fill_value=-1.0)
+        for (s_idx, s) in enumerate(self.specimen_arr):
+            collision_rates[s_idx, :] = s.collision_rate[:]
+        return collision_rates
 
     #####################################
     #           Configuration           #
     #####################################
-    def index(self, name):
-        """Find a :class:`Specimen`
-        with :attr:`Specimen.name` == *name*
-        in :attr:`specimen_array`
-        and return its index.
+    def index(self, item):
+        """Find the index of a :class:`Specimen`
+        by its :attr:`Specimen.name`.
+
+        If *item* is an :obj:`int`, assert *item* is an index.
+        If *item* is a :obj:`str`, search :attr:`specimen_arr`
+        and return the index where :attr:`Specimen.name` == *item*.
 
         Parameters
         ----------
-        name : :obj:`str`
-            The searched for :attr:`Specimen.name`.
+        item : :obj:`int` or :obj:`str`
+            Index or the searched for :attr:`Specimen.name`.
 
         Returns
         -------
@@ -128,110 +126,113 @@ class Species:
 
         Raises
         ------
-        AssertionError
-            *name* is not a :obj:`str`
+        IndexError
+            *item* is an int and out of bounds.
         ValueError
-            No :class:`Specimen` with :attr:`~Specimen.name` *name* exists.
+            *item* is a string and no Specimen with name *item* exists.
+        TypeError
+            *name* is neither an :obj:`int` or a :obj:`str`
         """
-        assert isinstance(name, str)
-        return self.names.index(name)
+        if isinstance(item, int):
+            if not 0 <= item < self.size:
+                raise IndexError
+            return item
+        if isinstance(item, str):
+            return self.names.index(item)
+        else:
+            raise TypeError("item must be either an int or a str,"
+                            "not a {}".format(type(item)))
 
-    def edit_specimen(self,
-                      item,
-                      name=None,
-                      color=None,
-                      mass=None,
-                      collision_rate=None):
-        """Edits attributes of a :obj:`Specimen`.
+    def add(self,
+            name=None,
+            mass=None,
+            collision_rate=None,
+            color=None):
+        """Add a new :obj:`Specimen` to :attr:`specimen_arr`.
+
+        If a parameter is None,
+        then the :obj:`Specimens <Specimen>` corresponding attribute
+        is set to a default value.
+
+        Parameters
+        ----------
+        name : :obj:`str`, optional
+        mass : :obj:`int`, optional
+        collision_rate : :obj:`~numpy.array` [:obj:`float`], optional
+            Determines the collision probability between two specimen.
+            Row (and column) of :attr:`collision_rates`.
+        color : :obj:`str`, optional
+        """
+        b_spm.Specimen.check_parameters(name=name,
+                                        mass=mass,
+                                        collision_rate=collision_rate,
+                                        color=color)
+        if name is None:
+            name = 'Specimen_' + str(self.size)
+        if mass is None:
+            mass = 1
+        if collision_rate is None:
+            collision_rate = np.ones(shape=self.size + 1, dtype=float)
+        if color is None:
+            color = next(iter(self.colors_unused), 'black')
+
+        s_new = b_spm.Specimen(name=name,
+                               mass=mass,
+                               color=color,
+                               collision_rate=collision_rate)
+        # adjust collision rates of already existing species
+        for (s_idx, s) in enumerate(self.specimen_arr):
+            assert isinstance(s, b_spm.Specimen)
+            s.collision_rate = np.append(s.collision_rate,
+                                         s_new.collision_rate[s_idx])
+        # add new specimen
+        self.specimen_arr = np.append(self.specimen_arr, [s_new])
+        self.check_integrity()
+        return
+
+    def edit(self,
+             item,
+             new_name=None,
+             new_mass=None,
+             new_collision_rate=None,
+             new_color=None):
+        """Edit attributes of the :obj:`Specimen`, denoted by *item*.
+
+        All attributes, where *new_<ATTRIBUTE>* is None,
+        stay unchanged. They are NOT set to None.
 
         Parameters
         ----------
         item : :obj:`int` or :obj:`str`
             Index or name of the :obj:`Specimen` to be edited
-        name : :obj:`str`, optional
-        color : :obj:`str`, optional
-        mass : int, optional
-        collision_rate : :obj:`~numpy.array` [:obj:`float`], optional
-            Determines the collision probability between two specimen.
-            Row (and column) of :attr:`collision_rate_matrix`.
+        new_name : :obj:`str`, optional
+        new_mass : int, optional
+        new_collision_rate : :obj:`~numpy.array` [:obj:`float`], optional
+        new_color : :obj:`str`, optional
         """
-        if isinstance(item, int):
-            item_idx = item
-        elif isinstance(item, str):
-            item_idx = self.index(item)
-        else:
-            raise TypeError("item must be either an int or a str, "
-                            "not a {}".format(type(item)))
-
-        b_spm.Specimen.check_parameters(name=name,
-                                        color=color,
-                                        mass=mass,
-                                        collision_rate=collision_rate)
-        if name is not None:
-            self[item_idx].name = name
-        if color is not None:
-            self[item_idx].color = color
-        if mass is not None:
-            self[item_idx].mass = mass
-        if collision_rate is not None:
-            if type(collision_rate) is list:
-                collision_rate = np.array(collision_rate, dtype=float)
-            assert collision_rate.size == self.size
-            self.collision_rate_matrix[item_idx, :] = collision_rate
-            self.collision_rate_matrix[:, item_idx] = collision_rate
+        (s_idx, s) = (self.index(item), self[item])
+        b_spm.Specimen.check_parameters(name=new_name,
+                                        mass=new_mass,
+                                        collision_rate=new_collision_rate,
+                                        color=new_color)
+        if new_name is not None:
+            s.name = new_name
+        if new_color is not None:
+            s.color = new_color
+        if new_mass is not None:
+            s.mass = new_mass
+        if new_collision_rate is not None:
+            assert new_collision_rate.size == self.size
+            s.collision_rate = new_collision_rate
+            # edit the other species collision rates,
+            # since collision_rates must by symmetric
+            for (s2_idx, s2) in enumerate(self.specimen_arr):
+                s2.collision_rate[s_idx] = s.collision_rate[s2_idx]
 
         self.check_integrity()
         return
 
-    def add_specimen(self,
-                     name=None,
-                     color=None,
-                     mass=None,
-                     collision_rate=None):
-        """Adds a new :obj:`Specimen`.
-
-        Parameters
-        ----------
-        name : :obj:`str`, optional
-        color : :obj:`str`, optional
-        mass : :obj:`int`, optional
-        collision_rate : :obj:`~numpy.array` [:obj:`float`], optional
-            Determines the collision probability between two specimen.
-            Row (and column) of :attr:`collision_rate_matrix`.
-        """
-        # Setup default parameters
-        default_name = 'Specimen_' + str(self.size)
-        default_color = next(iter(self.colors_unused), 'black')
-        default_mass = 1
-        default_collision_rate = np.ones(self.size + 1)
-
-        # Add the new row/column to self.collision_rate_matrix
-        tmp_col_rat_mat = np.zeros(shape=(self.size + 1, self.size + 1),
-                                   dtype=float)
-        tmp_col_rat_mat[0:-1, 0:-1] = self.collision_rate_matrix
-        tmp_col_rat_mat[-1, :] = default_collision_rate
-        tmp_col_rat_mat[:, -1] = default_collision_rate
-        self.collision_rate_matrix = tmp_col_rat_mat
-        self._relink_all_collision_rates()
-
-        # Create and append default Specimen
-        new_specimen = b_spm.Specimen(default_name,
-                                      default_color,
-                                      default_mass,
-                                      self.collision_rate_matrix[-1, :])
-        self.specimen_array = np.append(self.specimen_array,
-                                        [new_specimen])
-        # edit new Specimen
-        self.edit_specimen(-1,
-                           name=name,
-                           color=color,
-                           mass=mass,
-                           collision_rate=collision_rate)
-        self.check_integrity()
-        return
-
-    # Todo do unittest, to verify this actually works correctly
-    def delete_specimen(self, item):
+    def remove(self, item):
         """Removes a :obj:`Specimen`.
 
         Parameters
@@ -239,32 +240,12 @@ class Species:
         item : :obj:`int` or :obj:`str`
             Index or name of the :obj:`Specimen` to be removed.
         """
-        if isinstance(item, int):
-            index = item
-        elif isinstance(item, str):
-            index = self.index(item)
-        else:
-            raise TypeError
-
-        self.specimen_array = np.delete(self.specimen_array, index)
-        self.collision_rate_matrix = np.delete(self.collision_rate_matrix,
-                                               index,
-                                               axis=0)
-        self.collision_rate_matrix = np.delete(self.collision_rate_matrix,
-                                               index,
-                                               axis=1)
-        self._relink_all_collision_rates()
-        return
-
-    def _relink_all_collision_rates(self):
-        """Resets each :class:`Specimens <Specimen>`
-        :attr:`~Specimen.collision_rate`
-        to a view of its respective row in the :attr:`collision_rate_matrix`
-        for every single :obj:`Specimen`.
-        Note that he :attr:`Specimen.collision_rate` attributes are pointers.
-        """
-        for (i_s, s) in enumerate(self.specimen_array):
-            s.collision_rate = self.collision_rate_matrix[i_s, :]
+        item_idx = self.index(item)
+        self.specimen_arr = np.delete(self.specimen_arr, item_idx)
+        # remove items entry in in every remaining specimens collision rate
+        for s in self.specimen_arr:
+            s.collision_rate = np.delete(s.collision_rate, item_idx)
+        self.check_integrity()
         return
 
     #####################################
@@ -290,18 +271,19 @@ class Species:
         try:
             # read data from file
             names = hdf5_group["Names"]
-            colors = hdf5_group["Colors"].value
             masses = hdf5_group["Masses"].value
-            col_rate = hdf5_group["Collision_Rate_Matrix"].value
-            assert len(names.shape) is 1 and len(col_rate.shape) is 2
+            col_rate = hdf5_group["collision_rates"].value
+            colors = hdf5_group["Colors"].value
+            assert names.ndim is 1
+            assert col_rate.ndim is 2
             assert names.shape == colors.shape == masses.shape
             assert col_rate.shape == (names.size, names.size)
             # setup s iteratively
             for i in range(names.size):
-                self.add_specimen(name=names[i],
-                                  color=colors[i],
-                                  mass=masses[i],
-                                  collision_rate=col_rate[i, 0:i+1])
+                self.add(name=names[i],
+                         mass=int(masses[i]),
+                         collision_rate=col_rate[i, 0:i+1],
+                         color=colors[i])
         except KeyError:
             pass
         self.check_integrity()
@@ -331,10 +313,10 @@ class Species:
         # Write Attributes
         hdf5_group["Names"] = np.array(self.names,
                                        dtype=h5py_string_type)
+        hdf5_group["Masses"] = self.mass
+        hdf5_group["collision_rates"] = self.collision_rates
         hdf5_group["Colors"] = np.array(self.colors,
                                         dtype=h5py_string_type)
-        hdf5_group["Masses"] = self.mass
-        hdf5_group["Collision_Rate_Matrix"] = self.collision_rate_matrix
         return
 
     #####################################
@@ -342,34 +324,60 @@ class Species:
     #####################################
     def check_integrity(self):
         """Sanity Check. Checks Integrity of all Attributes"""
+        assert isinstance(self.specimen_arr, np.ndarray)
+        assert self.specimen_arr.ndim == 1
+        assert self.specimen_arr.size == self.size
+        for s in self.specimen_arr:
+            assert isinstance(s, b_spm.Specimen)
+            s.check_integrity()
+            assert s.collision_rate.size == self.size
+
         assert type(self.size) is int
         assert self.size >= 0
-        for (i_s, specimen) in enumerate(self.specimen_array):
-            assert isinstance(specimen, b_spm.Specimen)
-            specimen.check_integrity()
-            # names must be unique
-            assert self.names.count(specimen.name) == 1
-            # collision rate is a link to a row of the collision matrix
-            col_rat_1 = specimen.collision_rate
-            col_rat_2 = self.collision_rate_matrix[i_s, :]
-            col_rat_3 = self.collision_rate_matrix[:, i_s]
-            assert np.shares_memory(col_rat_1, col_rat_2)
-            assert isinstance(col_rat_1, np.ndarray)
-            assert np.all(col_rat_1 == col_rat_2)
-            assert np.all(col_rat_1 == col_rat_3)
-        assert self.collision_rate_matrix.shape == (self.size, self.size)
+
+        assert isinstance(self.names, list)
+        assert all(isinstance(name, str) for name in self.names)
+        assert all(self.names.count(name) == 1 for name in self.names)
+
+        assert isinstance(self.mass, np.ndarray)
+        assert self.mass.dtype == int
+        assert self.mass.size == self.size
+        assert all(m > 0 for m in self.mass)
+
+        assert isinstance(self.colors, list)
+        assert all(type(color) == str for color in self.colors)
+        assert all(color in b_const.SUPP_COLORS for color in self.colors)
+
+        assert isinstance(self.colors_unused, list)
+        assert all(type(color) == str for color in self.colors_unused)
+        assert all(color in b_const.SUPP_COLORS
+                   for color in self.colors_unused)
+        assert all(color not in self.colors_unused for color in self.colors)
+
+        assert isinstance(self.collision_rates, np.ndarray)
+        assert self.collision_rates.dtype == float
+        assert self.collision_rates.ndim == 2
+        assert self.collision_rates.shape == (self.size, self.size)
+        for (specimen_idx, specimen) in enumerate(self.specimen_arr):
+            # collision rates is a symmetric matrix
+            s_col_rate = specimen.collision_rate
+            row = self.collision_rates[specimen_idx, :]
+            column = self.collision_rates[:, specimen_idx]
+            assert isinstance(specimen.collision_rate, np.ndarray)
+            assert np.all(s_col_rate == row)
+            assert np.all(s_col_rate == column)
         return
 
     def __str__(self):
         """Converts the instance to a string, describing all attributes."""
         description = "Number of Specimen = {}\n".format(self.size)
-        for (i_s, specimen) in enumerate(self.specimen_array):
+        for (i_s, specimen) in enumerate(self.specimen_arr):
             description += 'Specimen_{}:'.format(i_s)
             description += '\n'
             description += '\t'
             description += specimen.__str__().replace('\n', '\n\t')
             description += '\n\n'
         description += "Collision-Factor-Matrix: \n"
-        matrix_string = self.collision_rate_matrix.__str__()
+        matrix_string = self.collision_rates.__str__()
         description += "\t" + matrix_string.replace('\n', '\n\t')
         return description

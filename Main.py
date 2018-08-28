@@ -4,7 +4,8 @@ import boltzpy as b_sim
 import numpy as np
 
 sim = b_sim.Simulation()
-if sim.s.size == 0:
+new_simulation = True
+if new_simulation:
     sim.add_specimen(mass=2, collision_rate=[50])
     sim.add_specimen(mass=3, collision_rate=[50, 50])
     sim.coll_substeps = 5
@@ -18,22 +19,18 @@ if sim.s.size == 0:
                            min_points_per_axis=4,
                            max_velocity=1.5,
                            velocity_offset=[-0.2, 0])
-print(sim.s["Specimen_1"])
-sim.save()
-
-# ini.load(cnf.file_address)
-sim.add_rule('Inner Point',
-             np.array([2.0, 1.0]),
-             np.array([[0.0, 0.0], [0.0, 0.0]]),
-             np.array([1.0, 1.0]),
-             name='High Pressure')
-sim.choose_rule(np.arange(0, 10), 0)
-sim.add_rule('Inner Point',
-             np.array([1.0, 1.0]),
-             np.array([[0.0, 0.0], [0.0, 0.0]]),
-             np.array([1.0, 1.0]),
-             name='Low Pressure')
-sim.choose_rule(np.arange(10, 21), 1)
+    sim.add_rule('Inner Point',
+                 np.array([2.0, 1.0]),
+                 np.array([[0.0, 0.0], [0.0, 0.0]]),
+                 np.array([1.0, 1.0]),
+                 name='High Pressure')
+    sim.choose_rule(np.arange(0, 10), 0)
+    sim.add_rule('Inner Point',
+                 np.array([1.0, 1.0]),
+                 np.array([[0.0, 0.0], [0.0, 0.0]]),
+                 np.array([1.0, 1.0]),
+                 name='Low Pressure')
+    sim.choose_rule(np.arange(10, 21), 1)
 print(sim.__str__(write_physical_grids=True))
 sim.save()
 
