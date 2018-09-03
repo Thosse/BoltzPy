@@ -134,14 +134,21 @@ class Species:
             *name* is neither an :obj:`int` or a :obj:`str`
         """
         if isinstance(item, int):
-            if not 0 <= item < self.size:
-                raise IndexError
-            return item
+            n_specimen = self.size
+            # allow negative/reverse indexing
+            if -n_specimen <= item < n_specimen:
+                return item
+            else:
+                msg = ("item must be in range(-self.size, self.size). "
+                       "Given item {} is not in [{},...,{}]."
+                       "".format(item, -n_specimen, n_specimen))
+                raise IndexError(msg)
         if isinstance(item, str):
             return self.names.index(item)
         else:
-            raise TypeError("item must be either an int or a str,"
-                            "not a {}".format(type(item)))
+            msg = ("item must be either an int or a str,"
+                   "not a {}".format(type(item)))
+            raise TypeError(msg)
 
     def add(self,
             name=None,
