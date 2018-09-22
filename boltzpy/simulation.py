@@ -113,13 +113,10 @@ class Simulation:
         Must be a 2D array.
     """
     def __init__(self, file_address=None):
-        # separate file directory and file root, using a helper function
-        h_separate = h_file.split_address
-        [self._file_directory, self._file_root] = h_separate(file_address)
-
-        # Sanity check on (processed) file address
-        self.check_parameters(file_address=self.file_address)
-        del file_address    # not needed anymore, could lead to typos
+        # set file address (using a setter method)
+        [self._file_directory, self._file_root] = ['', '']
+        self.file_address = file_address
+        del file_address  # not needed anymore, could lead to typos
 
         # Open HDF5 file
         if os.path.exists(self.file_address + '.hdf5'):
@@ -228,13 +225,8 @@ class Simulation:
                                                 'Momentum_Flow_X'],
                                                ['Energy',
                                                 'Energy_Flow_X']])
-        # # Submodules
-        # # Todo self.description = ... String that describes the simulation
-        # self.collision_relations = b_rel.CollisionRelations(self)
-        # # Todo self.schemes, get from configuration
-        # self.computation = b_cal.Calculation(self)
-        # self.animation = b_ani.Animation(self)
 
+        # # Todo self.description = ... String that describes the simulation
         file.close()
         self.check_integrity(complete_check=False)
         return
@@ -245,6 +237,21 @@ class Simulation:
         Full path of the :class:`Simulation` file.
         """
         return self._file_directory + self._file_root
+
+    @file_address.setter
+    def file_address(self, new_file_address):
+        # separate file directory and file root, using a helper function
+        # This standardizes the naming scheme
+        h_separate = h_file.split_address
+        [new_file_directory, new_file_root] = h_separate(new_file_address)
+        new_file_address = new_file_directory + new_file_root
+        # Sanity check on (standardized) file address
+        self.check_parameters(file_address=new_file_address)
+        # change file_address
+        [self._file_directory, self._file_root] = [new_file_directory,
+                                                   new_file_root]
+        self.check_parameters(file_address=self.file_address)
+        return
 
     @property
     def n_rules(self):
@@ -267,11 +274,15 @@ class Simulation:
         Parameters
         ----------
         name : :obj:`str`, optional
-        mass : int, optional
+        mass : :obj:`int`, optional
         collision_rate : :obj:`~numpy.array` [:obj:`float`] or :obj:`list` [:obj:`int`], optional
             Correlates to the collision probability between two specimen.
         color : :obj:`str`, optional
         """
+        # Todo alternative type of collision_rate is really a list of int?
+        # Todo  not a list of float?
+        # Todo  this is also implemented in the asserts in the beginning
+        # Todo  this also applies to edit Specimen
         if isinstance(collision_rate, list):
             assert all([isinstance(item, int) for item in collision_rate])
             collision_rate = np.array(collision_rate, dtype=float)
@@ -295,7 +306,7 @@ class Simulation:
         item : :obj:`int` or :obj:`str`
             Index or name of the :obj:`Specimen` to be edited
         name : :obj:`str`, optional
-        mass : int, optional
+        mass : :obj:`int`, optional
         collision_rate : :obj:`~numpy.array` [:obj:`float`] or :obj:`list` [:obj:`int`], optional
             Correlates to the collision probability between two specimen.
         color : :obj:`str`, optional
@@ -481,16 +492,16 @@ class Simulation:
         """Compute the fully configured Simulation"""
         self.check_integrity()
         # Todo write hash function in Computation folder
-        try:
-            file = h5py.File(self.file_address + '.hdf5')
-            hash = file["Computation"].attrs["Hash_Value"]
-            # Todo define hashing method
-            assert hash == self.__hash__()
-            print("Computation was already done!")
-            return
-        except (KeyError, AssertionError):
-            Calculation = b_run.Calculation(self)
-            Calculation.run()
+        #     file = h5py.File(self.file_address + '.hdf5')
+        #     # hash = file["Computation"].attrs["Hash_Value"]
+        #     # Todo define hashing method
+        #     assert hash == self.__hash__()
+        #     print("The saved results are up to date!"
+        #           "A new computation is not necessary")
+        #     return
+        # else (KeyError, AssertionError):
+        calculation = b_run.Calculation(self)
+        calculation.run()
         return
 
     # Todo rework animation module
@@ -584,32 +595,33 @@ class Simulation:
     # Todo Create __is_equal__ method, compare to default  params -> dont save
     def save(self, file_address=None):
         """Write all parameters of the :class:`Simulation` instance
-        to its corresponding file or to the given HDF5 file.
+        to a HDF5 file.
 
+        If a *file_address* is given, then this method works as a 'save as'.
+        In this case the :attr:`file_address` of the instance is changed
+        and the newly named instance is saved to a new .hdf5 file.
+        
         Parameters
         ----------
         file_address : :obj:`str`, optional
-            Either a full path, a base file name or a file root.
-            If a base file name or a file root is given,
+            Change the instances :attr:`file_address` to this value.
+
+            Is either a full path, a base file name or a file root.
+            If it is a base file name or a file root,
             then the file is placed in the
             :attr:`~boltzpy.constants.DEFAULT_DIRECTORY`.
         """
-        # Prepare file_address
-        if file_address is None:
-            file_address = self.file_address
-        # separate file directory and file root, using a helper function
-        h_separate = h_file.split_address
-        [file_directory, file_root] = h_separate(file_address)
-        file_address = file_directory + file_root
-        # Don't overwrite non-Simulation files
-        self.check_parameters(file_address=self.file_address)
+        # Change Simulation.file_name, if file_address is given
+        if file_address is not None:
+            self.file_address = file_address
+        del file_address
 
         # Sanity Check before saving
         self.check_integrity(False)
 
         # Todo if sv and collision parameters are the same -> keep Collisions
-        # Create new HDF5 file (delete old file, if any)
-        file = h5py.File(file_address + ".hdf5", mode='w')
+        # Create new HDF5 file (deletes old data, if any)
+        file = h5py.File(self.file_address + ".hdf5", mode='w')
         file.attrs["class"] = "Simulation"
 
         # Save Species
@@ -890,8 +902,6 @@ class Simulation:
         """Convert the instance to a string which describes all attributes."""
         description = ''
         description += 'Simulation File = ' + self.file_address + '.hdf5\n'
-        description += 'Time = ' + str(datetime.now()) + '\n'
-        description += '\n'
         description += 'Species\n'
         description += '-------\n'
         description += '\t' + self.s.__str__().replace('\n', '\n\t')

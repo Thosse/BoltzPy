@@ -17,12 +17,15 @@ Collisions Module
 -----------------
 .. automodule:: boltzpy.collisions
     :members:
+.. autoclass:: boltzpy.collisions.CollisionRelations
+    :members:
 
 Output Functions Module
 -----------------------
-.. autoclass:: boltzpy.output_functions
+.. automodule:: boltzpy.output_functions
     :members:
 
 Animation Module
 ----------------
 .. automodule:: boltzpy.animation
+    :members:
