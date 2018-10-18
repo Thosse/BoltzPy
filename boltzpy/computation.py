@@ -2,7 +2,7 @@
 import boltzpy as b_sim
 import boltzpy.collisions.collision_relations as b_rel
 import boltzpy.initialization as b_ini
-import boltzpy.output_functions as b_opf
+import boltzpy.output as b_out
 
 import numpy as np
 from time import time
@@ -88,7 +88,7 @@ class Calculation:
         Array of shape
         (:attr:`cnf.p.size <boltzpy.Grid.size>`,
         :attr:`cnf.sv.size <boltzpy.SVGrid.size>`).
-    f_out : :obj:`~boltzpy.computation.OutputFunction`
+    f_out : :class:`~boltzpy.output.OutputFunction`
         Handles generation and saving of interim results
     t_cur : :obj:`int`
         The current time step / index.
@@ -117,7 +117,7 @@ class Calculation:
         # Todo only necessary to set up transport step
         # Todo possibly useful to decide if to do collision step in position
         # self._p_flag = ini.p_flag
-        self.f_out = b_opf.OutputFunction(self._sim)
+        self.f_out = b_out.OutputFunction(self._sim)
         if self._sim.t.iG is None:
             self.t_cur = None
         else:
@@ -158,7 +158,7 @@ class Calculation:
     #####################################
     #            Calculation            #
     #####################################
-    def run(self):
+    def run(self, hdf_group_name):
         """Starts the Calculation and writes the interim results
         to the disk
         """
@@ -175,8 +175,7 @@ class Calculation:
             self._cols.setup()
 
         # Prepare Output functions
-        self.f_out.setup_f_arr()
-        self.f_out.setup_hdf5_subgroups()
+        self.f_out.output_function(hdf_group_name=hdf_group_name)
 
         # set start time
         self.t_cur = self._sim.t.iG[0, 0]

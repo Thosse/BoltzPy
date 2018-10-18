@@ -12,7 +12,6 @@ import boltzpy.helpers.file_addresses as h_file
 import numpy as np
 import os
 import h5py
-from datetime import datetime
 
 
 class Simulation:
@@ -488,7 +487,7 @@ class Simulation:
     #       Computation       #
     ###########################
     # Todo rework computation module
-    def run_computation(self):
+    def run_computation(self, hdf_group_name="Computation"):
         """Compute the fully configured Simulation"""
         self.check_integrity()
         # Todo write hash function in Computation folder
@@ -501,7 +500,7 @@ class Simulation:
         #     return
         # else (KeyError, AssertionError):
         calculation = b_run.Calculation(self)
-        calculation.run()
+        calculation.run(hdf_group_name=hdf_group_name)
         return
 
     # Todo rework animation module

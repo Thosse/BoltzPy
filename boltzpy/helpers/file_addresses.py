@@ -28,6 +28,6 @@ def split_address(file_address=None):
 
     # remove hdf5 ending, if any
     if file_root[-5:] == '.hdf5':
-        file_root = file_address[:-5]
+        file_root = file_root[:-5]
 
     return[file_directory, file_root]

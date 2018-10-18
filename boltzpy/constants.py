@@ -7,6 +7,10 @@
 #: then the file will be located in this directory.
 DEFAULT_DIRECTORY = __file__[:-20] + 'Simulations/'
 
+#: :obj:`str` : Default directory for all test files.
+#: All data used for testing purposes is stored in this directory.
+TEST_DIRECTORY = __file__[:-20] + 'test_data/'
+
 #: :obj:`str` : Default file root for simulation files.
 #: If no file name is given at all, then the file root will be this.
 DEFAULT_FILE_ROOT = "_unnamed_"
@@ -18,8 +22,6 @@ DEFAULT_FIGSIZE = (16, 9)
 #: :obj:`int` : Default Resolution for plots in
 #: :class:`~boltzpy.animation.Animation`.
 DEFAULT_DPI = 300
-
-# TODO SUPPORTED_SHAPE_OF_ANIMATION_GRID
 
 #: :obj:`set` [:obj:`str`] :
 #: Set of all currently supported moments.
@@ -34,7 +36,8 @@ SUPP_OUTPUT = {'Mass',
                'Energy',
                'Energy_Flow_X',
                'Energy_Flow_Y',
-               'Energy_Flow_Z'
+               'Energy_Flow_Z',
+               "Complete_Distribution"
                }
 
 #: :obj:`list` [:obj:`str`]:

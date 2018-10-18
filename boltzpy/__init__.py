@@ -45,5 +45,5 @@ from boltzpy.rule import Rule
 
 import boltzpy.collisions
 import boltzpy.computation
-import boltzpy.output_functions
+import boltzpy.output
 import boltzpy.animation

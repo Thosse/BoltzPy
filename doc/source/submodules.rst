@@ -22,7 +22,7 @@ Collisions Module
 
 Output Functions Module
 -----------------------
-.. automodule:: boltzpy.output_functions
+.. automodule:: boltzpy.output
     :members:
 
 Animation Module
