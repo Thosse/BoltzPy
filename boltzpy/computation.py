@@ -117,7 +117,7 @@ class Calculation:
         # Todo only necessary to set up transport step
         # Todo possibly useful to decide if to do collision step in position
         # self._p_flag = ini.p_flag
-        self.f_out = b_out.OutputFunction(self._sim)
+        self.f_out = None
         if self._sim.t.iG is None:
             self.t_cur = None
         else:
@@ -158,7 +158,7 @@ class Calculation:
     #####################################
     #            Calculation            #
     #####################################
-    def run(self, hdf_group_name):
+    def run(self, hdf5_group):
         """Starts the Calculation and writes the interim results
         to the disk
         """
@@ -175,7 +175,8 @@ class Calculation:
             self._cols.setup()
 
         # Prepare Output functions
-        self.f_out.output_function(hdf_group_name=hdf_group_name)
+        self.f_out = b_out.output_function(self._sim,
+                                           hdf5_group=hdf5_group)
 
         # set start time
         self.t_cur = self._sim.t.iG[0, 0]
@@ -189,7 +190,17 @@ class Calculation:
                 self._calculate_time_step()
                 self._print_time_estimate()
             # generate Output and write it to disk
-            self.f_out.apply(self)
+            # Todo this needs a data (cpu/GPU) parameter, containing all
+            # Todo replace this by a sv_grid attribute idx_range
+            # Todo replace sv._index and self.index_range() by index_range
+            idx_range = [self._sim.sv.idx_range(s_idx)
+                         for s_idx in range(self._sim.s.size)]
+            # TODO THIS IS WRONG! USE sv.pMG instead of indices!
+            self.f_out(self.data,
+                       np.array(idx_range),
+                       self._sim.s.mass,
+                       self._sim.sv.iMG,
+                       self.t_cur // self._sim.t.multi)
 
         time_taken_in_seconds = int(time() - self._cal_time)
         # large number of spaces necessary to overwrite the old terminal lines

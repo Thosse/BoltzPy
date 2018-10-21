@@ -1,265 +1,241 @@
+import boltzpy as b_sim
 
 import numpy as np
 import h5py
 
 
-# Todo Redo this, add new functionalities from new SVGrid
-class OutputFunction:
-    """Provides the :meth:`apply` method which
-    processes the :attr:`Calculation.data`
-    and writes the results to the simulation file.
+# Todo The whole module needs a proper naming scheme
+# Todo especially the output_functions / get_output_functions
+# Todo as they are easily mistaken for the important output_function
 
-    The class generates functions (:attr:`f_arr`) for all
-    :attr:`Simulation.output_parameters`.
-    The :meth:`apply` method iteratively calls all
-    the functions in :attr:`f_arr`
-    and writes each results to a single file on the disk.
+# Todo Can momentum_xyz be unified somehow? extra parameter necessary?
+def output_function(simulation,
+                    hdf5_group,
+                    ):
+    """Returns a single callable function
+    which receives the current :attr:`Calculation.data`,
+    generates the desired output,
+    and writes them to the given *hdf5_group* on the disk.
+
+    The generated function applies the respective function
+    for each output in the *output_parameters*
+    onto the the  :attr:`Calculation.data`
+    and writes the results to the
+    :class:`boltzpy.Simulation` file.
 
     Parameters
     ----------
     simulation : :class:`~boltzpy.Simulation`
+    hdf5_group : :obj:`h5py.Group`
     """
-    def __init__(self, simulation):
-        self._sim = simulation
-        self._f_arr = np.array([], dtype=object)
-        self.func = None
+    assert isinstance(simulation, b_sim.Simulation)
+    assert isinstance(hdf5_group, h5py.Group)
+    # set up hdf5 datasets to store results in
+    dataset_list = get_hdf5_datasets(simulation,
+                                     hdf5_group)
+    # setup output functions
+    f_out_list = get_output_functions(simulation)
+    # combine both lists to iterate over the tuples
+    # Todo why doesn't output_list = zip(f_out_list, dataset_list) work?
+    # Todo it only saves the value for t = 0, all the other values are 0
+    output_list = [(f_out_list[i], dataset_list[i])
+                   for i in range(len(dataset_list))]
+
+    # setup output function, iteratively calls each output function
+    def func(data, sv_idx_range_arr, mass_arr, velocities, time_idx):
+        for (f_out, hdf5_dataset) in output_list:
+            result = f_out(data, sv_idx_range_arr, mass_arr, velocities)
+            hdf5_dataset[time_idx] = result
         return
 
-    def shape(self, mom):
-        if mom in {'Mass',
-                   'Momentum_X',
-                   'Momentum_Y',
-                   'Momentum_Z',
-                   'Momentum_Flow_X',
-                   'Momentum_Flow_Y',
-                   'Momentum_Flow_Z',
-                   'Energy',
-                   'Energy_Flow_X',
-                   'Energy_Flow_Y',
-                   'Energy_Flow_Z'}:
-            return (self._sim.t.iG.shape[0],
-                    self._sim.p.iG.shape[0],
-                    self._sim.s.size,
-                    )
-        elif mom == 'Complete_Distribution':
-            return (self._sim.t.iG.shape[0],
-                    self._sim.p.iG.shape[0],
-                    self._sim.sv.size)
+    return func
+
+
+def get_hdf5_datasets(simulation,
+                      hdf5_group):
+    output_list = simulation.output_parameters.flatten()
+    # setup a dataset for each output
+    for output in output_list:
+        # clear previous results, if any
+        if output in hdf5_group.keys():
+            del hdf5_group[output]
+        shape = get_output_shape(output,
+                                 simulation.t.size,
+                                 simulation.p.size,
+                                 simulation.s.size,
+                                 simulation.sv.size)
+        hdf5_group.create_dataset(output,
+                                  shape=shape,
+                                  dtype=float)
+    return [hdf5_group[output] for output in output_list]
+
+
+def get_output_shape(output,
+                     t_size,
+                     p_size,
+                     s_size,
+                     sv_size):
+    """Returns the shape of the hdf5 dataset of the given output
+    based on the grid sizes.
+
+    Parameters
+    ----------
+    output : :obj:`str`
+         A single Output of the simulation.
+         Must be in :const:`~boltzpy.constants.SUPP_OUTPUT`
+    t_size : :obj:'int'
+        Size of the time :class:`boltzpy.Grid`
+    p_size : :obj:'int'
+        Size of the position :class:`boltzpy.Grid`
+    s_size : :obj:'int'
+        Number of different :class:`boltzpy.Species`
+    sv_size : :obj:'int'
+        Size of the Velocity :class:`boltzpy.SVGrid`
+
+    Returns
+    -------
+    :obj:`tuple`
+    """
+    if output in {'Mass',
+                  'Momentum_X',
+                  'Momentum_Y',
+                  'Momentum_Z',
+                  'Momentum_Flow_X',
+                  'Momentum_Flow_Y',
+                  'Momentum_Flow_Z',
+                  'Energy',
+                  'Energy_Flow_X',
+                  'Energy_Flow_Y',
+                  'Energy_Flow_Z'}:
+        return (t_size,
+                p_size,
+                s_size,
+                )
+    elif output == 'Complete_Distribution':
+        return (t_size,
+                p_size,
+                sv_size)
+    else:
+        message = 'Unsupported Output: {}'.format(output)
+        raise NotImplementedError(message)
+
+
+# Todo replace the different types of flows by a direction parameter
+# Todo this is a vector and allows more flexibility
+def get_output_functions(simulation):
+    output_functions = []
+    for output in simulation.output_parameters.flatten():
+        # ignore time dimension
+        if output == 'Mass':
+            f = mass_function
+        elif output == 'Momentum_X':
+            f = get_momentum_function(0)
+        elif output == 'Momentum_Flow_X':
+            f = get_momentum_flow_function(0)
+        elif output == 'Energy':
+            f = energy_function
+        elif output == 'Energy_Flow_X':
+            f = get_energy_flow_function(0)
+        elif output == 'Complete_Distribution':
+            f = complete_distribution_function
         else:
-            message = 'Unsupported Output: {}'.format(mom)
+            message = 'Unsupported Output: {}'.format(output)
             raise NotImplementedError(message)
+        output_functions.append(f)
+    return output_functions
 
-    @property
-    def f_arr(self):
-        """:obj:`~numpy.ndarray` of :obj:`function`:
-        Array of moment generating functions.
 
-        These functions
-        take :attr:`Calculation.data` as a parameter
-        and return the respective physical property as the result."""
-        return self._f_arr
+# Todo multiply with mass
+def mass_function(data, sv_idx_range_arr, mass_arr, velocities):
+    """Calculates and returns the mass"""
+    # shape = (position_grid.size, species.size)
+    shape = (data.shape[0], mass_arr.size)
+    mass = np.zeros(shape, dtype=float)
+    for (s_idx, [beg, end]) in enumerate(sv_idx_range_arr):
+        # mass is the sum over velocity grid of specimen
+        mass[..., s_idx] = np.sum(data[..., beg:end],
+                                  axis=-1)
+        # mass *= mass[s_idx]
+    return mass
 
-    def apply(self, calc):
-        """Processes the current :attr:`Calculation.data`
-        and writes the results to the disk.
 
-        Iteratively applies all moment generating functions
-        in :attr:`f_arr` to the current :attr:`Calculation.data`
-        and writes the results to the
-        :class:`boltzpy.Simulation` file.
+# Todo This is currently wrong!
+# Todo It uses the indices, not the physical velocities
+def get_momentum_function(direction):
+    """Generates and returns generating function for Momentum"""
+    assert direction in [0, 1, 2]
 
-        Parameters
-        ----------
-        calc : :obj:`Calculation`
-        """
-        self.func(calc)
+    def f_momentum(data, sv_idx_range_arr, mass_arr, velocities):
+        # shape = (position_grid.size, species.size)
+        shape = (data.shape[0], mass_arr.size)
+        momentum = np.zeros(shape, dtype=float)
+        for (s_idx, [beg, end]) in enumerate(sv_idx_range_arr):
+            V_dir = velocities[beg:end, direction]
+            momentum[..., s_idx] = np.sum(V_dir * data[..., beg:end],
+                                          axis=1)
+            momentum[..., s_idx] *= mass_arr[s_idx]
+        return momentum
 
-        return
+    return f_momentum
 
-    def output_function(self, hdf_group_name):
-        # set up hdf5 datasets to store results in
-        dataset_list = self.setup_hdf5_datasets(hdf_group_name)
-        # setup output functions
-        f_out_list = self.setup_f_arr()
-        # combine both lists to iterate over the tuples
-        # Todo why doesn't output_list = zip(f_out_list, dataset_list) work?
-        # Todo it only saves the value for t = 0, all the other values are 0
-        output_list = [(f_out_list[i], dataset_list[i])
-                       for i in range(len(dataset_list))]
 
-        # setup output function
-        def func(calc):
-            time_idx = calc.t_cur // self._sim.t.multi
-            for (f_out, hdf5_dataset) in output_list:
-                result = f_out(calc.data)
-                hdf5_dataset[time_idx] = result
-            return
+def get_momentum_flow_function(direction):
+    """Generates and returns generating function for Momentum Flow"""
+    assert direction in [0, 1, 2]
 
-        self.func = func
-        return func
+    def f_momentum_flow(data, sv_idx_range_arr, mass_arr, velocities):
+        # shape = (position_grid.size, species.size)
+        shape = (data.shape[0], mass_arr.size)
+        momentum_flow = np.zeros(shape, dtype=float)
+        for (s_idx, [beg, end]) in enumerate(sv_idx_range_arr):
+            V_dir = velocities[beg:end, direction]
+            momentum_flow[..., s_idx] = np.sum(V_dir ** 2
+                                               * data[..., beg:end],
+                                               axis=1)
+            momentum_flow[..., s_idx] *= mass_arr[s_idx]
+        return momentum_flow
 
-    def setup_hdf5_datasets(self, hdf5_group_name):
-        hdf5_file = h5py.File(self._sim.file_address + '.hdf5')
-        assert hdf5_group_name not in {'Collisions',
-                                       'Initialization',
-                                       'Position_Grid',
-                                       'Species',
-                                       'Time_grid',
-                                       'Velocity_Grids'}
-        # create hdf5 group, for results
-        if hdf5_group_name not in hdf5_file.keys():
-            hdf5_file.create_group(hdf5_group_name)
-        hdf5_group = hdf5_file[hdf5_group_name]
-        # setup datasets for all outputs
-        output_list = self._sim.output_parameters.flatten()
-        for output in output_list:
-            # clear previous results, if any
-            if output in hdf5_group.keys():
-                del hdf5_group[output]
-            shape = self.shape(output)
-            hdf5_group.create_dataset(output,
-                                      shape=shape,
-                                      dtype=float)
-        return [hdf5_group[output]
-                for output in output_list]
+    return f_momentum_flow
 
-    # Todo replace the different types of flows by a direction parameter
-    # Todo this is a vector and allows more flexibility
-    def setup_f_arr(self):
-        """Sets up :attr:`f_arr`"""
-        self._f_arr = []
-        for mom in self._sim.output_parameters.flatten():
-            if mom == 'Mass':
-                f = self._get_f_mass()
-            # Todo Mass_Flow == Momentum? Ask Hans
-            # elif mom is 'Mass_Flow':
-            #     f = self._get_f_mass_flow()
-            elif mom == 'Momentum_X':
-                f = self._get_f_momentum(0)
-            elif mom == 'Momentum_Y':
-                f = self._get_f_momentum(1)
-            elif mom == 'Momentum_Z':
-                f = self._get_f_momentum(2)
-            elif mom == 'Momentum_Flow_X':
-                f = self._get_f_momentum_flow(0)
-            elif mom == 'Momentum_Flow_X':
-                f = self._get_f_momentum_flow(1)
-            elif mom == 'Momentum_Flow_X':
-                f = self._get_f_momentum_flow(2)
-            elif mom == 'Energy':
-                f = self._get_f_energy()
-            elif mom == 'Energy_Flow_X':
-                f = self._get_f_energy_flow(0)
-            elif mom == 'Energy_Flow_Y':
-                f = self._get_f_energy_flow(1)
-            elif mom == 'Energy_Flow_Z':
-                f = self._get_f_energy_flow(2)
-            elif mom == 'Complete_Distribution':
-                f = self._get_f_complete()
-            else:
-                message = 'Unsupported Output: {}'.format(mom)
-                raise NotImplementedError(message)
-            self._f_arr.append(f)
-        return self._f_arr
 
-    def _get_f_mass(self):
-        """Generates and returns generating function for Mass"""
-        # ignore time dimension
-        shape = self.shape("Mass")[1:]
+def energy_function(data, sv_idx_range_arr, mass_arr, velocities):
+    """Calculates and returns the energy"""
+    # shape = (position_grid.size, species.size)
+    shape = (data.shape[0], mass_arr.size)
+    energy = np.zeros(shape, dtype=float)
+    for (s_idx, [beg, end]) in enumerate(sv_idx_range_arr):
+        V = velocities[beg:end, :]
+        V_2 = np.sqrt(np.sum(V ** 2, axis=1))
+        energy[..., s_idx] = np.sum(V_2 * data[..., beg:end],
+                                    axis=1)
+        energy[..., s_idx] *= 0.5 * mass_arr[s_idx]
+    return energy
 
-        def f_mass(data):
-            mass = np.zeros(shape, dtype=float)
-            for s_idx in range(shape[-1]):
-                [beg, end] = self._sim.sv.idx_range(s_idx)
-                # mass is the sum over velocity grid of specimen
-                mass[..., s_idx] = np.sum(data[..., beg:end],
-                                          axis=-1)
-            return mass
 
-        return f_mass
+def get_energy_flow_function(direction):
+    """Generates and returns generating function for Energy Flow"""
+    assert direction in [0, 1, 2]
 
-    def _get_f_momentum(self, direction):
-        """Generates and returns generating function for Momentum"""
-        assert direction in [0, 1, 2]
-        # ignore time dimension
-        shape = self.shape("Momentum_X")[1:]
+    def f_energy_flow(data, sv_idx_range_arr, mass_arr, velocities):
+        # shape = (position_grid.size, species.size)
+        shape = (data.shape[0], mass_arr.size)
+        energy_flow = np.zeros(shape, dtype=float)
+        for (s_idx, [beg, end]) in enumerate(sv_idx_range_arr):
+            V = velocities[beg:end, :]
+            V_norm = np.sqrt(np.sum(V ** 2, axis=1))
+            V_dir = velocities[beg:end, direction]
+            energy_flow[..., s_idx] = np.sum(V_norm
+                                             * V_dir
+                                             * data[..., beg:end],
+                                             axis=1)
+            energy_flow[..., s_idx] *= 0.5 * mass_arr[s_idx]
+        return energy_flow
 
-        def f_momentum(data):
-            momentum = np.zeros(shape, dtype=float)
-            for s_idx in range(shape[-1]):
-                [beg, end] = self._sim.sv.idx_range(s_idx)
-                V_dir = self._sim.sv.iMG[beg:end, direction]
-                momentum[..., s_idx] = np.sum(V_dir * data[..., beg:end],
-                                              axis=1)
-                momentum[..., s_idx] *= self._sim.s.mass[s_idx]
-            return momentum
+    return f_energy_flow
 
-        return f_momentum
 
-    def _get_f_momentum_flow(self, direction):
-        """Generates and returns generating function for Momentum Flow"""
-        # ignore time dimension
-        shape = self.shape("Momentum_Flow_X")[1:]
+def complete_distribution_function(data):
+    """Returns complete distribution of given data
+    """
+    return data
 
-        def f_momentum_flow(data):
-            momentum_flow = np.zeros(shape, dtype=float)
-            for s_idx in range(shape[-1]):
-                [beg, end] = self._sim.sv.idx_range(s_idx)
-                V_dir = np.array(self._sim.sv.iMG[beg:end, direction])
-                momentum_flow[..., s_idx] = np.sum(V_dir ** 2 * data[...,
-                                                                beg:end],
-                                                   axis=1)
-                momentum_flow[..., s_idx] *= self._sim.s.mass[s_idx]
-            return momentum_flow
-
-        return f_momentum_flow
-
-    def _get_f_energy(self):
-        """Generates and returns generating function for Energy"""
-        # ignore time dimension
-        shape = self.shape("Energy")[1:]
-
-        def f_energy(data):
-            energy = np.zeros(shape, dtype=float)
-            for s_idx in range(shape[-1]):
-                [beg, end] = self._sim.sv.idx_range(s_idx)
-                V = np.array(self._sim.sv.iMG[beg:end, :])
-                V_norm = np.sqrt(np.sum(V ** 2, axis=1))
-                energy[..., s_idx] = np.sum(V_norm * data[..., beg:end],
-                                            axis=1)
-                energy[..., s_idx] *= 0.5 * self._sim.s.mass[s_idx]
-            return energy
-
-        return f_energy
-
-    def _get_f_energy_flow(self, direction):
-        """Generates and returns generating function for Energy Flow"""
-        # ignore time dimension
-        shape = self.shape("Energy_Flow_X")[1:]
-
-        def f_energy_flow(data):
-            energy_flow = np.zeros(shape, dtype=float)
-            for s_idx in range(shape[-1]):
-                [beg, end] = self._sim.sv.idx_range(s_idx)
-                V = np.array(self._sim.sv.iMG[beg:end, :])
-                V_norm = np.sqrt(np.sum(V ** 2, axis=1))
-                V_dir = np.array(self._sim.sv.iMG[beg:end, direction])
-                energy_flow[..., s_idx] = np.sum(V_norm
-                                                 * V_dir
-                                                 * data[..., beg:end],
-                                                 axis=1)
-                energy_flow[..., s_idx] *= 0.5 * self._sim.s.mass[s_idx]
-            return energy_flow
-
-        return f_energy_flow
-
-    def _get_f_complete(self):
-        """Generates and returns generating function for Complete
-        Distribution"""
-
-        def f_complete(data):
-            """Returns complete distribution of given data
-            """
-            return data
-
-        return f_complete

@@ -21,5 +21,4 @@ def test_computation():
             results_old = hdf5_file["Computation"][output].value
             results_new = hdf5_file["Test"][output].value
             assert np.array_equal(results_old, results_new)
-        del hdf5_file["Test"]
     return

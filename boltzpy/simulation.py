@@ -487,7 +487,7 @@ class Simulation:
     #       Computation       #
     ###########################
     # Todo rework computation module
-    def run_computation(self, hdf_group_name="Computation"):
+    def run_computation(self, hdf5_group_name="Computation"):
         """Compute the fully configured Simulation"""
         self.check_integrity()
         # Todo write hash function in Computation folder
@@ -499,8 +499,18 @@ class Simulation:
         #           "A new computation is not necessary")
         #     return
         # else (KeyError, AssertionError):
+        assert hdf5_group_name not in {'Collisions',
+                                       'Initialization',
+                                       'Position_Grid',
+                                       'Species',
+                                       'Time_grid',
+                                       'Velocity_Grids'}
+        hdf5_file = h5py.File(self.file_address + '.hdf5')
+        if hdf5_group_name not in hdf5_file.keys():
+            hdf5_file.create_group(hdf5_group_name)
+        hdf5_group = h5py.File(self.file_address + '.hdf5')[hdf5_group_name]
         calculation = b_run.Calculation(self)
-        calculation.run(hdf_group_name=hdf_group_name)
+        calculation.run(hdf5_group=hdf5_group)
         return
 
     # Todo rework animation module

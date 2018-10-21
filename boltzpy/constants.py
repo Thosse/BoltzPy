@@ -1,7 +1,4 @@
 
-# Todo Everything might move into enum.Enum classes, for more structure
-
-
 #: :obj:`str` : Default directory for simulation files.
 #: If no full path is given,
 #: then the file will be located in this directory.
@@ -114,4 +111,3 @@ SUPP_GRID_POINT_CATEGORIES = ['Inner Point',
                               # 'Constant_IO_Point',
                               # 'Time_Variant_IO_Point'
                               ]
-
