@@ -195,11 +195,10 @@ class Calculation:
             # Todo replace sv._index and self.index_range() by index_range
             idx_range = [self._sim.sv.idx_range(s_idx)
                          for s_idx in range(self._sim.s.size)]
-            # TODO THIS IS WRONG! USE sv.pMG instead of indices!
             self.f_out(self.data,
                        np.array(idx_range),
                        self._sim.s.mass,
-                       self._sim.sv.iMG,
+                       self._sim.sv.pMG,
                        self.t_cur // self._sim.t.multi)
 
         time_taken_in_seconds = int(time() - self._cal_time)

@@ -128,13 +128,13 @@ class SVGrid:
 
             Array of shape (:attr:`size`, :attr:`dim`)
          """
-        pMG = np.zeros(self.iMG.shape, dtype=float) + self.offset
+        pMG = np.zeros(self.iMG.shape, dtype=float)
         for (i_G, G) in enumerate(self.vGrids):
             [beg, end] = self.idx_range(i_G)
-            pMG[beg: end] += G.pG
+            pMG[beg: end] = G.pG
         return pMG
 
-    # Todo def pv(specimen_icd, velocity_idx) -> implement in Grid as well
+    # Todo def pv(velocity_idx) -> implement in Grid as well
 
     @property
     def boundaries(self):
@@ -283,6 +283,7 @@ class SVGrid:
     #####################################
     #               Indexing            #
     #####################################
+    # TODO Add idx_range as attribute (arr (s.size, 2)
     def idx_range(self, specimen_index):
         """Get delimiters [begin, end]
         of the indexed :class:`Specimens <boltzpy.Specimen>`

@@ -159,8 +159,6 @@ def mass_function(data, sv_idx_range_arr, mass_arr, velocities):
     return mass
 
 
-# Todo This is currently wrong!
-# Todo It uses the indices, not the physical velocities
 def get_momentum_function(direction):
     """Generates and returns generating function for Momentum"""
     assert direction in [0, 1, 2]
