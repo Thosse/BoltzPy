@@ -532,6 +532,8 @@ class Simulation:
             assert output_arr.ndim == 2
             assert all([output in self.output_parameters.flatten()
                         for output in output_arr.flatten()])
+        if "Complete_Distribution" in output_arr.flatten():
+            raise NotImplementedError
         if specimen_arr is None:
             specimen_arr = self.s.specimen_arr
         else:
@@ -575,6 +577,8 @@ class Simulation:
             assert isinstance(output_arr, np.ndarray)
             assert all([output in self.output_parameters.flatten()
                         for output in output_arr])
+        if "Complete_Distribution" in output_arr.flatten():
+            raise NotImplementedError
         if specimen_arr is None:
             specimen_arr = self.s.specimen_arr
         else:

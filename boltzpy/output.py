@@ -5,7 +5,7 @@ import h5py
 
 
 # Todo The whole module needs a proper naming scheme
-# Todo especially the output_functions / get_output_functions
+# Todo especially the output_functions / _get_output_functions
 # Todo as they are easily mistaken for the important output_function
 
 # Todo Can momentum_xyz be unified somehow? extra parameter necessary?
@@ -31,10 +31,10 @@ def output_function(simulation,
     assert isinstance(simulation, b_sim.Simulation)
     assert isinstance(hdf5_group, h5py.Group)
     # set up hdf5 datasets to store results in
-    dataset_list = get_hdf5_datasets(simulation,
-                                     hdf5_group)
+    dataset_list = _get_hdf5_datasets(simulation,
+                                      hdf5_group)
     # setup output functions
-    f_out_list = get_output_functions(simulation)
+    f_out_list = _get_output_functions(simulation)
     # combine both lists to iterate over the tuples
     # Todo why doesn't output_list = zip(f_out_list, dataset_list) work?
     # Todo it only saves the value for t = 0, all the other values are 0
@@ -51,30 +51,30 @@ def output_function(simulation,
     return func
 
 
-def get_hdf5_datasets(simulation,
-                      hdf5_group):
+def _get_hdf5_datasets(simulation,
+                       hdf5_group):
     output_list = simulation.output_parameters.flatten()
     # setup a dataset for each output
     for output in output_list:
         # clear previous results, if any
         if output in hdf5_group.keys():
             del hdf5_group[output]
-        shape = get_output_shape(output,
-                                 simulation.t.size,
-                                 simulation.p.size,
-                                 simulation.s.size,
-                                 simulation.sv.size)
+        shape = _get_output_shape(output,
+                                  simulation.t.size,
+                                  simulation.p.size,
+                                  simulation.s.size,
+                                  simulation.sv.size)
         hdf5_group.create_dataset(output,
                                   shape=shape,
                                   dtype=float)
     return [hdf5_group[output] for output in output_list]
 
 
-def get_output_shape(output,
-                     t_size,
-                     p_size,
-                     s_size,
-                     sv_size):
+def _get_output_shape(output,
+                      t_size,
+                      p_size,
+                      s_size,
+                      sv_size):
     """Returns the shape of the hdf5 dataset of the given output
     based on the grid sizes.
 
@@ -122,22 +122,22 @@ def get_output_shape(output,
 
 # Todo replace the different types of flows by a direction parameter
 # Todo this is a vector and allows more flexibility
-def get_output_functions(simulation):
+def _get_output_functions(simulation):
     output_functions = []
     for output in simulation.output_parameters.flatten():
         # ignore time dimension
         if output == 'Mass':
-            f = mass_function
+            f = _mass_function
         elif output == 'Momentum_X':
-            f = get_momentum_function(0)
+            f = _get_momentum_function(0)
         elif output == 'Momentum_Flow_X':
-            f = get_momentum_flow_function(0)
+            f = _get_momentum_flow_function(0)
         elif output == 'Energy':
-            f = energy_function
+            f = _energy_function
         elif output == 'Energy_Flow_X':
-            f = get_energy_flow_function(0)
+            f = _get_energy_flow_function(0)
         elif output == 'Complete_Distribution':
-            f = complete_distribution_function
+            f = _complete_distribution_function
         else:
             message = 'Unsupported Output: {}'.format(output)
             raise NotImplementedError(message)
@@ -145,8 +145,8 @@ def get_output_functions(simulation):
     return output_functions
 
 
-# Todo multiply with mass
-def mass_function(data, sv_idx_range_arr, mass_arr, velocities):
+# Todo multiply with mass?
+def _mass_function(data, sv_idx_range_arr, mass_arr, velocities):
     """Calculates and returns the mass"""
     # shape = (position_grid.size, species.size)
     shape = (data.shape[0], mass_arr.size)
@@ -159,7 +159,7 @@ def mass_function(data, sv_idx_range_arr, mass_arr, velocities):
     return mass
 
 
-def get_momentum_function(direction):
+def _get_momentum_function(direction):
     """Generates and returns generating function for Momentum"""
     assert direction in [0, 1, 2]
 
@@ -177,7 +177,7 @@ def get_momentum_function(direction):
     return f_momentum
 
 
-def get_momentum_flow_function(direction):
+def _get_momentum_flow_function(direction):
     """Generates and returns generating function for Momentum Flow"""
     assert direction in [0, 1, 2]
 
@@ -196,7 +196,7 @@ def get_momentum_flow_function(direction):
     return f_momentum_flow
 
 
-def energy_function(data, sv_idx_range_arr, mass_arr, velocities):
+def _energy_function(data, sv_idx_range_arr, mass_arr, velocities):
     """Calculates and returns the energy"""
     # shape = (position_grid.size, species.size)
     shape = (data.shape[0], mass_arr.size)
@@ -210,7 +210,7 @@ def energy_function(data, sv_idx_range_arr, mass_arr, velocities):
     return energy
 
 
-def get_energy_flow_function(direction):
+def _get_energy_flow_function(direction):
     """Generates and returns generating function for Energy Flow"""
     assert direction in [0, 1, 2]
 
@@ -232,7 +232,10 @@ def get_energy_flow_function(direction):
     return f_energy_flow
 
 
-def complete_distribution_function(data):
+def _complete_distribution_function(data,
+                                    sv_idx_range_arr,
+                                    mass_arr,
+                                    velocities):
     """Returns complete distribution of given data
     """
     return data
