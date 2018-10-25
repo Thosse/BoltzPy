@@ -12,7 +12,6 @@ import boltzpy.helpers.file_addresses as h_file
 import numpy as np
 import os
 import h5py
-from datetime import datetime
 
 
 class Simulation:
@@ -488,7 +487,7 @@ class Simulation:
     #       Computation       #
     ###########################
     # Todo rework computation module
-    def run_computation(self):
+    def run_computation(self, hdf5_group_name="Computation"):
         """Compute the fully configured Simulation"""
         self.check_integrity()
         # Todo write hash function in Computation folder
@@ -500,8 +499,18 @@ class Simulation:
         #           "A new computation is not necessary")
         #     return
         # else (KeyError, AssertionError):
+        assert hdf5_group_name not in {'Collisions',
+                                       'Initialization',
+                                       'Position_Grid',
+                                       'Species',
+                                       'Time_grid',
+                                       'Velocity_Grids'}
+        hdf5_file = h5py.File(self.file_address + '.hdf5')
+        if hdf5_group_name not in hdf5_file.keys():
+            hdf5_file.create_group(hdf5_group_name)
+        hdf5_group = h5py.File(self.file_address + '.hdf5')[hdf5_group_name]
         calculation = b_run.Calculation(self)
-        calculation.run()
+        calculation.run(hdf5_group=hdf5_group)
         return
 
     # Todo rework animation module
@@ -523,6 +532,8 @@ class Simulation:
             assert output_arr.ndim == 2
             assert all([output in self.output_parameters.flatten()
                         for output in output_arr.flatten()])
+        if "Complete_Distribution" in output_arr.flatten():
+            raise NotImplementedError
         if specimen_arr is None:
             specimen_arr = self.s.specimen_arr
         else:
@@ -566,6 +577,8 @@ class Simulation:
             assert isinstance(output_arr, np.ndarray)
             assert all([output in self.output_parameters.flatten()
                         for output in output_arr])
+        if "Complete_Distribution" in output_arr.flatten():
+            raise NotImplementedError
         if specimen_arr is None:
             specimen_arr = self.s.specimen_arr
         else:

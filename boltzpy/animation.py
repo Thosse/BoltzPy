@@ -125,11 +125,11 @@ class Animation:
         moments = moment_array.flatten()
         file = h5py.File(self._sim.file_address + '.hdf5', mode='r')
         hdf5_group = file["Computation"]
-        for (i_s, specimen) in enumerate(specimen_names):
-            for (i_m, moment) in enumerate(moments):
-                result_t = hdf5_group[specimen][moment][time_step]
-                lines[i_m, i_s].set_data(self._sim.p.pG,
-                                         result_t)
+        for (specimen_idx, specimen) in enumerate(specimen_names):
+            for (moment_idx, moment) in enumerate(moments):
+                result_t = hdf5_group[moment][time_step, ...,  specimen_idx]
+                lines[moment_idx, specimen_idx].set_data(self._sim.p.pG,
+                                                         result_t)
         return lines
 
     def setup_figure(self,
@@ -252,20 +252,10 @@ class Animation:
                       'for 1D Problems' \
                       'This needs to be done for 3D plots'
             raise NotImplementedError(message)
-        min_val = 0
-        max_val = 0
-        # Todo This should depend only on Specimen_array, not on cnf.s
-        # Todo Go to definition-> fix this
-        species = self._sim.s.names
         file = h5py.File(self._sim.file_address + '.hdf5', mode='r')
-        hdf5_group = file["Computation"]
-        for specimen in species:
-            file_m = hdf5_group[specimen][moment]
-            for t in self._sim.t.iG[:, 0]:
-                i_t = t // self._sim.t.multi
-                result_t = file_m[i_t]
-                min_val = min(min_val, np.min(result_t))
-                max_val = max(max_val, np.max(result_t))
+        hdf5_dataset = file["Computation"][moment]
+        min_val = min(0, np.min(hdf5_dataset))
+        max_val = max(0, np.max(hdf5_dataset))
         axes.set_ylim(1.25 * min_val, 1.25 * max_val)
         return
 
@@ -275,8 +265,6 @@ class Animation:
                       'for 1D Problems' \
                       'This needs to be done for 3D plots'
             raise NotImplementedError(message)
-        # Todo This should depend only on moment_array, not on cnf.s
-        # Todo Go to definition-> fix this
         shape = self._sim.output_parameters.shape
         last_row = (shape[0]-1) * shape[1]
         if i_m < last_row:
