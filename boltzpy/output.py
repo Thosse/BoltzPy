@@ -1,45 +1,41 @@
 import boltzpy as b_sim
+import boltzpy.constants as b_const
 
 import numpy as np
 import h5py
 
 
-# Todo The whole module needs a proper naming scheme
-# Todo especially the output_functions / _get_output_functions
-# Todo as they are easily mistaken for the important output_function
-
-# Todo Can momentum_xyz be unified somehow? extra parameter necessary?
+# Todo momentum and the flows could receive an additional parameter: direction
+# Todo      The direction would be a (normalized) vector (2D/3D)
+# Todo      This would allow to view the in any possible direction
 def output_function(simulation,
                     hdf5_group,
                     ):
-    """Returns a single callable function
-    which receives the current :attr:`Calculation.data`,
-    generates the desired output,
-    and writes them to the given *hdf5_group* on the disk.
+    """Returns a single callable function that handles the output.
 
-    The generated function applies the respective function
-    for each output in the *output_parameters*
-    onto the the  :attr:`Calculation.data`
-    and writes the results to the
-    :class:`boltzpy.Simulation` file.
+    The returned function receives the current :attr:`Calculation.data`,
+    generates the desired output,
+    and writes it to :obj:`datasets <h5py.Dataset>`
+    located in the given *hdf5_group*.
 
     Parameters
     ----------
     simulation : :class:`~boltzpy.Simulation`
     hdf5_group : :obj:`h5py.Group`
+
+    Returns
+    -------
+    :obj:`function`
     """
     assert isinstance(simulation, b_sim.Simulation)
     assert isinstance(hdf5_group, h5py.Group)
-    # set up hdf5 datasets to store results in
-    dataset_list = _get_hdf5_datasets(simulation,
-                                      hdf5_group)
-    # setup output functions
-    f_out_list = _get_output_functions(simulation)
+    # set up hdf5 datasets for every output
+    datasets = _setup_datasets(simulation, hdf5_group)
+    # setup output functions for every output
+    subfuncs = _setup_subfuncs(simulation)
     # combine both lists to iterate over the tuples
-    # Todo why doesn't output_list = zip(f_out_list, dataset_list) work?
-    # Todo it only saves the value for t = 0, all the other values are 0
-    output_list = [(f_out_list[i], dataset_list[i])
-                   for i in range(len(dataset_list))]
+    output_list = [(subfuncs[output], datasets[output])
+                   for output in simulation.output_parameters.flatten()]
 
     # setup output function, iteratively calls each output function
     def func(data, sv_idx_range_arr, mass_arr, velocities, time_idx):
@@ -51,102 +47,66 @@ def output_function(simulation,
     return func
 
 
-def _get_hdf5_datasets(simulation,
-                       hdf5_group):
-    output_list = simulation.output_parameters.flatten()
-    # setup a dataset for each output
-    for output in output_list:
-        # clear previous results, if any
-        if output in hdf5_group.keys():
-            del hdf5_group[output]
-        shape = _get_output_shape(output,
-                                  simulation.t.size,
-                                  simulation.p.size,
-                                  simulation.s.size,
-                                  simulation.sv.size)
-        hdf5_group.create_dataset(output,
-                                  shape=shape,
-                                  dtype=float)
-    return [hdf5_group[output] for output in output_list]
+def _setup_datasets(simulation, hdf5_group):
+    """Create a obj:`h5py.Dataset` for every output
+    in the hdf5_group and return an ordered list of them.
 
-
-def _get_output_shape(output,
-                      t_size,
-                      p_size,
-                      s_size,
-                      sv_size):
-    """Returns the shape of the hdf5 dataset of the given output
-    based on the grid sizes.
+    Any already existing datasets will be replaced.
 
     Parameters
     ----------
-    output : :obj:`str`
-         A single Output of the simulation.
-         Must be in :const:`~boltzpy.constants.SUPP_OUTPUT`
-    t_size : :obj:'int'
-        Size of the time :class:`boltzpy.Grid`
-    p_size : :obj:'int'
-        Size of the position :class:`boltzpy.Grid`
-    s_size : :obj:'int'
-        Number of different :class:`boltzpy.Species`
-    sv_size : :obj:'int'
-        Size of the Velocity :class:`boltzpy.SVGrid`
+    simulation : :class:`~boltzpy.Simulation`
+    hdf5_group : :obj:`h5py.Group`
 
     Returns
     -------
-    :obj:`tuple`
+    :obj:`dict` [:obj:`str`:  :obj:`h5py.Group`]
     """
-    if output in {'Mass',
-                  'Momentum_X',
-                  'Momentum_Y',
-                  'Momentum_Z',
-                  'Momentum_Flow_X',
-                  'Momentum_Flow_Y',
-                  'Momentum_Flow_Z',
-                  'Energy',
-                  'Energy_Flow_X',
-                  'Energy_Flow_Y',
-                  'Energy_Flow_Z'}:
-        return (t_size,
-                p_size,
-                s_size,
-                )
-    elif output == 'Complete_Distribution':
-        return (t_size,
-                p_size,
-                sv_size)
-    else:
-        message = 'Unsupported Output: {}'.format(output)
-        raise NotImplementedError(message)
-
-
-# Todo replace the different types of flows by a direction parameter
-# Todo this is a vector and allows more flexibility
-def _get_output_functions(simulation):
-    output_functions = []
+    datasets = dict()
+    # setup a dataset for each output
     for output in simulation.output_parameters.flatten():
-        # ignore time dimension
-        if output == 'Mass':
-            f = _mass_function
-        elif output == 'Momentum_X':
-            f = _get_momentum_function(0)
-        elif output == 'Momentum_Flow_X':
-            f = _get_momentum_flow_function(0)
-        elif output == 'Energy':
-            f = _energy_function
-        elif output == 'Energy_Flow_X':
-            f = _get_energy_flow_function(0)
-        elif output == 'Complete_Distribution':
-            f = _complete_distribution_function
+        # clear previous results, if any
+        if output in hdf5_group.keys():
+            del hdf5_group[output]
+        if output == "Complete_Distribution":
+            shape = (simulation.t.size,
+                     simulation.p.size,
+                     simulation.sv.size)
         else:
-            message = 'Unsupported Output: {}'.format(output)
-            raise NotImplementedError(message)
-        output_functions.append(f)
-    return output_functions
+            shape = (simulation.t.size,
+                     simulation.p.size,
+                     simulation.s.size)
+        hdf5_group.create_dataset(output,
+                                  shape=shape,
+                                  dtype=float)
+        datasets[output] = hdf5_group[output]
+    return datasets
+
+
+def _setup_subfuncs(simulation):
+    """Create a generating function, for each specified output.
+    Return an ordered list of these functions.
+
+
+        Parameters
+        ----------
+        simulation : :class:`~boltzpy.Simulation`
+
+        Returns
+        -------
+        :obj:`dict` [:obj:`str`:  :obj:`function`]
+        """
+    subfuncs = dict()
+    for output in simulation.output_parameters.flatten():
+        assert output in b_const.SUPP_OUTPUT
+        # Read sub functions from globally defined functions
+        # store sub functions in dictionary
+        subfuncs[output] = globals()["_subfunc_" + output.lower()]
+    return subfuncs
 
 
 # Todo multiply with mass?
-def _mass_function(data, sv_idx_range_arr, mass_arr, velocities):
+def _subfunc_mass(data, sv_idx_range_arr, mass_arr, velocities):
     """Calculates and returns the mass"""
     # shape = (position_grid.size, species.size)
     shape = (data.shape[0], mass_arr.size)
@@ -159,8 +119,8 @@ def _mass_function(data, sv_idx_range_arr, mass_arr, velocities):
     return mass
 
 
-def _get_momentum_function(direction):
-    """Generates and returns generating function for Momentum"""
+def _get_subfunc_momentum(direction):
+    """Generates and returns generating function for momentum"""
     assert direction in [0, 1, 2]
 
     def f_momentum(data, sv_idx_range_arr, mass_arr, velocities):
@@ -176,9 +136,13 @@ def _get_momentum_function(direction):
 
     return f_momentum
 
+_subfunc_momentum_x = _get_subfunc_momentum(0)
+_subfunc_momentum_y = _get_subfunc_momentum(1)
+_subfunc_momentum_z = _get_subfunc_momentum(2)
 
-def _get_momentum_flow_function(direction):
-    """Generates and returns generating function for Momentum Flow"""
+
+def _get_subfunc_momentum_flow(direction):
+    """Generates and returns generating function for momentum flow"""
     assert direction in [0, 1, 2]
 
     def f_momentum_flow(data, sv_idx_range_arr, mass_arr, velocities):
@@ -195,8 +159,12 @@ def _get_momentum_flow_function(direction):
 
     return f_momentum_flow
 
+_subfunc_momentum_flow_x = _get_subfunc_momentum_flow(0)
+_subfunc_momentum_flow_y = _get_subfunc_momentum_flow(1)
+_subfunc_momentum_flow_z = _get_subfunc_momentum_flow(2)
 
-def _energy_function(data, sv_idx_range_arr, mass_arr, velocities):
+
+def _subfunc_energy(data, sv_idx_range_arr, mass_arr, velocities):
     """Calculates and returns the energy"""
     # shape = (position_grid.size, species.size)
     shape = (data.shape[0], mass_arr.size)
@@ -210,8 +178,8 @@ def _energy_function(data, sv_idx_range_arr, mass_arr, velocities):
     return energy
 
 
-def _get_energy_flow_function(direction):
-    """Generates and returns generating function for Energy Flow"""
+def _get_subfunc_energy_flow(direction):
+    """Generates and returns generating function for energy flow"""
     assert direction in [0, 1, 2]
 
     def f_energy_flow(data, sv_idx_range_arr, mass_arr, velocities):
@@ -231,12 +199,15 @@ def _get_energy_flow_function(direction):
 
     return f_energy_flow
 
+_subfunc_energy_flow_x = _get_subfunc_energy_flow(0)
+_subfunc_energy_flow_y = _get_subfunc_energy_flow(1)
+_subfunc_energy_flow_z = _get_subfunc_energy_flow(2)
 
-def _complete_distribution_function(data,
-                                    sv_idx_range_arr,
-                                    mass_arr,
-                                    velocities):
+
+def _subfunc_complete_distribution(data,
+                                   sv_idx_range_arr,
+                                   mass_arr,
+                                   velocities):
     """Returns complete distribution of given data
     """
     return data
-
