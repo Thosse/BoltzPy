@@ -21,7 +21,7 @@ def output_function(simulation,
     Parameters
     ----------
     simulation : :class:`~boltzpy.Simulation`
-    hdf5_group : :obj:`h5py.Group`
+    hdf5_group : :obj:`h5py.Group <h5py:Group>`
 
     Returns
     -------
@@ -48,7 +48,7 @@ def output_function(simulation,
 
 
 def _setup_datasets(simulation, hdf5_group):
-    """Create a obj:`h5py.Dataset` for every output
+    """Create a :obj:`h5py.Dataset <h5py:Dataset>` for every output
     in the hdf5_group and return an ordered list of them.
 
     Any already existing datasets will be replaced.
@@ -56,11 +56,11 @@ def _setup_datasets(simulation, hdf5_group):
     Parameters
     ----------
     simulation : :class:`~boltzpy.Simulation`
-    hdf5_group : :obj:`h5py.Group`
+    hdf5_group : :obj:`h5py.Group <h5py:Group>`
 
     Returns
     -------
-    :obj:`dict` [:obj:`str`:  :obj:`h5py.Group`]
+    :obj:`dict` [:obj:`str`:  :obj:`h5py.Group <h5py:Group>`]
     """
     datasets = dict()
     # setup a dataset for each output

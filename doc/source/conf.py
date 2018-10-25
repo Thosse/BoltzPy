@@ -76,6 +76,7 @@ intersphinx_mapping = {
     'matplotlib': ('http://matplotlib.sourceforge.net/', None),
     # references to python types, using :class:`list`,...
     'http://docs.python.org/dev': None,
+    'h5py': ('http://docs.h5py.org/en/latest/', None)
     }
 
 # List of patterns, relative to source directory, that match files and

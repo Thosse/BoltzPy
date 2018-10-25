@@ -104,7 +104,7 @@ class Rule:
 
         Parameters
         ----------
-        hdf5_group : :obj:`h5py.Group`
+        hdf5_group : :obj:`h5py.Group <h5py:Group>`
 
         Returns
         -------
@@ -150,7 +150,7 @@ class Rule:
 
         Parameters
         ----------
-        hdf5_group : :obj:`h5py.Group`
+        hdf5_group : :obj:`h5py.Group <h5py:Group>`
         """
         assert isinstance(hdf5_group, h5py.Group)
         self.check_integrity(False)
