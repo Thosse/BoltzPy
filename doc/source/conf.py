@@ -69,10 +69,15 @@ language = None
 
 # Linking for intersphinx.
 
-intersphinx_mapping = { # references to numpy, using :class:'numpy.*'
-                        'numpy': ('http://docs.scipy.org/doc/numpy/', None),
-                        # references to python types
-                        'http://docs.python.org/dev': None}
+intersphinx_mapping = { 
+    # references to numpy, using :class:'numpy.*'
+    'numpy': ('http://docs.scipy.org/doc/numpy/', None),
+    # references to matplotlib, using :class:'matplotlib.*'
+    'matplotlib': ('http://matplotlib.sourceforge.net/', None),
+    # references to python types, using :class:`list`,...
+    'http://docs.python.org/dev': None,
+    'h5py': ('http://docs.h5py.org/en/latest/', None)
+    }
 
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
