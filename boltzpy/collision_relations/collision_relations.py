@@ -17,14 +17,14 @@ class CollisionRelations:
     .. todo::
         - check integrity (non neg weights,
           no multiple occurrences, physical correctness)
-        - print method - visualization of collisions
+        - print method - visualization of collision_relations
         - add load / save method
         - **Add Stefan's Generation-Scheme**
-        - can both the transport and the collisions
+        - can both the transport and the collision_relations
           be implemented as interpolations? -> GPU Speed-Up
         - How to sort the arrays for maximum efficiency?
 
-        - count collisions for each pair of specimen? Useful?
+        - count collision_relations for each pair of specimen? Useful?
         - only for implemented index_difference:
           choose v[2] out of smaller grid
           which only contains possible values
@@ -41,7 +41,7 @@ class CollisionRelations:
     Attributes
     ----------
     collision_arr : :obj:`~numpy.array` [:obj:`int`]
-        Contains the active collisions.
+        Contains the active collision_relations.
         Each collision is a 4-tuple of indices in :attr:`sv.iG`
         and is in the form
         :math:`\left[ v_{s_1}^{pre}, v_{s_1}^{post},
@@ -104,7 +104,7 @@ class CollisionRelations:
 
     @property
     def n(self):
-        """:obj:`int` : Total number of active collisions."""
+        """:obj:`int` : Total number of active collision_relations."""
         return self.collision_arr.shape[0]
 
     # Todo Move this into Collision/calc_XXX method
@@ -145,12 +145,12 @@ class CollisionRelations:
     # Todo Simplify - Looks horrible
     # noinspection PyAssignmentToLoopOrWithParameter
     def _generate_collisions_complete(self):
-        """Generate all possible, non-useless collisions."""
+        """Generate all possible, non-useless collision_relations."""
         assert self._sim.coll_select_scheme == 'Complete'
         if self._sim.sv.form != 'rectangular':
             raise NotImplementedError('Currently, only rectangular '
                                       'grids are supported')
-        # collect collisions in these lists
+        # collect collision_relations in these lists
         col_arr = []
         weight_arr = []
 
@@ -316,7 +316,7 @@ class CollisionRelations:
               end='\r')
         # Size of complete velocity grid
         rows = self._sim.sv.size
-        # Number of different collisions
+        # Number of different collision_relations
         columns = self.n
         col_matrix = np.zeros(shape=(rows, columns),
                               dtype=float)
@@ -338,7 +338,7 @@ class CollisionRelations:
         #####################################
         #           Serialization           #
         #####################################
-    # Todo Move this save to bottom of generate collisions method
+    # Todo Move this save to bottom of generate collision_relations method
     def save(self, file_address=None):
         """Writes all attributes of the :class:`CollisionRelations` instance
         to the given HDF5-file.

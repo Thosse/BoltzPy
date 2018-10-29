@@ -4,7 +4,7 @@ import boltzpy.specimen as b_spm
 import boltzpy.grid as b_grd
 import boltzpy.svgrid as b_svg
 import boltzpy.rule as b_rul
-import boltzpy.computation as b_run
+import boltzpy.calculation as b_run
 import boltzpy.animation as b_ani
 
 import boltzpy.helpers.file_addresses as h_file
@@ -499,6 +499,8 @@ class Simulation:
         #           "A new computation is not necessary")
         #     return
         # else (KeyError, AssertionError):
+
+        # setup destination to write results
         assert hdf5_group_name not in {'Collisions',
                                        'Initialization',
                                        'Position_Grid',
@@ -509,6 +511,7 @@ class Simulation:
         if hdf5_group_name not in hdf5_file.keys():
             hdf5_file.create_group(hdf5_group_name)
         hdf5_group = h5py.File(self.file_address + '.hdf5')[hdf5_group_name]
+
         calculation = b_run.Calculation(self)
         calculation.run(hdf5_group=hdf5_group)
         return

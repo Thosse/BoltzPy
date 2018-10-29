@@ -15,9 +15,9 @@ Computation Module
 
 Collisions Module
 -----------------
-.. automodule:: boltzpy.collisions
+.. automodule:: boltzpy.collision_relations
     :members:
-.. autoclass:: boltzpy.collisions.CollisionRelations
+.. autoclass:: boltzpy.collision_relations.CollisionRelations
     :members:
 
 Output Functions Module
