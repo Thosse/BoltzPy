@@ -1,11 +1,12 @@
 import boltzpy.data as b_dat
 
-import numpy as np
 
-
-def transport_function(order_transp):
-    if order_transp == 1:
-        return _calculate_transport_step
+def transport_function(scheme):
+    if scheme["Transport_Scheme"] == "FiniteDifferences":
+        if scheme["Transport_Order"] == 1:
+            return _calculate_transport_step
+        else:
+            raise NotImplementedError
     else:
         raise NotImplementedError
 

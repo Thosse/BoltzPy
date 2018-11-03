@@ -1,4 +1,3 @@
-
 #: :obj:`str` : Default directory for simulation files.
 #: If no full path is given,
 #: then the file will be located in this directory.
@@ -45,25 +44,30 @@ SUPP_COLORS = ['blue', 'red', 'green',
                'orange', 'pink', 'lime',
                'black']
 
-#: :obj:`set` [:obj:`str`] :
-#: Set of all currently supported schemes
-#: for the selection of the collision partners.
-SUPP_COLL_SELECTION_SCHEMES = {'Complete'}
+#: :obj:`dict` [:obj:`str`, :obj:`list` [:obj:`str`]] :
+#: Denotes the list of all supported values for any key.
+SUPP_SCHEME_VALUES = {
+    "Approach": ["DiscreteVelocityModels"],
+    "OperatorSplitting_Order": [1],
+    "Transport_Scheme": ["FiniteDifferences"],
+    "Transport_Order": [1],
+    "Collisions_RelationsScheme": ["UniformComplete",
+                                   # "FreeFlow",
+                                   ],
+    "Collisions_ComputationScheme": ["EulerScheme"]
+    }
 
-#: :obj:`set` [:obj:`int`] :
-#: Set of all currently supported Convergence Orders
-#: for the Approximation of the Collision Operator.
-SUPP_ORDERS_COLL = {1, 2, 3, 4}
-
-#: :obj:`set` [:obj:`int`] :
-#: Set of all currently supported Convergence Orders
-#: of the Operator Splitting.
-SUPP_ORDERS_OS = {1, 2}
-
-#: :obj:`set` [:obj:`int`] :
-#: Set of all currently supported Convergence Orders
-#: for the Transport Step (PDE).
-SUPP_ORDERS_TRANSP = {1, 2}
+#: :obj:`dict` [:obj:`str`, :obj:`list` [:obj:`str`]] :
+#: Denotes the list of all additional key required by the given value.
+#: If a value is not a key of this :obj:`dict`,
+#: then this value requires no additional keys.
+REQ_SCHEME_PARAMETERS = {
+    "DiscreteVelocityModels": ["OperatorSplitting_Order",
+                               "Transport_Scheme",
+                               "Collisions_RelationsScheme",
+                               "Collisions_ComputationScheme"],
+    "FiniteDifferences": ["Transport_Order"]
+    }
 
 #: :obj:`set` [:obj:`str`] :
 #: Set of all characters, that are forbidden in any file addresses.
@@ -80,7 +84,6 @@ SUPP_GRID_FORMS = {'rectangular'}
 #: for :class:`~boltzpy.Grid`
 #: dimensions.
 SUPP_GRID_DIMENSIONS = {1, 2}
-
 
 #: :obj:`list` [:obj:`str`] :
 #: List of all currently supported categories

@@ -40,3 +40,8 @@ The Data Class
 --------------
 .. autoclass:: boltzpy.Data
     :members:
+
+The Scheme Class
+----------------
+.. autoclass:: boltzpy.Scheme
+    :members:

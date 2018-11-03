@@ -114,13 +114,8 @@ class Data:
         # # Todo implement proper collision setup()
         col = b_col.CollisionRelations(sim)
         # Generate collision relations
-        # Todo add coll_select_scheme = "free_flow"
-        # Todo move this if into col.setup()
-        if sim.coll_substeps != 0:
-            col.setup()
+        col.setup()
 
-        # Todo Move into Scheme
-        self.col_steps = sim.coll_substeps
         # Todo create struct -> 4 ints and 1 float together -> possible?
         self.col = col.collision_arr
         self.weight = col.weight_arr

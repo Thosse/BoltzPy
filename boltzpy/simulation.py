@@ -4,6 +4,7 @@ import boltzpy.specimen as b_spm
 import boltzpy.grid as b_grd
 import boltzpy.svgrid as b_svg
 import boltzpy.rule as b_rul
+import boltzpy.scheme as b_scm
 import boltzpy.calculation as b_run
 import boltzpy.animation as b_ani
 
@@ -89,27 +90,12 @@ class Simulation:
         :class:`~boltzpy.Grid` point
         to its :class:`initialization rule <Rule>`.
         Contains the indices of the respective :class:`rules <Rule>`
-    coll_select_scheme : :obj:`str`
-        Selection scheme for the collision partners.
-        Must be an element of
-        :const:`~boltzpy.constants.SUPP_COLL_SELECTION_SCHEMES`
-    coll_substeps : :obj:`int`
-        Number of collision substeps per time step.
-    order_os : :obj:`int`
-        Approximation order of Operator Splitting.
-        Must be in :const:`~boltzpy.constants.SUPP_ORDERS_OS`.
-    order_coll : :obj:`int`
-        Approximation order of approximation of the Collision Operator.
-        Must be in
-        :const:`~boltzpy.constants.SUPP_ORDERS_COLL`.
-    order_transp : :obj:`int`
-        Approximation order of transport solver.
-        Must be in
-        :const:`~boltzpy.constants.SUPP_ORDERS_TRANSP`.
     output_parameters : :obj:`~numpy.array` [:obj:`str`]
         Output/Results of the Simulation.
         Each element must be in :const:`~boltzpy.constants.SUPP_OUTPUT`.
         Must be a 2D array.
+    scheme : :class:`Scheme`
+        Contains all computation scheme parameters.
     """
     def __init__(self, file_address=None):
         # set file address (using a setter method)
@@ -188,31 +174,10 @@ class Simulation:
         #   Computation Attributes   #
         ##############################
         try:
-            key = "Collision_Selection_Scheme"
-            self.coll_select_scheme = file["Collisions"].attrs[key].value
+            key = "Computation"
+            self.scheme = b_scm.Scheme.load(file[key])
         except KeyError:
-            self.coll_select_scheme = 'Complete'
-        # Todo replace this by Knudsen Number + adaptive RungeKutta
-        try:
-            key = "Collision_Substeps"
-            self.coll_substeps = int(file["Computation"].attrs[key])
-        except KeyError:
-            self.coll_substeps = 1
-        try:
-            key = "Convergence_Order_Operator_Splitting"
-            self.order_os = int(file["Computation"].attrs[key])
-        except KeyError:
-            self.order_os = 1
-        try:
-            key = "Convergence_Order_Transport"
-            self.order_transp = int(file["Computation"].attrs[key])
-        except KeyError:
-            self.order_transp = 1
-        try:
-            key = "Convergence_Order_Collision_Operator"
-            self.order_coll = int(file["Computation"].attrs[key])
-        except KeyError:
-            self.order_coll = 1
+            self.scheme = b_scm.Scheme()
         try:
             key = "Computation/Output_Parameters"
             shape = file[key].attrs["shape"]
@@ -224,8 +189,6 @@ class Simulation:
                                                 'Momentum_Flow_X'],
                                                ['Energy',
                                                 'Energy_Flow_X']])
-
-        # # Todo self.description = ... String that describes the simulation
         file.close()
         self.check_integrity(complete_check=False)
         return
@@ -675,22 +638,9 @@ class Simulation:
         # Save Computation Parameters
         if "Computation" not in file.keys():
             file.create_group("Computation")
-        if self.coll_select_scheme is not None:
-            key = "Collision_Selection_Scheme"
-            file["Computation"].attrs[key] = self.coll_select_scheme
-        # Todo replace this by Knudsen Number + adaptive RungeKutta
-        if self.coll_substeps is not None:
-            key = "Collision_Substeps"
-            file["Computation"].attrs[key] = self.coll_substeps
-        if self.order_os is not None:
-            key = "Convergence_Order_Operator_Splitting"
-            file["Computation"].attrs[key] = self.order_os
-        if self.order_transp is not None:
-            key = "Convergence_Order_Transport"
-            file["Computation"].attrs[key] = self.order_transp
-        if self.order_coll is not None:
-            key = "Convergence_Order_Collision_Operator"
-            file["Computation"].attrs[key] = self.order_coll
+        # Save scheme
+        self.scheme.save(file["Computation"])
+
         if self.output_parameters is not None:
             #  noinspection PyUnresolvedReferences
             h5py_string_type = h5py.special_dtype(vlen=str)
@@ -724,11 +674,7 @@ class Simulation:
                               initialization_rules=self.rule_arr,
                               initialization_array=self.init_arr,
                               output_parameters=self.output_parameters,
-                              coll_select_scheme=self.coll_select_scheme,
-                              coll_substeps=self.coll_substeps,
-                              order_os=self.order_os,
-                              order_transp=self.order_transp,
-                              order_coll=self.order_coll,
+                              scheme=self.scheme,
                               complete_check=complete_check)
         return
 
@@ -741,11 +687,7 @@ class Simulation:
                          initialization_rules=None,
                          initialization_array=None,
                          output_parameters=None,
-                         coll_select_scheme=None,
-                         coll_substeps=None,
-                         order_os=None,
-                         order_transp=None,
-                         order_coll=None,
+                         scheme=None,
                          complete_check=False):
         r"""Sanity Check.
 
@@ -762,11 +704,7 @@ class Simulation:
         initialization_rules : :obj:`~numpy.array` [:class:`Rule`], optional
         initialization_array : :obj:`~numpy.array` [:obj:`int`], optional
         output_parameters : :obj:`~numpy.array` [:obj:`str`], optional
-        coll_select_scheme : :obj:`str`, optional
-        coll_substeps : :obj:`int`, optional
-        order_os : :obj:`int`, optional
-        order_transp : :obj:`int`, optional
-        order_coll : :obj:`int`, optional
+        scheme : :class:`Scheme`, optional
         complete_check : :obj:`bool`, optional
             If True, then all parameters must be assigned (not None).
             If False, then unassigned parameters are ignored.
@@ -885,32 +823,8 @@ class Simulation:
             assert all([mom in b_const.SUPP_OUTPUT
                         for mom in output_parameters.flatten()])
 
-        if coll_select_scheme is not None:
-            assert isinstance(coll_select_scheme, str)
-            selection_schemes = b_const.SUPP_COLL_SELECTION_SCHEMES
-            assert coll_select_scheme in selection_schemes
-
-        if coll_substeps is not None:
-            assert isinstance(coll_substeps, int)
-            assert coll_substeps >= 0
-
-        if order_os is not None:
-            assert isinstance(order_os, int)
-            assert order_os in b_const.SUPP_ORDERS_OS
-            if order_os != 1:
-                raise NotImplementedError
-
-        if order_coll is not None:
-            assert isinstance(order_coll, int)
-            assert order_coll in b_const.SUPP_ORDERS_COLL
-            if order_coll != 1:
-                raise NotImplementedError
-
-        if order_transp is not None:
-            assert isinstance(order_transp, int)
-            assert order_transp in b_const.SUPP_ORDERS_TRANSP
-            if order_transp != 1:
-                raise NotImplementedError
+        if scheme is not None:
+            scheme.check_integrity(complete_check)
         return
 
     def __str__(self,
@@ -952,24 +866,12 @@ class Simulation:
             init_arr_str = self.init_arr.__str__().replace('\n', '\n\t\t')
             description += init_arr_str + '\n'
         description += '\n'
-        description += 'Computation Data\n'
+        description += 'Computation Scheme\n'
+        description += '------------------\n\t'
+        description += self.scheme.__str__().replace('\n', '\n\t')
+        description += '\n'
+        description += 'Animated Moments\n'
         description += '----------------\n\t'
-        description += 'Collision Selection Scheme = ' \
-                       '{}'.format(self.coll_select_scheme)
-        description += '\n\t'
-        description += 'Collision Steps per Time Step = ' \
-                       '{}'.format(self.coll_substeps)
-        description += '\n\t'
-        description += 'Approximation Order of Operator Splitting = ' \
-                       '{}'.format(self.order_os)
-        description += '\n\t'
-        description += 'Approximation Order of Collision Operator = ' \
-                       '{}'.format(self.order_coll)
-        description += '\n\t'
-        description += 'Approximation Order of Transport Solver = ' \
-                       '{}'.format(self.order_transp)
-        description += '\n\t'
-        description += 'Animated Moments:\n\t\t'
-        output_str = self.output_parameters.__str__().replace('\n', '\n\t\t')
+        output_str = self.output_parameters.__str__().replace('\n', '\n\t')
         description += output_str + '\n'
         return description

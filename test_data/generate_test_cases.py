@@ -24,7 +24,6 @@ def shock_1spc(file_name="shock_1spc", compute=True, animate=False):
         os.remove(PATH + file_name + ".hdf5")
     sim = b_sim.Simulation(PATH + file_name)
     sim.add_specimen(mass=2, collision_rate=[50])
-    sim.coll_substeps = 1
     sim.setup_time_grid(max_time=0.1,
                         number_time_steps=11,
                         calculations_per_time_step=10)
@@ -47,6 +46,12 @@ def shock_1spc(file_name="shock_1spc", compute=True, animate=False):
                  np.array([1.0]),
                  name='Low Pressure')
     sim.choose_rule(np.arange(10, 21), 1)
+    sim.scheme["Approach"] = "DiscreteVelocityModels"
+    sim.scheme["OperatorSplitting_Order"] = 1
+    sim.scheme["Transport_Scheme"] = "FiniteDifferences"
+    sim.scheme["Transport_Order"] = 1
+    sim.scheme["Collisions_RelationsScheme"] = "UniformComplete"
+    sim.scheme["Collisions_ComputationScheme"] = "EulerScheme"
     sim.save()
     if compute:
         sim.run_computation()
@@ -63,10 +68,9 @@ def shock_2spc(file_name="shock_2spc", compute=True, animate=False):
     sim = b_sim.Simulation(PATH + file_name)
     sim.add_specimen(mass=2, collision_rate=[50])
     sim.add_specimen(mass=3, collision_rate=[50, 50])
-    sim.coll_substeps = 5
     sim.setup_time_grid(max_time=0.1,
                         number_time_steps=11,
-                        calculations_per_time_step=10)
+                        calculations_per_time_step=50)
     sim.setup_position_grid(grid_dimension=1,
                             grid_shape=[21],
                             grid_spacing=0.5)
@@ -86,6 +90,12 @@ def shock_2spc(file_name="shock_2spc", compute=True, animate=False):
                  np.array([1.0, 1.0]),
                  name='Low Pressure')
     sim.choose_rule(np.arange(10, 21), 1)
+    sim.scheme["Approach"] = "DiscreteVelocityModels"
+    sim.scheme["OperatorSplitting_Order"] = 1
+    sim.scheme["Transport_Scheme"] = "FiniteDifferences"
+    sim.scheme["Transport_Order"] = 1
+    sim.scheme["Collisions_RelationsScheme"] = "UniformComplete"
+    sim.scheme["Collisions_ComputationScheme"] = "EulerScheme"
     sim.save()
     if compute:
         sim.run_computation()
@@ -104,11 +114,10 @@ def shock_2spc_complete(file_name="shock_2spc_complete",
     sim = b_sim.Simulation(PATH + file_name)
     sim.add_specimen(mass=2, collision_rate=[50])
     sim.add_specimen(mass=3, collision_rate=[50, 50])
-    sim.coll_substeps = 5
     sim.output_parameters = np.array([["Complete_Distribution"]])
     sim.setup_time_grid(max_time=0.1,
                         number_time_steps=11,
-                        calculations_per_time_step=10)
+                        calculations_per_time_step=50)
     sim.setup_position_grid(grid_dimension=1,
                             grid_shape=[21],
                             grid_spacing=0.5)
@@ -128,6 +137,12 @@ def shock_2spc_complete(file_name="shock_2spc_complete",
                  np.array([1.0, 1.0]),
                  name='Low Pressure')
     sim.choose_rule(np.arange(10, 21), 1)
+    sim.scheme["Approach"] = "DiscreteVelocityModels"
+    sim.scheme["OperatorSplitting_Order"] = 1
+    sim.scheme["Transport_Scheme"] = "FiniteDifferences"
+    sim.scheme["Transport_Order"] = 1
+    sim.scheme["Collisions_RelationsScheme"] = "UniformComplete"
+    sim.scheme["Collisions_ComputationScheme"] = "EulerScheme"
     sim.save()
     if compute:
         sim.run_computation()
@@ -146,7 +161,6 @@ def shock_2spc_equalmass(file_name="shock_2spc_equalmass",
     sim = b_sim.Simulation(PATH + file_name)
     sim.add_specimen(mass=2, collision_rate=[50])
     sim.add_specimen(mass=2, collision_rate=[50, 5])
-    sim.coll_substeps = 1
     sim.setup_time_grid(max_time=0.1,
                         number_time_steps=11,
                         calculations_per_time_step=10)
@@ -169,6 +183,12 @@ def shock_2spc_equalmass(file_name="shock_2spc_equalmass",
                  np.array([1.0, 1.0]),
                  name='Low Pressure')
     sim.choose_rule(np.arange(10, 21), 1)
+    sim.scheme["Approach"] = "DiscreteVelocityModels"
+    sim.scheme["OperatorSplitting_Order"] = 1
+    sim.scheme["Transport_Scheme"] = "FiniteDifferences"
+    sim.scheme["Transport_Order"] = 1
+    sim.scheme["Collisions_RelationsScheme"] = "UniformComplete"
+    sim.scheme["Collisions_ComputationScheme"] = "EulerScheme"
     sim.save()
     if compute:
         sim.run_computation()
@@ -180,21 +200,8 @@ generate_test_case["shock_2spc_equalmass"] = shock_2spc_equalmass
 
 if __name__ == "__main__":
     for key in generate_test_case.keys():
-        old_str = b_sim.Simulation(PATH + key).__str__(True)
         print()
         case_str = "Generating {key}.hdf5".format(key=key)
         print(case_str)
         print(len(case_str)*'-')
         generate_test_case[key](key)
-        new_str = b_sim.Simulation(PATH + key).__str__(True)
-        try:
-            assert old_str == new_str
-        except:
-            if len(old_str) != len(new_str):
-                print("Different length!")
-            for (i, c) in enumerate(old_str):
-                if c != new_str[i]:
-                    print(old_str[i-10:i+10])
-                    print(new_str[i - 10:i + 10])
-                    input()
-

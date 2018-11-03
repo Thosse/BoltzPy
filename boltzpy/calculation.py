@@ -14,6 +14,15 @@ from time import time
 # move output into com/calc submodule
 # Replace orders by a dict scheme -> create dict of dicts for asserts
 
+
+def computation_function(scheme):
+    if scheme["Approach"] == "DiscreteVelocityModels":
+        return b_split.operator_splitting_function(scheme)
+    else:
+        msg = "Unsupported Approach: {}".format(scheme["Approach"])
+        raise NotImplementedError(msg)
+
+
 class Calculation:
     r"""Manages computation process
 
@@ -116,8 +125,7 @@ class Calculation:
         # Todo Add check_integrity / stability conditions?
         assert self.check_stability_conditions()
         # configure calculation_function
-        _calculate_time_step = b_split.operator_splitting_function(self.sim.order_os, self.sim.order_transp, self.sim.order_coll)
-
+        _calculate_time_step = computation_function(self.sim.scheme)
         # Prepare Output functions
         self.f_out = b_out.output_function(self.sim,
                                            hdf5_group=hdf5_group)

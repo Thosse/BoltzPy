@@ -1,8 +1,8 @@
 import numpy as np
 
 
-def collision_function(order_coll):
-    if order_coll == 1:
+def collision_function(scheme):
+    if scheme["Collisions_ComputationScheme"] == "EulerScheme":
         return _calculate_collision_step
     else:
         raise NotImplementedError

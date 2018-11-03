@@ -1,6 +1,5 @@
 
 import boltzpy as b_sim
-import boltzpy.constants as b_const
 
 import numpy as np
 from scipy.sparse import csr_matrix
@@ -77,23 +76,19 @@ class CollisionRelations:
         ###########################
         # load Collisions Array
         try:
-            key = ("Collisions/"
-                   + self._sim.coll_select_scheme
-                   + "/Collisions")
+            key = "Collisions/Relations"
             self.collision_arr = file[key].value
         except (KeyError, TypeError) as e:
             if isinstance(e, TypeError):
-                assert self._sim.coll_select_scheme is None
+                assert self._sim.scheme["Collisions/Relations Scheme"] is None
             self.collision_arr = np.array([], dtype=int)
         # load Weight Array
         try:
-            key = ("Collisions/"
-                   + self._sim.coll_select_scheme
-                   + "/Weights")
+            key = "Collisions/Weights"
             self.weight_arr = file[key].value
         except (KeyError, TypeError) as e:
             if isinstance(e, TypeError):
-                assert self._sim.coll_select_scheme is None
+                assert self._sim.scheme["Collisions/Relations Scheme"] is None
             self.weight_arr = np.array([], dtype=float)
 
         # Todo Move this into Collision/calc_XXX method
@@ -126,11 +121,12 @@ class CollisionRelations:
         """
         gen_col_time = time()
         print('Generating Collision Array...', end='\r')
-        if self._sim.coll_select_scheme == 'Complete':
+        if self._sim.scheme["Collisions_RelationsScheme"] == \
+                'UniformComplete':
             self._generate_collisions_complete()
         else:
             msg = 'Unsupported Selection Scheme:' \
-                      '{}'.format(self._sim.coll_select_scheme)
+                      '{}'.format(self._sim.scheme["CollisionsRelations_Scheme"])
             raise NotImplementedError(msg)
         print('Generating Collision Array...Done\n'
               'Time taken =  {} seconds\n'
@@ -146,7 +142,8 @@ class CollisionRelations:
     # noinspection PyAssignmentToLoopOrWithParameter
     def _generate_collisions_complete(self):
         """Generate all possible, non-useless collision_relations."""
-        assert self._sim.coll_select_scheme == 'Complete'
+        assert self._sim.scheme["Collisions_RelationsScheme"] == \
+               'UniformComplete'
         if self._sim.sv.form != 'rectangular':
             raise NotImplementedError('Currently, only rectangular '
                                       'grids are supported')
@@ -230,11 +227,7 @@ class CollisionRelations:
         """
         col_rate = self._sim.s.collision_rates[specimen[0],
                                                specimen[1]]
-        n_cols = self._sim.coll_substeps
-        if n_cols != 0:
-            return col_rate / n_cols
-        else:
-            return col_rate
+        return col_rate
 
     @staticmethod
     def _is_collision(d, v, pv):
@@ -309,8 +302,6 @@ class CollisionRelations:
         return np.allclose(pre_energy, post_energy)
 
     def generate_collision_matrix(self):
-        if self._sim.coll_substeps == 0:
-            return None
         gen_mat_time = time()
         print('Generating Collision Matrix...',
               end='\r')
@@ -348,8 +339,7 @@ class CollisionRelations:
         file_address : str, optional
             Full path to a :class:`~boltzpy.Simulation` HDF5-file.
         """
-        assert (self._sim.coll_select_scheme
-                in b_const.SUPP_COLL_SELECTION_SCHEMES)
+        self._sim.scheme.check_integrity()
         self.check_integrity()
 
         if file_address is None:
@@ -364,8 +354,7 @@ class CollisionRelations:
         file = h5py.File(file_address, mode='a')
 
         # Key to HDF5 directory
-        key = ("Collisions/"
-               + self._sim.coll_select_scheme)
+        key = "Collisions"
         # Remove previous CollisionRelations, if any
         if key in file.keys():
             del file[key]
@@ -374,11 +363,12 @@ class CollisionRelations:
             file.create_group(key)
 
         # save Collision Array
-        file[key + "/Collisions"] = self.collision_arr
+        file[key + "/Relations"] = self.collision_arr
 
-        # save Initialization Array
+        # save Weights Array
         file[key + "/Weights"] = self.weight_arr
 
+        # Todo Is that necessary? if not, then remove this
         # Save Number of Collisions as attribute
         file[key].attrs["Number_of_Collisions"] = self.n
         return
