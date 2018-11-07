@@ -1,14 +1,3 @@
-"""
-General Information
-    different time_taken variables
-        to compere load of transport, collision, writeOuts and so on
-    necessary? use profiling tool instead!
-Output needs
-    data,
-    sv_idx_range_arr,
-    velocities (sv.pMG),
-    mass_arr
-"""
 import boltzpy as b_sim
 import boltzpy.initialization as b_ini
 import boltzpy.collision_relations as b_col
@@ -17,6 +6,7 @@ import numpy as np
 from time import time
 
 
+# Todo Add vG_squared and vG_norm attributes? faster output?
 class Data:
     """Contains all parameters used by he computation.
 
@@ -84,6 +74,8 @@ class Data:
         # Velocity Grid parameters
         # Todo rework SVGRID._index -> idx_range, shape = (s.size, 2)
         # Todo noting begin and end of a specimens velocity grid
+        # Todo replace this by a sv_grid attribute idx_range
+        # Todo replace sv._index and self.index_range() by index_range
         self.v_range = np.array([[sim.sv._index[idx], sim.sv._index[idx+1]]
                                  for idx in range(sim.s.size)])
         # Todo rename pMG -> pG and implement efficiently
@@ -94,6 +86,7 @@ class Data:
         # Todo test if it faster to compute velocity (pv) on the fly
         # self.dv = np.array([sim.sv.vGrids[s].d for s in range(sim.s.size)])
 
+        self.n_spc = sim.s.size
         self.m = sim.s.mass
 
         self.t = 0
@@ -101,7 +94,6 @@ class Data:
         self.dt = sim.t.d
 
         self.dp = sim.p.d
-        # Todo move into init parameters?
         self.p_dim = sim.p.dim
         self.p_size = sim.p.size
 
@@ -127,6 +119,8 @@ class Data:
         # Todo add rule arr (only boundary points necessary)
         #   with initialization scheme (standardized for rho = 1)
         # Todo This involves a scheme to determine "sub-rules"
+        # Todo as the position of the boundary is important for its
+        # todo behaviour / reinitialization
 
         self._params = dict()
         # Keep as a "conditional" attribute?

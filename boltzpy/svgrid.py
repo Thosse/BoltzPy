@@ -8,6 +8,7 @@ import h5py
 import math
 
 
+# Todo move offset out of SVGrid? extra sim.attribute?
 class SVGrid:
     """Manages the Velocity Grids of all
     :class:`~boltzpy.Species` /

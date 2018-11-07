@@ -1,9 +1,9 @@
-
 import boltzpy.constants as b_const
 
 import h5py
 
 
+# Todo Scheme might needs a data (cpu/GPU) parameter
 class Scheme:
     """Encapsulates all parameters related to the computation schemes.
 

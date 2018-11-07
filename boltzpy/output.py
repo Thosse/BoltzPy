@@ -38,10 +38,10 @@ def output_function(simulation,
                    for output in simulation.output_parameters.flatten()]
 
     # setup output function, iteratively calls each output function
-    def func(data, sv_idx_range_arr, mass_arr, velocities, time_idx):
+    def func(data, write_idx):
         for (f_out, hdf5_dataset) in output_list:
-            result = f_out(data, sv_idx_range_arr, mass_arr, velocities)
-            hdf5_dataset[time_idx] = result
+            result = f_out(data)
+            hdf5_dataset[write_idx] = result
         return
 
     return func
@@ -106,14 +106,14 @@ def _setup_subfuncs(simulation):
 
 
 # Todo multiply with mass?
-def _subfunc_mass(data, sv_idx_range_arr, mass_arr, velocities):
+def _subfunc_mass(data):
     """Calculates and returns the mass"""
     # shape = (position_grid.size, species.size)
-    shape = (data.shape[0], mass_arr.size)
+    shape = (data.p_size, data.n_spc)
     mass = np.zeros(shape, dtype=float)
-    for (s_idx, [beg, end]) in enumerate(sv_idx_range_arr):
+    for (s_idx, [beg, end]) in enumerate(data.v_range):
         # mass is the sum over velocity grid of specimen
-        mass[..., s_idx] = np.sum(data[..., beg:end],
+        mass[..., s_idx] = np.sum(data.state[..., beg:end],
                                   axis=-1)
         # mass *= mass[s_idx]
     return mass
@@ -123,15 +123,15 @@ def _get_subfunc_momentum(direction):
     """Generates and returns generating function for momentum"""
     assert direction in [0, 1, 2]
 
-    def f_momentum(data, sv_idx_range_arr, mass_arr, velocities):
+    def f_momentum(data):
         # shape = (position_grid.size, species.size)
-        shape = (data.shape[0], mass_arr.size)
+        shape = (data.p_size, data.n_spc)
         momentum = np.zeros(shape, dtype=float)
-        for (s_idx, [beg, end]) in enumerate(sv_idx_range_arr):
-            V_dir = velocities[beg:end, direction]
-            momentum[..., s_idx] = np.sum(V_dir * data[..., beg:end],
+        for (s_idx, [beg, end]) in enumerate(data.v_range):
+            V_dir = data.vG[beg:end, direction]
+            momentum[..., s_idx] = np.sum(V_dir * data.state[..., beg:end],
                                           axis=1)
-            momentum[..., s_idx] *= mass_arr[s_idx]
+            momentum[..., s_idx] *= data.m[s_idx]
         return momentum
 
     return f_momentum
@@ -145,16 +145,16 @@ def _get_subfunc_momentum_flow(direction):
     """Generates and returns generating function for momentum flow"""
     assert direction in [0, 1, 2]
 
-    def f_momentum_flow(data, sv_idx_range_arr, mass_arr, velocities):
+    def f_momentum_flow(data):
         # shape = (position_grid.size, species.size)
-        shape = (data.shape[0], mass_arr.size)
+        shape = (data.p_size, data.n_spc)
         momentum_flow = np.zeros(shape, dtype=float)
-        for (s_idx, [beg, end]) in enumerate(sv_idx_range_arr):
-            V_dir = velocities[beg:end, direction]
+        for (s_idx, [beg, end]) in enumerate(data.v_range):
+            V_dir = data.vG[beg:end, direction]
             momentum_flow[..., s_idx] = np.sum(V_dir ** 2
-                                               * data[..., beg:end],
+                                               * data.state[..., beg:end],
                                                axis=1)
-            momentum_flow[..., s_idx] *= mass_arr[s_idx]
+            momentum_flow[..., s_idx] *= data.m[s_idx]
         return momentum_flow
 
     return f_momentum_flow
@@ -164,17 +164,17 @@ _subfunc_momentum_flow_y = _get_subfunc_momentum_flow(1)
 _subfunc_momentum_flow_z = _get_subfunc_momentum_flow(2)
 
 
-def _subfunc_energy(data, sv_idx_range_arr, mass_arr, velocities):
+def _subfunc_energy(data):
     """Calculates and returns the energy"""
     # shape = (position_grid.size, species.size)
-    shape = (data.shape[0], mass_arr.size)
+    shape = (data.p_size, data.n_spc)
     energy = np.zeros(shape, dtype=float)
-    for (s_idx, [beg, end]) in enumerate(sv_idx_range_arr):
-        V = velocities[beg:end, :]
+    for (s_idx, [beg, end]) in enumerate(data.v_range):
+        V = data.vG[beg:end, :]
         V_2 = np.sqrt(np.sum(V ** 2, axis=1))
-        energy[..., s_idx] = np.sum(V_2 * data[..., beg:end],
+        energy[..., s_idx] = np.sum(V_2 * data.state[..., beg:end],
                                     axis=1)
-        energy[..., s_idx] *= 0.5 * mass_arr[s_idx]
+        energy[..., s_idx] *= 0.5 * data.m[s_idx]
     return energy
 
 
@@ -182,19 +182,19 @@ def _get_subfunc_energy_flow(direction):
     """Generates and returns generating function for energy flow"""
     assert direction in [0, 1, 2]
 
-    def f_energy_flow(data, sv_idx_range_arr, mass_arr, velocities):
+    def f_energy_flow(data):
         # shape = (position_grid.size, species.size)
-        shape = (data.shape[0], mass_arr.size)
+        shape = (data.p_size, data.n_spc)
         energy_flow = np.zeros(shape, dtype=float)
-        for (s_idx, [beg, end]) in enumerate(sv_idx_range_arr):
-            V = velocities[beg:end, :]
+        for (s_idx, [beg, end]) in enumerate(data.v_range):
+            V = data.vG[beg:end, :]
             V_norm = np.sqrt(np.sum(V ** 2, axis=1))
-            V_dir = velocities[beg:end, direction]
+            V_dir = data.vG[beg:end, direction]
             energy_flow[..., s_idx] = np.sum(V_norm
                                              * V_dir
-                                             * data[..., beg:end],
+                                             * data.state[..., beg:end],
                                              axis=1)
-            energy_flow[..., s_idx] *= 0.5 * mass_arr[s_idx]
+            energy_flow[..., s_idx] *= 0.5 * data.m[s_idx]
         return energy_flow
 
     return f_energy_flow
@@ -204,10 +204,7 @@ _subfunc_energy_flow_y = _get_subfunc_energy_flow(1)
 _subfunc_energy_flow_z = _get_subfunc_energy_flow(2)
 
 
-def _subfunc_complete_distribution(data,
-                                   sv_idx_range_arr,
-                                   mass_arr,
-                                   velocities):
+def _subfunc_complete_distribution(data):
     """Returns complete distribution of given data
     """
-    return data
+    return data.state

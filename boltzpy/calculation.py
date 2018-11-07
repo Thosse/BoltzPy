@@ -58,6 +58,8 @@ r""""..todo::
             if its a point with 'sub'points or a neighbouring point
             of a finer area,with 'Ghost-Boundary-Points'
           * The total number of Grid-Refinement-Levels should be bound
+    - implement p-local time-adaptive scheme?
+        * split collision in multiple collision steps, to keep stability
 """
 
 import boltzpy as b_sim
@@ -67,7 +69,6 @@ import boltzpy.output as b_out
 import boltzpy.computation.operator_splitting as b_split
 
 import h5py
-import numpy as np
 from time import time
 
 
@@ -94,16 +95,7 @@ def compute(file_address,
             f_compute(data)
             _print_time_estimate(data)
         # generate Output and write it to disk
-        # Todo replace this by a sv_grid attribute idx_range
-        # Todo replace sv._index and self.index_range() by index_range
-        idx_range = data.v_range
-        # Todo this needs a data (cpu/GPU) parameter, containing all
-        # Todo only parameters -> data, tw_idx
-        f_output(data.state,
-                 np.array(idx_range),
-                 data.m,
-                 data.vG,
-                 tw_idx)
+        f_output(data, tw_idx)
 
     time_taken_in_seconds = int(time() - data.dur_total)
     # large number of spaces necessary to overwrite the old terminal lines
