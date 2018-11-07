@@ -136,3 +136,18 @@ class Data:
 
     def __getattr__(self, item):
         return self._params[item]
+
+    # Todo Add more check_integrity / stability conditions?
+    # Todo raise Warnings for weird configurations?
+    def check_stability_conditions(self):
+        """Checks Courant-Friedrichs-Levy Condition
+
+        Raises
+        ------
+        AssertionError
+            If any necessary condition is not satisfied."""
+        # check Courant-Friedrichs-Levy-Condition
+        max_v = np.linalg.norm(self.vG, axis=1).max()
+        # Courant–Friedrichs–Lewy (CFL) condition
+        assert max_v * (self.dt/self.dp) < 1/2
+        return

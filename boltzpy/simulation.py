@@ -5,7 +5,7 @@ import boltzpy.grid as b_grd
 import boltzpy.svgrid as b_svg
 import boltzpy.rule as b_rul
 import boltzpy.scheme as b_scm
-import boltzpy.calculation as b_run
+import boltzpy.calculation as b_clc
 import boltzpy.animation as b_ani
 
 import boltzpy.helpers.file_addresses as h_file
@@ -449,7 +449,6 @@ class Simulation:
     ###########################
     #       Computation       #
     ###########################
-    # Todo rework computation module
     def run_computation(self, hdf5_group_name="Computation"):
         """Compute the fully configured Simulation"""
         self.check_integrity()
@@ -464,19 +463,7 @@ class Simulation:
         # else (KeyError, AssertionError):
 
         # setup destination to write results
-        assert hdf5_group_name not in {'Collisions',
-                                       'Initialization',
-                                       'Position_Grid',
-                                       'Species',
-                                       'Time_grid',
-                                       'Velocity_Grids'}
-        hdf5_file = h5py.File(self.file_address + '.hdf5')
-        if hdf5_group_name not in hdf5_file.keys():
-            hdf5_file.create_group(hdf5_group_name)
-        hdf5_group = h5py.File(self.file_address + '.hdf5')[hdf5_group_name]
-
-        calculation = b_run.Calculation(self)
-        calculation.run(hdf5_group=hdf5_group)
+        b_clc.compute(self.file_address, hdf5_group_name)
         return
 
     # Todo rework animation module
