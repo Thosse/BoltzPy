@@ -35,3 +35,13 @@ The Rule Class
 --------------
 .. autoclass:: boltzpy.Rule
     :members:
+
+The Data Class
+--------------
+.. autoclass:: boltzpy.Data
+    :members:
+
+The Scheme Class
+----------------
+.. autoclass:: boltzpy.Scheme
+    :members:

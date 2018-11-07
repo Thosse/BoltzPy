@@ -17,7 +17,6 @@ def test_computation():
         sim.run_computation("Test")
         hdf5_file = h5py.File(case, mode='r')
         for output in sim.output_parameters.flatten():
-            print(output)
             results_old = hdf5_file["Computation"][output].value
             results_new = hdf5_file["Test"][output].value
             assert np.array_equal(results_old, results_new)

@@ -8,7 +8,6 @@ new_simulation = True
 if new_simulation:
     sim.add_specimen(mass=2, collision_rate=[50])
     sim.add_specimen(mass=3, collision_rate=[50, 50])
-    sim.coll_substeps = 5
     sim.setup_time_grid(max_time=1,
                         number_time_steps=101,
                         calculations_per_time_step=10)
@@ -31,6 +30,12 @@ if new_simulation:
                  np.array([1.0, 1.0]),
                  name='Low Pressure')
     sim.choose_rule(np.arange(10, 21), 1)
+    sim.scheme["Approach"] = "DiscreteVelocityModels"
+    sim.scheme["OperatorSplitting_Order"] = 1
+    sim.scheme["Transport_Scheme"] = "FiniteDifferences"
+    sim.scheme["Transport_Order"] = 1
+    sim.scheme["Collisions_RelationsScheme"] = "UniformComplete"
+    sim.scheme["Collisions_ComputationScheme"] = "EulerScheme"
 print(sim.__str__(write_physical_grids=True))
 sim.save()
 

@@ -42,8 +42,10 @@ from boltzpy.species import Species
 from boltzpy.svgrid import SVGrid
 from boltzpy.grid import Grid
 from boltzpy.rule import Rule
+from boltzpy.data import Data
+from boltzpy.scheme import Scheme
 
-import boltzpy.collisions
+import boltzpy.collision_relations
 import boltzpy.computation
 import boltzpy.output
 import boltzpy.animation
