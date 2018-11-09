@@ -1,9 +1,9 @@
-import boltzpy as b_sim
-import boltzpy.constants as b_const
 
 import numpy as np
 import h5py
 
+import boltzpy as bp
+import boltzpy.constants as bp_c
 
 # Todo momentum and the flows could receive an additional parameter: direction
 # Todo      The direction would be a (normalized) vector (2D/3D)
@@ -27,7 +27,7 @@ def output_function(simulation,
     -------
     :obj:`function`
     """
-    assert isinstance(simulation, b_sim.Simulation)
+    assert isinstance(simulation, bp.Simulation)
     assert isinstance(hdf5_group, h5py.Group)
     # set up hdf5 datasets for every output
     datasets = _setup_datasets(simulation, hdf5_group)
@@ -98,7 +98,7 @@ def _setup_subfuncs(simulation):
         """
     subfuncs = dict()
     for output in simulation.output_parameters.flatten():
-        assert output in b_const.SUPP_OUTPUT
+        assert output in bp_c.SUPP_OUTPUT
         # Read sub functions from globally defined functions
         # store sub functions in dictionary
         subfuncs[output] = globals()["_subfunc_" + output.lower()]

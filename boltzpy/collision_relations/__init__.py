@@ -1,1 +1,0 @@
-from .collision_relations import CollisionRelations

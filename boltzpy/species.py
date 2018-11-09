@@ -1,9 +1,9 @@
 
-import boltzpy.constants as b_const
-import boltzpy.specimen as b_spm
-
 import h5py
 import numpy as np
+
+import boltzpy as bp
+import boltzpy.constants as bp_c
 
 
 class Species:
@@ -26,7 +26,7 @@ class Species:
     """
     def __init__(self):
         self.specimen_arr = np.empty(shape=(0,),
-                                     dtype=b_spm.Specimen)
+                                     dtype=bp.Specimen)
         self.check_integrity()
         return
 
@@ -84,7 +84,7 @@ class Species:
         """
         # black color should only used, if all other colors are used up
         used_colors = self.colors + ['black']
-        unused_colors = [color for color in b_const.SUPP_COLORS
+        unused_colors = [color for color in bp_c.SUPP_COLORS
                          if color not in used_colors]
         return unused_colors
 
@@ -170,7 +170,7 @@ class Species:
             Row (and column) of :attr:`collision_rates`.
         color : :obj:`str`, optional
         """
-        b_spm.Specimen.check_parameters(name=name,
+        bp.Specimen.check_parameters(name=name,
                                         mass=mass,
                                         collision_rate=collision_rate,
                                         color=color)
@@ -183,13 +183,13 @@ class Species:
         if color is None:
             color = next(iter(self.colors_unused), 'black')
 
-        s_new = b_spm.Specimen(name=name,
+        s_new = bp.Specimen(name=name,
                                mass=mass,
                                color=color,
                                collision_rate=collision_rate)
         # adjust collision rates of already existing species
         for (s_idx, s) in enumerate(self.specimen_arr):
-            assert isinstance(s, b_spm.Specimen)
+            assert isinstance(s, bp.Specimen)
             s.collision_rate = np.append(s.collision_rate,
                                          s_new.collision_rate[s_idx])
         # add new specimen
@@ -218,7 +218,7 @@ class Species:
         new_color : :obj:`str`, optional
         """
         (s_idx, s) = (self.index(item), self[item])
-        b_spm.Specimen.check_parameters(name=new_name,
+        bp.Specimen.check_parameters(name=new_name,
                                         mass=new_mass,
                                         collision_rate=new_collision_rate,
                                         color=new_color)
@@ -335,7 +335,7 @@ class Species:
         assert self.specimen_arr.ndim == 1
         assert self.specimen_arr.size == self.size
         for s in self.specimen_arr:
-            assert isinstance(s, b_spm.Specimen)
+            assert isinstance(s, bp.Specimen)
             s.check_integrity()
             assert s.collision_rate.size == self.size
 
@@ -353,11 +353,11 @@ class Species:
 
         assert isinstance(self.colors, list)
         assert all(type(color) == str for color in self.colors)
-        assert all(color in b_const.SUPP_COLORS for color in self.colors)
+        assert all(color in bp_c.SUPP_COLORS for color in self.colors)
 
         assert isinstance(self.colors_unused, list)
         assert all(type(color) == str for color in self.colors_unused)
-        assert all(color in b_const.SUPP_COLORS
+        assert all(color in bp_c.SUPP_COLORS
                    for color in self.colors_unused)
         assert all(color not in self.colors_unused for color in self.colors)
 

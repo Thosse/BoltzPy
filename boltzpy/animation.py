@@ -1,8 +1,4 @@
 
-import boltzpy as b_sim
-import boltzpy.constants as b_const
-import boltzpy.specimen as b_spm
-
 import numpy as np
 import h5py
 import matplotlib.animation as mpl_ani
@@ -10,6 +6,9 @@ import matplotlib.axes as mpl_axes
 import matplotlib.lines as mpl_lines
 import matplotlib.pyplot as plt
 from time import time
+
+import boltzpy as bp
+import boltzpy.constants as bp_c
 
 
 # Todo add custom colors custom linewidth,... for animate and snapshot
@@ -23,7 +22,7 @@ class Animation:
     simulation : :class:`~boltzpy.Simulation`
     """
     def __init__(self, simulation):
-        assert isinstance(simulation, b_sim.Simulation)
+        assert isinstance(simulation, bp.Simulation)
         # Todo simulation.check_integrity(complete_check=False)
         self._sim = simulation
         self._writer = mpl_ani.writers['ffmpeg'](fps=15, bitrate=1800)
@@ -152,14 +151,14 @@ class Animation:
                       'for 1D Problems'
             raise NotImplementedError(message)
         if figsize is None:
-            figsize = b_const.DEFAULT_FIGSIZE
+            figsize = bp_c.DEFAULT_FIGSIZE
         else:
             assert isinstance(figsize, tuple)
             assert all([isinstance(_, int) and _ > 0
                         for _ in figsize])
             assert len(figsize) == 2
         if dpi is None:
-            dpi = b_const.DEFAULT_DPI
+            dpi = bp_c.DEFAULT_DPI
             assert isinstance(dpi, int)
         figure = plt.figure(figsize=figsize,
                             dpi=dpi)
@@ -301,7 +300,7 @@ class Animation:
                     for axes in axes_array])
         assert isinstance(specimen_array, np.ndarray)
         assert specimen_array.ndim == 1
-        assert all([isinstance(specimen, b_spm.Specimen)
+        assert all([isinstance(specimen, bp.Specimen)
                     for specimen in specimen_array])
         lines = np.empty(shape=(axes_array.size, specimen_array.size),
                          dtype=object)
@@ -340,7 +339,7 @@ class Animation:
                     for line in line_array.flatten()])
         assert isinstance(specimen_array, np.ndarray)
         assert specimen_array.ndim == 1
-        assert all([isinstance(specimen, b_spm.Specimen)
+        assert all([isinstance(specimen, bp.Specimen)
                     for specimen in specimen_array])
         assert isinstance(loc, str)
         # get specimen names

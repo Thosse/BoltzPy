@@ -1,6 +1,7 @@
-import boltzpy.constants as b_const
 
 import h5py
+
+import boltzpy.constants as bp_c
 
 
 # Todo Scheme might needs a data (cpu/GPU) parameter
@@ -30,11 +31,11 @@ class Scheme:
             msg = "Invalid Key!"
             raise KeyError(msg)
         # Add new keys required by new value, if any
-        if value in b_const.REQ_SCHEME_PARAMETERS.keys():
-            for new_key in b_const.REQ_SCHEME_PARAMETERS[value]:
+        if value in bp_c.REQ_SCHEME_PARAMETERS.keys():
+            for new_key in bp_c.REQ_SCHEME_PARAMETERS[value]:
                 self.dictionary[new_key] = None
         # Set new value
-        assert value in b_const.SUPP_SCHEME_VALUES[key]
+        assert value in bp_c.SUPP_SCHEME_VALUES[key]
         self.dictionary[key] = value
         # delete old entries, that are not required anymore
         current_keys = set(self.dictionary.keys())
@@ -68,8 +69,8 @@ class Scheme:
             key = unchecked_keys.pop()
             value = self[key]
             # add required parameters, if any
-            if value in b_const.REQ_SCHEME_PARAMETERS.keys():
-                new_keys = b_const.REQ_SCHEME_PARAMETERS[value]
+            if value in bp_c.REQ_SCHEME_PARAMETERS.keys():
+                new_keys = bp_c.REQ_SCHEME_PARAMETERS[value]
                 additional_keys = [key for key in new_keys
                                    if key not in required_keys]
                 unchecked_keys.extend(additional_keys)
@@ -141,7 +142,7 @@ class Scheme:
         assert set(self.keys()) == self._required_keys()
         for (key, value) in self.items():
             assert isinstance(key, str)
-            assert value is None or value in b_const.SUPP_SCHEME_VALUES[key]
+            assert value is None or value in bp_c.SUPP_SCHEME_VALUES[key]
         if complete_check:
             for (key, value) in self.items():
                 assert value is not None

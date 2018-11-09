@@ -1,3 +1,5 @@
+import os
+
 #: :obj:`str` : Default directory for simulation files.
 #: If no full path is given,
 #: then the file will be located in this directory.
@@ -6,6 +8,17 @@ DEFAULT_DIRECTORY = __file__[:-20] + 'Simulations/'
 #: :obj:`str` : Default directory for all test files.
 #: All data used for testing purposes is stored in this directory.
 TEST_DIRECTORY = __file__[:-20] + 'test_data/'
+
+#: :obj:`str` : Default file (address) for temporary test results.
+TEST_TMP_FILE = TEST_DIRECTORY + '_tmp_.hdf5'
+
+#: :obj:`list` [:obj:`str`] : Contains all available test cases
+#: in the :const:`TEST_DIRECTORY`.
+TEST_CASES = [os.path.join(TEST_DIRECTORY, file)
+              for file in os.listdir(TEST_DIRECTORY)
+              if os.path.isfile(os.path.join(TEST_DIRECTORY, file))
+              and file[-5:] == '.hdf5'
+              and file != '_tmp_.hdf5']
 
 #: :obj:`str` : Default file root for simulation files.
 #: If no file name is given at all, then the file root will be this.

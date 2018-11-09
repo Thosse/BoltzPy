@@ -1,9 +1,10 @@
-import boltzpy as b_sim
-import boltzpy.initialization as b_ini
-import boltzpy.collision_relations as b_col
+from time import time
 
 import numpy as np
-from time import time
+
+import boltzpy as bp
+import boltzpy.initialization as bp_ini
+import boltzpy.collisions as cp_rel
 
 
 # Todo Add vG_squared and vG_norm attributes? faster output?
@@ -64,11 +65,11 @@ class Data:
     """
     def __init__(self, file_address):
         # create temporary Simulation instance
-        sim = b_sim.Simulation(file_address)
+        sim = bp.Simulation(file_address)
         # data arrays, this contains all grids
         # Todo Rework initialization (move into rules?)
         # Todo Class for single Space points (V-Grid + 0.Moment)?
-        self.state = b_ini.create_psv_grid(sim)
+        self.state = bp_ini.create_psv_grid(sim)
         self.result = np.copy(self.state)
 
         # Velocity Grid parameters
@@ -104,7 +105,7 @@ class Data:
 
         # Collision arrays
         # # Todo implement proper collision setup()
-        col = b_col.CollisionRelations(sim)
+        col = cp_rel.CollisionRelations(sim)
         # Generate collision relations
         col.setup()
 

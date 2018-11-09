@@ -1,11 +1,10 @@
 
-import boltzpy.constants as b_const
-import boltzpy.grid as b_grd
-import boltzpy.species as b_spc
-
 import numpy as np
 import h5py
 import math
+
+import boltzpy as bp
+import boltzpy.constants as bp_c
 
 
 # Todo move offset out of SVGrid? extra sim.attribute?
@@ -236,7 +235,7 @@ class SVGrid:
 
         # sanity check
         self.check_integrity(False)
-        assert type(species_array) is b_spc.Species
+        assert type(species_array) is bp.Species
         species_array.check_integrity()
 
         # Construct self.vGrids
@@ -254,7 +253,7 @@ class SVGrid:
         spacings = [2 * self._MAX_V / (n_i - 1)
                     for n_i in number_of_grid_points]
         # Contains the velocity Grid of each specimen
-        vGrids = [b_grd.Grid(grid_form=self.form,
+        vGrids = [bp.Grid(grid_form=self.form,
                              grid_dimension=self.dim,
                              grid_shape=np.array(grid_shapes[i]),
                              grid_spacing=spacings[i],
@@ -479,7 +478,7 @@ class SVGrid:
         # All Velocity Grids must have equal boundaries
         if self.vGrids is not None:
             for G in self.vGrids:
-                assert isinstance(G, b_grd.Grid)
+                assert isinstance(G, bp.Grid)
                 assert np.array_equal(G.boundaries + self.offset,
                                       self.boundaries)
         return
@@ -518,11 +517,11 @@ class SVGrid:
         # check all parameters, if set
         if form is not None:
             assert isinstance(form, str)
-            assert form in b_const.SUPP_GRID_FORMS
+            assert form in bp_c.SUPP_GRID_FORMS
 
         if dimension is not None:
             assert isinstance(dimension, int)
-            assert dimension in b_const.SUPP_GRID_DIMENSIONS
+            assert dimension in bp_c.SUPP_GRID_DIMENSIONS
 
         if max_velocity is not None:
             assert isinstance(max_velocity, float)
@@ -544,7 +543,7 @@ class SVGrid:
         if vgrid_arr is not None:
             assert isinstance(vgrid_arr, np.ndarray)
             assert vgrid_arr.dtype == 'object'
-            assert all(isinstance(grid, b_grd.Grid) for grid in vgrid_arr)
+            assert all(isinstance(grid, bp.Grid) for grid in vgrid_arr)
             for grid in vgrid_arr:
                 grid.check_integrity()
             assert vgrid_arr.ndim == 1

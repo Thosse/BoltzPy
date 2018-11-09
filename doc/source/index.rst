@@ -8,7 +8,9 @@
    :hidden:
 
    classes
-   submodules
+   constants
+   computation
+   animation
 
 
 .. automodule:: boltzpy
@@ -16,6 +18,8 @@
 Links
 -----
  * :ref:`classes`
- * :ref:`submodules`
+ * :ref:`constants`
+ * :ref:`computation`
+ * :ref:`animation`
  * :ref:`search`
  * :ref:`genindex`

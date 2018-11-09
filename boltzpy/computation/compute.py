@@ -62,14 +62,13 @@ r""""..todo::
         * split collision in multiple collision steps, to keep stability
 """
 
-import boltzpy as b_sim
-import boltzpy.scheme as b_scm
-import boltzpy.data as b_dat
-import boltzpy.output as b_out
-import boltzpy.computation.operator_splitting as b_split
-
-import h5py
 from time import time
+import h5py
+
+import boltzpy as bp
+import boltzpy.computation as cp
+from boltzpy.computation import operator_splitting as cp_os
+from boltzpy.computation import output as cp_out
 
 
 # Todo Check if file address is a proper hdf5 file
@@ -78,7 +77,7 @@ def compute(file_address,
             hdf5_group_name="Computation"):
     assert isinstance(file_address, str)
     # Generate Computation data
-    data = b_dat.Data(file_address)
+    data = cp.Data(file_address)
     data.check_stability_conditions()
     # Generate computation functions
     f_compute = generate_computation_functions(file_address)
@@ -107,9 +106,9 @@ def compute(file_address,
 
 def generate_computation_functions(file_address):
     hdf5_group = h5py.File(file_address + ".hdf5")["Computation"]
-    scheme = b_scm.Scheme.load(hdf5_group)
+    scheme = bp.Scheme.load(hdf5_group)
     if scheme["Approach"] == "DiscreteVelocityModels":
-        return b_split.operator_splitting_function(scheme)
+        return cp_os.operator_splitting_function(scheme)
     else:
         msg = "Unsupported Approach: {}".format(scheme["Approach"])
         raise NotImplementedError(msg)
@@ -118,7 +117,7 @@ def generate_computation_functions(file_address):
 # Todo Move this into output.py?
 def generate_output_functions(file_address,
                               hdf5_group_name):
-    simulation = b_sim.Simulation(file_address)
+    simulation = bp.Simulation(file_address)
     assert hdf5_group_name not in {'Collisions',
                                    'Initialization',
                                    'Position_Grid',
@@ -129,8 +128,8 @@ def generate_output_functions(file_address,
     if hdf5_group_name not in hdf5_file.keys():
         hdf5_file.create_group(hdf5_group_name)
     hdf5_group = h5py.File(file_address + '.hdf5')[hdf5_group_name]
-    return b_out.output_function(simulation,
-                                 hdf5_group)
+    return cp_out.output_function(simulation,
+                                  hdf5_group)
 
 
 # Todo profile this!
