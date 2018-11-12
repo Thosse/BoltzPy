@@ -38,7 +38,7 @@ Scheme
 .. autoclass:: boltzpy.Scheme
     :members:
 
-CollisionRelations
-------------------
-.. autoclass:: boltzpy.CollisionRelations
+Collisions
+----------
+.. autoclass:: boltzpy.Collisions
     :members:

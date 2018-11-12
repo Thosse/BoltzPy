@@ -1,1 +1,1 @@
-from boltzpy.collisions.collision_relations import CollisionRelations
+from boltzpy.collisions.collisions import Collisions

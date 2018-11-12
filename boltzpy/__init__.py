@@ -39,5 +39,4 @@ from boltzpy.simulation import Simulation
 from boltzpy.species import Species
 from boltzpy.specimen import Specimen
 from boltzpy.svgrid import SVGrid
-from boltzpy.collisions import CollisionRelations
-
+from boltzpy.collisions import Collisions

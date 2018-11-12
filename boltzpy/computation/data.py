@@ -4,7 +4,6 @@ import numpy as np
 
 import boltzpy as bp
 import boltzpy.initialization as bp_ini
-import boltzpy.collisions as cp_rel
 
 
 # Todo Add vG_squared and vG_norm attributes? faster output?
@@ -104,14 +103,11 @@ class Data:
         self.dur_transp = 0.0
 
         # Collision arrays
-        # # Todo implement proper collision setup()
-        col = cp_rel.CollisionRelations(sim)
-        # Generate collision relations
-        col.setup()
-
         # Todo create struct -> 4 ints and 1 float together -> possible?
-        self.col = col.collision_arr
-        self.weight = col.weight_arr
+        if not sim.coll.is_set_up:
+            sim.coll.setup(sim.scheme, sim.sv, sim.s)
+        self.col = sim.coll.relations
+        self.weight = sim.coll.weights
 
         # Array, denotes the category of a space point
         # and thus its behaviour
@@ -125,7 +121,7 @@ class Data:
 
         self._params = dict()
         # Keep as a "conditional" attribute?
-        self._params["col_mat"] = col.mat
+        self._params["col_mat"] = sim.coll.generate_collision_matrix(sim.t.d)
 
         return
 

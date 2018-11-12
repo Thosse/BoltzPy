@@ -138,6 +138,13 @@ class Simulation:
         except KeyError:
             self.sv = bp.SVGrid()
 
+        # load Collisions, if any
+        try:
+            key = "Collisions"
+            self.coll = bp.Collisions.load(file[key])
+        except KeyError:
+            self.coll = bp.Collisions()
+
         #################################
         #   Initialization Attributes   #
         #################################
@@ -245,7 +252,8 @@ class Simulation:
         # Todo add initial_distribution
         return (self.t.is_set_up
                 and self.p.is_set_up
-                and self.sv.is_set_up)
+                and self.sv.is_set_up
+                and self.coll.is_set_up)
 
     #############################
     #       Configuration       #
@@ -634,6 +642,11 @@ class Simulation:
         key = "Velocity_Grids"
         file.create_group(key)
         self.sv.save(file[key])
+
+        # Save Collisions
+        key = "Collisions"
+        file.create_group(key)
+        self.coll.save(file[key])
 
         # Save initialization rules
         file.create_group("Initialization")
