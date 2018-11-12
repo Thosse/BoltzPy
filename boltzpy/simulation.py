@@ -687,7 +687,8 @@ class Simulation:
                               initialization_array=self.init_arr,
                               output_parameters=self.output_parameters,
                               scheme=self.scheme,
-                              complete_check=complete_check)
+                              complete_check=complete_check,
+                              context=self)
         return
 
     @staticmethod
@@ -700,7 +701,8 @@ class Simulation:
                          initialization_array=None,
                          output_parameters=None,
                          scheme=None,
-                         complete_check=False):
+                         complete_check=False,
+                         context=None):
         r"""Sanity Check.
 
         Check integrity of given parameters and their interaction.
@@ -720,7 +722,12 @@ class Simulation:
         complete_check : :obj:`bool`, optional
             If True, then all parameters must be assigned (not None).
             If False, then unassigned parameters are ignored.
+        context : :class:`Simulation`, optional
+            The Simulation instance, allows checking related attributes.
         """
+        if context is not None:
+            assert isinstance(context, Simulation)
+
         # For complete check, assert that all parameters are assigned
         assert isinstance(complete_check, bool)
         if complete_check is True:
@@ -779,18 +786,8 @@ class Simulation:
 
         if species_velocity_grid is not None:
             assert isinstance(species_velocity_grid, bp.SVGrid)
-            species_velocity_grid.check_integrity(complete_check)
-
-        if position_grid is not None \
-                and species_velocity_grid is not None:
-            if position_grid.dim is not None \
-                    and species_velocity_grid.dim is not None:
-                assert species_velocity_grid.dim >= position_grid.dim
-
-        if species is not None \
-                and species_velocity_grid is not None:
-            if species_velocity_grid.n_grids is not None:
-                assert species_velocity_grid.n_grids == species.size
+            species_velocity_grid.check_integrity(complete_check,
+                                                  context)
 
         if initialization_rules is not None:
             assert isinstance(initialization_rules, np.ndarray)

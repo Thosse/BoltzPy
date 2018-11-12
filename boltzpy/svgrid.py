@@ -485,7 +485,9 @@ class SVGrid:
     #           Verification            #
     #####################################
     # Todo compare with sim.s.masses -> additional asserts
-    def check_integrity(self, complete_check=True):
+    def check_integrity(self,
+                        complete_check=True,
+                        context=None):
         """Sanity Check.
 
         Assert all conditions in :meth:`check_parameters`
@@ -495,6 +497,8 @@ class SVGrid:
         complete_check : :obj:`bool`, optional
             If True, then all attributes must be assigned (not None).
             If False, then unassigned attributes are ignored.
+        context : :class:`Simulation`, optional
+            The Simulation, which this instance belongs to.
         """
         self.check_parameters(form=self.form,
                               dimension=self.dim,
@@ -505,7 +509,8 @@ class SVGrid:
                               vgrid_arr=self.vGrids,
                               idx_multigrid=self.iMG,
                               velocity_offset=self.offset,
-                              complete_check=complete_check)
+                              complete_check=complete_check,
+                              context=context)
         # Additional Conditions on instance:
         # All Velocity Grids must have equal boundaries
         # Todo there should be a better solution for this
@@ -526,7 +531,8 @@ class SVGrid:
                          vgrid_arr=None,
                          idx_multigrid=None,
                          velocity_offset=None,
-                         complete_check=False):
+                         complete_check=False,
+                         context=None):
         """Sanity Check.
         Checks integrity of given parameters and their interactions.
 
@@ -544,10 +550,17 @@ class SVGrid:
         complete_check : :obj:`bool`, optional
             If True, then all parameters must be set (not None).
             If False, then unassigned parameters are ignored.
+        context : :class:`Simulation`, optional
+            The Simulation, which this instance belongs to.
         """
+        if context is not None:
+            assert isinstance(context, bp.Simulation)
+
         assert isinstance(complete_check, bool)
         if complete_check is True:
-            assert all([param is not None for param in locals().values()])
+            assert all(param_val is not None
+                       for (param_key, param_val) in locals().items()
+                       if param_key != "context")
 
         # check all parameters, if set
         if form is not None:
@@ -557,6 +570,8 @@ class SVGrid:
         if dimension is not None:
             assert isinstance(dimension, int)
             assert dimension in bp_c.SUPP_GRID_DIMENSIONS
+            if context is not None and context.p.dim is not None:
+                assert dimension >= context.p.dim
 
         if max_velocity is not None:
             assert isinstance(max_velocity, float)
@@ -571,8 +586,11 @@ class SVGrid:
             assert masses.dtype == int
             assert masses.ndim == 1
             assert all(m >= 1 for m in masses)
-            # Todo Compare with sim.s
+            if context is not None:
+                assert masses.size == context.s.size
+                assert all(masses == context.s.mass)
 
+        # Todo assert one is None, IFF all are None
         # number of specimen, simplifies upcoming checks
         if idx_helper is not None:
             assert isinstance(idx_helper, np.ndarray)
@@ -589,6 +607,8 @@ class SVGrid:
             for grid in vgrid_arr:
                 grid.check_integrity()
             assert vgrid_arr.ndim == 1
+            if context is not None:
+                assert vgrid_arr.size == context.s.size
             if vgrid_arr.size > 0:
                 if dimension is None:
                     dimension = vgrid_arr[0].dim
