@@ -1,4 +1,3 @@
-
 import h5py
 import numpy as np
 
@@ -24,6 +23,7 @@ class Species:
     specimen_arr : :obj:`~numpy.array` [:class:`Specimen`]
         Array of all simulated :class:`Specimen`.
     """
+
     def __init__(self):
         self.specimen_arr = np.empty(shape=(0,),
                                      dtype=bp.Specimen)
@@ -104,6 +104,16 @@ class Species:
             collision_rates[s_idx, :] = s.collision_rate[:]
         return collision_rates
 
+    @property
+    def is_configured(self):
+        """Check if all necessary attributes of the instance are set.
+
+        Returns
+        -------
+        :obj:`bool`
+        """
+        return self.size >= 1
+
     #####################################
     #           Configuration           #
     #####################################
@@ -171,9 +181,9 @@ class Species:
         color : :obj:`str`, optional
         """
         bp.Specimen.check_parameters(name=name,
-                                        mass=mass,
-                                        collision_rate=collision_rate,
-                                        color=color)
+                                     mass=mass,
+                                     collision_rate=collision_rate,
+                                     color=color)
         if name is None:
             name = 'Specimen_' + str(self.size)
         if mass is None:
@@ -184,9 +194,9 @@ class Species:
             color = next(iter(self.colors_unused), 'black')
 
         s_new = bp.Specimen(name=name,
-                               mass=mass,
-                               color=color,
-                               collision_rate=collision_rate)
+                            mass=mass,
+                            color=color,
+                            collision_rate=collision_rate)
         # adjust collision rates of already existing species
         for (s_idx, s) in enumerate(self.specimen_arr):
             assert isinstance(s, bp.Specimen)
@@ -219,9 +229,9 @@ class Species:
         """
         (s_idx, s) = (self.index(item), self[item])
         bp.Specimen.check_parameters(name=new_name,
-                                        mass=new_mass,
-                                        collision_rate=new_collision_rate,
-                                        color=new_color)
+                                     mass=new_mass,
+                                     collision_rate=new_collision_rate,
+                                     color=new_color)
         if new_name is not None:
             s.name = new_name
         if new_color is not None:
@@ -289,7 +299,7 @@ class Species:
             for i in range(names.size):
                 self.add(name=names[i],
                          mass=int(masses[i]),
-                         collision_rate=col_rate[i, 0:i+1],
+                         collision_rate=col_rate[i, 0:i + 1],
                          color=colors[i])
         except KeyError:
             pass

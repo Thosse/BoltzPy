@@ -166,6 +166,34 @@ class Grid:
             assert self.iG is None
             return None
 
+    @property
+    def is_configured(self):
+        """Check if all necessary attributes of the instance are set.
+
+        Returns
+        -------
+        :obj:`bool`
+        """
+        necessary_params = [self.form,
+                            self.dim,
+                            self.n,
+                            self.d,
+                            self.multi]
+        if any([val is None for val in necessary_params]):
+            return False
+        else:
+            return True
+
+    @property
+    def is_set_up(self):
+        """Check if the instance is completely set up.
+
+        Returns
+        -------
+        :obj:`bool`
+        """
+        return self.is_configured and self.iG is not None
+
     #####################################
     #           Configuration           #
     #####################################
@@ -179,10 +207,10 @@ class Grid:
             I set to :obj:`True` (non-default),
             the newly created Grid is :meth:`centralized <centralize>`.
         """
-        necessary_params = [self.form, self.dim, self.n, self.d, self.multi]
-        if any([val is None for val in necessary_params]):
+        if not self.is_configured:
             return
-        self.check_integrity(False)
+        else:
+            self.check_integrity(False)
 
         if self.form == 'rectangular':
             self._construct_rectangular_grid()

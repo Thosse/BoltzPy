@@ -44,6 +44,16 @@ class Scheme:
             del self.dictionary[_key]
         return
 
+    @property
+    def is_configured(self):
+        """Check if all necessary attributes of the instance are set.
+
+        Returns
+        -------
+        :obj:`bool`
+        """
+        return all(value is not None for(key, value) in self.items())
+
     def keys(self):
         """Returns a list of all scheme parameters.
 

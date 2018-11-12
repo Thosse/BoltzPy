@@ -84,12 +84,12 @@ class Simulation:
         :class:`~boltzpy.Grid` point
         to its :class:`initialization rule <Rule>`.
         Contains the indices of the respective :class:`rules <Rule>`
+    scheme : :class:`Scheme`
+        Contains all computation scheme parameters.
     output_parameters : :obj:`~numpy.array` [:obj:`str`]
         Output/Results of the Simulation.
         Each element must be in :const:`~boltzpy.constants.SUPP_OUTPUT`.
         Must be a 2D array.
-    scheme : :class:`Scheme`
-        Contains all computation scheme parameters.
     """
 
     def __init__(self, file_address=None):
@@ -134,7 +134,7 @@ class Simulation:
         try:
             key = "Velocity_Grids"
             self.sv = bp.SVGrid.load(file[key])
-            self.sv.setup(self.s)
+            self.sv.setup()
         except KeyError:
             self.sv = bp.SVGrid()
 
@@ -216,6 +216,36 @@ class Simulation:
         Total number of :class:`initialization rules <Rule>` set up so far.
         """
         return self.rule_arr.size
+
+    @property
+    def is_configured(self):
+        """Check if all necessary attributes of the instance are set.
+
+        Returns
+        -------
+        :obj:`bool`
+        """
+        # Todo add output_parameters
+        # Todo add initial_distribution / rule_arr
+        return (self.s.is_configured
+                and self.t.is_configured
+                and self.p.is_configured
+                and self.sv.is_configured
+                and self.scheme.is_configured)
+
+    @property
+    def is_set_up(self):
+        """Check if the instance is completely set up and ready to call
+        :meth:`run_computation`.
+
+        Returns
+        -------
+        :obj:`bool`
+        """
+        # Todo add initial_distribution
+        return (self.t.is_set_up
+                and self.p.is_set_up
+                and self.sv.is_set_up)
 
     #############################
     #       Configuration       #
@@ -367,8 +397,8 @@ class Simulation:
                             grid_dimension=grid_dimension,
                             min_points_per_axis=min_points_per_axis,
                             max_velocity=max_velocity,
-                            velocity_offset=velocity_offset,
-                            species_array=self.s)
+                            masses=self.s.mass,
+                            velocity_offset=velocity_offset)
         return
 
     def add_rule(self,
