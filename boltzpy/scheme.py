@@ -1,4 +1,4 @@
-
+import numpy as np
 import h5py
 
 import boltzpy.constants as bp_c
@@ -59,18 +59,18 @@ class Scheme:
 
         Returns
         -------
-        :obj:`list` [:obj:`str`]
+        :obj:`dict_keys <dict.keys>` [:obj:`str`]
         """
-        return list(self.dictionary.keys())
+        return self.dictionary.keys()
 
     def items(self):
         """Returns a list of all scheme parameters and their value.
 
         Returns
         -------
-        :obj:`list` [:obj:`tuple` [:obj:`str`, :obj:`str`]]
+        :obj:`dict_items <dict.items>`
         """
-        return list(self.dictionary.items())
+        return self.dictionary.items()
 
     def _required_keys(self):
         required_keys = ["Approach"]
@@ -108,8 +108,14 @@ class Scheme:
         assert isinstance(hdf5_group, h5py.Group)
 
         self = Scheme()
-        for key in hdf5_group.attrs:
-            self.dictionary[key] = hdf5_group.attrs[key]
+        for (key, value) in hdf5_group.attrs.items():
+            if type(value) is str:
+                self.dictionary[key] = hdf5_group.attrs[key]
+            elif type(value) is np.int64:
+                self.dictionary[key] = int(hdf5_group.attrs[key])
+            else:
+                msg = 'Unsupported type read: {t}'.format(t=type(value))
+                raise NotImplementedError(msg)
         for key in self._required_keys():
             if key not in self.keys():
                 self.dictionary[key] = None
@@ -152,6 +158,9 @@ class Scheme:
         assert set(self.keys()) == self._required_keys()
         for (key, value) in self.items():
             assert isinstance(key, str)
+            assert (value is None
+                    or isinstance(value, str)
+                    or isinstance(value, int))
             assert value is None or value in bp_c.SUPP_SCHEME_VALUES[key]
         if complete_check:
             for (key, value) in self.items():
@@ -184,6 +193,6 @@ class Scheme:
     def __eq__(self, other):
         if not isinstance(other, Scheme):
             return False
-        if self.items() != other.items():
+        if self.dictionary != other.dictionary:
             return False
         return True

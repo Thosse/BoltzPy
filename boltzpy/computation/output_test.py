@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 
 import boltzpy.constants as bp_c
-import boltzpy.simulation as bp
+import boltzpy as bp
 
 
 @pytest.mark.parametrize("test_case", bp_c.TEST_CASES)
