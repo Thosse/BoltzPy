@@ -1,7 +1,8 @@
-import boltzpy.constants as b_const
 
 import numpy as np
 import h5py
+
+import boltzpy.constants as bp_c
 
 
 # Todo What exactly is rho? drift and temperature? divided by rho?
@@ -73,7 +74,7 @@ class Rule:
                               name=name,
                               color=color)
         if category is not None:
-            self.i_cat = b_const.SUPP_GRID_POINT_CATEGORIES.index(category)
+            self.i_cat = bp_c.SUPP_GRID_POINT_CATEGORIES.index(category)
         else:
             self.i_cat = None
 
@@ -117,7 +118,7 @@ class Rule:
         # read attributes from file
         try:
             category = hdf5_group["Category"].value
-            category_idx = b_const.SUPP_GRID_POINT_CATEGORIES.index(category)
+            category_idx = bp_c.SUPP_GRID_POINT_CATEGORIES.index(category)
             self.i_cat = int(category_idx)
         except KeyError:
             self.i_cat = None
@@ -162,7 +163,7 @@ class Rule:
 
         # write all set attributes to file
         if self.i_cat is not None:
-            category = b_const.SUPP_GRID_POINT_CATEGORIES[self.i_cat]
+            category = bp_c.SUPP_GRID_POINT_CATEGORIES[self.i_cat]
             hdf5_group["Category"] = category
         if self.rho is not None:
             hdf5_group["Mass"] = self.rho
@@ -191,7 +192,7 @@ class Rule:
             If False, then unassigned attributes are ignored.
         """
         if self.i_cat is not None:
-            category = b_const.SUPP_GRID_POINT_CATEGORIES[self.i_cat]
+            category = bp_c.SUPP_GRID_POINT_CATEGORIES[self.i_cat]
         else:
             category = None
         self.check_parameters(category=category,
@@ -235,28 +236,28 @@ class Rule:
             assert all([param is not None for param in locals().values()])
 
         # Set up basic constants
-        n_categories = len(b_const.SUPP_GRID_POINT_CATEGORIES)
+        n_categories = len(bp_c.SUPP_GRID_POINT_CATEGORIES)
         n_species = None
 
         # check all parameters, if set
         if category is not None:
             assert isinstance(category, str)
-            assert category in b_const.SUPP_GRID_POINT_CATEGORIES
+            assert category in bp_c.SUPP_GRID_POINT_CATEGORIES
             if category_idx is None:
-                category_list = b_const.SUPP_GRID_POINT_CATEGORIES
+                category_list = bp_c.SUPP_GRID_POINT_CATEGORIES
                 category_idx = category_list.index(category)
             else:
-                category_list = b_const.SUPP_GRID_POINT_CATEGORIES
+                category_list = bp_c.SUPP_GRID_POINT_CATEGORIES
                 assert category_idx == category_list.index(category)
 
         if category_idx is not None:
             assert isinstance(category_idx, int)
             assert category_idx in range(n_categories)
             if category is None:
-                category_list = b_const.SUPP_GRID_POINT_CATEGORIES
+                category_list = bp_c.SUPP_GRID_POINT_CATEGORIES
                 category = category_list[category_idx]
             else:
-                category_list = b_const.SUPP_GRID_POINT_CATEGORIES
+                category_list = bp_c.SUPP_GRID_POINT_CATEGORIES
                 assert category == category_list[category_idx]
 
         if rho is not None:
@@ -291,7 +292,7 @@ class Rule:
 
         if color is not None:
             assert isinstance(color, str)
-            assert color in b_const.SUPP_COLORS
+            assert color in bp_c.SUPP_COLORS
         return
 
     def __str__(self, idx=None):
@@ -301,7 +302,7 @@ class Rule:
             description += 'Rule = {}\n'.format(self.name)
         else:
             description += 'Rule_{} = {}\n'.format(idx, self.name)
-        category = b_const.SUPP_GRID_POINT_CATEGORIES[self.i_cat]
+        category = bp_c.SUPP_GRID_POINT_CATEGORIES[self.i_cat]
         description += 'Category = ' + category + '\n'
         description += 'Rho:\n\t'
         description += self.rho.__str__() + '\n'

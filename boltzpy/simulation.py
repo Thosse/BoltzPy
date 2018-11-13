@@ -1,18 +1,12 @@
-import boltzpy.constants as b_const
-import boltzpy.species as b_spc
-import boltzpy.specimen as b_spm
-import boltzpy.grid as b_grd
-import boltzpy.svgrid as b_svg
-import boltzpy.rule as b_rul
-import boltzpy.scheme as b_scm
-import boltzpy.calculation as b_clc
-import boltzpy.animation as b_ani
-
-import boltzpy.helpers.file_addresses as h_file
-
-import numpy as np
 import os
 import h5py
+import numpy as np
+
+import boltzpy.helpers.file_addresses as bp_h
+import boltzpy.animation as bp_ani
+import boltzpy.computation.compute as bp_cp
+import boltzpy.constants as bp_c
+import boltzpy as bp
 
 
 class Simulation:
@@ -90,13 +84,14 @@ class Simulation:
         :class:`~boltzpy.Grid` point
         to its :class:`initialization rule <Rule>`.
         Contains the indices of the respective :class:`rules <Rule>`
+    scheme : :class:`Scheme`
+        Contains all computation scheme parameters.
     output_parameters : :obj:`~numpy.array` [:obj:`str`]
         Output/Results of the Simulation.
         Each element must be in :const:`~boltzpy.constants.SUPP_OUTPUT`.
         Must be a 2D array.
-    scheme : :class:`Scheme`
-        Contains all computation scheme parameters.
     """
+
     def __init__(self, file_address=None):
         # set file address (using a setter method)
         [self._file_directory, self._file_root] = ['', '']
@@ -116,32 +111,39 @@ class Simulation:
         # load Species
         try:
             key = "Species"
-            self.s = b_spc.Species.load(file[key])
+            self.s = bp.Species.load(file[key])
         except KeyError:
-            self.s = b_spc.Species()
+            self.s = bp.Species()
 
         # load Time Grid
         try:
             key = "Time_Grid"
-            self.t = b_grd.Grid.load(file[key])
+            self.t = bp.Grid.load(file[key])
         except KeyError:
-            self.t = b_grd.Grid()
+            self.t = bp.Grid()
         self.t.dim = 1
 
         # load Position Grid
         try:
             key = "Position_Grid"
-            self.p = b_grd.Grid().load(file[key])
+            self.p = bp.Grid().load(file[key])
         except KeyError:
-            self.p = b_grd.Grid()
+            self.p = bp.Grid()
 
         # load Velocity Grids
         try:
             key = "Velocity_Grids"
-            self.sv = b_svg.SVGrid.load(file[key])
-            self.sv.setup(self.s)
+            self.sv = bp.SVGrid.load(file[key])
+            self.sv.setup()
         except KeyError:
-            self.sv = b_svg.SVGrid()
+            self.sv = bp.SVGrid()
+
+        # load Collisions, if any
+        try:
+            key = "Collisions"
+            self.coll = bp.Collisions.load(file[key])
+        except KeyError:
+            self.coll = bp.Collisions()
 
         #################################
         #   Initialization Attributes   #
@@ -152,13 +154,13 @@ class Simulation:
             # Number of Rules is stored in group attributes
             n_rules = int(hdf5_group.attrs["Number of Rules"])
             # store rules in here iteratively
-            self.rule_arr = np.empty(shape=(n_rules,), dtype=b_rul.Rule)
+            self.rule_arr = np.empty(shape=(n_rules,), dtype=bp.Rule)
             # iteratively read the rules
             for rule_idx in range(n_rules):
                 key = "Rule_" + str(rule_idx)
-                self.rule_arr[rule_idx] = b_rul.Rule.load(hdf5_group[key])
+                self.rule_arr[rule_idx] = bp.Rule.load(hdf5_group[key])
         except KeyError:
-            self.rule_arr = np.empty(shape=(0,), dtype=b_rul.Rule)
+            self.rule_arr = np.empty(shape=(0,), dtype=bp.Rule)
 
         # load initialization array
         try:
@@ -175,9 +177,9 @@ class Simulation:
         ##############################
         try:
             key = "Computation"
-            self.scheme = b_scm.Scheme.load(file[key])
+            self.scheme = bp.Scheme.load(file[key])
         except KeyError:
-            self.scheme = b_scm.Scheme()
+            self.scheme = bp.Scheme()
         try:
             key = "Computation/Output_Parameters"
             shape = file[key].attrs["shape"]
@@ -204,7 +206,7 @@ class Simulation:
     def file_address(self, new_file_address):
         # separate file directory and file root, using a helper function
         # This standardizes the naming scheme
-        h_separate = h_file.split_address
+        h_separate = bp_h.split_address
         [new_file_directory, new_file_root] = h_separate(new_file_address)
         new_file_address = new_file_directory + new_file_root
         # Sanity check on (standardized) file address
@@ -221,6 +223,37 @@ class Simulation:
         Total number of :class:`initialization rules <Rule>` set up so far.
         """
         return self.rule_arr.size
+
+    @property
+    def is_configured(self):
+        """Check if all necessary attributes of the instance are set.
+
+        Returns
+        -------
+        :obj:`bool`
+        """
+        # Todo add output_parameters
+        # Todo add initial_distribution / rule_arr
+        return (self.s.is_configured
+                and self.t.is_configured
+                and self.p.is_configured
+                and self.sv.is_configured
+                and self.scheme.is_configured)
+
+    @property
+    def is_set_up(self):
+        """Check if the instance is completely set up and ready to call
+        :meth:`run_computation`.
+
+        Returns
+        -------
+        :obj:`bool`
+        """
+        # Todo add initial_distribution
+        return (self.t.is_set_up
+                and self.p.is_set_up
+                and self.sv.is_set_up
+                and self.coll.is_set_up)
 
     #############################
     #       Configuration       #
@@ -313,11 +346,11 @@ class Simulation:
         calculations_per_time_step : :obj:`int`
         """
         step_size = max_time / (number_time_steps - 1)
-        self.t = b_grd.Grid(grid_form='rectangular',
-                            grid_dimension=1,
-                            grid_shape=np.array([number_time_steps]),
-                            grid_spacing=step_size,
-                            grid_multiplicator=calculations_per_time_step)
+        self.t = bp.Grid(grid_form='rectangular',
+                         grid_dimension=1,
+                         grid_shape=np.array([number_time_steps]),
+                         grid_spacing=step_size,
+                         grid_multiplicator=calculations_per_time_step)
         return
 
     def setup_position_grid(self,
@@ -336,10 +369,10 @@ class Simulation:
         if isinstance(grid_shape, list):
             assert all([isinstance(item, int) for item in grid_shape])
             grid_shape = np.array(grid_shape, dtype=int)
-        self.p = b_grd.Grid(grid_form='rectangular',
-                            grid_dimension=grid_dimension,
-                            grid_shape=grid_shape,
-                            grid_spacing=grid_spacing)
+        self.p = bp.Grid(grid_form='rectangular',
+                         grid_dimension=grid_dimension,
+                         grid_shape=grid_shape,
+                         grid_spacing=grid_spacing)
         # Update shape of initialization_array
         self.init_arr = np.full(shape=self.p.size,
                                 fill_value=-1,
@@ -368,12 +401,12 @@ class Simulation:
         grid_form : :obj:`str`, optional
         velocity_offset : :obj:`~numpy.array` [:obj:`float`], optional
         """
-        self.sv = b_svg.SVGrid(grid_form=grid_form,
-                               grid_dimension=grid_dimension,
-                               min_points_per_axis=min_points_per_axis,
-                               max_velocity=max_velocity,
-                               velocity_offset=velocity_offset,
-                               species_array=self.s)
+        self.sv = bp.SVGrid(grid_form=grid_form,
+                            grid_dimension=grid_dimension,
+                            min_points_per_axis=min_points_per_axis,
+                            max_velocity=max_velocity,
+                            masses=self.s.mass,
+                            velocity_offset=velocity_offset)
         return
 
     def add_rule(self,
@@ -399,16 +432,16 @@ class Simulation:
         color : str, optional
             Displayed in the GUI to visualize the initialization.
         """
-        b_rul.Rule.check_parameters(category=category,
-                                    rho=rho,
-                                    drift=drift,
-                                    temp=temp)
-        new_rule = b_rul.Rule(category,
-                              rho,
-                              drift,
-                              temp,
-                              name,
-                              color)
+        bp.Rule.check_parameters(category=category,
+                                 rho=rho,
+                                 drift=drift,
+                                 temp=temp)
+        new_rule = bp.Rule(category,
+                           rho,
+                           drift,
+                           temp,
+                           name,
+                           color)
         self.rule_arr = np.append(self.rule_arr, [new_rule])
         self.check_parameters(species=self.s,
                               species_velocity_grid=self.sv,
@@ -463,7 +496,7 @@ class Simulation:
         # else (KeyError, AssertionError):
 
         # setup destination to write results
-        b_clc.compute(self.file_address, hdf5_group_name)
+        bp_cp.compute(self.file_address, hdf5_group_name)
         return
 
     # Todo rework animation module
@@ -492,11 +525,11 @@ class Simulation:
         else:
             assert isinstance(specimen_arr, np.ndarray)
             assert specimen_arr.ndim == 1
-            assert all([isinstance(specimen, b_spm.Specimen)
+            assert all([isinstance(specimen, bp.Specimen)
                         for specimen in specimen_arr])
             assert all([specimen.name in self.s.names
                         for specimen in self.s])
-        animation = b_ani.Animation(self)
+        animation = bp_ani.Animation(self)
         animation.animate(output_arr, specimen_arr)
         return
 
@@ -537,18 +570,18 @@ class Simulation:
         else:
             assert isinstance(specimen_arr, np.ndarray)
             assert specimen_arr.ndim == 1
-            assert all([isinstance(specimen, b_spm.Specimen)
+            assert all([isinstance(specimen, bp.Specimen)
                         for specimen in specimen_arr])
             assert all([specimen.name in self.s.names
                         for specimen in self.s])
         if snapshot_name is None:
             snapshot_name = (self.file_address + '_t={}.eps'.format(time_step))
         else:
-            (file_dir,) = h_file.split_address(snapshot_name)
+            (file_dir,) = bp_h.split_address(snapshot_name)
             assert os.path.isdir(file_dir)
             assert os.access(file_dir, os.W_OK)
 
-        animation = b_ani.Animation(self)
+        animation = bp_ani.Animation(self)
         animation.snapshot(time_step,
                            output_arr,
                            specimen_arr,
@@ -566,7 +599,7 @@ class Simulation:
         If a *file_address* is given, then this method works as a 'save as'.
         In this case the :attr:`file_address` of the instance is changed
         and the newly named instance is saved to a new .hdf5 file.
-        
+
         Parameters
         ----------
         file_address : :obj:`str`, optional
@@ -609,6 +642,11 @@ class Simulation:
         key = "Velocity_Grids"
         file.create_group(key)
         self.sv.save(file[key])
+
+        # Save Collisions
+        key = "Collisions"
+        file.create_group(key)
+        self.coll.save(file[key])
 
         # Save initialization rules
         file.create_group("Initialization")
@@ -662,7 +700,8 @@ class Simulation:
                               initialization_array=self.init_arr,
                               output_parameters=self.output_parameters,
                               scheme=self.scheme,
-                              complete_check=complete_check)
+                              complete_check=complete_check,
+                              context=self)
         return
 
     @staticmethod
@@ -675,7 +714,8 @@ class Simulation:
                          initialization_array=None,
                          output_parameters=None,
                          scheme=None,
-                         complete_check=False):
+                         complete_check=False,
+                         context=None):
         r"""Sanity Check.
 
         Check integrity of given parameters and their interaction.
@@ -695,7 +735,12 @@ class Simulation:
         complete_check : :obj:`bool`, optional
             If True, then all parameters must be assigned (not None).
             If False, then unassigned parameters are ignored.
+        context : :class:`Simulation`, optional
+            The Simulation instance, allows checking related attributes.
         """
+        if context is not None:
+            assert isinstance(context, Simulation)
+
         # For complete check, assert that all parameters are assigned
         assert isinstance(complete_check, bool)
         if complete_check is True:
@@ -718,7 +763,7 @@ class Simulation:
             assert os.access(file_directory, os.W_OK), \
                 "No write access to directory {}".format(file_directory)
             # Assert Validity of characters
-            for char in b_const.INVALID_CHARACTERS:
+            for char in bp_c.INVALID_CHARACTERS:
                 assert char not in file_root, \
                     "The provided file root is invalid:\n" \
                     "It contains invalid characters: '{}'" \
@@ -735,16 +780,16 @@ class Simulation:
                 assert hdf5_file.attrs["class"] == "Simulation"
 
         if species is not None:
-            assert isinstance(species, b_spc.Species)
+            assert isinstance(species, bp.Species)
             species.check_integrity()
 
         if time_grid is not None:
-            assert isinstance(time_grid, b_grd.Grid)
+            assert isinstance(time_grid, bp.Grid)
             time_grid.check_integrity(complete_check)
             assert time_grid.dim == 1
 
         if position_grid is not None:
-            assert isinstance(position_grid, b_grd.Grid)
+            assert isinstance(position_grid, bp.Grid)
             position_grid.check_integrity(complete_check)
             # Todo Remove this, when implementing 2D Transport
             if position_grid.dim is not None \
@@ -753,26 +798,16 @@ class Simulation:
                 raise NotImplementedError(msg)
 
         if species_velocity_grid is not None:
-            assert isinstance(species_velocity_grid, b_svg.SVGrid)
-            species_velocity_grid.check_integrity(complete_check)
-
-        if position_grid is not None \
-                and species_velocity_grid is not None:
-            if position_grid.dim is not None \
-                    and species_velocity_grid.dim is not None:
-                assert species_velocity_grid.dim >= position_grid.dim
-
-        if species is not None \
-                and species_velocity_grid is not None:
-            if species_velocity_grid.n_grids is not None:
-                assert species_velocity_grid.n_grids == species.size
+            assert isinstance(species_velocity_grid, bp.SVGrid)
+            species_velocity_grid.check_integrity(complete_check,
+                                                  context)
 
         if initialization_rules is not None:
             assert isinstance(initialization_rules, np.ndarray)
             assert initialization_rules.ndim == 1
             assert initialization_rules.dtype == 'object'
             for rule in initialization_rules:
-                assert isinstance(rule, b_rul.Rule)
+                assert isinstance(rule, bp.Rule)
                 rule.check_integrity(complete_check)
                 if rule.rho is not None and species is not None:
                     assert rule.rho.shape == (species.size,)
@@ -807,7 +842,7 @@ class Simulation:
         if output_parameters is not None:
             assert isinstance(output_parameters, np.ndarray)
             assert len(output_parameters.shape) is 2
-            assert all([mom in b_const.SUPP_OUTPUT
+            assert all([mom in bp_c.SUPP_OUTPUT
                         for mom in output_parameters.flatten()])
 
         if scheme is not None:

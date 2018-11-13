@@ -1,11 +1,9 @@
-
-import boltzpy.constants as b_const
-import boltzpy.grid as b_grd
-import boltzpy.species as b_spc
-
 import numpy as np
 import h5py
 import math
+
+import boltzpy as bp
+import boltzpy.constants as bp_c
 
 
 # Todo move offset out of SVGrid? extra sim.attribute?
@@ -32,6 +30,8 @@ class SVGrid:
     dim : :obj:`int`
         Dimensionality of all Velocity :class:`Grids <boltzpy.Grid>`.
         Must be in :const:`~boltzpy.constants.SUPP_GRID_DIMENSIONS`.
+    masses :obj:`~numpy.array` [:obj:`int`] :
+        Array of masses of the simulated :class:`Specimen`.
     vGrids : :obj:`~numpy.array` [:class:`~boltzpy.Grid`]
         Array of all Velocity :class:`Grids <boltzpy.Grid>`.
         Each Velocity Grids attribute
@@ -56,22 +56,25 @@ class SVGrid:
         is :math:`offset + d[S] \cdot SVG[i]`.
         Array of shape=(dim,).
     """
+
     def __init__(self,
                  grid_form=None,
                  grid_dimension=None,
                  min_points_per_axis=None,
                  max_velocity=None,
-                 velocity_offset=None,
-                 species_array=None):
+                 masses=None,
+                 velocity_offset=None):
         self.check_parameters(form=grid_form,
                               dimension=grid_dimension,
                               max_velocity=max_velocity,
                               min_points_per_axis=min_points_per_axis,
+                              masses=masses,
                               velocity_offset=velocity_offset)
         self.form = grid_form
         self.dim = grid_dimension
         self._MAX_V = max_velocity
         self._MIN_N = min_points_per_axis
+        self.masses = masses
         if velocity_offset is not None:
             self.offset = np.array(velocity_offset)
         elif grid_dimension is not None:
@@ -84,8 +87,7 @@ class SVGrid:
         self._index = None
         self.vGrids = None
         self.iMG = None
-
-        self.setup(species_array)
+        self.setup()
         return
 
     # TODO figure out whats useful
@@ -152,10 +154,42 @@ class SVGrid:
         else:
             return self.offset + self.vGrids[0].boundaries
 
+    @property
+    def is_configured(self):
+        """Check if all necessary attributes of the instance are set.
+
+        Returns
+        -------
+        :obj:`bool`
+        """
+        necessary_params = [self.form,
+                            self.dim,
+                            self._MAX_V,
+                            self._MIN_N,
+                            self.masses]
+        if any([val is None for val in necessary_params]):
+            return False
+        else:
+            return True
+
+    @property
+    def is_set_up(self):
+        """Check if the instance is completely set up.
+
+        Returns
+        -------
+        :obj:`bool`
+        """
+        ret_val = (self.is_configured
+                   and self._index is not None
+                   and self.iMG is not None
+                   and self.vGrids is not None)
+        return ret_val
+
     #####################################
     #           Configuration           #
     #####################################
-    def setup(self, species_array):
+    def setup(self):
         r"""Construct the
         :class:`Velocity Grids <boltzpy.Grid>` :attr:`vGrids`
         for the given
@@ -220,50 +254,38 @@ class SVGrid:
             grows cubic in its :attr:`~boltzpy.Specimen.mass`.
 
               :math:`size \sim n^{dim} \sim mass^{dim}`.
-
-        Parameters
-        ----------
-        species_array : :obj:`~boltzpy.Species`
         """
         # only run setup, if all necessary parameters are set
-        necessary_params = [self.form,
-                            self.dim,
-                            self._MAX_V,
-                            self._MIN_N,
-                            species_array]
-        if any([val is None for val in necessary_params]):
+        if not self.is_configured:
             return
-
-        # sanity check
-        self.check_integrity(False)
-        assert type(species_array) is b_spc.Species
-        species_array.check_integrity()
+        else:
+            # sanity check
+            self.check_integrity(False)
 
         # Construct self.vGrids
-        mass_array = species_array.mass
-        min_mass = np.amin(mass_array)
+        min_mass = np.amin(self.masses)
         # Minimum number of segments (see docstring)
         min_segments = self._MIN_N - 1
         # Number of complete segments (see docstring)
         n_complete_segments = math.ceil(min_segments / min_mass)
         number_of_grid_points = [(n_complete_segments * mass) + 1
-                                 for mass in mass_array]
+                                 for mass in self.masses]
         grid_shapes = [[n] * self.dim for n in number_of_grid_points]
         # spacing of the velocity grid for each specimen
         # Todo replace, allow Grid.init with number of points (array)
         spacings = [2 * self._MAX_V / (n_i - 1)
                     for n_i in number_of_grid_points]
         # Contains the velocity Grid of each specimen
-        vGrids = [b_grd.Grid(grid_form=self.form,
-                             grid_dimension=self.dim,
-                             grid_shape=np.array(grid_shapes[i]),
-                             grid_spacing=spacings[i],
-                             grid_is_centered=True)
-                  for i in range(species_array.size)]
+        vGrids = [bp.Grid(grid_form=self.form,
+                          grid_dimension=self.dim,
+                          grid_shape=np.array(grid_shapes[i]),
+                          grid_spacing=spacings[i],
+                          grid_is_centered=True)
+                  for i in range(self.masses.size)]
         self.vGrids = np.array(vGrids)
 
         # construct self._index
-        self._index = np.zeros(species_array.size + 1,
+        self._index = np.zeros(self.masses.size + 1,
                                dtype=int)
         for (i_G, vGrid) in enumerate(vGrids):
             self._index[i_G + 1] = self._index[i_G] + vGrid.size
@@ -301,7 +323,7 @@ class SVGrid:
         -------
         :obj:`~numpy.array` [:obj:`int`]
         """
-        return self._index[specimen_index: specimen_index+2]
+        return self._index[specimen_index: specimen_index + 2]
 
     # Todo indexing needs to be checked/edited for new SVGrid class
     # Todo replace by index in respective vGrid?
@@ -333,7 +355,7 @@ class SVGrid:
         # Todo Throw exception if not a grid entry (instead of None)
         i_flat = 0
         # get vector-index, by reversing Grid.centralize() - method
-        i_vec = np.array((grid_entry+self.vGrids[specimen_index].n - 1) // 2,
+        i_vec = np.array((grid_entry + self.vGrids[specimen_index].n - 1) // 2,
                          dtype=int)
         for _dim in range(self.dim):
             n_loc = self.vGrids[specimen_index].n[_dim]
@@ -366,7 +388,7 @@ class SVGrid:
             :attr:`SVGrid.iMG`.
         """
         for i in range(self._index.size):
-            if self._index[i] <= velocity_idx < self._index[i+1]:
+            if self._index[i] <= velocity_idx < self._index[i + 1]:
                 return i
         msg = 'The given index ({}) points out of the boundaries of ' \
               'iMG, the concatenated Velocity Grid.'.format(velocity_idx)
@@ -415,6 +437,11 @@ class SVGrid:
         except KeyError:
             self._MIN_N = None
         try:
+            key = "Masses"
+            self.masses = hdf5_group[key].value
+        except KeyError:
+            self.masses = None
+        try:
             key = "Velocity Offset"
             self.offset = hdf5_group[key].value
         except KeyError:
@@ -448,6 +475,8 @@ class SVGrid:
             hdf5_group["Maximum Velocity"] = self._MAX_V
         if self._MIN_N is not None:
             hdf5_group["Minimum Number of Grid Points"] = self._MIN_N
+        if self.masses is not None:
+            hdf5_group["Masses"] = self.masses
         if self.offset is not None:
             hdf5_group["Velocity Offset"] = self.offset
         return
@@ -455,7 +484,10 @@ class SVGrid:
     #####################################
     #           Verification            #
     #####################################
-    def check_integrity(self, complete_check=True):
+    # Todo compare with sim.s.masses -> additional asserts
+    def check_integrity(self,
+                        complete_check=True,
+                        context=None):
         """Sanity Check.
 
         Assert all conditions in :meth:`check_parameters`
@@ -465,21 +497,26 @@ class SVGrid:
         complete_check : :obj:`bool`, optional
             If True, then all attributes must be assigned (not None).
             If False, then unassigned attributes are ignored.
+        context : :class:`Simulation`, optional
+            The Simulation, which this instance belongs to.
         """
         self.check_parameters(form=self.form,
                               dimension=self.dim,
                               max_velocity=self._MAX_V,
                               min_points_per_axis=self._MIN_N,
+                              masses=self.masses,
                               idx_helper=self._index,
                               vgrid_arr=self.vGrids,
                               idx_multigrid=self.iMG,
                               velocity_offset=self.offset,
-                              complete_check=complete_check)
+                              complete_check=complete_check,
+                              context=context)
         # Additional Conditions on instance:
         # All Velocity Grids must have equal boundaries
+        # Todo there should be a better solution for this
         if self.vGrids is not None:
             for G in self.vGrids:
-                assert isinstance(G, b_grd.Grid)
+                assert isinstance(G, bp.Grid)
                 assert np.array_equal(G.boundaries + self.offset,
                                       self.boundaries)
         return
@@ -489,11 +526,13 @@ class SVGrid:
                          dimension=None,
                          max_velocity=None,
                          min_points_per_axis=None,
+                         masses=None,
                          idx_helper=None,
                          vgrid_arr=None,
                          idx_multigrid=None,
                          velocity_offset=None,
-                         complete_check=False):
+                         complete_check=False,
+                         context=None):
         """Sanity Check.
         Checks integrity of given parameters and their interactions.
 
@@ -503,6 +542,7 @@ class SVGrid:
         dimension : :obj:`int`, optional
         max_velocity : :obj:`float`. optional
         min_points_per_axis : :obj:`int` optional
+        masses : :obj:`~numpy.array` [:obj:`int`], optional
         idx_helper : :obj:`~numpy.array` [:obj:`int`], optional
         vgrid_arr : :obj:`~numpy.array` [:class:`Grid`], optional
         idx_multigrid : :obj:`~numpy.array` [:obj:`int`], optional
@@ -510,19 +550,28 @@ class SVGrid:
         complete_check : :obj:`bool`, optional
             If True, then all parameters must be set (not None).
             If False, then unassigned parameters are ignored.
+        context : :class:`Simulation`, optional
+            The Simulation, which this instance belongs to.
         """
+        if context is not None:
+            assert isinstance(context, bp.Simulation)
+
         assert isinstance(complete_check, bool)
         if complete_check is True:
-            assert all([param is not None for param in locals().values()])
+            assert all(param_val is not None
+                       for (param_key, param_val) in locals().items()
+                       if param_key != "context")
 
         # check all parameters, if set
         if form is not None:
             assert isinstance(form, str)
-            assert form in b_const.SUPP_GRID_FORMS
+            assert form in bp_c.SUPP_GRID_FORMS
 
         if dimension is not None:
             assert isinstance(dimension, int)
-            assert dimension in b_const.SUPP_GRID_DIMENSIONS
+            assert dimension in bp_c.SUPP_GRID_DIMENSIONS
+            if context is not None and context.p.dim is not None:
+                assert dimension >= context.p.dim
 
         if max_velocity is not None:
             assert isinstance(max_velocity, float)
@@ -532,6 +581,16 @@ class SVGrid:
             assert isinstance(min_points_per_axis, int)
             assert min_points_per_axis > 1
 
+        if masses is not None:
+            assert isinstance(masses, np.ndarray)
+            assert masses.dtype == int
+            assert masses.ndim == 1
+            assert all(m >= 1 for m in masses)
+            if context is not None:
+                assert masses.size == context.s.size
+                assert all(masses == context.s.mass)
+
+        # Todo assert one is None, IFF all are None
         # number of specimen, simplifies upcoming checks
         if idx_helper is not None:
             assert isinstance(idx_helper, np.ndarray)
@@ -544,10 +603,12 @@ class SVGrid:
         if vgrid_arr is not None:
             assert isinstance(vgrid_arr, np.ndarray)
             assert vgrid_arr.dtype == 'object'
-            assert all(isinstance(grid, b_grd.Grid) for grid in vgrid_arr)
+            assert all(isinstance(grid, bp.Grid) for grid in vgrid_arr)
             for grid in vgrid_arr:
                 grid.check_integrity()
             assert vgrid_arr.ndim == 1
+            if context is not None:
+                assert vgrid_arr.size == context.s.size
             if vgrid_arr.size > 0:
                 if dimension is None:
                     dimension = vgrid_arr[0].dim
@@ -596,7 +657,8 @@ class SVGrid:
 
         if self.vGrids is not None:
             for (i_G, vGrid) in enumerate(self.vGrids):
-                description += 'Specimen_{}:\n\t'.format(i_G)
+                description += 'Specimen_{s}, mass = {m}:' \
+                               '\n\t'.format(s=i_G, m=self.masses[i_G])
                 grid_str = vGrid.__str__(write_physical_grid)
                 description += grid_str.replace('\n', '\n\t')
                 description += '\n'

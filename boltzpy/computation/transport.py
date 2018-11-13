@@ -1,5 +1,3 @@
-import boltzpy.data as b_dat
-
 
 def transport_function(scheme):
     if scheme["Transport_Scheme"] == "FiniteDifferences":
@@ -13,7 +11,6 @@ def transport_function(scheme):
 
 def _calculate_transport_step(data):
     """Executes single collision step on complete P-Grid"""
-    assert isinstance(data, b_dat.Data)
     if data.p_dim != 1:
         message = 'Transport is currently only implemented ' \
                   'for 1D Problems'

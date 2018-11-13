@@ -1,9 +1,9 @@
-import boltzpy as b_sim
-import boltzpy.initialization as b_ini
-import boltzpy.collision_relations as b_col
+from time import time
 
 import numpy as np
-from time import time
+
+import boltzpy as bp
+import boltzpy.initialization as bp_ini
 
 
 # Todo Add vG_squared and vG_norm attributes? faster output?
@@ -64,11 +64,11 @@ class Data:
     """
     def __init__(self, file_address):
         # create temporary Simulation instance
-        sim = b_sim.Simulation(file_address)
+        sim = bp.Simulation(file_address)
         # data arrays, this contains all grids
         # Todo Rework initialization (move into rules?)
         # Todo Class for single Space points (V-Grid + 0.Moment)?
-        self.state = b_ini.create_psv_grid(sim)
+        self.state = bp_ini.create_psv_grid(sim)
         self.result = np.copy(self.state)
 
         # Velocity Grid parameters
@@ -103,14 +103,11 @@ class Data:
         self.dur_transp = 0.0
 
         # Collision arrays
-        # # Todo implement proper collision setup()
-        col = b_col.CollisionRelations(sim)
-        # Generate collision relations
-        col.setup()
-
         # Todo create struct -> 4 ints and 1 float together -> possible?
-        self.col = col.collision_arr
-        self.weight = col.weight_arr
+        if not sim.coll.is_set_up:
+            sim.coll.setup(sim.scheme, sim.sv, sim.s)
+        self.col = sim.coll.relations
+        self.weight = sim.coll.weights
 
         # Array, denotes the category of a space point
         # and thus its behaviour
@@ -124,7 +121,7 @@ class Data:
 
         self._params = dict()
         # Keep as a "conditional" attribute?
-        self._params["col_mat"] = col.mat
+        self._params["col_mat"] = sim.coll.generate_collision_matrix(sim.t.d)
 
         return
 

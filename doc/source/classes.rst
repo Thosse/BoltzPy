@@ -1,47 +1,44 @@
-.. highlight:: py
-
-.. role:: python(code)
-   :language: py
-
 .. _classes:
 
+Classes
+=======
 
-The Simulation Class
---------------------
+Simulation
+----------
 .. autoclass:: boltzpy.Simulation
     :members:
 
-The Species Class
------------------
+Species
+-------
 .. autoclass:: boltzpy.Species
     :members:
 
-The Specimen Class
-------------------
+Specimen
+--------
 .. autoclass:: boltzpy.Specimen
     :members:
 
-The Grid Class
---------------
+Grid
+----
 .. autoclass:: boltzpy.Grid
     :members:
 
-The SVGrid Class
-----------------
+SVGrid
+------
 .. autoclass:: boltzpy.SVGrid
     :members:
 
-The Rule Class
---------------
+Rule
+----
 .. autoclass:: boltzpy.Rule
     :members:
 
-The Data Class
---------------
-.. autoclass:: boltzpy.Data
+Scheme
+------
+.. autoclass:: boltzpy.Scheme
     :members:
 
-The Scheme Class
-----------------
-.. autoclass:: boltzpy.Scheme
+Collisions
+----------
+.. autoclass:: boltzpy.Collisions
     :members:

@@ -1,5 +1,6 @@
 import numpy as np
-import boltzpy.constants as b_const
+
+import boltzpy.constants as bp_c
 
 
 # Todo how to reference class attributes in numpy style?
@@ -100,7 +101,7 @@ class Specimen:
 
         if color is not None:
             assert isinstance(color, str)
-            assert color in b_const.SUPP_COLORS
+            assert color in bp_c.SUPP_COLORS
 
         if mass is not None:
             assert type(mass) == int

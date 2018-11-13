@@ -1,9 +1,9 @@
 
-import boltzpy.constants as b_const
-
 import numpy as np
 import h5py
 from math import isclose
+
+import boltzpy.constants as bp_c
 
 
 class Grid:
@@ -166,6 +166,34 @@ class Grid:
             assert self.iG is None
             return None
 
+    @property
+    def is_configured(self):
+        """Check if all necessary attributes of the instance are set.
+
+        Returns
+        -------
+        :obj:`bool`
+        """
+        necessary_params = [self.form,
+                            self.dim,
+                            self.n,
+                            self.d,
+                            self.multi]
+        if any([val is None for val in necessary_params]):
+            return False
+        else:
+            return True
+
+    @property
+    def is_set_up(self):
+        """Check if the instance is completely set up.
+
+        Returns
+        -------
+        :obj:`bool`
+        """
+        return self.is_configured and self.iG is not None
+
     #####################################
     #           Configuration           #
     #####################################
@@ -179,10 +207,10 @@ class Grid:
             I set to :obj:`True` (non-default),
             the newly created Grid is :meth:`centralized <centralize>`.
         """
-        necessary_params = [self.form, self.dim, self.n, self.d, self.multi]
-        if any([val is None for val in necessary_params]):
+        if not self.is_configured:
             return
-        self.check_integrity(False)
+        else:
+            self.check_integrity(False)
 
         if self.form == 'rectangular':
             self._construct_rectangular_grid()
@@ -424,11 +452,11 @@ class Grid:
         # check all parameters, if set
         if form is not None:
             assert isinstance(form, str)
-            assert form in b_const.SUPP_GRID_FORMS
+            assert form in bp_c.SUPP_GRID_FORMS
 
         if dimension is not None:
             assert isinstance(dimension, int)
-            assert dimension in b_const.SUPP_GRID_DIMENSIONS
+            assert dimension in bp_c.SUPP_GRID_DIMENSIONS
 
         if shape is not None:
             assert isinstance(shape, np.ndarray)
@@ -463,7 +491,7 @@ class Grid:
         if idx_grid is not None:
             assert isinstance(idx_grid, np.ndarray)
             assert idx_grid.dtype == int
-            assert idx_grid.ndim in b_const.SUPP_GRID_DIMENSIONS
+            assert idx_grid.ndim in bp_c.SUPP_GRID_DIMENSIONS
             if dimension is not None and size is not None:
                 assert idx_grid.shape == (size, dimension)
             if multi is not None:

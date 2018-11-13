@@ -13,8 +13,12 @@ The BoltzPy package is a solver for the boltzpy equation.
 Basic Structure of the Code:
 ----------------------------
 
- Any simulation is essentially an instance of 
- :py:class:`boltzpy.Simulation`.
+ Any simulation is set up by creating
+ a :py:class:`boltzpy.Simulation` instance.
+ This instance can call its
+ :py:meth:`~boltzpy.Simulation.run_computation` method
+ to start the simulation and has methods to visualize the results as well.
+
 
 
 Workflow
@@ -27,25 +31,12 @@ Workflow
    and :py:class:`Positional-Space-Grid <boltzpy.Grid>`
  * Configure :py:class:`Specimen-Velocity-Grids
    <boltzpy.SVGrid>`
-
-Submodules:
------------
-
- * :py:mod:`boltzpy.collisions`
- * :py:mod:`boltzpy.computation`
- * :py:mod:`boltzpy.animation`
 """
-
-from boltzpy.simulation import Simulation
-from boltzpy.specimen import Specimen
-from boltzpy.species import Species
-from boltzpy.svgrid import SVGrid
 from boltzpy.grid import Grid
 from boltzpy.rule import Rule
-from boltzpy.data import Data
 from boltzpy.scheme import Scheme
-
-import boltzpy.collision_relations
-import boltzpy.computation
-import boltzpy.output
-import boltzpy.animation
+from boltzpy.simulation import Simulation
+from boltzpy.species import Species
+from boltzpy.specimen import Specimen
+from boltzpy.svgrid import SVGrid
+from boltzpy.collisions import Collisions
