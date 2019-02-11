@@ -168,11 +168,9 @@ class Grid:
 
     @property
     def is_configured(self):
-        """Check if all necessary attributes of the instance are set.
-
-        Returns
-        -------
-        :obj:`bool`
+        """:obj:`bool` :
+        True, if all necessary attributes of the instance are set.
+        False Otherwise.
         """
         necessary_params = [self.form,
                             self.dim,
@@ -186,11 +184,10 @@ class Grid:
 
     @property
     def is_set_up(self):
-        """Check if the instance is completely set up.
-
-        Returns
-        -------
-        :obj:`bool`
+        """:obj:`bool` :
+        True, if the instance is completely set up and ready to call
+        :meth:`~Simulation.run_computation`.
+        False Otherwise.
         """
         return self.is_configured and self.iG is not None
 
@@ -319,11 +316,11 @@ class Grid:
 
         Parameters
         ----------
-        hdf5_group : :obj:`h5py.Group`
+        hdf5_group : :obj:`h5py.Group <h5py:Group>`
 
         Returns
         -------
-        :class:`Grid`
+        self : :class:`Grid`
         """
         assert isinstance(hdf5_group, h5py.Group)
         assert hdf5_group.attrs["class"] == "Grid"
@@ -520,7 +517,8 @@ class Grid:
         return
 
     def __str__(self, write_physical_grids=False):
-        """Convert the instance to a string, describing all attributes."""
+        """:obj:`str` :
+        A human readable string which describes all attributes of the instance."""
         description = ''
         description += "Dimension = {}\n".format(self.dim)
         description += "Geometric Form = {}\n".format(self.form)

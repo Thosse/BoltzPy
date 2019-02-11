@@ -38,8 +38,8 @@ class Collisions:
         Each collision is a 4-tuple of indices in :attr:`sv.iG`
         and is in the form
         :math:`\left[ v_{s_1}^{pre}, v_{s_1}^{post},
-                      v_{s_2}^{pre}, v_{s_2}^{post}
-               \right]`.
+        v_{s_2}^{pre}, v_{s_2}^{post}
+        \right]`.
     weights : :obj:`~numpy.array` [:obj:`float`]
         Contains the numeric integration weights
         of the respective collision in :attr:`relations`.
@@ -59,11 +59,9 @@ class Collisions:
 
     @property
     def is_set_up(self):
-        """Check if the instance is completely set up.
-
-        Returns
-        -------
-        :obj:`bool`
+        """:obj:`bool` :
+        True, if the instance is completely set up and ready to call :meth:`~Simulation.run_computation`.
+        False Otherwise.
         """
         return self.relations is not None and self.weights is not None
 
@@ -277,11 +275,11 @@ class Collisions:
 
         Parameters
         ----------
-        hdf5_group : :obj:`h5py.Group`
+        hdf5_group : :obj:`h5py.Group <h5py:Group>`
 
         Returns
         -------
-        :class:`Collisions`
+        self : :class:`Collisions`
         """
         assert isinstance(hdf5_group, h5py.Group)
         # Todo move back in, with hashes

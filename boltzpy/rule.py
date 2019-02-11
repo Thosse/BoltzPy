@@ -109,7 +109,7 @@ class Rule:
 
         Returns
         -------
-        :class:`Rule`
+        self : :class:`Rule`
         """
         assert isinstance(hdf5_group, h5py.Group)
         assert hdf5_group.attrs["class"] == "Rule"

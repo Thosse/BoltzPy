@@ -30,7 +30,7 @@ class SVGrid:
     dim : :obj:`int`
         Dimensionality of all Velocity :class:`Grids <boltzpy.Grid>`.
         Must be in :const:`~boltzpy.constants.SUPP_GRID_DIMENSIONS`.
-    masses :obj:`~numpy.array` [:obj:`int`] :
+    masses : :obj:`~numpy.array` [:obj:`int`]
         Array of masses of the simulated :class:`Specimen`.
     vGrids : :obj:`~numpy.array` [:class:`~boltzpy.Grid`]
         Array of all Velocity :class:`Grids <boltzpy.Grid>`.
@@ -156,11 +156,9 @@ class SVGrid:
 
     @property
     def is_configured(self):
-        """Check if all necessary attributes of the instance are set.
-
-        Returns
-        -------
-        :obj:`bool`
+        """:obj:`bool` :
+        True, if all necessary attributes of the instance are set.
+        False Otherwise.
         """
         necessary_params = [self.form,
                             self.dim,
@@ -174,11 +172,10 @@ class SVGrid:
 
     @property
     def is_set_up(self):
-        """Check if the instance is completely set up.
-
-        Returns
-        -------
-        :obj:`bool`
+        """:obj:`bool` :
+        True, if the instance is completely set up and ready to call
+        :meth:`~Simulation.run_computation`.
+        False Otherwise.
         """
         ret_val = (self.is_configured
                    and self._index is not None
@@ -321,7 +318,7 @@ class SVGrid:
 
         Returns
         -------
-        :obj:`~numpy.array` [:obj:`int`]
+        idx_range : :obj:`~numpy.array` [:obj:`int`]
         """
         return self._index[specimen_index: specimen_index + 2]
 
@@ -344,12 +341,11 @@ class SVGrid:
 
         Returns
         -------
-        :obj:`int`
-            Index of *grid_entry* in :attr:`~SVGrid.iMG`.
+        index : :obj:`int`
 
         Raises
         ------
-        ValueError
+        err_val : :obj:`ValueError`
             If *grid_entry* is not in the Velocity Grid.
         """
         # Todo Throw exception if not a grid entry (instead of None)
@@ -379,11 +375,11 @@ class SVGrid:
 
         Returns
         -------
-        :obj:`int`
+        index : :obj:`int`
 
         Raises
         ------
-        IndexError
+        err_idx : :obj:`IndexError`
             If *velocity_idx* is out of the range of
             :attr:`SVGrid.iMG`.
         """
@@ -409,7 +405,7 @@ class SVGrid:
 
         Returns
         -------
-        :class:`SVGrid`
+        self : :class:`SVGrid`
         """
         assert isinstance(hdf5_group, h5py.Group)
         assert hdf5_group.attrs["class"] == "SVGrid"
@@ -648,7 +644,8 @@ class SVGrid:
 
     def __str__(self,
                 write_physical_grid=False):
-        """Convert the instance to a string, describing all attributes."""
+        """:obj:`str` :
+        A human readable string which describes all attributes of the instance."""
         description = ''
         description += "Dimension = {}\n".format(self.dim)
         description += "Geometric Form = {}\n".format(self.form)

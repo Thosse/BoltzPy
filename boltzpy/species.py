@@ -31,7 +31,7 @@ class Species:
         return
 
     def __getitem__(self, item):
-        """Get a :class:`Specimen` by index or name.
+        """Get a :class:`Specimen` instance by index or name.
 
         Parameters
         ----------
@@ -40,7 +40,7 @@ class Species:
 
         Returns
         -------
-        :class:`Specimen`
+        spc : :class:`Specimen`
         """
         item_idx = self.index(item)
         return self.specimen_arr[item_idx]
@@ -78,7 +78,7 @@ class Species:
 
     @property
     def colors_unused(self):
-        """:obj:`list` [:obj:`str`]:
+        """:obj:`list` [:obj:`str`] :
         List of all default colors with no
         :obj:`Specimen` of that color.
         """
@@ -90,8 +90,9 @@ class Species:
 
     @property
     def collision_rates(self):
-        """:obj:`~numpy.array` [:obj:`float`]
-        Determines the collision probability between two specimen.
+        """:obj:`~numpy.array` [:obj:`float`] :
+        A factor for the collision probability between two specimen.
+
         The :attr:`Specimen.collision_rates <boltzpy.Specimen>`
         of the :class:`Specimen` are the rows and columns
         of this symmetric matrix.
@@ -106,11 +107,9 @@ class Species:
 
     @property
     def is_configured(self):
-        """Check if all necessary attributes of the instance are set.
-
-        Returns
-        -------
-        :obj:`bool`
+        """:obj:`bool` :
+        True, if all necessary attributes of the instance are set.
+        False Otherwise.
         """
         return self.size >= 1
 
@@ -121,8 +120,8 @@ class Species:
         """Find the index of a :class:`Specimen`
         by its :attr:`Specimen.name`.
 
-        If *item* is an :obj:`int`, assert *item* is an index.
-        If *item* is a :obj:`str`, search :attr:`specimen_arr`
+        If *item* is an :obj:`int`, then assert *item* is a proper index.
+        If *item* is a :obj:`str`, then search :attr:`specimen_arr`
         and return the index where :attr:`Specimen.name` == *item*.
 
         Parameters
@@ -132,15 +131,15 @@ class Species:
 
         Returns
         -------
-        :obj:`int`
+        index : :obj:`int`
 
         Raises
         ------
-        IndexError
+        err_idx : :obj:`IndexError`
             *item* is an int and out of bounds.
-        ValueError
+        err_val : :obj:`ValueError`
             *item* is a string and no Specimen with name *item* exists.
-        TypeError
+        err_type : :obj:`TypeError`
             *name* is neither an :obj:`int` or a :obj:`str`
         """
         if isinstance(item, int):
@@ -223,7 +222,7 @@ class Species:
         item : :obj:`int` or :obj:`str`
             Index or name of the :obj:`Specimen` to be edited
         new_name : :obj:`str`, optional
-        new_mass : int, optional
+        new_mass : :obj:`int`, optional
         new_collision_rate : :obj:`~numpy.array` [:obj:`float`], optional
         new_color : :obj:`str`, optional
         """
@@ -279,7 +278,7 @@ class Species:
 
         Returns
         -------
-        :class:`Species`
+        self : :class:`Species`
         """
         assert isinstance(hdf5_group, h5py.Group)
         assert hdf5_group.attrs["class"] == "Species"
@@ -386,7 +385,8 @@ class Species:
         return
 
     def __str__(self):
-        """Converts the instance to a string, describing all attributes."""
+        """:obj:`str` :
+        A human readable string which describes all attributes of the instance."""
         description = "Number of Specimen = {}\n".format(self.size)
         for (i_s, specimen) in enumerate(self.specimen_arr):
             description += 'Specimen_{}:'.format(i_s)

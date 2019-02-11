@@ -226,11 +226,9 @@ class Simulation:
 
     @property
     def is_configured(self):
-        """Check if all necessary attributes of the instance are set.
-
-        Returns
-        -------
-        :obj:`bool`
+        """:obj:`bool` :
+        True, if all necessary attributes of the instance are set.
+        False Otherwise.
         """
         # Todo add output_parameters
         # Todo add initial_distribution / rule_arr
@@ -242,12 +240,9 @@ class Simulation:
 
     @property
     def is_set_up(self):
-        """Check if the instance is completely set up and ready to call
-        :meth:`run_computation`.
-
-        Returns
-        -------
-        :obj:`bool`
+        """:obj:`bool` :
+        True, if the instance is completely set up and ready to call :meth:`~Simulation.run_computation`.
+        False Otherwise.
         """
         # Todo add initial_distribution
         return (self.t.is_set_up
@@ -427,9 +422,9 @@ class Simulation:
         rho : :obj:`~numpy.array` [:obj:`float`]
         drift : :obj:`~numpy.array` [:obj:`float`]
         temp : :obj:`~numpy.array` [:obj:`float`]
-        name : str, optional
+        name : :obj:`str`, optional
             Displayed in the GUI to visualize the initialization.
-        color : str, optional
+        color : :obj:`str`, optional
             Displayed in the GUI to visualize the initialization.
         """
         bp.Rule.check_parameters(category=category,
@@ -851,7 +846,8 @@ class Simulation:
 
     def __str__(self,
                 write_physical_grids=False):
-        """Convert the instance to a string which describes all attributes."""
+        """:obj:`str` :
+        A human readable string which describes all attributes of the instance."""
         description = ''
         description += 'Simulation File = ' + self.file_address + '.hdf5\n'
         description += 'Species\n'

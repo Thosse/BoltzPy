@@ -46,29 +46,27 @@ class Scheme:
 
     @property
     def is_configured(self):
-        """Check if all necessary attributes of the instance are set.
-
-        Returns
-        -------
-        :obj:`bool`
+        """:obj:`bool` :
+        True, if all necessary attributes of the instance are set.
+        False Otherwise.
         """
         return all(value is not None for(key, value) in self.items())
 
     def keys(self):
-        """Returns a list of all scheme parameters.
+        """Returns the list of all scheme parameters.
 
         Returns
         -------
-        :obj:`dict_keys <dict.keys>` [:obj:`str`]
+        keys : :obj:`dict_keys <dict.keys>` [:obj:`str`]
         """
         return self.dictionary.keys()
 
     def items(self):
-        """Returns a list of all scheme parameters and their value.
+        """Returns the list of all scheme parameters and their value.
 
         Returns
         -------
-        :obj:`dict_items <dict.items>`
+        items : :obj:`dict_items <dict.items>`
         """
         return self.dictionary.items()
 
@@ -99,11 +97,11 @@ class Scheme:
 
         Parameters
         ----------
-        hdf5_group : :obj:`h5py.Group`
+        hdf5_group : :obj:`h5py.Group <h5py:Group>`
 
         Returns
         -------
-        :class:`Scheme`
+        self : :class:`Scheme`
         """
         assert isinstance(hdf5_group, h5py.Group)
 
@@ -167,6 +165,8 @@ class Scheme:
                 assert value is not None
 
     def __str__(self):
+        """:obj:`str` :
+        A human readable string which describes all attributes of the instance."""
         ret = ""
         for key in sorted(self.keys()):
             ret += "{key} = {val}\n".format(key=key,
