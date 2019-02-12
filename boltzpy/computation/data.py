@@ -30,8 +30,8 @@ class Data:
         :class:`Specimens <boltzpy.Specimen>` velocity grid.
     vG : :obj:`~numpy.array` [:obj:`float`]
         The physical velocity Grid (See :attr:`SVGrid.pMG`)
-    v_offset : :obj:`~numpy.array` [:obj:`float`]
-        Offsets the velocities in the transport step
+    velocity_offset : :obj:`~numpy.array` [:obj:`float`]
+        Offsets the velocities in and ONLY in the transport step
         (non-boundary points only!).
         This is best viewed as the velocity of a moving observer
         for the animation.
@@ -81,7 +81,7 @@ class Data:
         # Todo rename pMG -> pG and implement efficiently
         self.vG = sim.sv.pMG
         # Todo rename offset, remove from svgrid -> movingObserver?
-        self.v_offset = sim.sv.offset
+        self.velocity_offset = np.array(sim.scheme.Transport_VelocityOffset)
         # Todo Add this as property to SVGRID
         # Todo test if it faster to compute velocity (pv) on the fly
         # self.dv = np.array([sim.sv.vGrids[s].d for s in range(sim.s.size)])

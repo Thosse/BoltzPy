@@ -8,7 +8,7 @@ from boltzpy.computation import collisions as cp_col
 def operator_splitting_function(scheme):
     calc_transport_step = cp_tr.transport_function(scheme)
     calc_collision_step = cp_col.collision_function(scheme)
-    if scheme["OperatorSplitting_Order"] == 1:
+    if scheme.OperatorSplitting == "FirstOrder":
         def _calculate_time_step(data):
             """Executes a single time step"""
             # executing time step

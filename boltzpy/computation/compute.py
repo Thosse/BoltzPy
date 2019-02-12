@@ -105,13 +105,9 @@ def compute(file_address,
 
 
 def generate_computation_functions(file_address):
-    hdf5_group = h5py.File(file_address + ".hdf5")["Computation"]
+    hdf5_group = h5py.File(file_address + ".hdf5")["Scheme"]
     scheme = bp.Scheme.load(hdf5_group)
-    if scheme["Approach"] == "DiscreteVelocityModels":
-        return cp_os.operator_splitting_function(scheme)
-    else:
-        msg = "Unsupported Approach: {}".format(scheme["Approach"])
-        raise NotImplementedError(msg)
+    return cp_os.operator_splitting_function(scheme)
 
 
 # Todo Move this into output.py?

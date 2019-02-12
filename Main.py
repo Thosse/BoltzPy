@@ -3,9 +3,9 @@
 import boltzpy as b_sim
 import numpy as np
 
-sim = b_sim.Simulation()
-new_simulation = True
-if new_simulation:
+exisiting_simulation_file = None
+sim = b_sim.Simulation(exisiting_simulation_file)
+if exisiting_simulation_file is None:
     sim.add_specimen(mass=2, collision_rate=[50])
     sim.add_specimen(mass=3, collision_rate=[50, 50])
     sim.setup_time_grid(max_time=1,
@@ -16,8 +16,7 @@ if new_simulation:
                             grid_spacing=0.5)
     sim.set_velocity_grids(grid_dimension=2,
                            min_points_per_axis=4,
-                           max_velocity=1.5,
-                           velocity_offset=[-0.2, 0])
+                           max_velocity=1.5)
     sim.add_rule('Inner Point',
                  np.array([2.0, 1.0]),
                  np.array([[0.0, 0.0], [0.0, 0.0]]),
@@ -30,12 +29,11 @@ if new_simulation:
                  np.array([1.0, 1.0]),
                  name='Low Pressure')
     sim.choose_rule(np.arange(10, 21), 1)
-    sim.scheme["Approach"] = "DiscreteVelocityModels"
-    sim.scheme["OperatorSplitting_Order"] = 1
-    sim.scheme["Transport_Scheme"] = "FiniteDifferences"
-    sim.scheme["Transport_Order"] = 1
-    sim.scheme["Collisions_RelationsScheme"] = "UniformComplete"
-    sim.scheme["Collisions_ComputationScheme"] = "EulerScheme"
+    sim.scheme.OperatorSplitting = "FirstOrder"
+    sim.scheme.Transport = "FiniteDifferences_FirstOrder"
+    sim.scheme.Transport_VelocityOffset = np.array([-0.2, 0.0])
+    sim.scheme.Collisions_Generation = "UniformComplete"
+    sim.scheme.Collisions_Computation = "EulerScheme"
 print(sim.__str__(write_physical_grids=True))
 sim.save()
 

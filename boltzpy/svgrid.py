@@ -6,14 +6,13 @@ import boltzpy as bp
 import boltzpy.constants as bp_c
 
 
-# Todo move offset out of SVGrid? extra sim.attribute?
 class SVGrid:
     """Manages the Velocity Grids of all
     :class:`~boltzpy.Species` /
     :class:`~boltzpy.Specimen`.
 
     .. todo::
-        - add method for physical velocities (offset + iMG*d).
+        - add fast method to get physical velocities from index (cython!)
           Apply this in pG attribute.
         - Ask Hans, should the Grid always contain the center/zero?
         - Todo Add unit tests
@@ -46,15 +45,10 @@ class SVGrid:
         position/physical values (:attr:`pG`)
         of all Velocity Grid points.
         All entries are factors, such that
-        :math:`pG = offset + iG \cdot d`.
+        :math:`pG = iG \cdot d`.
         Note that some V-Grid points occur in multiple
         :class:`Velocity Grids <boltzpy.Grid>`.
-        Array of shape (:attr:`size`, :attr:`dim`).
-    offset : :obj:`~numpy.array` [:obj:`float`]
-        Shifts the physical velocities, to be centered around :attr:`offset`.
-        The physical value of any Velocity-Grid point v_i of Specimen S
-        is :math:`offset + d[S] \cdot SVG[i]`.
-        Array of shape=(dim,).
+        Array of shape (:attr:`size`, :attr:`dim`)
     """
 
     def __init__(self,
@@ -62,26 +56,17 @@ class SVGrid:
                  grid_dimension=None,
                  min_points_per_axis=None,
                  max_velocity=None,
-                 masses=None,
-                 velocity_offset=None):
+                 masses=None):
         self.check_parameters(form=grid_form,
                               dimension=grid_dimension,
                               max_velocity=max_velocity,
                               min_points_per_axis=min_points_per_axis,
-                              masses=masses,
-                              velocity_offset=velocity_offset)
+                              masses=masses)
         self.form = grid_form
         self.dim = grid_dimension
         self._MAX_V = max_velocity
         self._MIN_N = min_points_per_axis
         self.masses = masses
-        if velocity_offset is not None:
-            self.offset = np.array(velocity_offset)
-        elif grid_dimension is not None:
-            self.offset = np.zeros(grid_dimension, dtype=float)
-        else:
-            self.offset = None
-
         # The remaining attributes are calculated in setup() method
         # _index[i] denotes the beginning of the i-th velocity Grid in iMG
         self._index = None
@@ -127,7 +112,7 @@ class SVGrid:
             The physical Multi-Grid pG denotes the physical values /
             position of all grid points.
 
-                :math:`pG := offset + iG \cdot d`
+                :math:`pG := iG \cdot d`
 
             Array of shape (:attr:`size`, :attr:`dim`)
          """
@@ -152,7 +137,7 @@ class SVGrid:
         if self.vGrids is None:
             return None
         else:
-            return self.offset + self.vGrids[0].boundaries
+            return self.vGrids[0].boundaries
 
     @property
     def is_configured(self):
@@ -437,11 +422,6 @@ class SVGrid:
             self.masses = hdf5_group[key].value
         except KeyError:
             self.masses = None
-        try:
-            key = "Velocity Offset"
-            self.offset = hdf5_group[key].value
-        except KeyError:
-            self.offset = None
 
         self.check_integrity(False)
         return self
@@ -473,8 +453,6 @@ class SVGrid:
             hdf5_group["Minimum Number of Grid Points"] = self._MIN_N
         if self.masses is not None:
             hdf5_group["Masses"] = self.masses
-        if self.offset is not None:
-            hdf5_group["Velocity Offset"] = self.offset
         return
 
     #####################################
@@ -504,7 +482,6 @@ class SVGrid:
                               idx_helper=self._index,
                               vgrid_arr=self.vGrids,
                               idx_multigrid=self.iMG,
-                              velocity_offset=self.offset,
                               complete_check=complete_check,
                               context=context)
         # Additional Conditions on instance:
@@ -513,8 +490,7 @@ class SVGrid:
         if self.vGrids is not None:
             for G in self.vGrids:
                 assert isinstance(G, bp.Grid)
-                assert np.array_equal(G.boundaries + self.offset,
-                                      self.boundaries)
+                assert np.array_equal(G.boundaries, self.boundaries)
         return
 
     @staticmethod
@@ -526,7 +502,6 @@ class SVGrid:
                          idx_helper=None,
                          vgrid_arr=None,
                          idx_multigrid=None,
-                         velocity_offset=None,
                          complete_check=False,
                          context=None):
         """Sanity Check.
@@ -542,7 +517,6 @@ class SVGrid:
         idx_helper : :obj:`~numpy.array` [:obj:`int`], optional
         vgrid_arr : :obj:`~numpy.array` [:class:`Grid`], optional
         idx_multigrid : :obj:`~numpy.array` [:obj:`int`], optional
-        velocity_offset : :obj:`~numpy.array` [:obj:`float`], optional
         complete_check : :obj:`bool`, optional
             If True, then all parameters must be set (not None).
             If False, then unassigned parameters are ignored.
@@ -630,16 +604,6 @@ class SVGrid:
                     end = idx_helper[vGrid_idx + 1]
                     assert vGrid.size == end - beg
                     assert np.array_equal(vGrid.iG, idx_multigrid[beg: end])
-
-        if velocity_offset is not None:
-            if type(velocity_offset) in [list, float]:
-                velocity_offset = np.array(velocity_offset,
-                                           dtype=float)
-            assert velocity_offset.dtype == float
-
-        if dimension is not None and velocity_offset is not None:
-            assert velocity_offset.shape == (dimension,)
-
         return
 
     def __str__(self,
@@ -650,7 +614,6 @@ class SVGrid:
         description += "Dimension = {}\n".format(self.dim)
         description += "Geometric Form = {}\n".format(self.form)
         description += "Total Size = {}\n".format(self.size)
-        description += "Offset = {}\n".format(self.offset)
 
         if self.vGrids is not None:
             for (i_G, vGrid) in enumerate(self.vGrids):

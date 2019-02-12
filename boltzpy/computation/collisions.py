@@ -2,7 +2,7 @@ import numpy as np
 
 
 def collision_function(scheme):
-    if scheme["Collisions_ComputationScheme"] == "EulerScheme":
+    if scheme.Collisions_Computation == "EulerScheme":
         return _calculate_collision_step
     else:
         raise NotImplementedError

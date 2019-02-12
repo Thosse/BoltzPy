@@ -57,31 +57,6 @@ SUPP_COLORS = ['blue', 'red', 'green',
                'orange', 'pink', 'lime',
                'black']
 
-#: :obj:`dict` [:obj:`str`, :obj:`list` [:obj:`str`]] :
-#: Denotes the list of all supported values for any key.
-SUPP_SCHEME_VALUES = {
-    "Approach": ["DiscreteVelocityModels"],
-    "OperatorSplitting_Order": [1],
-    "Transport_Scheme": ["FiniteDifferences"],
-    "Transport_Order": [1],
-    "Collisions_RelationsScheme": ["UniformComplete",
-                                   # "FreeFlow",
-                                   ],
-    "Collisions_ComputationScheme": ["EulerScheme"]
-    }
-
-#: :obj:`dict` [:obj:`str`, :obj:`list` [:obj:`str`]] :
-#: Denotes the list of all additional key required by the given value.
-#: If a value is not a key of this :obj:`dict`,
-#: then this value requires no additional keys.
-REQ_SCHEME_PARAMETERS = {
-    "DiscreteVelocityModels": ["OperatorSplitting_Order",
-                               "Transport_Scheme",
-                               "Collisions_RelationsScheme",
-                               "Collisions_ComputationScheme"],
-    "FiniteDifferences": ["Transport_Order"]
-    }
-
 #: :obj:`set` [:obj:`str`] :
 #: Set of all characters, that are forbidden in any file addresses.
 INVALID_CHARACTERS = {'.', '"', "'", '/', '§', '$', '&',

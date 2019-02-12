@@ -176,7 +176,7 @@ class Simulation:
         #   Computation Attributes   #
         ##############################
         try:
-            key = "Computation"
+            key = "Scheme"
             self.scheme = bp.Scheme.load(file[key])
         except KeyError:
             self.scheme = bp.Scheme()
@@ -358,7 +358,7 @@ class Simulation:
         Parameters
         ----------
         grid_dimension : :obj:`int`
-        grid_shape : :obj:`~numpy.array`  [:obj:`int`] or :obj:`list` [:obj:`int`]
+        grid_shape : :obj:`~numpy.array` [:obj:`int`] or :obj:`list` [:obj:`int`]
         grid_spacing : :obj:`float`
         """
         if isinstance(grid_shape, list):
@@ -374,14 +374,11 @@ class Simulation:
                                 dtype=int)
         return
 
-    # Todo Crosscheck offset -> very weird for boundaries / complex spaces
-    # Todo                      is it a moving camera?
     def set_velocity_grids(self,
                            grid_dimension,
                            min_points_per_axis,
                            max_velocity,
-                           grid_form='rectangular',
-                           velocity_offset=None):
+                           grid_form='rectangular'):
         """Set up :attr:`sv`.
 
         1. Generate a minimal Velocity :class:`Grid`.
@@ -394,14 +391,12 @@ class Simulation:
         min_points_per_axis : :obj:`int`
         max_velocity : :obj:`float`
         grid_form : :obj:`str`, optional
-        velocity_offset : :obj:`~numpy.array` [:obj:`float`], optional
         """
         self.sv = bp.SVGrid(grid_form=grid_form,
                             grid_dimension=grid_dimension,
                             min_points_per_axis=min_points_per_axis,
                             max_velocity=max_velocity,
-                            masses=self.s.mass,
-                            velocity_offset=velocity_offset)
+                            masses=self.s.mass)
         return
 
     def add_rule(self,
@@ -656,10 +651,10 @@ class Simulation:
         file[key] = self.init_arr
 
         # Save Computation Parameters
-        if "Computation" not in file.keys():
-            file.create_group("Computation")
+        if "Scheme" not in file.keys():
+            file.create_group("Scheme")
         # Save scheme
-        self.scheme.save(file["Computation"])
+        self.scheme.save(file["Scheme"])
 
         if self.output_parameters is not None:
             #  noinspection PyUnresolvedReferences
@@ -847,7 +842,8 @@ class Simulation:
     def __str__(self,
                 write_physical_grids=False):
         """:obj:`str` :
-        A human readable string which describes all attributes of the instance."""
+        A human readable string which describes all attributes of the instance.
+        """
         description = ''
         description += 'Simulation File = ' + self.file_address + '.hdf5\n'
         description += 'Species\n'

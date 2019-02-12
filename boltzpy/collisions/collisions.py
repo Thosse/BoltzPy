@@ -78,11 +78,11 @@ class Collisions:
         assert isinstance(species, bp.Species)
         print('Generating Collision Array...', end='')
         time_beg = time()
-        if scheme["Collisions_RelationsScheme"] == 'UniformComplete':
+        if scheme.Collisions_Generation == 'UniformComplete':
             self._generate_collisions_complete(svgrid, species)
         else:
             msg = ('Unsupported Selection Scheme:'
-                   + '{}'.format(scheme["CollisionsRelations_Scheme"]))
+                   + '{}'.format(scheme.Collisions_Generation))
             raise NotImplementedError(msg)
         time_end = time()
         print('Done\n'

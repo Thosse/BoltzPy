@@ -1,10 +1,7 @@
 
 def transport_function(scheme):
-    if scheme["Transport_Scheme"] == "FiniteDifferences":
-        if scheme["Transport_Order"] == 1:
-            return _calculate_transport_step
-        else:
-            raise NotImplementedError
+    if scheme.Transport == "FiniteDifferences_FirstOrder":
+        return _calculate_transport_step
     else:
         raise NotImplementedError
 
@@ -18,7 +15,7 @@ def _calculate_transport_step(data):
 
     dt = data.dt
     dp = data.dp
-    offset = data.v_offset
+    offset = data.velocity_offset
     for (spc, [beg, end]) in enumerate(data.v_range):
         # Todo removal of boundaries (p in range(1, ... -1))
         # Todo is only temporary,
