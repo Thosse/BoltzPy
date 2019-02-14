@@ -165,7 +165,7 @@ class Simulation:
         # load initialization array
         try:
             key = "Initialization/Initialization Array"
-            self.init_arr = file[key].value
+            self.init_arr = file[key][()]
         except KeyError:
             # default value -1 <=> no initialization rule assigned here
             self.init_arr = np.full(shape=self.p.size,
@@ -183,7 +183,7 @@ class Simulation:
         try:
             key = "Computation/Output_Parameters"
             shape = file[key].attrs["shape"]
-            self.output_parameters = file[key].value.reshape(shape)
+            self.output_parameters = file[key][()].reshape(shape)
         except KeyError:
             self.output_parameters = np.array([['Mass',
                                                 'Momentum_X'],

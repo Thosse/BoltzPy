@@ -19,8 +19,8 @@ def test_computation(test_case):
     # compare results
     try:
         for output in sim.output_parameters.flatten():
-            results_old = old_file["Computation"][output].value
-            results_new = new_file["Test"][output].value
+            results_old = old_file["Computation"][output][()]
+            results_new = new_file["Test"][output][()]
             assert results_old.shape == results_new.shape
             assert np.array_equal(results_old, results_new)
     finally:

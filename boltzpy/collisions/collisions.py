@@ -288,11 +288,11 @@ class Collisions:
 
         # read attributes from file
         try:
-            self.relations = hdf5_group["Relations"].value
+            self.relations = hdf5_group["Relations"][()]
         except KeyError:
             self.relations = None
         try:
-            self.weights = hdf5_group["Weights"].value
+            self.weights = hdf5_group["Weights"][()]
         except KeyError:
             self.weights = None
         # Todo read Scheme parameters from relations (save as attributes)

@@ -7,7 +7,7 @@ import boltzpy.constants as bp_c
 
 
 class SVGrid:
-    """Manages the Velocity Grids of all
+    r"""Manages the Velocity Grids of all
     :class:`~boltzpy.Species` /
     :class:`~boltzpy.Specimen`.
 
@@ -106,7 +106,7 @@ class SVGrid:
     # Todo can be replaced by pv method?
     @property
     def pMG(self):
-        """:obj:`~numpy.array` [:obj:`float`] :
+        r""":obj:`~numpy.array` [:obj:`float`] :
         Construct the *physical Multi-Grid* (**computationally heavy!**).
 
             The physical Multi-Grid pG denotes the physical values /
@@ -399,27 +399,27 @@ class SVGrid:
         # read attributes from file
         try:
             key = "Form"
-            self.form = hdf5_group[key].value
+            self.form = hdf5_group[key][()]
         except KeyError:
             self.form = None
         try:
             key = "Dimension"
-            self.dim = int(hdf5_group[key].value)
+            self.dim = int(hdf5_group[key][()])
         except KeyError:
             self.dim = None
         try:
             key = "Maximum Velocity"
-            self._MAX_V = hdf5_group[key].value
+            self._MAX_V = hdf5_group[key][()]
         except KeyError:
             self._MAX_V = None
         try:
             key = "Minimum Number of Grid Points"
-            self._MIN_N = int(hdf5_group[key].value)
+            self._MIN_N = int(hdf5_group[key][()])
         except KeyError:
             self._MIN_N = None
         try:
             key = "Masses"
-            self.masses = hdf5_group[key].value
+            self.masses = hdf5_group[key][()]
         except KeyError:
             self.masses = None
 

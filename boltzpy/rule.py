@@ -117,29 +117,29 @@ class Rule:
 
         # read attributes from file
         try:
-            category = hdf5_group["Category"].value
+            category = hdf5_group["Category"][()]
             category_idx = bp_c.SUPP_GRID_POINT_CATEGORIES.index(category)
             self.i_cat = int(category_idx)
         except KeyError:
             self.i_cat = None
         try:
-            self.rho = hdf5_group["Mass"].value
+            self.rho = hdf5_group["Mass"][()]
         except KeyError:
             self.rho = None
         try:
-            self.drift = hdf5_group["Mean Velocity"].value
+            self.drift = hdf5_group["Mean Velocity"][()]
         except KeyError:
             self.drift = None
         try:
-            self.temp = hdf5_group["Temperature"].value
+            self.temp = hdf5_group["Temperature"][()]
         except KeyError:
             self.temp = None
         try:
-            self.name = hdf5_group["Name"].value
+            self.name = hdf5_group["Name"][()]
         except KeyError:
             self.name = ''
         try:
-            self.color = hdf5_group["Color"].value
+            self.color = hdf5_group["Color"][()]
         except KeyError:
             self.color = 'black'
         self.check_integrity(False)

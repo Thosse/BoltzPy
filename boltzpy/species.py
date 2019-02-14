@@ -287,9 +287,9 @@ class Species:
         try:
             # read data from file
             names = hdf5_group["Names"]
-            masses = hdf5_group["Masses"].value
-            col_rate = hdf5_group["collision_rates"].value
-            colors = hdf5_group["Colors"].value
+            masses = hdf5_group["Masses"][()]
+            col_rate = hdf5_group["collision_rates"][()]
+            colors = hdf5_group["Colors"][()]
             assert names.ndim is 1
             assert col_rate.ndim is 2
             assert names.shape == colors.shape == masses.shape

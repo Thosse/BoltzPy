@@ -104,7 +104,7 @@ class Grid:
 
     @property
     def spacing(self):
-        """:obj:`float` :
+        r""":obj:`float` :
         The (physical) distance between two :class:`Grid` points.
         It holds :math:`spacing = d \cdot multi`.
         """
@@ -115,7 +115,7 @@ class Grid:
 
     @property
     def pG(self):
-        """:obj:`~numpy.array` [:obj:`float`] :
+        r""":obj:`~numpy.array` [:obj:`float`] :
         Construct the *physical Grid* (**computationally heavy!**).
 
             The physical Grid pG denotes the physical values of
@@ -328,23 +328,23 @@ class Grid:
 
         # read attributes from file
         try:
-            self.form = hdf5_group["Form"].value
+            self.form = hdf5_group["Form"][()]
         except KeyError:
             self.form = None
         try:
-            self.dim = int(hdf5_group["Dimension"].value)
+            self.dim = int(hdf5_group["Dimension"][()])
         except KeyError:
             self.dim = None
         try:
-            self.n = hdf5_group["Points_per_Dimension"].value
+            self.n = hdf5_group["Points_per_Dimension"][()]
         except KeyError:
             self.n = None
         try:
-            self.d = hdf5_group["Step_Size"].value
+            self.d = hdf5_group["Step_Size"][()]
         except KeyError:
             self.d = None
         try:
-            self.multi = int(hdf5_group["Multiplicator"].value)
+            self.multi = int(hdf5_group["Multiplicator"][()])
         except KeyError:
             self.multi = None
 
