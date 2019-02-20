@@ -258,11 +258,11 @@ class SVGrid:
         spacings = [2 * self._MAX_V / (n_i - 1)
                     for n_i in number_of_grid_points]
         # Contains the velocity Grid of each specimen
-        vGrids = [bp.Grid(grid_form=self.form,
-                          grid_dimension=self.dim,
-                          grid_shape=np.array(grid_shapes[i]),
-                          grid_spacing=spacings[i],
-                          grid_is_centered=True)
+        vGrids = [bp.Grid(ndim=self.dim,
+                          shape=np.array(grid_shapes[i]),
+                          form=self.form,
+                          physical_spacing=spacings[i],
+                          is_centered=True)
                   for i in range(self.masses.size)]
         self.vGrids = np.array(vGrids)
 
@@ -336,10 +336,10 @@ class SVGrid:
         # Todo Throw exception if not a grid entry (instead of None)
         i_flat = 0
         # get vector-index, by reversing Grid.centralize() - method
-        i_vec = np.array((grid_entry + self.vGrids[specimen_index].n - 1) // 2,
+        i_vec = np.array((grid_entry + self.vGrids[specimen_index].shape - 1) // 2,
                          dtype=int)
         for _dim in range(self.dim):
-            n_loc = self.vGrids[specimen_index].n[_dim]
+            n_loc = self.vGrids[specimen_index].shape[_dim]
             i_flat *= n_loc
             i_flat += i_vec[_dim]
         i_flat += self._index[specimen_index]
@@ -540,8 +540,8 @@ class SVGrid:
         if dimension is not None:
             assert isinstance(dimension, int)
             assert dimension in bp_c.SUPP_GRID_DIMENSIONS
-            if context is not None and context.p.dim is not None:
-                assert dimension >= context.p.dim
+            if context is not None and context.p.ndim is not None:
+                assert dimension >= context.p.ndim
 
         if max_velocity is not None:
             assert isinstance(max_velocity, float)
@@ -581,16 +581,17 @@ class SVGrid:
                 assert vgrid_arr.size == context.s.size
             if vgrid_arr.size > 0:
                 if dimension is None:
-                    dimension = vgrid_arr[0].dim
+                    dimension = vgrid_arr[0].ndim
                     form = vgrid_arr[0].form
-                assert all(grid.dim == dimension
+                assert all(grid.ndim == dimension
                            and grid.form == form
                            for grid in vgrid_arr)
             if idx_helper is not None:
                 assert vgrid_arr.size == idx_helper.size - 1
             if min_points_per_axis is not None:
                 for vGrid in vgrid_arr:
-                    assert all(n_i >= min_points_per_axis for n_i in vGrid.n)
+                    assert all(n_i >= min_points_per_axis
+                               for n_i in vGrid.shape)
 
         if idx_multigrid is not None:
             assert isinstance(idx_multigrid, np.ndarray)
@@ -609,7 +610,8 @@ class SVGrid:
     def __str__(self,
                 write_physical_grid=False):
         """:obj:`str` :
-        A human readable string which describes all attributes of the instance."""
+        A human readable string which describes all attributes of the instance.
+        """
         description = ''
         description += "Dimension = {}\n".format(self.dim)
         description += "Geometric Form = {}\n".format(self.form)

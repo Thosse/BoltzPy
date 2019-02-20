@@ -130,11 +130,11 @@ class Collisions:
 
         for s[0] in range(n_spc):
             m[0] = mass[s[0]]
-            d[0] = sv.vGrids[s[0]].d
+            d[0] = sv.vGrids[s[0]].delta
             slc[0] = sv.idx_range(s[0])
             for s[1] in range(s[0], n_spc):
                 m[1] = mass[s[1]]
-                d[1] = sv.vGrids[s[1]].d
+                d[1] = sv.vGrids[s[1]].delta
                 slc[1] = sv.idx_range(s[1])
                 # v[0, 0] = v_pre_s0
                 for v[0, 0] in range(slc[0, 0], slc[0, 1]):

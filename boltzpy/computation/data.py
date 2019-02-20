@@ -91,10 +91,10 @@ class Data:
 
         self.t = 0
         self.tG = sim.t.iG  # keep it, for adaptive time grids
-        self.dt = sim.t.d
+        self.dt = sim.t.delta
 
-        self.dp = sim.p.d
-        self.p_dim = sim.p.dim
+        self.dp = sim.p.delta
+        self.p_dim = sim.p.ndim
         self.p_size = sim.p.size
 
         # Todo maybe a bad name -> denotes start time, not duration!
@@ -121,8 +121,7 @@ class Data:
 
         self._params = dict()
         # Keep as a "conditional" attribute?
-        self._params["col_mat"] = sim.coll.generate_collision_matrix(sim.t.d)
-
+        self._params["col_mat"] = sim.coll.generate_collision_matrix(sim.t.delta)
         return
 
     def __getattr__(self, item):

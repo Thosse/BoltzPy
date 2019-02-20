@@ -56,7 +56,7 @@ class Simulation:
     -----
         * :attr:`t.iG` denotes the time steps
           when the results are written to the HDF5 file.
-        * :attr:`t.multi` denotes the number of calculation steps
+        * :attr:`t.index_spacing` denotes the number of calculation steps
           between two writes.
 
     Parameters
@@ -121,7 +121,7 @@ class Simulation:
             self.t = bp.Grid.load(file[key])
         except KeyError:
             self.t = bp.Grid()
-        self.t.dim = 1
+        self.t.ndim = 1
 
         # load Position Grid
         try:
@@ -341,11 +341,11 @@ class Simulation:
         calculations_per_time_step : :obj:`int`
         """
         step_size = max_time / (number_time_steps - 1)
-        self.t = bp.Grid(grid_form='rectangular',
-                         grid_dimension=1,
-                         grid_shape=np.array([number_time_steps]),
-                         grid_spacing=step_size,
-                         grid_multiplicator=calculations_per_time_step)
+        self.t = bp.Grid(ndim=1,
+                         shape=np.array([number_time_steps]),
+                         form='rectangular',
+                         physical_spacing=step_size,
+                         index_spacing=calculations_per_time_step)
         return
 
     def setup_position_grid(self,
@@ -364,10 +364,10 @@ class Simulation:
         if isinstance(grid_shape, list):
             assert all([isinstance(item, int) for item in grid_shape])
             grid_shape = np.array(grid_shape, dtype=int)
-        self.p = bp.Grid(grid_form='rectangular',
-                         grid_dimension=grid_dimension,
-                         grid_shape=grid_shape,
-                         grid_spacing=grid_spacing)
+        self.p = bp.Grid(ndim=grid_dimension,
+                         shape=grid_shape,
+                         form='rectangular',
+                         physical_spacing=grid_spacing)
         # Update shape of initialization_array
         self.init_arr = np.full(shape=self.p.size,
                                 fill_value=-1,
@@ -776,14 +776,14 @@ class Simulation:
         if time_grid is not None:
             assert isinstance(time_grid, bp.Grid)
             time_grid.check_integrity(complete_check)
-            assert time_grid.dim == 1
+            assert time_grid.ndim == 1
 
         if position_grid is not None:
             assert isinstance(position_grid, bp.Grid)
             position_grid.check_integrity(complete_check)
             # Todo Remove this, when implementing 2D Transport
-            if position_grid.dim is not None \
-                    and position_grid.dim is not 1:
+            if position_grid.ndim is not None \
+                    and position_grid.ndim is not 1:
                 msg = "Currently only 1D Simulations are supported!"
                 raise NotImplementedError(msg)
 

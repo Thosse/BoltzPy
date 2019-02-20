@@ -1,10 +1,10 @@
 
 # Desired Command / Road Map
-import boltzpy as b_sim
+import boltzpy as bp
 import numpy as np
 
 exisiting_simulation_file = None
-sim = b_sim.Simulation(exisiting_simulation_file)
+sim = bp.Simulation(exisiting_simulation_file)
 if exisiting_simulation_file is None:
     sim.add_specimen(mass=2, collision_rate=[50])
     sim.add_specimen(mass=3, collision_rate=[50, 50])
