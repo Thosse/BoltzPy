@@ -3,13 +3,18 @@ import numpy as np
 import h5py
 from math import isclose
 
+import boltzpy as bp
 import boltzpy.constants as bp_c
 
 
+# noinspection PyPep8Naming
 class Grid:
     r"""Basic class for all Grids.
 
     .. todo::
+        - in case of homogeneous simulation (grid shape = [1])
+          force unnecessary parameters (spacings, delta) to be None.
+          this forces possibles errors to occur in development.
         - add index_spacing documentation
         - Add unit tests
         - Add grid.plot() method
@@ -328,7 +333,9 @@ class Grid:
     #####################################
     #           Verification            #
     #####################################
-    def check_integrity(self, complete_check=True):
+    def check_integrity(self,
+                        complete_check=True,
+                        context=None):
         """Sanity Check.
 
         Assert all conditions in :meth:`check_parameters`.
@@ -338,6 +345,9 @@ class Grid:
         complete_check : :obj:`bool`, optional
             If True, then all attributes must be assigned (not None).
             If False, then unassigned attributes are ignored.
+        context : :class:`Simulation`, optional
+            The Simulation, which this instance belongs to.
+            This allows additional checks.
         """
         self.check_parameters(ndim=self.ndim,
                               shape=self.shape,
@@ -350,7 +360,8 @@ class Grid:
                               iG=self.iG,
                               pG=self.pG,
                               boundaries=self.boundaries,
-                              complete_check=complete_check)
+                              complete_check=complete_check,
+                              context=context)
         return
 
     @staticmethod
@@ -365,7 +376,8 @@ class Grid:
                          iG=None,
                          pG=None,
                          boundaries=None,
-                         complete_check=False):
+                         complete_check=False,
+                         context=None):
         """Sanity Check.
 
         Checks integrity of given parameters and their interactions.
@@ -386,11 +398,18 @@ class Grid:
         complete_check : :obj:`bool`, optional
             If True, then all parameters must be set (not None).
             If False, then unassigned parameters are ignored.
+        context : :class:`Simulation`, optional
+            The Simulation, which this instance belongs to.
+            This allows additional checks.
         """
-        # For complete check, assert that all parameters are assigned
         assert isinstance(complete_check, bool)
+        # For complete check, assert that all parameters are assigned
         if complete_check is True:
-            assert all([param is not None for param in locals().values()])
+            assert all(param_val is not None
+                       for (param_key, param_val) in locals().items()
+                       if param_key != "context")
+        if context is not None:
+            assert isinstance(context, bp.Simulation)
 
         # check all parameters, if set
         if ndim is not None:
@@ -400,10 +419,11 @@ class Grid:
         if shape is not None:
             assert isinstance(shape, np.ndarray)
             assert shape.dtype == int
-            assert all(shape >= 2)
-
-        if ndim is not None and shape is not None:
-                assert shape.shape == (ndim,)
+            assert shape.ndim == 1
+            assert all(shape >= 2) or all(shape == 1)
+            if context is not None:
+                if all(shape == 1):
+                    assert context.scheme.Transport == "NoTransport"
 
         if physical_spacing is not None:
             assert isinstance(physical_spacing, float)
@@ -424,12 +444,6 @@ class Grid:
             assert isinstance(delta, float)
             assert delta > 0
 
-        if physical_spacing is not None \
-                and index_spacing is not None \
-                and delta is not None:
-            assert isclose(physical_spacing,
-                           index_spacing * delta)
-
         if size is not None:
             assert isinstance(size, int)
             assert size >= 1
@@ -441,11 +455,28 @@ class Grid:
             assert iG.dtype == int
             assert iG.ndim is 2
 
-        if ndim is not None and size is not None and iG is not None:
+        # Todo test pG
+
+        if boundaries is not None:
+            assert isinstance(boundaries, np.ndarray)
+            assert boundaries.dtype == float
+            assert boundaries.ndim == 2
+            assert boundaries.shape[0] == 2
+
+        # check correct attribute relations
+        if ndim is not None and shape is not None:
+                assert shape.shape == (ndim,)
+
+        if all(attr is not None
+               for attr in [physical_spacing, index_spacing, delta]):
+            assert isclose(physical_spacing,
+                           index_spacing * delta)
+
+        if all(attr is not None for attr in [ndim, size, iG]):
             assert iG.shape == (size, ndim)
 
         # distances between grid points are multiples of index spacing
-        if index_spacing is not None and iG is not None:
+        if all(attr is not None for attr in [index_spacing, iG]):
             shifted_array = iG - iG[0]
             assert np.all(shifted_array % index_spacing == 0)
 
@@ -455,14 +486,6 @@ class Grid:
                 assert np.array_equal(iG[0], -iG[-1])
             else:
                 assert np.all(iG[0] == 0)
-
-        # Todo test pG
-
-        if boundaries is not None:
-            assert isinstance(boundaries, np.ndarray)
-            assert boundaries.dtype == float
-            assert boundaries.ndim == 2
-            assert boundaries.shape[0] == 2
 
         return
 

@@ -38,12 +38,16 @@ class Scheme:
 
     #: :obj:`dict` [:obj:`str`, :obj:`list`]
     SUPP_VALUES = {
-        "OperatorSplitting": ["FirstOrder"],
+        "OperatorSplitting": ["FirstOrder",
+                              # NoTransport
+                              ],
         "Transport": ["FiniteDifferences_FirstOrder"],
         "Collisions_Generation": ["UniformComplete",
-                                  # "FreeFlow",
+                                  # "NoCollisions",
                                   ],
-        "Collisions_Computation": ["EulerScheme"]
+        "Collisions_Computation": ["EulerScheme",
+                                   # NoCollisions,
+                                   ]
     }
 
     #: :obj:`dict` [:obj:`str`, :obj:`type`]

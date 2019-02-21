@@ -473,6 +473,7 @@ class SVGrid:
             If False, then unassigned attributes are ignored.
         context : :class:`Simulation`, optional
             The Simulation, which this instance belongs to.
+            This allows additional checks.
         """
         self.check_parameters(form=self.form,
                               dimension=self.dim,
@@ -522,15 +523,16 @@ class SVGrid:
             If False, then unassigned parameters are ignored.
         context : :class:`Simulation`, optional
             The Simulation, which this instance belongs to.
+            This allows additional checks.
         """
-        if context is not None:
-            assert isinstance(context, bp.Simulation)
-
         assert isinstance(complete_check, bool)
+        # For complete check, assert that all parameters are assigned
         if complete_check is True:
             assert all(param_val is not None
                        for (param_key, param_val) in locals().items()
                        if param_key != "context")
+        if context is not None:
+            assert isinstance(context, bp.Simulation)
 
         # check all parameters, if set
         if form is not None:
