@@ -392,8 +392,8 @@ class Simulation:
         max_velocity : :obj:`float`
         grid_form : :obj:`str`, optional
         """
-        self.sv = bp.SVGrid(grid_form=grid_form,
-                            grid_dimension=grid_dimension,
+        self.sv = bp.SVGrid(form=grid_form,
+                            ndim=grid_dimension,
                             min_points_per_axis=min_points_per_axis,
                             max_velocity=max_velocity,
                             masses=self.s.mass)
@@ -805,7 +805,7 @@ class Simulation:
                         and species is not None
                         and species_velocity_grid is not None):
                     assert rule.drift.shape == (species.size,
-                                                species_velocity_grid.dim)
+                                                species_velocity_grid.ndim)
                 if rule.temp is not None and species is not None:
                     assert rule.temp.shape == (species.size,)
 

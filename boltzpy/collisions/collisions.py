@@ -116,7 +116,7 @@ class Collisions:
         v = np.zeros((2, 2), dtype=int)
         # physical velocities (in multiples of d[s])
         # indexed as in v:  pv[i, j] = sv.iMG[ v[i, j] ]
-        pv = np.zeros((2, 2, sv.dim), dtype=int)
+        pv = np.zeros((2, 2, sv.ndim), dtype=int)
 
         # For the colliding specimen we keep track of
         # specimen-indices
@@ -189,7 +189,7 @@ class Collisions:
             Array of shape=(2,2).
         pv : array(int)
             Physical Velocities, as multiples of their respective step size d.
-            Array of shape=(2,2, sv.dim).
+            Array of shape=(2,2, sv.ndim).
 
         Returns
         -------

@@ -14,11 +14,7 @@ class SVGrid:
     .. todo::
         - add fast method to get physical velocities from index (cython!)
           Apply this in pG attribute.
-        - Ask Hans, should the Grid always contain the center/zero?
         - Todo Add unit tests
-        - is it useful to implement different construction schemes?
-          (grid boundaries/step_size can be chosen to fit in grids,
-          based on the least common multiple,...)
 
     Attributes
     ----------
@@ -26,7 +22,7 @@ class SVGrid:
         Geometric form of all Velocity :class:`Grids <boltzpy.Grid>`.
         Must be an element of
         :const:`~boltzpy.constants.SUPP_GRID_FORMS`.
-    dim : :obj:`int`
+    ndim : :obj:`int`
         Dimensionality of all Velocity :class:`Grids <boltzpy.Grid>`.
         Must be in :const:`~boltzpy.constants.SUPP_GRID_DIMENSIONS`.
     masses : :obj:`~numpy.array` [:obj:`int`]
@@ -52,18 +48,18 @@ class SVGrid:
     """
 
     def __init__(self,
-                 grid_form=None,
-                 grid_dimension=None,
+                 form=None,
+                 ndim=None,
                  min_points_per_axis=None,
                  max_velocity=None,
                  masses=None):
-        self.check_parameters(form=grid_form,
-                              dimension=grid_dimension,
+        self.check_parameters(form=form,
+                              ndim=ndim,
                               max_velocity=max_velocity,
                               min_points_per_axis=min_points_per_axis,
                               masses=masses)
-        self.form = grid_form
-        self.dim = grid_dimension
+        self.form = form
+        self.ndim = ndim
         self._MAX_V = max_velocity
         self._MIN_N = min_points_per_axis
         self.masses = masses
@@ -146,7 +142,7 @@ class SVGrid:
         False Otherwise.
         """
         necessary_params = [self.form,
-                            self.dim,
+                            self.ndim,
                             self._MAX_V,
                             self._MIN_N,
                             self.masses]
@@ -252,13 +248,13 @@ class SVGrid:
         n_complete_segments = math.ceil(min_segments / min_mass)
         number_of_grid_points = [(n_complete_segments * mass) + 1
                                  for mass in self.masses]
-        grid_shapes = [[n] * self.dim for n in number_of_grid_points]
+        grid_shapes = [[n] * self.ndim for n in number_of_grid_points]
         # spacing of the velocity grid for each specimen
         # Todo replace, allow Grid.init with number of points (array)
         spacings = [2 * self._MAX_V / (n_i - 1)
                     for n_i in number_of_grid_points]
         # Contains the velocity Grid of each specimen
-        vGrids = [bp.Grid(ndim=self.dim,
+        vGrids = [bp.Grid(ndim=self.ndim,
                           shape=np.array(grid_shapes[i]),
                           form=self.form,
                           physical_spacing=spacings[i],
@@ -273,7 +269,7 @@ class SVGrid:
             self._index[i_G + 1] = self._index[i_G] + vGrid.size
 
         # construct self.iMG
-        self.iMG = np.zeros((self.size, self.dim),
+        self.iMG = np.zeros((self.size, self.ndim),
                             dtype=int)
         # store the integer Grids (vGrid.iG), by writing them
         # consecutively into the integer Multi-Grid (self.iMG)
@@ -338,7 +334,7 @@ class SVGrid:
         # get vector-index, by reversing Grid.centralize() - method
         i_vec = np.array((grid_entry + self.vGrids[specimen_index].shape - 1) // 2,
                          dtype=int)
-        for _dim in range(self.dim):
+        for _dim in range(self.ndim):
             n_loc = self.vGrids[specimen_index].shape[_dim]
             i_flat *= n_loc
             i_flat += i_vec[_dim]
@@ -404,9 +400,9 @@ class SVGrid:
             self.form = None
         try:
             key = "Dimension"
-            self.dim = int(hdf5_group[key][()])
+            self.ndim = int(hdf5_group[key][()])
         except KeyError:
-            self.dim = None
+            self.ndim = None
         try:
             key = "Maximum Velocity"
             self._MAX_V = hdf5_group[key][()]
@@ -445,8 +441,8 @@ class SVGrid:
         # write all set attributes to file
         if self.form is not None:
             hdf5_group["Form"] = self.form
-        if self.dim is not None:
-            hdf5_group["Dimension"] = self.dim
+        if self.ndim is not None:
+            hdf5_group["Dimension"] = self.ndim
         if self._MAX_V is not None:
             hdf5_group["Maximum Velocity"] = self._MAX_V
         if self._MIN_N is not None:
@@ -476,7 +472,7 @@ class SVGrid:
             This allows additional checks.
         """
         self.check_parameters(form=self.form,
-                              dimension=self.dim,
+                              ndim=self.ndim,
                               max_velocity=self._MAX_V,
                               min_points_per_axis=self._MIN_N,
                               masses=self.masses,
@@ -496,7 +492,7 @@ class SVGrid:
 
     @staticmethod
     def check_parameters(form=None,
-                         dimension=None,
+                         ndim=None,
                          max_velocity=None,
                          min_points_per_axis=None,
                          masses=None,
@@ -511,7 +507,7 @@ class SVGrid:
         Parameters
         ----------
         form : :obj:`str`, optional
-        dimension : :obj:`int`, optional
+        ndim : :obj:`int`, optional
         max_velocity : :obj:`float`. optional
         min_points_per_axis : :obj:`int` optional
         masses : :obj:`~numpy.array` [:obj:`int`], optional
@@ -539,11 +535,11 @@ class SVGrid:
             assert isinstance(form, str)
             assert form in bp_c.SUPP_GRID_FORMS
 
-        if dimension is not None:
-            assert isinstance(dimension, int)
-            assert dimension in bp_c.SUPP_GRID_DIMENSIONS
+        if ndim is not None:
+            assert isinstance(ndim, int)
+            assert ndim in bp_c.SUPP_GRID_DIMENSIONS
             if context is not None and context.p.ndim is not None:
-                assert dimension >= context.p.ndim
+                assert ndim >= context.p.ndim
 
         if max_velocity is not None:
             assert isinstance(max_velocity, float)
@@ -582,10 +578,10 @@ class SVGrid:
             if context is not None:
                 assert vgrid_arr.size == context.s.size
             if vgrid_arr.size > 0:
-                if dimension is None:
-                    dimension = vgrid_arr[0].ndim
+                if ndim is None:
+                    ndim = vgrid_arr[0].ndim
                     form = vgrid_arr[0].form
-                assert all(grid.ndim == dimension
+                assert all(grid.ndim == ndim
                            and grid.form == form
                            for grid in vgrid_arr)
             if idx_helper is not None:
@@ -615,7 +611,7 @@ class SVGrid:
         A human readable string which describes all attributes of the instance.
         """
         description = ''
-        description += "Dimension = {}\n".format(self.dim)
+        description += "Dimension = {}\n".format(self.ndim)
         description += "Geometric Form = {}\n".format(self.form)
         description += "Total Size = {}\n".format(self.size)
 
