@@ -15,7 +15,7 @@ class Grid:
         - in case of homogeneous simulation (grid shape = [1])
           force unnecessary parameters (spacings, delta) to be None.
           this forces possibles errors to occur in development.
-        - add index_spacing documentation
+        - add spacing documentation
         - Add unit tests
         - Add grid.plot() method
         - Add form = "circular"
@@ -47,7 +47,7 @@ class Grid:
         :const:`~boltzpy.constants.SUPP_GRID_FORMS`.
     physical_spacing : :obj:`float`
         Step size for the physical grid points.
-    index_spacing : :obj:`int`, optional
+    spacing : :obj:`int`, optional
         This allows
         centered velocity grids (without the zero),
         write-intervalls for time grids
@@ -66,7 +66,7 @@ class Grid:
         Geometric form of the :class:`Grid`.
     delta : :obj:`float`
         Smallest possible step size of the :obj:`Grid`.
-    index_spacing : :obj:`int`, optional
+    spacing : :obj:`int`, optional
         This allows
         centered velocity grids (without the zero),
         write-intervalls for time grids
@@ -86,22 +86,22 @@ class Grid:
                  shape=None,
                  form=None,
                  physical_spacing=None,
-                 index_spacing=2,
+                 spacing=2,
                  is_centered=False):
         self.check_parameters(ndim=ndim,
                               shape=shape,
                               form=form,
                               physical_spacing=physical_spacing,
-                              index_spacing=index_spacing,
+                              spacing=spacing,
                               is_centered=is_centered)
         self.ndim = ndim
         self.shape = shape
         self.form = form
         if physical_spacing is not None:
-            self.delta = physical_spacing / index_spacing
+            self.delta = physical_spacing / spacing
         else:
             self.delta = None
-        self.index_spacing = index_spacing
+        self.spacing = spacing
         self.is_centered = is_centered
         self.iG = None
         # set up self.iG, if all necessary parameters are given
@@ -129,10 +129,10 @@ class Grid:
 
         It holds :math:`physical \_ spacing = delta \cdot index \_ spacing`.
         """
-        if self.delta is None or self.index_spacing is None:
+        if self.delta is None or self.spacing is None:
             return None
         else:
-            return self.delta * self.index_spacing
+            return self.delta * self.spacing
 
     @property
     def pG(self):
@@ -177,7 +177,7 @@ class Grid:
                             self.shape,
                             self.delta,
                             self.form,
-                            self.index_spacing,
+                            self.spacing,
                             self.is_centered]
         if any([val is None for val in necessary_params]):
             return False
@@ -207,8 +207,8 @@ class Grid:
         # Create rectangular Grid first
         # Create list of axes (1D arrays)
         axes = [np.arange(0,
-                          points_on_axis * self.index_spacing,
-                          self.index_spacing)
+                          points_on_axis * self.spacing,
+                          self.spacing)
                 for points_on_axis in self.shape]
         # Create mesh grid from axes
         # Note that *[a,b,c] == a,b,c
@@ -251,15 +251,15 @@ class Grid:
         """Shift the integer Grid (:attr:`iG`) to be centered around zero.
         """
         assert isinstance(self.iG, np.ndarray)
-        assert self.index_spacing is not None
+        assert self.spacing is not None
         double_shift = np.max(self.iG, axis=0) + np.min(self.iG, axis=0)
         if np.all(double_shift % 2 == 0):
             shift = double_shift // 2
             self.iG -= shift
         else:
             msg = "Even Grids can only be centralized, " \
-                  "if the index_spacing is even. " \
-                  "index_spacing = {}".format(self.index_spacing)
+                  "if the spacing is even. " \
+                  "spacing = {}".format(self.spacing)
             raise AttributeError(msg)
         return
 
@@ -295,10 +295,10 @@ class Grid:
             params["physical_spacing"] = float(hdf5_group["Physical_Spacing"][()])
         if "Form" in hdf5_group.keys():
             params["form"] = hdf5_group["Form"][()]
-        if "Index_Spacing" in hdf5_group.keys():
-            params["index_spacing"] = int(hdf5_group["Index_Spacing"][()])
+        if "Spacing" in hdf5_group.keys():
+            params["spacing"] = int(hdf5_group["Spacing"][()])
         else:
-            params["index_spacing"] = None
+            params["spacing"] = None
         if "Is_Centered" in hdf5_group.keys():
             params["is_centered"] = bool(hdf5_group["Is_Centered"][()])
         else:
@@ -332,8 +332,8 @@ class Grid:
             hdf5_group["Physical_Spacing"] = self.physical_spacing
         if self.form is not None:
             hdf5_group["Form"] = self.form
-        if self.index_spacing is not None:
-            hdf5_group["Index_Spacing"] = self.index_spacing
+        if self.spacing is not None:
+            hdf5_group["Spacing"] = self.spacing
         if self.is_centered is not None:
             hdf5_group["Is_Centered"] = self.is_centered
 
@@ -365,7 +365,7 @@ class Grid:
                               shape=self.shape,
                               physical_spacing=self.physical_spacing,
                               form=self.form,
-                              index_spacing=self.index_spacing,
+                              spacing=self.spacing,
                               is_centered=self.is_centered,
                               delta=self.delta,
                               size=self.size,
@@ -381,7 +381,7 @@ class Grid:
                          shape=None,
                          physical_spacing=None,
                          form=None,
-                         index_spacing=None,
+                         spacing=None,
                          is_centered=None,
                          delta=None,
                          size=None,
@@ -400,7 +400,7 @@ class Grid:
         shape : :obj:`tuple` [:obj:`int`], optional
         physical_spacing : :obj:`float`, optional
         form : :obj:`str`, optional
-        index_spacing : :obj:`int`, optional
+        spacing : :obj:`int`, optional
         is_centered : :obj:`bool`, optional
         delta : :obj:`float`, optional
         size : :obj:`int`, optional
@@ -442,9 +442,9 @@ class Grid:
             assert isinstance(form, str)
             assert form in bp_c.SUPP_GRID_FORMS
 
-        if index_spacing is not None:
-            assert isinstance(index_spacing, int)
-            assert index_spacing > 0
+        if spacing is not None:
+            assert isinstance(spacing, int)
+            assert spacing > 0
 
         if is_centered is not None:
             assert isinstance(is_centered, bool)
@@ -477,17 +477,17 @@ class Grid:
                 assert len(shape) == ndim
 
         if all(attr is not None
-               for attr in [physical_spacing, index_spacing, delta]):
+               for attr in [physical_spacing, spacing, delta]):
             assert isclose(physical_spacing,
-                           index_spacing * delta)
+                           spacing * delta)
 
         if all(attr is not None for attr in [ndim, size, iG]):
             assert iG.shape == (size, ndim)
 
         # distances between grid points are multiples of index spacing
-        if all(attr is not None for attr in [index_spacing, iG]):
+        if all(attr is not None for attr in [spacing, iG]):
             shifted_array = iG - iG[0]
-            assert np.all(shifted_array % index_spacing == 0)
+            assert np.all(shifted_array % spacing == 0)
 
         if is_centered is not None and iG is not None:
             if is_centered:
@@ -524,7 +524,7 @@ class Grid:
         description += "Geometric Form = {}\n".format(self.form)
         description += "Total Size = {}\n".format(self.size)
         description += "Physical_Spacing = {}\n".format(self.physical_spacing)
-        description += "Index_Spacing = {}\n".format(self.index_spacing)
+        description += "Spacing = {}\n".format(self.spacing)
         description += "Internal Step Size = {}\n".format(self.delta)
         description += 'Is_Centered = {}\n'.format(self.is_centered)
         description += "Boundaries:\n"

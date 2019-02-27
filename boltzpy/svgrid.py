@@ -37,7 +37,7 @@ class SVGrid:
         Maximum physical velocity for every sub grid.
     shapes : :obj:`list` [:obj:`tuple` [:obj:`int`]]
         Contains the shape of each sub grid.
-    index_spacings : :obj:`list` [:obj:`int`]
+    spacings : :obj:`list` [:obj:`int`]
         Contains the index spacing of each sub grid.
     forms : :obj:`list` [:obj:`str`]
         Contains the geometric form of each sub grid
@@ -55,8 +55,8 @@ class SVGrid:
         Contains the :attr:`Grid.form` of each sub grid.
     shapes : :obj:`list` [:obj:`tuple` [:obj:`int`]]
         Contains the :attr:`Grid.shape` of each sub grid.
-    index_spacings : :obj:`list` [:obj:`int`]
-        Contains the :attr:`Grid.index_spacing` of each sub grid.
+    spacings : :obj:`list` [:obj:`int`]
+        Contains the :attr:`Grid.spacing` of each sub grid.
     delta : :obj:`float`
         Smallest possible step size of the :obj:`Grid`.
     index_range : :obj:`~numpy.array` [:obj:`int`]
@@ -80,17 +80,17 @@ class SVGrid:
                  ndim=None,
                  maximum_velocity=None,
                  shapes=None,
-                 index_spacings=None,
+                 spacings=None,
                  forms=None):
         self.check_parameters(ndim=ndim,
                               shapes=shapes,
-                              index_spacings=None,
+                              spacings=None,
                               maximum_velocity=maximum_velocity,
                               forms=forms)
         self.ndim = ndim
         self.maximum_velocity = maximum_velocity
         self.shapes = shapes
-        self.index_spacings = index_spacings
+        self.spacings = spacings
         self.forms = forms
         # the following attributes are set in setup()
         self.delta = None
@@ -145,7 +145,7 @@ class SVGrid:
         """
         necessary_params = [self.ndim,
                             self.shapes,
-                            self.index_spacings,
+                            self.spacings,
                             self.forms]
         if any([val is None for val in necessary_params]):
             return False
@@ -188,7 +188,7 @@ class SVGrid:
                                shape=self.shapes[i],
                                form=self.forms[i],
                                physical_spacing=1.0,
-                               index_spacing=self.index_spacings[i],
+                               spacing=self.spacings[i],
                                is_centered=True)
             self.vGrids[i] = new_grid
             self.index_range[i, 1] = self.index_range[i, 0] + new_grid.size
@@ -302,10 +302,10 @@ class SVGrid:
             shapes = [tuple(int(width) for width in shape)
                       for shape in hdf5_group["Shapes"]]
             params["shapes"] = shapes
-        if "Index_Spacings" in hdf5_group.keys():
-            index_spacings = [int(spacing)
-                              for spacing in hdf5_group["Index_Spacings"]]
-            params["index_spacings"] = index_spacings
+        if "Spacings" in hdf5_group.keys():
+            spacings = [int(spacing)
+                        for spacing in hdf5_group["Spacings"]]
+            params["spacings"] = spacings
         if "Forms" in hdf5_group.keys():
             params["forms"] = list(hdf5_group["Forms"][()])
 
@@ -335,8 +335,8 @@ class SVGrid:
             hdf5_group["Maximum_Velocity"] = self.maximum_velocity
         if self.shapes is not None:
             hdf5_group["Shapes"] = self.shapes
-        if self.index_spacings is not None:
-            hdf5_group["Index_Spacings"] = self.index_spacings
+        if self.spacings is not None:
+            hdf5_group["Spacings"] = self.spacings
         if self.forms is not None:
             # Todo This is a dirty hack
             hdf5_group["Forms"] = np.array(self.forms,
@@ -371,7 +371,7 @@ class SVGrid:
                               maximum_velocity=self.maximum_velocity,
                               delta=self.delta,
                               shapes=self.shapes,
-                              index_spacings=self.index_spacings,
+                              spacings=self.spacings,
                               forms=self.forms,
                               index_range=self.index_range,
                               vGrids=self.vGrids,
@@ -389,7 +389,7 @@ class SVGrid:
                          maximum_velocity=None,
                          delta=None,
                          shapes=None,
-                         index_spacings=None,
+                         spacings=None,
                          forms=None,
                          vGrids=None,
                          index_range=None,
@@ -408,7 +408,7 @@ class SVGrid:
         maximum_velocity : :obj:`float`. optional
         delta : :obj:`float`, optional
         shapes : :obj:`list` [:obj:`tuple` [:obj:`int`]], optional
-        index_spacings : :obj:`list` [:obj:`int`], optional
+        spacings : :obj:`list` [:obj:`int`], optional
         forms : :obj:`list` [:obj:`str`], optional
         vGrids : :obj:`~numpy.array` [:class:`Grid`], optional
         index_range : :obj:`~numpy.array` [:obj:`int`], optional
@@ -461,15 +461,15 @@ class SVGrid:
                 if any(entry != shape[0] for entry in shape):
                     raise NotImplementedError
 
-        if index_spacings is not None:
-            assert isinstance(index_spacings, list)
+        if spacings is not None:
+            assert isinstance(spacings, list)
             if number_of_grids is not None:
-                assert number_of_grids == len(index_spacings)
+                assert number_of_grids == len(spacings)
             else:
-                number_of_grids = len(index_spacings)
-            for index_spacing in index_spacings:
+                number_of_grids = len(spacings)
+            for spacing in spacings:
                 bp.Grid.check_parameters(ndim=ndim,
-                                         index_spacing=index_spacing,
+                                         spacing=spacing,
                                          context=context)
 
         if forms is not None:
@@ -504,8 +504,8 @@ class SVGrid:
                     assert delta == G.delta
                 if shapes is not None:
                     assert np.all(shapes[idx_G] == G.shape)
-                if index_spacings is not None:
-                    assert index_spacings[idx_G] == G.index_spacing
+                if spacings is not None:
+                    assert spacings[idx_G] == G.spacing
                 if forms is not None:
                     assert forms[idx_G] == G.form
             if context is not None:

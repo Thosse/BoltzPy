@@ -57,7 +57,7 @@ class Simulation:
     -----
         * :attr:`t.iG` denotes the time steps
           when the results are written to the HDF5 file.
-        * :attr:`t.index_spacing` denotes the number of calculation steps
+        * :attr:`t.spacing` denotes the number of calculation steps
           between two writes.
 
     Parameters
@@ -345,7 +345,7 @@ class Simulation:
                          shape=(number_time_steps,),
                          form='rectangular',
                          physical_spacing=step_size,
-                         index_spacing=calculations_per_time_step)
+                         spacing=calculations_per_time_step)
         return
 
     def setup_position_grid(self,
@@ -397,15 +397,15 @@ class Simulation:
             raise AttributeError
         lcm = int(h_lcm.lcm(self.s.mass))
         if use_identical_spacing:
-            index_spacings = [2] * self.s.size
+            spacings = [2] * self.s.size
         else:
-            index_spacings = [2 * lcm // int(m)
+            spacings = [2 * lcm // int(m)
                               for m in self.s.mass]
         forms = [geometric_form] * self.s.size
         self.sv = bp.SVGrid(ndim=grid_dimension,
                             maximum_velocity=maximum_velocity,
                             shapes=shapes,
-                            index_spacings=index_spacings,
+                            spacings=spacings,
                             forms=forms)
         return
 
