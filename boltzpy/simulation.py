@@ -2,7 +2,8 @@ import os
 import h5py
 import numpy as np
 
-import boltzpy.helpers.file_addresses as bp_h
+import boltzpy.helpers.file_addresses as h_adr
+import boltzpy.helpers.least_common_multiple as h_lcm
 import boltzpy.animation as bp_ani
 import boltzpy.computation.compute as bp_cp
 import boltzpy.constants as bp_c
@@ -134,7 +135,6 @@ class Simulation:
         try:
             key = "Velocity_Grids"
             self.sv = bp.SVGrid.load(file[key])
-            self.sv.setup()
         except KeyError:
             self.sv = bp.SVGrid()
 
@@ -206,7 +206,7 @@ class Simulation:
     def file_address(self, new_file_address):
         # separate file directory and file root, using a helper function
         # This standardizes the naming scheme
-        h_separate = bp_h.split_address
+        h_separate = h_adr.split_address
         [new_file_directory, new_file_root] = h_separate(new_file_address)
         new_file_address = new_file_directory + new_file_root
         # Sanity check on (standardized) file address
@@ -342,7 +342,7 @@ class Simulation:
         """
         step_size = max_time / (number_time_steps - 1)
         self.t = bp.Grid(ndim=1,
-                         shape=np.array([number_time_steps]),
+                         shape=(number_time_steps,),
                          form='rectangular',
                          physical_spacing=step_size,
                          index_spacing=calculations_per_time_step)
@@ -358,12 +358,9 @@ class Simulation:
         Parameters
         ----------
         grid_dimension : :obj:`int`
-        grid_shape : :obj:`~numpy.array` [:obj:`int`] or :obj:`list` [:obj:`int`]
+        grid_shape : :obj:`tuple` [:obj:`int`]
         grid_spacing : :obj:`float`
         """
-        if isinstance(grid_shape, list):
-            assert all([isinstance(item, int) for item in grid_shape])
-            grid_shape = np.array(grid_shape, dtype=int)
         self.p = bp.Grid(ndim=grid_dimension,
                          shape=grid_shape,
                          form='rectangular',
@@ -376,9 +373,10 @@ class Simulation:
 
     def set_velocity_grids(self,
                            grid_dimension,
-                           min_points_per_axis,
-                           max_velocity,
-                           grid_form='rectangular'):
+                           maximum_velocity,
+                           shapes,
+                           geometric_form='rectangular',
+                           use_identical_spacing=False):
         """Set up :attr:`sv`.
 
         1. Generate a minimal Velocity :class:`Grid`.
@@ -388,15 +386,27 @@ class Simulation:
         Parameters
         ----------
         grid_dimension : :obj:`int`
-        min_points_per_axis : :obj:`int`
-        max_velocity : :obj:`float`
-        grid_form : :obj:`str`, optional
+        maximum_velocity : :obj:`float`
+        shapes : :obj:`list` [:obj:`tuple` [:obj:`int`]]
+        geometric_form : :obj:`str`, optional
+        use_identical_spacing : :obj:`bool`, optional
+            If True, then all specimen use equal grids.
+            If False, then the spacing is adjusted to the mass ratio.
         """
-        self.sv = bp.SVGrid(form=grid_form,
-                            ndim=grid_dimension,
-                            min_points_per_axis=min_points_per_axis,
-                            max_velocity=max_velocity,
-                            masses=self.s.mass)
+        if not self.s.is_configured:
+            raise AttributeError
+        lcm = int(h_lcm.lcm(self.s.mass))
+        if use_identical_spacing:
+            index_spacings = [2] * self.s.size
+        else:
+            index_spacings = [2 * lcm // int(m)
+                              for m in self.s.mass]
+        forms = [geometric_form] * self.s.size
+        self.sv = bp.SVGrid(ndim=grid_dimension,
+                            maximum_velocity=maximum_velocity,
+                            shapes=shapes,
+                            index_spacings=index_spacings,
+                            forms=forms)
         return
 
     def add_rule(self,
@@ -567,7 +577,7 @@ class Simulation:
         if snapshot_name is None:
             snapshot_name = (self.file_address + '_t={}.eps'.format(time_step))
         else:
-            (file_dir,) = bp_h.split_address(snapshot_name)
+            (file_dir,) = h_adr.split_address(snapshot_name)
             assert os.path.isdir(file_dir)
             assert os.access(file_dir, os.W_OK)
 

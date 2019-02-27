@@ -72,14 +72,9 @@ class Data:
         self.result = np.copy(self.state)
 
         # Velocity Grid parameters
-        # Todo rework SVGRID._index -> idx_range, shape = (s.size, 2)
-        # Todo noting begin and end of a specimens velocity grid
-        # Todo replace this by a sv_grid attribute idx_range
-        # Todo replace sv._index and self.index_range() by index_range
-        self.v_range = np.array([[sim.sv._index[idx], sim.sv._index[idx+1]]
-                                 for idx in range(sim.s.size)])
+        self.v_range = sim.sv.index_range
         # Todo rename pMG -> pG and implement efficiently
-        self.vG = sim.sv.pMG
+        self.vG = sim.sv.delta * sim.sv.iMG
         # Todo rename offset, remove from svgrid -> movingObserver?
         self.velocity_offset = np.array(sim.scheme.Transport_VelocityOffset)
         # Todo Add this as property to SVGRID

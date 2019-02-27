@@ -25,14 +25,22 @@ class Grid:
         - Enable non-uniform/adaptive Grids
           (see :class:`~boltzpy.computation.Calculation`)
 
+        Note
+    ----
+    The parameter :attr:`iMG` describes the
+    position/physical values of all  Grid points.
+    All entries must be viewed as multiples of :attr:`delta:
+
+        :math:`pG = iG \cdot d`.
+
     Parameters
     ----------
     ndim : :obj:`int`
         The number of :obj:`Grid` dimensions.
         Must be in :const:`~boltzpy.constants.SUPP_GRID_DIMENSIONS`.
-    shape : :obj:`~numpy.array` [:obj:`int`]
+    shape : :obj:`tuple` [:obj:`int`]
         Number of :obj:`Grid` points for each dimension.
-        Array of shape (:attr:`dim`).
+        Tuple of length :attr:`ndim`.
     form : :obj:`str`
         Geometric form of the :class:`Grid`.
         Must be an element of
@@ -52,7 +60,7 @@ class Grid:
     ----------
     ndim : :obj:`int`
         The number of :obj:`Grid` dimensions.
-    shape : :obj:`~numpy.array` [:obj:`int`]
+    shape : :obj:`tuple` [:obj:`int`]
         Number of :obj:`Grid` points for each dimension.
     form : :obj:`str`
         Geometric form of the :class:`Grid`.
@@ -80,11 +88,14 @@ class Grid:
                  physical_spacing=None,
                  index_spacing=2,
                  is_centered=False):
+        self.check_parameters(ndim=ndim,
+                              shape=shape,
+                              form=form,
+                              physical_spacing=physical_spacing,
+                              index_spacing=index_spacing,
+                              is_centered=is_centered)
         self.ndim = ndim
-        if shape is not None:
-            self.shape = np.array(shape, dtype=int)
-        else:
-            self.shape = None
+        self.shape = shape
         self.form = form
         if physical_spacing is not None:
             self.delta = physical_spacing / index_spacing
@@ -123,7 +134,6 @@ class Grid:
         else:
             return self.delta * self.index_spacing
 
-    # Todo move into function, set parameter for matrix/tensor style?
     @property
     def pG(self):
         r""":obj:`~numpy.array` [:obj:`float`] :
@@ -277,9 +287,12 @@ class Grid:
         if "Dimensions" in hdf5_group.keys():
             params["ndim"] = int(hdf5_group["Dimensions"][()])
         if "Shape" in hdf5_group.keys():
-            params["shape"] = hdf5_group["Shape"][()]
+            # cast into tuple of ints
+            shape = hdf5_group["Shape"][()]
+            params["shape"] = tuple(int(width) for width in shape)
+        # Todo remove physical spacing as attribute(parameter
         if "Physical_Spacing" in hdf5_group.keys():
-            params["physical_spacing"] = hdf5_group["Physical_Spacing"][()]
+            params["physical_spacing"] = float(hdf5_group["Physical_Spacing"][()])
         if "Form" in hdf5_group.keys():
             params["form"] = hdf5_group["Form"][()]
         if "Index_Spacing" in hdf5_group.keys():
@@ -326,8 +339,7 @@ class Grid:
 
         # check that the class can be reconstructed from the save
         other = Grid.load(hdf5_group)
-        # Todo Implement __eq__ method
-        # assert self == other
+        assert self == other
         return
 
     #####################################
@@ -385,7 +397,7 @@ class Grid:
         Parameters
         ----------
         ndim : :obj:`int`, optional
-        shape : :obj:`~numpy.array` [:obj:`int`], optional
+        shape : :obj:`tuple` [:obj:`int`], optional
         physical_spacing : :obj:`float`, optional
         form : :obj:`str`, optional
         index_spacing : :obj:`int`, optional
@@ -417,13 +429,10 @@ class Grid:
             assert ndim in bp_c.SUPP_GRID_DIMENSIONS
 
         if shape is not None:
-            assert isinstance(shape, np.ndarray)
-            assert shape.dtype == int
-            assert shape.ndim == 1
-            assert all(shape >= 2) or all(shape == 1)
-            if context is not None:
-                if all(shape == 1):
-                    assert context.scheme.Transport == "NoTransport"
+            assert isinstance(shape, tuple)
+            assert all(isinstance(width, int) for width in shape)
+            assert (all(width >= 2 for width in shape)
+                    or all(width == 1 for width in shape))
 
         if physical_spacing is not None:
             assert isinstance(physical_spacing, float)
@@ -448,7 +457,7 @@ class Grid:
             assert isinstance(size, int)
             assert size >= 1
             if form is 'rectangular' and shape is not None:
-                assert shape.prod() == size
+                assert np.prod(shape) == size
 
         if iG is not None:
             assert isinstance(iG, np.ndarray)
@@ -465,7 +474,7 @@ class Grid:
 
         # check correct attribute relations
         if ndim is not None and shape is not None:
-                assert shape.shape == (ndim,)
+                assert len(shape) == ndim
 
         if all(attr is not None
                for attr in [physical_spacing, index_spacing, delta]):
@@ -488,6 +497,23 @@ class Grid:
                 assert np.all(iG[0] == 0)
 
         return
+
+    def __eq__(self, other):
+        if not isinstance(other, Grid):
+            return False
+        if set(self.__dict__.keys()) != set(other.__dict__.keys()):
+            return False
+        for (key, value) in self.__dict__.items():
+            other_value = other.__dict__[key]
+            if type(value) != type(other_value):
+                return False
+            if isinstance(value, np.ndarray):
+                if np.all(value != other_value):
+                    return False
+            else:
+                if value != other_value:
+                    return False
+        return True
 
     def __str__(self, write_physical_grids=False):
         """:obj:`str` :
