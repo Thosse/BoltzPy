@@ -36,9 +36,9 @@ def create_psv_grid(self):
         for i_s in range(self.s.size):
             rho = r.rho[i_s]
             temp = r.temp[i_s]
-            [begin, end] = self.sv.idx_range(i_s)
+            [begin, end] = self.sv.index_range[i_s]
             v_grid = self.sv.iMG[begin:end]
-            dv = self.sv.vGrids[i_s].d
+            dv = self.sv.delta
             for (i_v, v) in enumerate(v_grid):
                 # Physical Velocity
                 pv = dv * v

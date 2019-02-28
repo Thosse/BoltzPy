@@ -7,8 +7,6 @@ import h5py
 import boltzpy as bp
 
 
-# Todo Add Collision Scheme "Free_Flow"
-# Todo rework this, using new SVGrid
 class Collisions:
     r"""Generates and encapsulates the collision :attr:`relations`
     and :attr:`weights`.
@@ -16,17 +14,13 @@ class Collisions:
     .. todo::
         - check integrity (non neg weights,
           no multiple occurrences, physical correctness)
-        - print method - visualization of collisions
+        - plot method - visualization of collisions (opt. param: svgrid, species)
         - add load / save method
         - **Add Stefan's Generation-Scheme**
         - can both the transport and the collisions
-          be implemented as interpolations? -> GPU Speed-Up
-        - How to sort the arrays for maximum efficiency?
-
+          be implemented as interpolations? -> GPU Speed-UP
         - count collisions for each pair of specimen? Useful?
-        - only for implemented index_difference:
-          choose v[2] out of smaller grid
-          which only contains possible values
+          This allows to do collision steps specieswise, but also leads to more matrices...
         - Check if its faster to switch v[0, 1] and v[1, 0]?
         - @generate: replace for loops by numpy.apply_along_axis
           (this probably needs several additional functions).
@@ -35,11 +29,10 @@ class Collisions:
     ----------
     relations : :obj:`~numpy.array` [:obj:`int`]
         Contains the active collisions.
-        Each collision is a 4-tuple of indices in :attr:`sv.iG`
+        Each collision is a 4-tuple of indices in :attr:`sv.iMG`
         and is in the form
-        :math:`\left[ v_{s_1}^{pre}, v_{s_1}^{post},
-        v_{s_2}^{pre}, v_{s_2}^{post}
-        \right]`.
+        :math:`\left[ v_0, v_1, w_0, w_1\right]`,
+        where *_0, *_1 are the pre and post collision velocities, respectively.
     weights : :obj:`~numpy.array` [:obj:`float`]
         Contains the numeric integration weights
         of the respective collision in :attr:`relations`.
@@ -60,191 +53,176 @@ class Collisions:
     @property
     def is_set_up(self):
         """:obj:`bool` :
-        True, if the instance is completely set up and ready to call :meth:`~Simulation.run_computation`.
+        True, if the instance is completely set up
+        and ready to call :meth:`~Simulation.run_computation`.
         False Otherwise.
         """
-        return self.relations is not None and self.weights is not None
+        is_set_up = self.relations is not None and self.weights is not None
+        return is_set_up
 
     #####################################
     #           Configuration           #
     #####################################
-
     def setup(self, scheme, svgrid, species):
-        """Generates the :obj:`collision_arr`,
-        based on the :attr:`~boltzpy.Scheme`.
+        """Generates the :attr:`relations` and :attr:`weights`.
+
+        Parameters
+        ----------
+        scheme : :class:`Scheme`
+        svgrid : :class:`SVGrid`
+        species : :class:`Species`
         """
         assert isinstance(scheme, bp.Scheme)
         assert isinstance(svgrid, bp.SVGrid)
         assert isinstance(species, bp.Species)
-        print('Generating Collision Array...', end='')
+        print('Generating Collision Array...')
         time_beg = time()
         if scheme.Collisions_Generation == 'UniformComplete':
+            # Todo this should just as well work for other forms
+            # Todo it just depends on the find_index
             self._generate_collisions_complete(svgrid, species)
         else:
             msg = ('Unsupported Selection Scheme:'
                    + '{}'.format(scheme.Collisions_Generation))
             raise NotImplementedError(msg)
         time_end = time()
-        print('Done\n'
-              'Time taken =  {t} seconds\n'
+        print('Time taken =  {t} seconds\n'
               'Total Number of Collisions = {n}\n'
               ''.format(t=round(time_end - time_beg, 3),
                         n=self.size))
         self.check_integrity()
         return
 
-        # Todo Simplify - Looks horrible
-        # noinspection PyAssignmentToLoopOrWithParameter
-
-    def _generate_collisions_complete(self, svgrid, species):
+    def _generate_collisions_complete(self,
+                                      svgrid,
+                                      species):
         """Generate all possible, non-useless collisions."""
-        if svgrid.form != 'rectangular':
-            msg = 'Unsupported SVGrid form: {f}'.format(f=svgrid.form)
+        if any(form != 'rectangular' for form in svgrid.forms):
+            msg = 'Unsupported SVGrid forms: {f}'.format(f=svgrid.forms)
             raise NotImplementedError(msg)
-        # collect collisions in these lists
-        col_arr = []
-        weight_arr = []
+        # collect collisions in the following lists
+        collisions = []
+        weights = []
 
-        # Abbreviations
-        sv = svgrid
-        mass = sv.masses
-        n_spc = mass.size
-
-        # Each collision is an array of 4 Velocity-Indices
-        # Ordered as: [[v_pre_s0, v_post_s0],
-        #              [v_pre_s1, v_post_s1]]
-        v = np.zeros((2, 2), dtype=int)
-        # physical velocities (in multiples of d[s])
-        # indexed as in v:  pv[i, j] = sv.iMG[ v[i, j] ]
-        pv = np.zeros((2, 2, sv.dim), dtype=int)
-
-        # For the colliding specimen we keep track of
-        # specimen-indices
-        s = np.zeros((2,), dtype=int)
-        # masses
-        m = np.zeros((2,), dtype=int)
-        # step sizes
-        d = np.zeros((2,), dtype=float)
-        # the slices in the sv_grid, slc[spc, :] = [start, end+1]
-        slc = np.zeros((2, 2), dtype=int)
-
-        for s[0] in range(n_spc):
-            m[0] = mass[s[0]]
-            d[0] = sv.vGrids[s[0]].d
-            slc[0] = sv.idx_range(s[0])
-            for s[1] in range(s[0], n_spc):
-                m[1] = mass[s[1]]
-                d[1] = sv.vGrids[s[1]].d
-                slc[1] = sv.idx_range(s[1])
-                # v[0, 0] = v_pre_s0
-                for v[0, 0] in range(slc[0, 0], slc[0, 1]):
-                    pv[0, 0] = sv.iMG[v[0, 0]]
-                    # v[0, 1] = v_post_s0
-                    for v[0, 1] in range(v[0, 0] + 1, slc[0, 1]):
-                        # due to range, ignores v=(a,a,X,X) (no effect)
-                        pv[0, 1] = sv.iMG[v[0, 1]]
-                        # Velocity difference (dimensional, multiples of d[1])
-                        # dpv_1 = - dpv_0 = pv[0, 0] - pv[0, 1]
-                        dpv_1 = pv[0, 0] - pv[0, 1]
-                        # v[1, 0] = v_pre_s1
-                        for v[1, 0] in range(slc[1, 0], slc[1, 1]):
-                            pv[1, 0] = sv.iMG[v[1, 0]]
-                            # Calculate
-                            pv[1, 1] = pv[1, 0] + dpv_1
-                            # get index ov v[1, 1]
-                            try:
-                                v[1, 1] = sv.get_index(s[1], pv[1, 1])
-                            except ValueError:
+        """The velocities are named in the following way:
+        1. v* and w* are velocities of the first/second specimen, respectively
+        2. v0 or w0 denotes the velocity before the collision
+           v1 or w1 denotes the velocity after the collision
+        """
+        # Choose first Specimen
+        for (idx_spc_v, grid_v) in enumerate(svgrid.vGrids):
+            index_offset_v = svgrid.index_range[idx_spc_v, 0]
+            mass_v = species.mass[idx_spc_v]
+            # Choose second Specimen
+            for (idx_spc_w, grid_w) in enumerate(svgrid.vGrids):
+                index_offset_w = svgrid.index_range[idx_spc_w, 0]
+                mass_w = species.mass[idx_spc_w]
+                if idx_spc_w < idx_spc_v:
+                    # we already checked this combination
+                    continue
+                """Iterate over all possible velocity combinations
+                check whether they are proper collisions
+                if yes, then store them in the list"""
+                for (loc_v0, v0) in enumerate(grid_v.iG):
+                    # global index in self.iMG
+                    index_v0 = index_offset_v + loc_v0
+                    assert np.all(v0 == svgrid.iMG[index_v0])
+                    # we choose idx_v0 < idx_v1 to ignore v=(a, a, * , *)
+                    # and ignore repeating collisions
+                    for (loc_v1, v1) in enumerate(grid_v.iG[loc_v0 + 1:]):
+                        # global index in self.iMG
+                        index_v1 = index_v0 + 1 + loc_v1
+                        assert np.all(v1 == svgrid.iMG[index_v1])
+                        # calculate Velocity (index) difference
+                        diff_v = v1 - v0
+                        for (loc_w0, w0) in enumerate(grid_w.iG):
+                            # global index in self.iMG
+                            index_w0 = index_offset_w + loc_w0
+                            assert np.all(w0 == svgrid.iMG[index_w0])
+                            # Calculate w1, using the momentum invariance
+                            diff_w = -diff_v * mass_v // mass_w
+                            w1 = w0 + diff_w
+                            # find the global index of w1, if its in the grid
+                            index_w1 = svgrid.find_index(idx_spc_w, w1)
+                            if index_w1 is None:
                                 continue
-                            # if v[1, 1] < v[0, 0], then the collision was
-                            # already found before
-                            if v[1, 1] < v[0, 0]:
+                            # check if its a proper Collision
+                            new_col_idx = [index_v0,
+                                           index_v1,
+                                           index_w0,
+                                           index_w1]
+                            new_col_val = np.array([v0, v1, w0, w1],
+                                                   dtype=int)
+                            is_a_collision = self.check_single_collision(
+                                new_col_idx,
+                                new_col_val,
+                                [mass_v, mass_w])
+                            if not is_a_collision:
                                 continue
-
-                            # Check if v fulfills all conditions
-                            if not self._is_collision(d, v, pv):
-                                continue
-
                             # Collision is accepted -> Add to List
-                            col_arr.append(v.flatten())
-                            weight = species.collision_rates[s[0], s[1]]
-                            weight_arr.append(weight)
-        assert len(col_arr) == len(weight_arr)
-        self.relations = np.array(col_arr, dtype=int)
-        self.weights = np.array(weight_arr, dtype=float)
+                            collisions.append(new_col_idx)
+                            new_weight = species.collision_rates[idx_spc_v,
+                                                                 idx_spc_w]
+                            weights.append(new_weight)
+        assert len(collisions) == len(weights)
+        self.relations = np.array(collisions, dtype=int)
+        self.weights = np.array(weights, dtype=float)
         return
 
     @staticmethod
-    def _is_collision(d, v, pv):
+    def check_single_collision(collision_indices,
+                               collision_velocities,
+                               masses):
         """Check whether the Collision Candidate fulfills all necessary
         Conditions.
 
         Parameters
         ----------
-        d : array(float)
+        collision_indices : :obj:`list` [:obj:`int`]
+            Indices of the colliding velocities in the SV-Grid.
+            Array of shape=(4).
+        collision_velocities : :obj:`~numpy.array` [:obj:`int`]
+            Colliding velocities in the SV-Grid
+            in multitudes of :attr:`SVGrid.delta`.
+            Array of shape=(4, :attr:`SVGrid.ndim`).
+        masses : array(int)
             Step sizes of the Specimens Velocity-Grids
             Array of shape=(2,).
-        v : array(int)
-            Indices of the colliding velocities in the SV-Grid.
-            Array of shape=(2,2).
-        pv : array(int)
-            Physical Velocities, as multiples of their respective step size d.
-            Array of shape=(2,2, sv.dim).
 
         Returns
         -------
         bool
             True if collision fulfills all conditions, False otherwise.
         """
-        # Ignore v=(X,b,b,X) (only for s[0]=s[1], has no effect)
-        if v[0, 1] == v[1, 0]:
+        # Abbreviation
+
+        v = collision_velocities[0:2]
+        w = collision_velocities[2:4]
+        m = masses
+        # Value not found in Grid
+        if collision_indices[3] is None:
+            return False
+        # Ignore collisions that were already found
+        if collision_indices[3] < collision_indices[0]:
+            # Todo maybe add ...[2] < ...[0] as well
+            return False
+        # Ignore v=(X,b,b,X) for same species
+        # as such collisions have no effect
+        if np.all(collision_indices[1] == collision_indices[2]):
             return False
         # Ignore Collisions with no initial velocity difference
-        elif np.allclose(pv[0, 0] * d[0], pv[1, 0] * d[1]):
+        if np.all(v[0] == w[0]):
             return False
-        # Ignore Collisions not fulfilling law of conservation of energy
-        elif not Collisions._meets_energy_conservation(d, pv):
+        # invariance of momentum
+        if not np.all(m[0] * (v[1] - v[0]) == m[1] * (w[0] - w[1])):
+            return False
+        # invariance of energy
+        energy_0 = np.sum(m[0] * v[0] ** 2 + m[1] * w[0] ** 2)
+        energy_1 = np.sum(m[0] * v[1] ** 2 + m[1] * w[1] ** 2)
+        if energy_0 != energy_1:
             return False
         # Accept this Collision
-        else:
-            return True
-
-    # Todo Check if its pv or iG - d * pv makes no sense
-    @staticmethod
-    def _meets_energy_conservation(d, pv):
-        """Checks if the collision denoted by pv
-        fulfills energy conservation
-
-        Parameters
-        ----------
-        d : array(float)
-            Step sizes of the Specimens Velocity-Grids
-        pv : array(int)
-            Indices of the colliding velocities in the Complete SV-Grid
-
-        Returns
-        -------
-        bool
-            True if collision fulfills energy conservation law,
-            False otherwise.
-        """
-        assert isinstance(pv, np.ndarray)
-        assert isinstance(d, np.ndarray)
-        # TODO Add nicely to Docstring
-        # Energy Conservation law:
-        #    m[0]*(d[0]*pv[0, 0])**2 + m[1]*(d[1]*pv[1, 0])**2
-        # == m[0]*(d[0]*pv[0, 1])**2 + m[1]*(d[1]*pv[1, 1])**2
-        # m[i]*d[i] = CONST for all Specimen
-        # => can be canceled in Equation:
-        #    d[0]*pv[0, 0]**2 + d[1]*pv[1, 0]**2
-        # == d[0]*pv[0, 1]**2 + d[1]*pv[1, 1]**2
-        pre_energy = d[0] * pv[0, 0] ** 2 + d[1] * pv[1, 0] ** 2
-        assert isinstance(pre_energy, np.ndarray)
-        pre_energy = pre_energy.sum()
-        post_energy = d[0] * pv[0, 1] ** 2 + d[1] * pv[1, 1] ** 2
-        assert isinstance(post_energy, np.ndarray)
-        post_energy = post_energy.sum()
-        return np.allclose(pre_energy, post_energy)
+        return True
 
     def generate_collision_matrix(self, dt):
         # Size of complete velocity grid
@@ -254,16 +232,30 @@ class Collisions:
         col_matrix = np.zeros(shape=(rows, columns),
                               dtype=float)
         for [i_col, col] in enumerate(self.relations):
-            # Negative sign for pre-collision velocities
-            # => necessary for stability
-            #   v[i]*v[j] - v[k]*v[l] is used as collision term
-            #   => v'[*] = ... - X*u[*]
+            """Negative sign for pre-collision velocities
+            => necessary for stability
+               v[i]*v[j] - v[k]*v[l] is used as collision term
+               => v'[*] = ... - X*u[*]"""
             # Todo multiplication with dt -> move out of matrix
             col_weight = dt * self.weights[i_col]
             col_matrix[col, i_col] = [-1, 1, -1, 1]
             col_matrix[col, i_col] *= col_weight
         col_mat = csr_matrix(col_matrix)
         return col_mat
+
+    @property
+    def number_of_collision_invariants(self):
+        """:obj:`int` :
+        Determines the number of collision invariants
+        by computing the rank of the resulting matrix.
+        """
+        if self.relations is None:
+            return None
+        else:
+            mat = self.generate_collision_matrix(1)
+            rank = np.linalg.matrix_rank(mat.toarray())
+            size_of_velocity_space = mat.shape[0]
+            return size_of_velocity_space - rank
 
     #####################################
     #           Serialization           #
@@ -295,7 +287,6 @@ class Collisions:
             self.weights = hdf5_group["Weights"][()]
         except KeyError:
             self.weights = None
-        # Todo read Scheme parameters from relations (save as attributes)
 
         self.check_integrity()
         return self
@@ -353,23 +344,3 @@ class Collisions:
                     # Todo add conserves energy check
             assert all(w > 0 for w in self.weights.flatten())
         return
-
-# Todo Keep for testing
-    # @staticmethod
-    # def Test_is_v_in_col_arr(v, col_arr):
-    #     """Check if :obj:`v` or an equivalent permutation of it
-    #     is already in :obj:`col_arr`"""
-    #     # Todo speed up
-    #     v = v.flatten()
-    #     # set of permutation, which are checked:
-    #     col_permutations = np.zeros((4, 4))
-    #     col_permutations[0] = np.copy(v)
-    #     col_permutations[1] = np.array([v[1], v[0], v[3], v[2]])
-    #     col_permutations[2] = np.array([v[2], v[3], v[0], v[1]])
-    #     col_permutations[3] = np.array([v[3], v[2], v[1], v[0]])
-    #     for old_col in col_arr:
-    #         if np.any(np.all(col_permutations == old_col, axis=1)):
-    #             print("Permutations = \n{}".format(col_permutations))
-    #             print("Found Col = \n{}".format(old_col))
-    #             return True
-    #     return False

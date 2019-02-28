@@ -3,8 +3,6 @@ import numpy as np
 import boltzpy.constants as bp_c
 
 
-# Todo how to reference class attributes in numpy style?
-# Todo break line in multi attribute docstring
 class Specimen:
     """Contains the data of a single simulated specimen.
 

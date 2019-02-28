@@ -146,7 +146,7 @@ class Animation:
         -------
         :obj:`matplotlib.pyplot.figure`
         """
-        if self._sim.p.dim is not 1:
+        if self._sim.p.ndim is not 1:
             message = 'Animation is currently only implemented ' \
                       'for 1D Problems'
             raise NotImplementedError(message)
@@ -185,7 +185,7 @@ class Animation:
         -------
         :obj:`~numpy.ndarray` [:obj:`matplotlib.axes.Axes`]
         """
-        if self._sim.p.dim is not 1:
+        if self._sim.p.ndim is not 1:
             message = 'Animation is currently only implemented ' \
                       'for 1D Problems'
             raise NotImplementedError(message)
@@ -221,7 +221,7 @@ class Animation:
         return axes_array
 
     def _set_range(self, axes):
-        if self._sim.p.dim != 1:
+        if self._sim.p.ndim != 1:
             message = 'Animation is currently only implemented ' \
                       'for 1D Problems'
             raise NotImplementedError(message)
@@ -246,7 +246,7 @@ class Animation:
         moment : str
             Name of the moment
         """
-        if self._sim.p.dim != 1:
+        if self._sim.p.ndim != 1:
             message = 'Animation is currently only implemented ' \
                       'for 1D Problems' \
                       'This needs to be done for 3D plots'
@@ -259,7 +259,7 @@ class Animation:
         return
 
     def _set_tick_labels(self, axes, i_m):
-        if self._sim.p.dim is not 1:
+        if self._sim.p.ndim is not 1:
             message = 'Animation is currently only implemented ' \
                       'for 1D Problems' \
                       'This needs to be done for 3D plots'
@@ -290,7 +290,7 @@ class Animation:
         -------
         :obj:`~numpy.ndarray` [:obj:`matplotlib.lines.Line2D`]
         """
-        if self._sim.p.dim is not 1:
+        if self._sim.p.ndim is not 1:
             message = 'Animation is currently only implemented ' \
                       'for 1D Problems' \
                       'This needs to be done for 3D plots'
