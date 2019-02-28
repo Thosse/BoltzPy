@@ -264,6 +264,32 @@ class Grid:
         return
 
     #####################################
+    #           Visualization           #
+    #####################################
+    def plot(self, plot_object=None, **plot_style):
+        """Plot the Grid using matplotlib.
+
+        Parameters
+        ----------
+        plot_object : TODO Figure? matplotlib.pyplot?
+        """
+        show_plot_directly = plot_object is None
+        pG = self.iG * self.delta
+        if plot_object is None:
+            # Choose standard pyplot
+            import matplotlib.pyplot as plt
+            plot_object = plt
+        # Plot Grid as scatter plot
+        if self.ndim == 2:
+            plot_object.scatter(pG[:, 0], pG[:, 1],
+                                **plot_style)
+        else:
+            raise NotImplementedError
+        if show_plot_directly:
+            plot_object.show()
+        return plot_object
+
+    #####################################
     #           Serialization           #
     #####################################
     @staticmethod

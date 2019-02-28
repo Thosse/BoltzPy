@@ -272,6 +272,35 @@ class SVGrid:
         raise IndexError(msg)
 
     #####################################
+    #           Visualization           #
+    #####################################
+    #: :obj:`list` [:obj:`dict`]:
+    #: Default plot_styles for :meth::`plot`
+    plot_styles = [{"marker": 'o', "color": "r", "facecolors": 'none'},
+                   {"marker": 's', "color": "b", "facecolors": 'none'},
+                   {"marker": 'x', "color": "black"},
+                   {"marker": 'D', "color": "green", "facecolors": "none"}]
+
+    def plot(self, plot_object=None):
+        """Plot the Grid using matplotlib.
+
+        Parameters
+        ----------
+        plot_object : TODO Figure? matplotlib.pyplot?
+        """
+        show_plot_directly = plot_object is None
+        if plot_object is None:
+            # Choose standard pyplot
+            import matplotlib.pyplot as plt
+            plot_object = plt
+        # Plot Grids as scatter plot
+        for (idx_G, G) in enumerate(self.vGrids):
+            G.plot(plot_object, **(self.plot_styles[idx_G]))
+        if show_plot_directly:
+            plot_object.show()
+        return plot_object
+
+    #####################################
     #           Serialization           #
     #####################################
     # Todo read and write all Velocity Grids instead?
@@ -556,6 +585,12 @@ class SVGrid:
                 if value != other_value:
                     return False
         return True
+
+    def __lt__(self, other):
+        if self.size <= other.size:
+            return True
+        else:
+            return False
 
     def __str__(self,
                 write_physical_grid=False):
