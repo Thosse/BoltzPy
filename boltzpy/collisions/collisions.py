@@ -243,6 +243,20 @@ class Collisions:
         col_mat = csr_matrix(col_matrix)
         return col_mat
 
+    @property
+    def number_of_collision_invariants(self):
+        """:obj:`int` :
+        Determines the number of collision invariants
+        by computing the rank of the resulting matrix.
+        """
+        if self.relations is None:
+            return None
+        else:
+            mat = self.generate_collision_matrix(1)
+            rank = np.linalg.matrix_rank(mat.toarray())
+            size_of_velocity_space = mat.shape[0]
+            return size_of_velocity_space - rank
+
     #####################################
     #           Serialization           #
     #####################################
