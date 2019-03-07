@@ -225,9 +225,8 @@ class Animation:
             message = 'Animation is currently only implemented ' \
                       'for 1D Problems'
             raise NotImplementedError(message)
-        x_boundaries = self._sim.p.boundaries
-        x_min = x_boundaries[0, 0]
-        x_max = x_boundaries[1, 0]
+        x_min = np.min(self._sim.p.iG, axis=0) * self._sim.p.delta
+        x_max = np.max(self._sim.p.iG, axis=0) * self._sim.p.delta
         axes.set_xlim(x_min, x_max)
         return
 

@@ -152,22 +152,6 @@ class Grid:
             return self.iG * self.delta
 
     @property
-    def boundaries(self):
-        """ :obj:`~numpy.array` of :obj:`float`:
-        Minimum and maximum physical values
-        of all :class:`Grid` points
-        in array of shape (2, :attr:`dim`).
-        """
-        # if Grid is not initialized -> None
-        if self.iG is None or self.delta is None:
-            return None
-        else:
-            min_val = np.min(self.iG, axis=0)
-            max_val = np.max(self.iG, axis=0)
-            boundaries = self.delta * np.array([min_val, max_val])
-            return boundaries
-
-    @property
     def is_configured(self):
         """:obj:`bool` :
         True, if all necessary attributes of the instance are set.
@@ -191,7 +175,6 @@ class Grid:
         :meth:`~Simulation.run_computation`.
         False Otherwise.
         """
-        # Todo check sefl.__dict__?
         return self.is_configured and self.iG is not None
 
     #####################################
@@ -396,8 +379,6 @@ class Grid:
                               delta=self.delta,
                               size=self.size,
                               iG=self.iG,
-                              pG=self.pG,
-                              boundaries=self.boundaries,
                               complete_check=complete_check,
                               context=context)
         return
@@ -412,8 +393,6 @@ class Grid:
                          delta=None,
                          size=None,
                          iG=None,
-                         pG=None,
-                         boundaries=None,
                          complete_check=False,
                          context=None):
         """Sanity Check.
@@ -431,8 +410,6 @@ class Grid:
         delta : :obj:`float`, optional
         size : :obj:`int`, optional
         iG : :obj:`~numpy.array` [:obj:`int`], optional
-        pG : :obj:`~numpy.array` [:obj:`float`], optional
-        boundaries : :obj:`~numpy.array` [:obj:`float`], optional
         complete_check : :obj:`bool`, optional
             If True, then all parameters must be set (not None).
             If False, then unassigned parameters are ignored.
@@ -490,14 +467,6 @@ class Grid:
             assert iG.dtype == int
             assert iG.ndim is 2
 
-        # Todo test pG
-
-        if boundaries is not None:
-            assert isinstance(boundaries, np.ndarray)
-            assert boundaries.dtype == float
-            assert boundaries.ndim == 2
-            assert boundaries.shape[0] == 2
-
         # check correct attribute relations
         if ndim is not None and shape is not None:
                 assert len(shape) == ndim
@@ -553,8 +522,6 @@ class Grid:
         description += "Spacing = {}\n".format(self.spacing)
         description += "Internal Step Size = {}\n".format(self.delta)
         description += 'Is_Centered = {}\n'.format(self.is_centered)
-        description += "Boundaries:\n"
-        description += '\t' + self.boundaries.__str__().replace('\n', '\n\t')
         if write_physical_grids:
             description += '\n'
             description += 'Physical Grid:\n\t'

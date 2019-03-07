@@ -128,16 +128,6 @@ class SVGrid:
             return None
 
     @property
-    def boundaries(self):
-        """:obj:`list` [:obj:`~numpy.array` [:obj:`float`]] :
-        :attr:`Grid.boundaries` of each sub grid.
-        """
-        if self.vGrids is not None:
-            return [grid.boundaries for grid in self.vGrids]
-        else:
-            return None
-
-    @property
     def is_configured(self):
         """:obj:`bool` :
         True, if all attributes necessary to run :meth:`setup` are set.
@@ -367,7 +357,6 @@ class SVGrid:
         if self.spacings is not None:
             hdf5_group["Spacings"] = self.spacings
         if self.forms is not None:
-            # Todo This is a dirty hack
             hdf5_group["Forms"] = np.array(self.forms,
                                            dtype=h5py.special_dtype(vlen=str))
 
@@ -379,7 +368,6 @@ class SVGrid:
     #####################################
     #           Verification            #
     #####################################
-    # Todo compare with sim.s.masses -> additional asserts
     def check_integrity(self,
                         complete_check=True,
                         context=None):
@@ -407,12 +395,10 @@ class SVGrid:
                               iMG=self.iMG,
                               number_of_grids=self.number_of_grids,
                               size=self.size,
-                              boundaries=self.boundaries,
                               complete_check=complete_check,
                               context=context)
         return
 
-    # Todo write checks on boundaries
     @staticmethod
     def check_parameters(ndim=None,
                          maximum_velocity=None,
@@ -425,7 +411,6 @@ class SVGrid:
                          iMG=None,
                          number_of_grids=None,
                          size=None,
-                         boundaries=None,
                          complete_check=False,
                          context=None):
         """Sanity Check.
@@ -444,7 +429,6 @@ class SVGrid:
         iMG : :obj:`~numpy.array` [:obj:`int`], optional
         number_of_grids : :obj:`int`, optional
         size : :obj:`int`, optional
-        boundaries : :obj:`list` [:obj:`~numpy.array` [:obj:`float`]], optional
         complete_check : :obj:`bool`, optional
             If True, then all parameters must be set (not None).
             If False, then unassigned parameters are ignored.
@@ -460,8 +444,6 @@ class SVGrid:
                        if param_key != "context")
         if context is not None:
             assert isinstance(context, bp.Simulation)
-
-        # Todo define number of grids, if possible
 
         if ndim is not None:
             assert isinstance(ndim, int)
@@ -520,6 +502,18 @@ class SVGrid:
                 number_of_grids = vGrids.size
             assert vGrids.ndim == 1
             assert vGrids.dtype == 'object'
+            if shapes is None:
+                shapes = list(G.shape for G in vGrids)
+            else:
+                assert shapes == [G.shape for G in vGrids]
+            if spacings is None:
+                spacings = [G.spacing for G in vGrids]
+            else:
+                assert spacings == [G.spacing for G in vGrids]
+            if forms is None:
+                forms = [G.form for G in vGrids]
+            else:
+                assert forms == [G.form for G in vGrids]
             for (idx_G, G) in enumerate(vGrids):
                 isinstance(G, bp.Grid)
                 G.check_integrity()
@@ -531,14 +525,6 @@ class SVGrid:
                     delta = G.delta
                 else:
                     assert delta == G.delta
-                if shapes is not None:
-                    assert np.all(shapes[idx_G] == G.shape)
-                if spacings is not None:
-                    assert spacings[idx_G] == G.spacing
-                if forms is not None:
-                    assert forms[idx_G] == G.form
-            if context is not None:
-                assert vGrids.size == context.s.size
 
         if index_range is not None:
             assert isinstance(index_range, np.ndarray)
