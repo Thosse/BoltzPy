@@ -34,8 +34,8 @@ def create_psv_grid(self):
         r = self.rule_arr[i_rule]
         # Todo - simply call r_apply method?
         for i_s in range(self.s.size):
-            rho = r.rho[i_s]
-            temp = r.temp[i_s]
+            rho = r.initial_rho[i_s]
+            temp = r.initial_temp[i_s]
             [begin, end] = self.sv.index_range[i_s]
             v_grid = self.sv.iMG[begin:end]
             dv = self.sv.delta
@@ -43,7 +43,7 @@ def create_psv_grid(self):
                 # Physical Velocity
                 pv = dv * v
                 # Todo np.array(v) only for PyCharm Warning - Check out
-                diff_v = np.sum((np.array(pv) - r.drift[i_s])**2)
+                diff_v = np.sum((np.array(pv) - r.initial_drift[i_s])**2)
                 psv[i_p, begin + i_v] = rho * math.exp(-0.5*(diff_v/temp))
             # Todo read into Rjasanov's script and do this correctly
             # Todo THIS IS CURRENTLY WRONG! ONLY TEMPORARY FIX

@@ -410,36 +410,35 @@ class Simulation:
         return
 
     def add_rule(self,
-                 category,
-                 rho,
-                 drift,
-                 temp,
+                 behaviour_type,
+                 initial_rho,
+                 initial_drift,
+                 initial_temp,
                  name=None,
                  color=None):
         """Add a new :class:`initialization rule <Rule>` to :attr:`rule_arr`.
 
         Parameters
         ----------
-        category : :obj:`str`
-            Category of the :class:`P-Grid <boltzpy.Grid>` point.
-            Must be in
-            :const:`~boltzpy.constants.SUPP_GRID_POINT_CATEGORIES`.
-        rho : :obj:`~numpy.array` [:obj:`float`]
-        drift : :obj:`~numpy.array` [:obj:`float`]
-        temp : :obj:`~numpy.array` [:obj:`float`]
+        behaviour_type : :obj:`str`
+        Determines the behaviour during the simulation.
+        Must be in :const:`~boltzpy.constants.SUPP_BEHAVIOUR_TYPES`.
+        initial_rho : :obj:`~numpy.array` [:obj:`float`]
+        initial_drift : :obj:`~numpy.array` [:obj:`float`]
+        initial_temp : :obj:`~numpy.array` [:obj:`float`]
         name : :obj:`str`, optional
             Displayed in the GUI to visualize the initialization.
         color : :obj:`str`, optional
             Displayed in the GUI to visualize the initialization.
         """
-        bp.Rule.check_parameters(category=category,
-                                 rho=rho,
-                                 drift=drift,
-                                 temp=temp)
-        new_rule = bp.Rule(category,
-                           rho,
-                           drift,
-                           temp,
+        bp.Rule.check_parameters(behaviour_type=behaviour_type,
+                                 initial_rho=initial_rho,
+                                 initial_drift=initial_drift,
+                                 initial_temp=initial_temp)
+        new_rule = bp.Rule(behaviour_type,
+                           initial_rho,
+                           initial_drift,
+                           initial_temp,
                            name,
                            color)
         self.rule_arr = np.append(self.rule_arr, [new_rule])
@@ -809,15 +808,14 @@ class Simulation:
             for rule in initialization_rules:
                 assert isinstance(rule, bp.Rule)
                 rule.check_integrity(complete_check)
-                if rule.rho is not None and species is not None:
-                    assert rule.rho.shape == (species.size,)
-                if (rule.drift is not None
+                if rule.initial_rho is not None and species is not None:
+                    assert rule.initial_rho.shape == (species.size,)
+                if (rule.initial_drift is not None
                         and species is not None
                         and species_velocity_grid is not None):
-                    assert rule.drift.shape == (species.size,
-                                                species_velocity_grid.ndim)
-                if rule.temp is not None and species is not None:
-                    assert rule.temp.shape == (species.size,)
+                    assert rule.initial_drift.shape == (species.size, species_velocity_grid.ndim)
+                if rule.initial_temp is not None and species is not None:
+                    assert rule.initial_temp.shape == (species.size,)
 
         if initialization_array is not None:
             assert isinstance(initialization_array, np.ndarray)

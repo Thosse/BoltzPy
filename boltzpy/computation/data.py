@@ -104,12 +104,12 @@ class Data:
         self.col = sim.coll.relations
         self.weight = sim.coll.weights
 
-        # Array, denotes the category of a space point
+        # Array, denotes the behaviour_type of a space point
         # and thus its behaviour
         self.category = sim.init_arr
 
         # Todo add rule arr (only boundary points necessary)
-        #   with initialization scheme (standardized for rho = 1)
+        #   with initialization scheme (standardized for initial_rho = 1)
         # Todo This involves a scheme to determine "sub-rules"
         # Todo as the position of the boundary is important for its
         # todo behaviour / reinitialization
