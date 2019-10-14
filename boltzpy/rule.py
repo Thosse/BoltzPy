@@ -27,16 +27,14 @@ class Rule:
     initial_drift : :obj:`~numpy.array` [:obj:`float`]
     initial_temp : :obj:`~numpy.array` [:obj:`float`]
     affected_points : :obj:`~numpy.array`[:obj:`int`], optional
-        Contains all indices of the space points, where this rule applies
     name : :obj:`str`, optional
     color : :obj:`str`, optional
 
     Attributes
     ----------
-    i_cat : :obj:`int`
-        determines the behaviour during the simulation
-        Denotes the index of an element of
-        :const:`~boltzpy.constants.SUPP_BEHAVIOUR_TYPES`.
+    behaviour_type : :obj:`str`
+        Determines the behaviour during the simulation.
+        Must be in :const:`~boltzpy.constants.SUPP_BEHAVIOUR_TYPES`.
     initial_rho : :obj:`~numpy.array` [:obj:`float`]
         Correlates to the initial amount of particles in
         :class:`P-Grid <boltzpy.Grid>` point.
@@ -69,11 +67,7 @@ class Rule:
                               initial_temp=initial_temp,
                               name=name,
                               color=color)
-        if behaviour_type is not None:
-            self.i_cat = bp_c.SUPP_BEHAVIOUR_TYPES.index(behaviour_type)
-        else:
-            self.i_cat = None
- 
+        self.behaviour_type = behaviour_type
         self.initial_rho = initial_rho
         self.initial_drift = initial_drift
         self.initial_temp = initial_temp
@@ -113,11 +107,9 @@ class Rule:
 
         # read attributes from file
         try:
-            behaviour_type = hdf5_group["Category"][()]
-            category_idx = bp_c.SUPP_BEHAVIOUR_TYPES.index(behaviour_type)
-            self.i_cat = int(category_idx)
+            self.behaviour_type = hdf5_group["Category"][()]
         except KeyError:
-            self.i_cat = None
+            self.behaviour_type = None
         try:
             self.initial_rho = hdf5_group["Mass"][()]
         except KeyError:
@@ -158,9 +150,8 @@ class Rule:
         hdf5_group.attrs["class"] = "Rule"
 
         # write all set attributes to file
-        if self.i_cat is not None:
-            behaviour_type = bp_c.SUPP_BEHAVIOUR_TYPES[self.i_cat]
-            hdf5_group["Category"] = behaviour_type
+        if self.behaviour_type is not None:
+            hdf5_group["Category"] = self.behaviour_type
         if self.initial_rho is not None:
             hdf5_group["Mass"] = self.initial_rho
         if self.initial_drift is not None:
@@ -187,12 +178,7 @@ class Rule:
             If True, then all attributes must be assigned (not None).
             If False, then unassigned attributes are ignored.
         """
-        if self.i_cat is not None:
-            behaviour_type = bp_c.SUPP_BEHAVIOUR_TYPES[self.i_cat]
-        else:
-            behaviour_type = None
-        self.check_parameters(behaviour_type=behaviour_type,
-                              category_idx=self.i_cat,
+        self.check_parameters(behaviour_type=self.behaviour_type,
                               initial_rho=self.initial_rho,
                               initial_drift=self.initial_drift,
                               initial_temp=self.initial_temp,
@@ -203,7 +189,6 @@ class Rule:
 
     @staticmethod
     def check_parameters(behaviour_type=None,
-                         category_idx=None,
                          initial_rho=None,
                          initial_drift=None,
                          initial_temp=None,
@@ -216,7 +201,6 @@ class Rule:
         Parameters
         ----------
         behaviour_type : :obj:`str`, optional
-        category_idx : :obj:`int`, optional
         initial_rho : :obj:`~numpy.array` [:obj:`float`], optional
         initial_drift : :obj:`~numpy.array` [:obj:`float`], optional
         initial_temp : :obj:`~numpy.array` [:obj:`float`], optional
@@ -239,22 +223,6 @@ class Rule:
         if behaviour_type is not None:
             assert isinstance(behaviour_type, str)
             assert behaviour_type in bp_c.SUPP_BEHAVIOUR_TYPES
-            if category_idx is None:
-                category_list = bp_c.SUPP_BEHAVIOUR_TYPES
-                category_idx = category_list.index(behaviour_type)
-            else:
-                category_list = bp_c.SUPP_BEHAVIOUR_TYPES
-                assert category_idx == category_list.index(behaviour_type)
-
-        if category_idx is not None:
-            assert isinstance(category_idx, int)
-            assert category_idx in range(n_categories)
-            if behaviour_type is None:
-                category_list = bp_c.SUPP_BEHAVIOUR_TYPES
-                behaviour_type = category_list[category_idx]
-            else:
-                category_list = bp_c.SUPP_BEHAVIOUR_TYPES
-                assert behaviour_type == category_list[category_idx]
 
         if initial_rho is not None:
             assert isinstance(initial_rho, np.ndarray)
@@ -298,8 +266,7 @@ class Rule:
             description += 'Rule = {}\n'.format(self.name)
         else:
             description += 'Rule_{} = {}\n'.format(idx, self.name)
-        behaviour_type = bp_c.SUPP_BEHAVIOUR_TYPES[self.i_cat]
-        description += 'Behaviour Type = ' + behaviour_type + '\n'
+        description += 'Behaviour Type = ' + self.behaviour_type + '\n'
         description += 'Rho:\n\t'
         description += self.initial_rho.__str__() + '\n'
         description += 'Drift:\n\t'
