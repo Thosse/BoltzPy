@@ -439,14 +439,16 @@ class Simulation:
                            initial_rho,
                            initial_drift,
                            initial_temp,
-                           name,
-                           color)
+                           affected_points=[],
+                           name=name,
+                           color=color)
         self.rule_arr = np.append(self.rule_arr, [new_rule])
         self.check_parameters(species=self.s,
                               species_velocity_grid=self.sv,
                               initialization_rules=self.rule_arr)
         return
 
+    # Todo Error potential here! Double check, that old indices are removed
     def choose_rule(self,
                     array_of_grid_point_indices,
                     rule_index):
@@ -473,6 +475,18 @@ class Simulation:
         assert np.max(array_of_grid_point_indices) < self.p.size
         assert isinstance(rule_index, int)
         assert 0 <= rule_index < self.n_rules
+
+        for r in self.rule_arr:
+            old_points = np.where(np.isin(r.affected_points,
+                                          array_of_grid_point_indices))
+            r.affected_points = np.delete(r.affected_points,
+                                          old_points)
+            r.check_integrity()
+
+        # add points to rules affected_points
+        self.rule_arr[rule_index].affected_points = np.append(
+            self.rule_arr[rule_index].affected_points,
+            array_of_grid_point_indices)
 
         for p in array_of_grid_point_indices:
             self.init_arr[p] = rule_index

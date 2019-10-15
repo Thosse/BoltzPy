@@ -26,7 +26,7 @@ class Rule:
     initial_rho : :obj:`~numpy.array` [:obj:`float`]
     initial_drift : :obj:`~numpy.array` [:obj:`float`]
     initial_temp : :obj:`~numpy.array` [:obj:`float`]
-    affected_points : :obj:`~numpy.array`[:obj:`int`], optional
+    affected_points : :obj:`list`[:obj:`int`], optional
     name : :obj:`str`, optional
     color : :obj:`str`, optional
 
@@ -65,12 +65,17 @@ class Rule:
                               initial_rho=initial_rho,
                               initial_drift=initial_drift,
                               initial_temp=initial_temp,
+                              affected_points=affected_points,
                               name=name,
                               color=color)
         self.behaviour_type = behaviour_type
         self.initial_rho = initial_rho
         self.initial_drift = initial_drift
         self.initial_temp = initial_temp
+        if affected_points is None:
+            self.affected_points = np.empty((0,), dtype=int)
+        else:
+            self.affected_points = np.array(affected_points, dtype =int)
 
         if name is not None:
             self.name = name
@@ -178,10 +183,12 @@ class Rule:
             If True, then all attributes must be assigned (not None).
             If False, then unassigned attributes are ignored.
         """
+        assert isinstance(self.affected_points, np.ndarray)
         self.check_parameters(behaviour_type=self.behaviour_type,
                               initial_rho=self.initial_rho,
                               initial_drift=self.initial_drift,
                               initial_temp=self.initial_temp,
+                              affected_points=self.affected_points,
                               name=self.name,
                               color=self.color,
                               complete_check=complete_check)
@@ -192,6 +199,7 @@ class Rule:
                          initial_rho=None,
                          initial_drift=None,
                          initial_temp=None,
+                         affected_points=None,
                          name=None,
                          color=None,
                          complete_check=False):
@@ -204,6 +212,7 @@ class Rule:
         initial_rho : :obj:`~numpy.array` [:obj:`float`], optional
         initial_drift : :obj:`~numpy.array` [:obj:`float`], optional
         initial_temp : :obj:`~numpy.array` [:obj:`float`], optional
+        affected_points : :obj:`list`[:obj:`int`]
         name : :obj:`str`, optional
         color : :obj:`str`, optional
         complete_check : :obj:`bool`, optional
@@ -250,6 +259,14 @@ class Rule:
             if n_species is not None:
                 assert initial_temp.shape[0] == n_species
             # n_species = initial_temp.shape[0]
+
+        if affected_points is not None:
+            if isinstance(affected_points, list):
+                affected_points = np.array(affected_points, dtype=int)
+            assert isinstance(affected_points, np.ndarray)
+            assert affected_points.ndim == 1
+            assert affected_points.dtype == int
+            assert affected_points.size == len(set(affected_points))
 
         if name is not None:
             assert isinstance(name, str)
