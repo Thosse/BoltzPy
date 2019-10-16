@@ -60,15 +60,13 @@ class TestCase(dict):
                              initial_drift=np.array([[0.0, 0.0],
                                                      [0.0, 0.0]]),
                              initial_temp=np.array([1.0, 1.0]),
-                             affected_points=[0, 1, 2],
-                             name='High Pressure'),
+                             affected_points=[0, 1, 2]),
                      bp.Rule(behaviour_type="Inner Point",
                              initial_rho=np.array([1.0, 1.0]),
                              initial_drift=np.array([[0.0, 0.0],
                                                      [0.0, 0.0]]),
                              initial_temp=np.array([1.0, 1.0]),
-                             affected_points=[3, 4, 5],
-                             name='Low Pressure')
+                             affected_points=[3, 4, 5])
                      ]
             geometry = bp.Geometry(ndim=p.ndim,
                                    shape=p.shape,
@@ -95,9 +93,9 @@ class TestCase(dict):
 
         if coll is None:
             coll = bp.Collisions()
+            # Todo move into save_results?
             coll.setup(scheme=scheme, svgrid=sv, species=s)
         self["coll"] = coll
-
         return
 
     @staticmethod
@@ -107,19 +105,16 @@ class TestCase(dict):
     def save_results(self, address=None):
         if address is None:
             address = self.address(self["file_name"])
-        assert not os.path.exists(address)
+        assert not os.path.exists(address), address
         sim = bp.Simulation(address)
         sim.s = self["s"]
         sim.t = self["t"]
         sim.p = self["p"]
         sim.sv = self["sv"]
         sim.geometry = self["geometry"]
-        sim.rule_arr = sim.geometry.rules
-        sim.init_arr = sim.geometry.init_array
         sim.scheme = self["scheme"]
         sim.output_parameters = self["output_parameters"]
         sim.coll = self["coll"]
-        print(sim.__str__(write_physical_grids=True))
         sim.save()
         sim.run_computation()
         return sim
@@ -176,14 +171,12 @@ tc1_rules = [bp.Rule(behaviour_type="Inner Point",
                      initial_rho=np.array([1.0]),
                      initial_drift=np.array([[0.0, 0.0]]),
                      initial_temp=np.array([1.0]),
-                     affected_points=[0, 1, 2],
-                     name='High Pressure'),
+                     affected_points=[0, 1, 2]),
              bp.Rule(behaviour_type="Inner Point",
                      initial_rho=np.array([1.0]),
                      initial_drift=np.array([[0.0, 0.0]]),
                      initial_temp=np.array([1.0]),
-                     affected_points=[3, 4, 5],
-                     name='Low Pressure')
+                     affected_points=[3, 4, 5])
              ]
 tc1_geometry = bp.Geometry(ndim=1,
                            shape=(6,),
@@ -220,4 +213,4 @@ CASES.append(TestCase("shock_2species_complete",
 if __name__ == "__main__":
     for tc in CASES:
         assert isinstance(tc, TestCase)
-        tc.save_results()
+        tc.update_results()

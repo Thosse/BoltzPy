@@ -76,15 +76,11 @@ class Simulation:
         The Time Grid.
     p : :class:`Grid`
         Position-Space Grid
+    geometry: :class:`Geometry`
+        Describes the behaviour for all position points.
+        Contains the :class:`initialization rules <Rule>`
     sv : :class:`SVGrid`
         Velocity-Space Grids of all Specimen.
-    rule_arr : :obj:`~numpy.array` [:class:`Rule`]
-        Array of the specified :class:`initialization rules <Rule>`.
-    init_arr : :obj:`~numpy.array` [:obj:`int`]
-        Links each :attr:`p`
-        :class:`~boltzpy.Grid` point
-        to its :class:`initialization rule <Rule>`.
-        Contains the indices of the respective :class:`rules <Rule>`
     scheme : :class:`Scheme`
         Contains all computation scheme parameters.
     output_parameters : :obj:`~numpy.array` [:obj:`str`]
@@ -131,6 +127,13 @@ class Simulation:
         except KeyError:
             self.p = bp.Grid()
 
+        # load geometry
+        try:
+            key = "Geometry"
+            self.geometry = bp.Geometry.load(file[key])
+        except KeyError:
+            self.geometry = bp.Geometry()
+
         # load Velocity Grids
         try:
             key = "Velocity_Grids"
@@ -145,41 +148,13 @@ class Simulation:
         except KeyError:
             self.coll = bp.Collisions()
 
-        #################################
-        #   Initialization Attributes   #
-        #################################
-        # load initialization rules
-        try:
-            hdf5_group = file["Initialization"]
-            # Number of Rules is stored in group attributes
-            n_rules = int(hdf5_group.attrs["Number of Rules"])
-            # store rules in here iteratively
-            self.rule_arr = np.empty(shape=(n_rules,), dtype=bp.Rule)
-            # iteratively read the rules
-            for rule_idx in range(n_rules):
-                key = "Rule_" + str(rule_idx)
-                self.rule_arr[rule_idx] = bp.Rule.load(hdf5_group[key])
-        except KeyError:
-            self.rule_arr = np.empty(shape=(0,), dtype=bp.Rule)
-
-        # load initialization array
-        try:
-            key = "Initialization/Initialization Array"
-            self.init_arr = file[key][()]
-        except KeyError:
-            # default value -1 <=> no initialization rule assigned here
-            self.init_arr = np.full(shape=self.p.size,
-                                    fill_value=-1,
-                                    dtype=int)
-
-        ##############################
-        #   Computation Attributes   #
-        ##############################
+        # load Scheme
         try:
             key = "Scheme"
             self.scheme = bp.Scheme.load(file[key])
         except KeyError:
             self.scheme = bp.Scheme()
+        # load output params Todo Move these into Scheme, as a (1D) Set
         try:
             key = "Computation/Output_Parameters"
             shape = file[key].attrs["shape"]
@@ -192,6 +167,9 @@ class Simulation:
                                                ['Energy',
                                                 'Energy_Flow_X']])
         file.close()
+        # Todo replace
+        self.init_arr = self.geometry.init_array
+        self.rule_arr = self.geometry.rules
         self.check_integrity(complete_check=False)
         return
 
@@ -222,7 +200,7 @@ class Simulation:
         """:obj:`int` :
         Total number of :class:`initialization rules <Rule>` set up so far.
         """
-        return self.rule_arr.size
+        return self.geometry.rules.size
 
     @property
     def is_configured(self):
@@ -352,7 +330,7 @@ class Simulation:
                             grid_dimension,
                             grid_shape,
                             grid_spacing):
-        """Set up :attr:`p` and adjust :attr:`init_arr` to the new shape.
+        """Set up :attr:`p` and adjust :attr:`geometry` to the new shape.
         See :class:`Grid() <Grid>`
 
         Parameters
@@ -366,9 +344,7 @@ class Simulation:
                          form='rectangular',
                          physical_spacing=grid_spacing)
         # Update shape of initialization_array
-        self.init_arr = np.full(shape=self.p.size,
-                                fill_value=-1,
-                                dtype=int)
+        self.geometry.shape = self.p.shape
         return
 
     def set_velocity_grids(self,
@@ -414,8 +390,7 @@ class Simulation:
                  initial_rho,
                  initial_drift,
                  initial_temp,
-                 name=None,
-                 color=None):
+                 affected_points=None):
         """Add a new :class:`initialization rule <Rule>` to :attr:`rule_arr`.
 
         Parameters
@@ -426,70 +401,19 @@ class Simulation:
         initial_rho : :obj:`~numpy.array` [:obj:`float`]
         initial_drift : :obj:`~numpy.array` [:obj:`float`]
         initial_temp : :obj:`~numpy.array` [:obj:`float`]
-        name : :obj:`str`, optional
-            Displayed in the GUI to visualize the initialization.
-        color : :obj:`str`, optional
-            Displayed in the GUI to visualize the initialization.
+        affected_points : :obj:`list`[:obj:`int`], optional
+            Contains all indices of the space points, where this rule applies
         """
-        bp.Rule.check_parameters(behaviour_type=behaviour_type,
-                                 initial_rho=initial_rho,
-                                 initial_drift=initial_drift,
-                                 initial_temp=initial_temp)
-        new_rule = bp.Rule(behaviour_type,
-                           initial_rho,
-                           initial_drift,
-                           initial_temp,
-                           affected_points=[],
-                           name=name,
-                           color=color)
-        self.rule_arr = np.append(self.rule_arr, [new_rule])
+        self.geometry.add_rule(
+            behaviour_type=behaviour_type,
+            initial_rho=initial_rho,
+            initial_drift=initial_drift,
+            initial_temp=initial_temp,
+            affected_points=affected_points)
+
         self.check_parameters(species=self.s,
                               species_velocity_grid=self.sv,
-                              initialization_rules=self.rule_arr)
-        return
-
-    # Todo Error potential here! Double check, that old indices are removed
-    def choose_rule(self,
-                    array_of_grid_point_indices,
-                    rule_index):
-        """Let the given :class:`P-Grid <boltzpy.Grid>` points
-        be initialized with the specified
-        :class:`initialization rule <Rule>`.
-
-        Sets the :attr:`init_arr` entries
-        of all  :class:`P-Grid <boltzpy.Grid>` points
-        in *array_of_grid_point_indices* to *rule_index*.
-
-        Parameters
-        ----------
-        array_of_grid_point_indices : :obj:`~numpy.array` [:obj:`int`]
-            Contains flat indices of
-            :class:`P-Grid <boltzpy.Grid>` points.
-        rule_index : :obj:`int`
-            Index of a :class:`initialization rule <Rule>`
-            in :attr:`rule_arr`.
-        """
-        assert isinstance(array_of_grid_point_indices, np.ndarray)
-        assert array_of_grid_point_indices.dtype == int
-        assert np.min(array_of_grid_point_indices) >= 0
-        assert np.max(array_of_grid_point_indices) < self.p.size
-        assert isinstance(rule_index, int)
-        assert 0 <= rule_index < self.n_rules
-
-        for r in self.rule_arr:
-            old_points = np.where(np.isin(r.affected_points,
-                                          array_of_grid_point_indices))
-            r.affected_points = np.delete(r.affected_points,
-                                          old_points)
-            r.check_integrity()
-
-        # add points to rules affected_points
-        self.rule_arr[rule_index].affected_points = np.append(
-            self.rule_arr[rule_index].affected_points,
-            array_of_grid_point_indices)
-
-        for p in array_of_grid_point_indices:
-            self.init_arr[p] = rule_index
+                              geometry=self.geometry)
         return
 
     ###########################
@@ -498,6 +422,9 @@ class Simulation:
     def run_computation(self, hdf5_group_name="Computation"):
         """Compute the fully configured Simulation"""
         self.check_integrity()
+        #Todo replace
+        self.init_arr = self.geometry.init_array
+        self.rule_arr = self.geometry.rules
         # Todo write hash function in Computation folder
         #     file = h5py.File(self.file_address + '.hdf5')
         #     # hash = file["Computation"].attrs["Hash_Value"]
@@ -651,6 +578,11 @@ class Simulation:
         file.create_group(key)
         self.p.save(file[key])
 
+        # Save Geometry
+        key = "Geometry"
+        file.create_group(key)
+        self.geometry.save(file[key])
+
         # Save Velocity Grids
         key = "Velocity_Grids"
         file.create_group(key)
@@ -660,18 +592,6 @@ class Simulation:
         key = "Collisions"
         file.create_group(key)
         self.coll.save(file[key])
-
-        # Save initialization rules
-        file.create_group("Initialization")
-        hdf5_group = file["Initialization"]
-        hdf5_group.attrs["Number of Rules"] = self.n_rules
-        for (rule_idx, rule) in enumerate(self.rule_arr):
-            hdf5_group.create_group("Rule_" + str(rule_idx))
-            rule.save(hdf5_group["Rule_" + str(rule_idx)])
-
-        # Save initialization Array
-        key = "Initialization/Initialization Array"
-        file[key] = self.init_arr
 
         # Save Computation Parameters
         if "Scheme" not in file.keys():
@@ -709,8 +629,7 @@ class Simulation:
                               time_grid=self.t,
                               position_grid=self.p,
                               species_velocity_grid=self.sv,
-                              initialization_rules=self.rule_arr,
-                              initialization_array=self.init_arr,
+                              geometry=self.geometry,
                               output_parameters=self.output_parameters,
                               scheme=self.scheme,
                               complete_check=complete_check,
@@ -723,8 +642,7 @@ class Simulation:
                          time_grid=None,
                          position_grid=None,
                          species_velocity_grid=None,
-                         initialization_rules=None,
-                         initialization_array=None,
+                         geometry=None,
                          output_parameters=None,
                          scheme=None,
                          complete_check=False,
@@ -740,9 +658,7 @@ class Simulation:
         time_grid : :obj:`Grid`, optional
         position_grid : :obj:`Grid`, optional
         species_velocity_grid : :obj:`SVGrid`, optional
-
-        initialization_rules : :obj:`~numpy.array` [:class:`Rule`], optional
-        initialization_array : :obj:`~numpy.array` [:obj:`int`], optional
+        geometry: :class:`Geometry`, optional
         output_parameters : :obj:`~numpy.array` [:obj:`str`], optional
         scheme : :class:`Scheme`, optional
         complete_check : :obj:`bool`, optional
@@ -815,41 +731,10 @@ class Simulation:
             species_velocity_grid.check_integrity(complete_check,
                                                   context)
 
-        if initialization_rules is not None:
-            assert isinstance(initialization_rules, np.ndarray)
-            assert initialization_rules.ndim == 1
-            assert initialization_rules.dtype == 'object'
-            for rule in initialization_rules:
-                assert isinstance(rule, bp.Rule)
-                rule.check_integrity(complete_check)
-                if rule.initial_rho is not None and species is not None:
-                    assert rule.initial_rho.shape == (species.size,)
-                if (rule.initial_drift is not None
-                        and species is not None
-                        and species_velocity_grid is not None):
-                    assert rule.initial_drift.shape == (species.size, species_velocity_grid.ndim)
-                if rule.initial_temp is not None and species is not None:
-                    assert rule.initial_temp.shape == (species.size,)
-
-        if initialization_array is not None:
-            assert isinstance(initialization_array, np.ndarray)
-            assert initialization_array.dtype == int
-            assert np.min(initialization_array) >= -1
-            # Todo Check this in unit tests,
-            # Todo      compare before and after save + load
-            if position_grid.size is not None:
-                assert initialization_array.size == position_grid.size
-            else:
-                assert initialization_array.size == 1
-            if initialization_rules is not None:
-                assert (np.max(initialization_array)
-                        < initialization_rules.size), \
-                    'Undefined Rule! A P-Grid point is set ' \
-                    'to be initialized by an undefined initialization rule.'
-            if complete_check is True:
-                assert np.min(initialization_array) >= 0, \
-                    'Positional Grid is not properly initialized.' \
-                    'Some Grid points have no initialization rule!'
+        if geometry is not None:
+            assert isinstance(geometry, bp.Geometry)
+            geometry.check_integrity(complete_check,
+                                     context)
 
         if output_parameters is not None:
             assert isinstance(output_parameters, np.ndarray)
@@ -891,16 +776,11 @@ class Simulation:
         description += '\t' + velocity_str.replace('\n', '\n\t')
         description += '\n'
         description += '\n'
-        description += 'Initialization Data\n'
-        description += '-------------------\n'
-        for (rule_idx, rule) in enumerate(self.rule_arr):
-            rule_str = rule.__str__(rule_idx).replace('\n', '\n\t')
-            description += '\t' + rule_str
-            description += '\n'
-        if write_physical_grids:
-            description += '\tFlag-Grid of P-Space:\n\t\t'
-            init_arr_str = self.init_arr.__str__().replace('\n', '\n\t\t')
-            description += init_arr_str + '\n'
+        description += 'Geometry\n'
+        description += '--------\n'
+        geometry_str = self.geometry.__str__()
+        description += '\t' + geometry_str.replace('\n', '\n\t')
+        description += '\n'
         description += '\n'
         description += 'Computation Scheme\n'
         description += '------------------\n\t'

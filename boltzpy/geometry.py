@@ -63,6 +63,14 @@ class Geometry:
             self.rules = np.empty((0,), dtype=bp.Rule)
         return
 
+    #: :obj:`dict` : Default ascii char, for terminal print
+    DEFAULT_ASCII = {"Inner Point": 'o',
+                     'Boundary Point': '#',
+                     'Constant_IO_Point': '>',
+                     'Time_Variant_IO_Point': '~',
+                     None: '?'
+                     }
+
     @property
     def size(self):
         if self.shape is not None:
@@ -70,7 +78,7 @@ class Geometry:
         else:
             return None
 
-    # Todo Error potential here! Double check, that old indices are removed
+    # Todo Add test, that old indices are removed
     def add_rule(self,
                  behaviour_type,
                  initial_rho,
@@ -104,27 +112,37 @@ class Geometry:
         new_rule = bp.Rule(behaviour_type,
                            initial_rho,
                            initial_drift,
-                           initial_temp)
+                           initial_temp,
+                           affected_points)
         self.rules = np.append(self.rules, [new_rule])
+        self.apply_rule(rule=new_rule, affected_points=affected_points)
+        self.check_integrity(complete_check=False)
+        return
 
-        # adjust affected_points for all rules
-        assert isinstance(affected_points, np.ndarray)
-        assert affected_points.dtype == int
-        assert np.min(affected_points) >= 0
-        assert np.max(affected_points) < self.size
+    def apply_rule(self,
+                   rule,
+                   affected_points):
+        """Add a new :class:`initialization rule <Rule>` to :attr:`rule_arr`.
 
+        Parameters
+        ----------
+        rule : :obj:`~boltzpy.Rule`
+        affected_points : :obj:`list` [:obj:`int`]
+            Contains flat indices of
+            :class:`P-Grid <boltzpy.Grid>` points.
+        """
+        assert isinstance(rule, bp.Rule)
+        rule.check_integrity(complete_check=False)
         # remove previous occurrences
         for r in self.rules:
             occurrences = np.where(np.isin(r.affected_points, affected_points))
             r.affected_points = np.delete(r.affected_points, occurrences)
 
         # add points to rules affected_points
-        new_rule.affected_points = np.append(new_rule.affected_points,
-                                             affected_points)
+        rule.affected_points = np.append(rule.affected_points,
+                                         affected_points)
 
-        # self.check_parameters(species=self.s,
-        #                       species_velocity_grid=self.sv,
-        #                       initialization_rules=self.rule_arr)
+        self.check_integrity(complete_check=False)
         return
 
     # Todo Only Temporary!
@@ -165,8 +183,8 @@ class Geometry:
             params["shape"] = tuple(int(width) for width in shape)
         # load rules
         n_rules = 0
-        if "Number of Rules" in hdf5_group.keys():
-            n_rules = hdf5_group["Number of Rules"][()]
+        if "Number of Rules" in hdf5_group.attrs.keys():
+            n_rules = hdf5_group.attrs["Number of Rules"][()]
         params["rules"] = np.empty(shape=(n_rules,), dtype=bp.Rule)
         # iteratively read the rules
         for idx_rule in range(n_rules):
@@ -279,8 +297,13 @@ class Geometry:
                 assert shape == context.p.shape
 
         if rules is not None:
+            assert isinstance(rules, np.ndarray)
+            assert rules.dtype == bp.Rule
+            assert rules.ndim == 1
             for rule in rules:
-                rule.check_integrity(complete_check=complete_check)
+                assert isinstance(rule, bp.Rule)
+                rule.check_integrity(complete_check=complete_check,
+                                     context=context)
             # all points must be affected at most once
             affected_points = set()
             count_affected_points = 0
@@ -288,6 +311,11 @@ class Geometry:
                 affected_points.update(rule.affected_points)
                 count_affected_points += rule.affected_points.size
             assert len(affected_points) == count_affected_points
+            if context is not None and context.p.size is not None:
+                assert count_affected_points <= context.p.size
+            # all points must be affected at least once
+            if complete_check:
+                assert len(affected_points) == np.prod(shape)
 
         # check correct attribute relations
         if ndim is not None and shape is not None:

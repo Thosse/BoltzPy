@@ -2,6 +2,7 @@
 import numpy as np
 import h5py
 
+import boltzpy as bp
 import boltzpy.constants as bp_c
 
 
@@ -27,8 +28,6 @@ class Rule:
     initial_drift : :obj:`~numpy.array` [:obj:`float`]
     initial_temp : :obj:`~numpy.array` [:obj:`float`]
     affected_points : :obj:`list`[:obj:`int`], optional
-    name : :obj:`str`, optional
-    color : :obj:`str`, optional
 
     Attributes
     ----------
@@ -48,26 +47,18 @@ class Rule:
         velocity distribution.
     affected_points : :obj:`~numpy.array`[:obj:`int`]
         Contains all indices of the space points, where this rule applies
-    name : :obj:`str`
-        Is displayed in the GUI to visualize the initialization.
-    color : :obj:`str`
-        Is Displayed in the GUI to visualize the initialization.
     """
     def __init__(self,
                  behaviour_type=None,
                  initial_rho=None,
                  initial_drift=None,
                  initial_temp=None,
-                 affected_points=None,
-                 name=None,
-                 color=None):
+                 affected_points=None):
         self.check_parameters(behaviour_type=behaviour_type,
                               initial_rho=initial_rho,
                               initial_drift=initial_drift,
                               initial_temp=initial_temp,
-                              affected_points=affected_points,
-                              name=name,
-                              color=color)
+                              affected_points=affected_points)
         self.behaviour_type = behaviour_type
         self.initial_rho = initial_rho
         self.initial_drift = initial_drift
@@ -75,17 +66,7 @@ class Rule:
         if affected_points is None:
             self.affected_points = np.empty((0,), dtype=int)
         else:
-            self.affected_points = np.array(affected_points, dtype =int)
-
-        if name is not None:
-            self.name = name
-        else:
-            self.name = ''
-
-        if color is not None:
-            self.color = color
-        else:
-            self.color = 'black'
+            self.affected_points = np.array(affected_points, dtype=int)
 
         self.check_integrity(False)
         return
@@ -112,7 +93,7 @@ class Rule:
 
         # read attributes from file
         try:
-            self.behaviour_type = hdf5_group["Category"][()]
+            self.behaviour_type = hdf5_group["Behaviour Type"][()]
         except KeyError:
             self.behaviour_type = None
         try:
@@ -128,13 +109,9 @@ class Rule:
         except KeyError:
             self.initial_temp = None
         try:
-            self.name = hdf5_group["Name"][()]
+            self.affected_points = hdf5_group["Affected Points"][()]
         except KeyError:
-            self.name = ''
-        try:
-            self.color = hdf5_group["Color"][()]
-        except KeyError:
-            self.color = 'black'
+            self.affected_points = np.empty((0,), dtype=int)
         self.check_integrity(False)
         return self
 
@@ -156,23 +133,21 @@ class Rule:
 
         # write all set attributes to file
         if self.behaviour_type is not None:
-            hdf5_group["Category"] = self.behaviour_type
+            hdf5_group["Behaviour Type"] = self.behaviour_type
         if self.initial_rho is not None:
             hdf5_group["Mass"] = self.initial_rho
         if self.initial_drift is not None:
             hdf5_group["Mean Velocity"] = self.initial_drift
         if self.initial_temp is not None:
             hdf5_group["Temperature"] = self.initial_temp
-        if self.name != '':
-            hdf5_group["Name"] = self.name
-        if self.color != 'black':
-            hdf5_group["Color"] = self.color
+        hdf5_group["Affected Points"] = self.affected_points
+
         return
 
     #####################################
     #            Verification           #
     #####################################
-    def check_integrity(self, complete_check=True):
+    def check_integrity(self, complete_check=True, context=None):
         """Sanity Check.
         Assert all conditions in :meth:`check_parameters`
         and the correct type of all attributes of the instance.
@@ -182,6 +157,9 @@ class Rule:
         complete_check : :obj:`bool`, optional
             If True, then all attributes must be assigned (not None).
             If False, then unassigned attributes are ignored.
+        context : :class:`Simulation`, optional
+            The Simulation, which this instance belongs to.
+            This allows additional checks.
         """
         assert isinstance(self.affected_points, np.ndarray)
         self.check_parameters(behaviour_type=self.behaviour_type,
@@ -189,9 +167,8 @@ class Rule:
                               initial_drift=self.initial_drift,
                               initial_temp=self.initial_temp,
                               affected_points=self.affected_points,
-                              name=self.name,
-                              color=self.color,
-                              complete_check=complete_check)
+                              complete_check=complete_check,
+                              context=context)
         return
 
     @staticmethod
@@ -200,9 +177,8 @@ class Rule:
                          initial_drift=None,
                          initial_temp=None,
                          affected_points=None,
-                         name=None,
-                         color=None,
-                         complete_check=False):
+                         complete_check=False,
+                         context=None):
         """Sanity Check.
         Checks integrity of given parameters and their interactions.
 
@@ -213,20 +189,28 @@ class Rule:
         initial_drift : :obj:`~numpy.array` [:obj:`float`], optional
         initial_temp : :obj:`~numpy.array` [:obj:`float`], optional
         affected_points : :obj:`list`[:obj:`int`]
-        name : :obj:`str`, optional
-        color : :obj:`str`, optional
         complete_check : :obj:`bool`, optional
             If True, then all parameters must be set (not None).
             If False, then unassigned parameters are ignored.
+        context : :class:`Simulation`, optional
+            The Simulation, which this instance belongs to.
+            This allows additional checks.
         """
         # For complete check, assert that all parameters are assigned
         assert isinstance(complete_check, bool)
         if complete_check is True:
-            assert all([param is not None for param in locals().values()])
+            assert all(param_val is not None
+                       for (param_key, param_val) in locals().items()
+                       if param_key != "context")
+        if context is not None:
+            assert isinstance(context, bp.Simulation)
 
         # Set up basic constants
         n_categories = len(bp_c.SUPP_BEHAVIOUR_TYPES)
-        n_species = None
+        if context is not None:
+            n_species = context.s.size
+        else:
+            n_species = None
 
         # check all parameters, if set
         if behaviour_type is not None:
@@ -239,7 +223,7 @@ class Rule:
             assert initial_rho.ndim == 1
             assert np.min(initial_rho) > 0
             if n_species is not None:
-                assert initial_rho.shape[0] == n_species
+                assert initial_rho.shape == (n_species,)
             n_species = initial_rho.shape[0]
 
         if initial_drift is not None:
@@ -250,6 +234,8 @@ class Rule:
                 assert initial_drift.shape[0] == n_species
             n_species = initial_drift.shape[0]
             assert initial_drift.shape[1] in [2, 3]
+            if context is not None and context.sv.ndim is not None:
+                assert initial_drift.shape[1] == context.sv.ndim
 
         if initial_temp is not None:
             assert isinstance(initial_temp, np.ndarray)
@@ -257,7 +243,7 @@ class Rule:
             assert initial_temp.ndim == 1
             assert np.min(initial_temp) > 0
             if n_species is not None:
-                assert initial_temp.shape[0] == n_species
+                assert initial_temp.shape == (n_species,)
             # n_species = initial_temp.shape[0]
 
         if affected_points is not None:
@@ -266,23 +252,36 @@ class Rule:
             assert isinstance(affected_points, np.ndarray)
             assert affected_points.ndim == 1
             assert affected_points.dtype == int
+            if affected_points.size != 0:
+                assert np.min(affected_points) >= 0
+            if context is not None and context.geometry.shape is not None:
+                assert np.max(affected_points) < context.geometry.size
             assert affected_points.size == len(set(affected_points))
 
-        if name is not None:
-            assert isinstance(name, str)
-
-        if color is not None:
-            assert isinstance(color, str)
-            assert color in bp_c.SUPP_COLORS
         return
+
+    def __eq__(self, other):
+        if not isinstance(other, Rule):
+            return False
+        if set(self.__dict__.keys()) != set(other.__dict__.keys()):
+            return False
+        for (key, value) in self.__dict__.items():
+            other_value = other.__dict__[key]
+            if type(value) != type(other_value):
+                return False
+            if isinstance(value, np.ndarray):
+                if np.all(value != other_value):
+                    return False
+            else:
+                if value != other_value:
+                    return False
+        return True
 
     def __str__(self, idx=None):
         """Convert the instance to a string, describing all attributes."""
         description = ''
-        if idx is None:
-            description += 'Rule = {}\n'.format(self.name)
-        else:
-            description += 'Rule_{} = {}\n'.format(idx, self.name)
+        if idx is not None:
+            description += 'Rule_{}:\n'.format(idx)
         description += 'Behaviour Type = ' + self.behaviour_type + '\n'
         description += 'Rho:\n\t'
         description += self.initial_rho.__str__() + '\n'

@@ -18,18 +18,17 @@ if exisiting_simulation_file is None:
                            maximum_velocity=1.5,
                            shapes=[(5, 5),
                                    (7, 7)])
-    sim.add_rule('Inner Point',
-                 np.array([2.0, 1.0]),
-                 np.array([[0.0, 0.0], [0.0, 0.0]]),
-                 np.array([1.0, 1.0]),
-                 name='High Pressure')
-    sim.choose_rule(np.arange(0, 10), 0)
-    sim.add_rule('Inner Point',
-                 np.array([1.0, 1.0]),
-                 np.array([[0.0, 0.0], [0.0, 0.0]]),
-                 np.array([1.0, 1.0]),
-                 name='Low Pressure')
-    sim.choose_rule(np.arange(10, 21), 1)
+    sim.geometry = bp.Geometry(ndim=sim.p.ndim, shape=sim.p.shape)
+    sim.add_rule(behaviour_type='Inner Point',
+                 initial_rho=np.array([2.0, 1.0]),
+                 initial_drift=np.array([[0.0, 0.0], [0.0, 0.0]]),
+                 initial_temp=np.array([1.0, 1.0]),
+                 affected_points=np.arange(0, 10))
+    sim.add_rule(behaviour_type='Inner Point',
+                 initial_rho=np.array([1.0, 1.0]),
+                 initial_drift=np.array([[0.0, 0.0], [0.0, 0.0]]),
+                 initial_temp=np.array([1.0, 1.0]),
+                 affected_points=np.arange(10, 21))
     sim.scheme.OperatorSplitting = "FirstOrder"
     sim.scheme.Transport = "FiniteDifferences_FirstOrder"
     sim.scheme.Transport_VelocityOffset = np.array([-0.2, 0.0])
