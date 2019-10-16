@@ -33,6 +33,11 @@ Rule
 .. autoclass:: boltzpy.Rule
     :members:
 
+Geometry
+--------
+.. autoclass:: boltzpy.Geometry
+    :members:
+    
 Scheme
 ------
 .. autoclass:: boltzpy.Scheme
