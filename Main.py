@@ -29,6 +29,7 @@ if exisiting_simulation_file is None:
                  initial_drift=np.array([[0.0, 0.0], [0.0, 0.0]]),
                  initial_temp=np.array([1.0, 1.0]),
                  affected_points=np.arange(10, 21))
+    sim.geometry.setup(sim.sv)
     sim.scheme.OperatorSplitting = "FirstOrder"
     sim.scheme.Transport = "FiniteDifferences_FirstOrder"
     sim.scheme.Transport_VelocityOffset = np.array([-0.2, 0.0])
@@ -37,6 +38,7 @@ if exisiting_simulation_file is None:
 print(sim.__str__(write_physical_grids=True))
 sim.coll.setup(sim.scheme, sim.sv, sim.s)
 sim.save()
+
 
 sim.run_computation()
 

@@ -6,6 +6,7 @@ import boltzpy as bp
 import boltzpy.constants as bp_c
 
 
+# TODO edit apply/affected points to be stored as dimensional tuples
 class Geometry:
     r"""Describes the spatial geometry of the Simulation.
 
@@ -34,6 +35,7 @@ class Geometry:
 
     """
     def __init__(self, ndim=None, shape=None, rules=None):
+        # TODO move into check_integrity
         if ndim is not None:
             assert isinstance(ndim, int)
             assert ndim in bp_c.SUPP_GRID_DIMENSIONS
@@ -78,14 +80,22 @@ class Geometry:
         else:
             return None
 
+    @property
+    def size_of_model(self):
+        if self.rules.size == 0:
+            return None
+        sizes = [rule.size_of_model for rule in self.rules]
+        # all model_sizes must be equal
+        assert len(set(sizes)) == 1
+        return sizes[0]
+
     # Todo Add test, that old indices are removed
     def add_rule(self,
                  behaviour_type,
                  initial_rho,
                  initial_drift,
                  initial_temp,
-                 affected_points,
-                 ascii_char=None):
+                 affected_points):
         """Add a new :class:`initialization rule <Rule>` to :attr:`rule_arr`.
 
         Parameters
@@ -100,8 +110,6 @@ class Geometry:
         affected_points : :obj:`list` [:obj:`int`]
             Contains flat indices of
             :class:`P-Grid <boltzpy.Grid>` points.
-        ascii_char : :obj:`str`, optional
-            Displayed in the GUI to visualize the initialization.
         """
         bp.Rule.check_parameters(behaviour_type=behaviour_type,
                                  initial_rho=initial_rho,
@@ -117,6 +125,21 @@ class Geometry:
         self.rules = np.append(self.rules, [new_rule])
         self.apply_rule(rule=new_rule, affected_points=affected_points)
         self.check_integrity(complete_check=False)
+        return
+
+    @property
+    def is_set_up(self):
+        if any(attr is None for attr in self.__dict__.values()):
+            return False
+        if any(not rule.is_set_up for rule in self.rules):
+            return False
+        else:
+            self.check_integrity()
+            return True
+
+    def setup(self, sv_grid):
+        for rule in self.rules:
+            rule.setup(sv_grid)
         return
 
     def apply_rule(self,
@@ -153,6 +176,30 @@ class Geometry:
             for idx_p in r.affected_points:
                 init_arr[idx_p] = idx_r
         return init_arr
+
+    @property
+    def initial_state(self):
+        """Fully initiallized initial state.
+
+        Returns
+        -------
+        state : :class:`~numpy.array` [:obj:`float`]
+            The initialized PSV-Grid.
+            Array of shape
+            (:attr:`Simulation.p.size
+            <boltzpy.Grid.size>`,
+            :attr:`Simulation.sv.size
+            <boltzpy.SVGrid.size>`).
+        """
+        if not self.is_set_up:
+            return None
+        shape = (self.size, self.size_of_model)
+        state = np.zeros(shape=shape, dtype=float)
+        for rule in self.rules:
+            for p in rule.affected_points:
+                state[p, :] = rule.initial_state
+        # Todo state = state.reshape(shape + (model_size,))
+        return state
 
     #####################################
     #           Serialization           #
@@ -316,6 +363,10 @@ class Geometry:
             # all points must be affected at least once
             if complete_check:
                 assert len(affected_points) == np.prod(shape)
+            # All rules must work on the same model
+            size_of_model = set(rule.size_of_model
+                                for rule in rules)
+            assert len(size_of_model) in [0, 1]
 
         # check correct attribute relations
         if ndim is not None and shape is not None:

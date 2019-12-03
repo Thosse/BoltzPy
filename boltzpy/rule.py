@@ -1,6 +1,8 @@
 
 import numpy as np
 import h5py
+# TODO only temporary, replace with vectorized np method
+import math
 
 import boltzpy as bp
 import boltzpy.constants as bp_c
@@ -27,7 +29,10 @@ class Rule:
     initial_rho : :obj:`~numpy.array` [:obj:`float`]
     initial_drift : :obj:`~numpy.array` [:obj:`float`]
     initial_temp : :obj:`~numpy.array` [:obj:`float`]
-    affected_points : :obj:`list`[:obj:`int`], optional
+    affected_points : :obj:`list`[:obj:`int`]
+    initial_state : :obj:`~numpy.array` [:obj:`float`], optional
+        Only given for testing purposes. Otherwise this is set by
+        calling the :meth:`setup`
 
     Attributes
     ----------
@@ -47,13 +52,16 @@ class Rule:
         velocity distribution.
     affected_points : :obj:`~numpy.array`[:obj:`int`]
         Contains all indices of the space points, where this rule applies
+    initial_state : :obj:`~numpy.array` [:obj:`float`]
+        Initial state of the simulation model.
     """
     def __init__(self,
                  behaviour_type=None,
                  initial_rho=None,
                  initial_drift=None,
                  initial_temp=None,
-                 affected_points=None):
+                 affected_points=None,
+                 initial_state=None):
         self.check_parameters(behaviour_type=behaviour_type,
                               initial_rho=initial_rho,
                               initial_drift=initial_drift,
@@ -67,8 +75,76 @@ class Rule:
             self.affected_points = np.empty((0,), dtype=int)
         else:
             self.affected_points = np.array(affected_points, dtype=int)
+        self.initial_state = initial_state
+        self.check_integrity(complete_check=False)
+        return
 
-        self.check_integrity(False)
+    @property
+    def dimension(self):
+        self.check_parameters(initial_rho=self.initial_rho,
+                              initial_drift=self.initial_drift,
+                              initial_temp=self.initial_temp)
+        if self.initial_drift is None:
+            return None
+        else:
+            return self.initial_drift.shape[1]
+
+    @property
+    def number_of_species(self):
+        self.check_parameters(initial_rho=self.initial_rho,
+                              initial_drift=self.initial_drift,
+                              initial_temp=self.initial_temp)
+        if self.initial_rho is not None:
+            return self.initial_rho.size
+        if self.initial_temp is not None:
+            return self.initial_temp.size
+        if self.initial_drift is not None:
+            return self.initial_drift.shape[0]
+        return None
+
+    # Todo use this function to vecorize setup()
+    def density(self, velocity):
+        pass
+
+    @property
+    def is_set_up(self):
+        if any(attr is None for attr in self.__dict__.values()):
+            return False
+        else:
+            self.check_integrity()
+            return True
+
+    @property
+    def size_of_model(self):
+        if self.initial_state is not None:
+            return self.initial_state.size
+        else:
+            return None
+
+    # Todo (ST) use correct initialization form (mass in exponent)
+    # Todo (LT) use a Newton Scheme for correct values
+    def setup(self, svgrid):
+        assert isinstance(svgrid, bp.SVGrid)
+        assert self.dimension == svgrid.ndim
+        self.initial_state = np.zeros(svgrid.size)
+        for idx_spc in range(self.number_of_species):
+            rho = self.initial_rho[idx_spc]
+            drift = self.initial_drift[idx_spc]
+            temp = self.initial_temp[idx_spc]
+
+            [begin, end] = svgrid.index_range[idx_spc]
+            v_grid = svgrid.iMG[begin:end]
+            dv = svgrid.delta
+            for (i_v, v) in enumerate(v_grid):
+                # Physical Velocity
+                pv = np.array(dv * v)
+                diff_v = np.sum((pv - drift) ** 2)
+                self.initial_state[begin + i_v] = rho * math.exp(-0.5 * (diff_v / temp))
+            # Todo read into Rjasanov's script and do this correctly
+            # Todo THIS IS CURRENTLY WRONG! ONLY TEMPORARY FIX
+            # Adjust initialized values, to match configurations
+            adj = self.initial_state[begin:end].sum()
+            self.initial_state[begin:end] *= rho / adj
         return
 
     #####################################
@@ -89,29 +165,23 @@ class Rule:
         """
         assert isinstance(hdf5_group, h5py.Group)
         assert hdf5_group.attrs["class"] == "Rule"
-        self = Rule()
+        # read parameters from file
+        params = dict()
+        if "Behaviour Type" in hdf5_group.keys():
+            params["behaviour_type"] = hdf5_group["Behaviour Type"][()]
+        # Rename into Rho / Density
+        if "Mass" in hdf5_group.keys():
+            params["initial_rho"] = hdf5_group["Mass"][()]
+        if "Mean Velocity" in hdf5_group.keys():
+            params["initial_drift"] = hdf5_group["Mean Velocity"][()]
+        if "Temperature" in hdf5_group.keys():
+            params["initial_temp"] = hdf5_group["Temperature"][()]
+        if "Affected Points" in hdf5_group.keys():
+            params["affected_points"] = hdf5_group["Affected Points"][()]
+        if "Initial State" in hdf5_group.keys():
+            params["initial_state"] = hdf5_group["Initial State"][()]
 
-        # read attributes from file
-        try:
-            self.behaviour_type = hdf5_group["Behaviour Type"][()]
-        except KeyError:
-            self.behaviour_type = None
-        try:
-            self.initial_rho = hdf5_group["Mass"][()]
-        except KeyError:
-            self.initial_rho = None
-        try:
-            self.initial_drift = hdf5_group["Mean Velocity"][()]
-        except KeyError:
-            self.initial_drift = None
-        try:
-            self.initial_temp = hdf5_group["Temperature"][()]
-        except KeyError:
-            self.initial_temp = None
-        try:
-            self.affected_points = hdf5_group["Affected Points"][()]
-        except KeyError:
-            self.affected_points = np.empty((0,), dtype=int)
+        self = Rule(**params)
         self.check_integrity(False)
         return self
 
@@ -141,6 +211,8 @@ class Rule:
         if self.initial_temp is not None:
             hdf5_group["Temperature"] = self.initial_temp
         hdf5_group["Affected Points"] = self.affected_points
+        if self.initial_state is not None:
+            hdf5_group["Initial State"] = self.initial_state
 
         return
 

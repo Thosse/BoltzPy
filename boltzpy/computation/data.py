@@ -3,7 +3,6 @@ from time import time
 import numpy as np
 
 import boltzpy as bp
-import boltzpy.initialization as bp_ini
 
 
 # Todo Add vG_squared and vG_norm attributes? faster output?
@@ -68,7 +67,7 @@ class Data:
         # data arrays, this contains all grids
         # Todo Rework initialization (move into rules?)
         # Todo Class for single Space points (V-Grid + 0.Moment)?
-        self.state = bp_ini.create_psv_grid(sim)
+        self.state = sim.geometry.initial_state
         self.result = np.copy(self.state)
 
         # Velocity Grid parameters

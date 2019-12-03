@@ -167,7 +167,9 @@ class Simulation:
                                                ['Energy',
                                                 'Energy_Flow_X']])
         file.close()
-        # Todo replace
+        # Todo check what happens if sv is not initialzed
+        self.setup()
+        # Todo remove this, replace usage by geometry
         self.init_arr = self.geometry.init_array
         self.rule_arr = self.geometry.rules
         self.check_integrity(complete_check=False)
@@ -225,8 +227,13 @@ class Simulation:
         # Todo add initial_distribution
         return (self.t.is_set_up
                 and self.p.is_set_up
+                and self.geometry.is_set_up
                 and self.sv.is_set_up
                 and self.coll.is_set_up)
+
+    def setup(self):
+        self.geometry.setup(self.sv)
+        return
 
     #############################
     #       Configuration       #
@@ -422,9 +429,6 @@ class Simulation:
     def run_computation(self, hdf5_group_name="Computation"):
         """Compute the fully configured Simulation"""
         self.check_integrity()
-        #Todo replace
-        self.init_arr = self.geometry.init_array
-        self.rule_arr = self.geometry.rules
         # Todo write hash function in Computation folder
         #     file = h5py.File(self.file_address + '.hdf5')
         #     # hash = file["Computation"].attrs["Hash_Value"]
