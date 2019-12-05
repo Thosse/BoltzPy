@@ -81,8 +81,9 @@ def compute(file_address,
     data.check_stability_conditions()
     # Generate computation functions
     f_compute = generate_computation_functions(file_address)
-    f_output = generate_output_functions(file_address,
-                                         hdf5_group_name)
+    sim = bp.Simulation(file_address)
+    f_output = cp_out.generate_output_function(sim,
+                                               hdf5_group_name)
 
     # Start computation
     print('Calculating...          ', end='\r')
@@ -104,28 +105,12 @@ def compute(file_address,
     return
 
 
+# Todo generate transport and collision seperately
+# Todo generaty operator splitting with functions as parameter
 def generate_computation_functions(file_address):
     hdf5_group = h5py.File(file_address + ".hdf5")["Scheme"]
     scheme = bp.Scheme.load(hdf5_group)
     return cp_os.operator_splitting_function(scheme)
-
-
-# Todo Move this into output.py?
-def generate_output_functions(file_address,
-                              hdf5_group_name):
-    simulation = bp.Simulation(file_address)
-    assert hdf5_group_name not in {'Collisions',
-                                   'Initialization',
-                                   'Position_Grid',
-                                   'Species',
-                                   'Time_grid',
-                                   'Velocity_Grids'}
-    hdf5_file = h5py.File(file_address + '.hdf5')
-    if hdf5_group_name not in hdf5_file.keys():
-        hdf5_file.create_group(hdf5_group_name)
-    hdf5_group = h5py.File(file_address + '.hdf5')[hdf5_group_name]
-    return cp_out.output_function(simulation,
-                                  hdf5_group)
 
 
 # Todo profile this!

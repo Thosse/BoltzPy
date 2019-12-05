@@ -3,14 +3,12 @@ import numpy as np
 import h5py
 
 import boltzpy as bp
-import boltzpy.constants as bp_c
 
-# Todo momentum and the flows could receive an additional parameter: direction
-# Todo      The direction would be a (normalized) vector (2D/3D)
-# Todo      This would allow to view the in any possible direction
-def output_function(simulation,
-                    hdf5_group,
-                    ):
+
+# Todo move this into Scheme, getting the sizes as attributes?
+# Todo separate the moment functions to work on a single (spc) grid and return that result, move for loop into call
+def generate_output_function(simulation,
+                             hdf5_group_name="Computation"):
     """Returns a single callable function that handles the output.
 
     The returned function receives the current :attr:`Calculation.data`,
@@ -21,53 +19,41 @@ def output_function(simulation,
     Parameters
     ----------
     simulation : :class:`~boltzpy.Simulation`
-    hdf5_group : :obj:`h5py.Group <h5py:Group>`
+    hdf5_group_name : :obj:`str`
 
     Returns
     -------
     :obj:`function`
     """
     assert isinstance(simulation, bp.Simulation)
-    assert isinstance(hdf5_group, h5py.Group)
-    # set up hdf5 datasets for every output
-    datasets = _setup_datasets(simulation, hdf5_group)
-    # setup output functions for every output
-    subfuncs = _setup_subfuncs(simulation)
-    # combine both lists to iterate over the tuples
-    output_list = [(subfuncs[output], datasets[output])
-                   for output in simulation.output_parameters.flatten()]
+    assert isinstance(hdf5_group_name, str)
+    # Todo 1. move output_parameters into Scheme
+    # Todo 2. test scheme here
 
-    # setup output function, iteratively calls each output function
-    def func(data, write_idx):
-        for (f_out, hdf5_dataset) in output_list:
-            result = f_out(data)
-            hdf5_dataset[write_idx] = result
-        return
+    # Set up hdf group in storage file
+    assert hdf5_group_name not in {'Collisions',
+                                   'Geometry',
+                                   'Position_Grid',
+                                   'Scheme',
+                                   'Species',
+                                   'Time_grid',
+                                   'Velocity_Grids'}
+    hdf5_file = h5py.File(simulation.file_address + '.hdf5')
+    if hdf5_group_name not in hdf5_file.keys():
+        hdf5_file.create_group(hdf5_group_name)
+    hdf5_group = hdf5_file[hdf5_group_name]
+    # Todo clear everything else from this group (move output parameters to Scheme)
 
-    return func
+    # Todo describe output list
+    output_list = np.empty(shape=(simulation.output_parameters.size, 2),
+                           dtype=object)
 
-
-def _setup_datasets(simulation, hdf5_group):
-    """Create a :obj:`h5py.Dataset <h5py:Dataset>` for every output
-    in the hdf5_group and return an ordered list of them.
-
-    Any already existing datasets will be replaced.
-
-    Parameters
-    ----------
-    simulation : :class:`~boltzpy.Simulation`
-    hdf5_group : :obj:`h5py.Group <h5py:Group>`
-
-    Returns
-    -------
-    :obj:`dict` [:obj:`str`:  :obj:`h5py.Group <h5py:Group>`]
-    """
-    datasets = dict()
-    # setup a dataset for each output
-    for output in simulation.output_parameters.flatten():
+    # set up and store hdf5 datasets
+    for [idx_out, output] in enumerate(simulation.output_parameters.flatten()):
         # clear previous results, if any
         if output in hdf5_group.keys():
             del hdf5_group[output]
+        # Define shape of dataset
         if output == "Complete_Distribution":
             shape = (simulation.t.size,
                      simulation.p.size,
@@ -79,132 +65,112 @@ def _setup_datasets(simulation, hdf5_group):
         hdf5_group.create_dataset(output,
                                   shape=shape,
                                   dtype=float)
-        datasets[output] = hdf5_group[output]
-    return datasets
+        output_list[idx_out, 1] = hdf5_group[output]
+
+    # set up and store callable output functions
+    for [idx_out, output] in enumerate(simulation.output_parameters.flatten()):
+        if output == "Density":
+            output_list[idx_out, 0] = density
+        if output == "Mass":
+            output_list[idx_out, 0] = mass
+        if output == "Momentum_X":
+            output_list[idx_out, 0] = momentum_x
+        if output == "Momentum_Flow_X":
+            output_list[idx_out, 0] = momentum_flow_x
+        if output == "Energy":
+            output_list[idx_out, 0] = energy
+        if output == "Energy_Flow_X":
+            output_list[idx_out, 0] = energy_flow_x
+        if output == "Complete_Distribution":
+            output_list[idx_out, 0] = complete_distribution
+
+    # finally, setup output function,
+    # that calls sub functions and writes to the proper groups
+    def func(data, write_idx):
+        for (f_out, hdf5_dataset) in output_list:
+            hdf5_dataset[write_idx] = f_out(data)
+        return
+
+    return func
 
 
-def _setup_subfuncs(simulation):
-    """Create a generating function, for each specified output.
-    Return an ordered list of these functions.
+# Todo Multiply by some constant, for realistic values
+def density(data):
+    """Calculates and returns the particle density"""
+    # shape = (position_grid.size, species.size)
+    shape = (data.p_size, data.n_spc)
+    result = np.empty(shape, dtype=float)
+    for (s_idx, [beg, end]) in enumerate(data.v_range):
+        # mass is the sum over velocity grid of specimen
+        result[..., s_idx] = np.sum(data.state[..., beg:end], axis=-1)
+    return result
 
 
-        Parameters
-        ----------
-        simulation : :class:`~boltzpy.Simulation`
-
-        Returns
-        -------
-        :obj:`dict` [:obj:`str`:  :obj:`function`]
-        """
-    subfuncs = dict()
-    for output in simulation.output_parameters.flatten():
-        assert output in bp_c.SUPP_OUTPUT
-        # Read sub functions from globally defined functions
-        # store sub functions in dictionary
-        subfuncs[output] = globals()["_subfunc_" + output.lower()]
-    return subfuncs
-
-
-# Todo multiply with mass?
-def _subfunc_mass(data):
+def mass(data):
     """Calculates and returns the mass"""
     # shape = (position_grid.size, species.size)
     shape = (data.p_size, data.n_spc)
-    mass = np.zeros(shape, dtype=float)
+    result = np.empty(shape, dtype=float)
     for (s_idx, [beg, end]) in enumerate(data.v_range):
         # mass is the sum over velocity grid of specimen
-        mass[..., s_idx] = np.sum(data.state[..., beg:end],
-                                  axis=-1)
-        # mass *= mass[s_idx]
-    return mass
+        result[..., s_idx] = np.sum(data.state[..., beg:end],
+                                    axis=-1)
+        # TODO result[..., s_idx]  *= mass[s_idx]
+    return result
 
 
-def _get_subfunc_momentum(direction):
-    """Generates and returns generating function for momentum"""
-    assert direction in [0, 1, 2]
-
-    def f_momentum(data):
-        # shape = (position_grid.size, species.size)
-        shape = (data.p_size, data.n_spc)
-        momentum = np.zeros(shape, dtype=float)
-        for (s_idx, [beg, end]) in enumerate(data.v_range):
-            V_dir = data.vG[beg:end, direction]
-            momentum[..., s_idx] = np.sum(V_dir * data.state[..., beg:end],
-                                          axis=1)
-            momentum[..., s_idx] *= data.m[s_idx]
-        return momentum
-
-    return f_momentum
-
-_subfunc_momentum_x = _get_subfunc_momentum(0)
-_subfunc_momentum_y = _get_subfunc_momentum(1)
-_subfunc_momentum_z = _get_subfunc_momentum(2)
+def momentum_x(data):
+    # shape = (position_grid.size, species.size)
+    shape = (data.p_size, data.n_spc)
+    result = np.zeros(shape, dtype=float)
+    for (s_idx, [beg, end]) in enumerate(data.v_range):
+        V_dir = data.vG[beg:end, 0]
+        result[..., s_idx] = np.sum(V_dir * data.state[..., beg:end], axis=1)
+        result[..., s_idx] *= data.m[s_idx]
+    return result
 
 
-def _get_subfunc_momentum_flow(direction):
-    """Generates and returns generating function for momentum flow"""
-    assert direction in [0, 1, 2]
-
-    def f_momentum_flow(data):
-        # shape = (position_grid.size, species.size)
-        shape = (data.p_size, data.n_spc)
-        momentum_flow = np.zeros(shape, dtype=float)
-        for (s_idx, [beg, end]) in enumerate(data.v_range):
-            V_dir = data.vG[beg:end, direction]
-            momentum_flow[..., s_idx] = np.sum(V_dir ** 2
-                                               * data.state[..., beg:end],
-                                               axis=1)
-            momentum_flow[..., s_idx] *= data.m[s_idx]
-        return momentum_flow
-
-    return f_momentum_flow
-
-_subfunc_momentum_flow_x = _get_subfunc_momentum_flow(0)
-_subfunc_momentum_flow_y = _get_subfunc_momentum_flow(1)
-_subfunc_momentum_flow_z = _get_subfunc_momentum_flow(2)
+def momentum_flow_x(data):
+    # shape = (position_grid.size, species.size)
+    shape = (data.p_size, data.n_spc)
+    result = np.zeros(shape, dtype=float)
+    for (s_idx, [beg, end]) in enumerate(data.v_range):
+        V_dir = data.vG[beg:end, 0]
+        result[..., s_idx] = np.sum(V_dir ** 2 * data.state[..., beg:end],
+                                    axis=1)
+        result[..., s_idx] *= data.m[s_idx]
+    return result
 
 
-def _subfunc_energy(data):
+def energy(data):
     """Calculates and returns the energy"""
     # shape = (position_grid.size, species.size)
     shape = (data.p_size, data.n_spc)
-    energy = np.zeros(shape, dtype=float)
+    result = np.zeros(shape, dtype=float)
     for (s_idx, [beg, end]) in enumerate(data.v_range):
         V = data.vG[beg:end, :]
         V_2 = np.sqrt(np.sum(V ** 2, axis=1))
-        energy[..., s_idx] = np.sum(V_2 * data.state[..., beg:end],
+        result[..., s_idx] = np.sum(V_2 * data.state[..., beg:end],
                                     axis=1)
-        energy[..., s_idx] *= 0.5 * data.m[s_idx]
-    return energy
+        result[..., s_idx] *= 0.5 * data.m[s_idx]
+    return result
 
 
-def _get_subfunc_energy_flow(direction):
-    """Generates and returns generating function for energy flow"""
-    assert direction in [0, 1, 2]
-
-    def f_energy_flow(data):
-        # shape = (position_grid.size, species.size)
-        shape = (data.p_size, data.n_spc)
-        energy_flow = np.zeros(shape, dtype=float)
-        for (s_idx, [beg, end]) in enumerate(data.v_range):
-            V = data.vG[beg:end, :]
-            V_norm = np.sqrt(np.sum(V ** 2, axis=1))
-            V_dir = data.vG[beg:end, direction]
-            energy_flow[..., s_idx] = np.sum(V_norm
-                                             * V_dir
-                                             * data.state[..., beg:end],
-                                             axis=1)
-            energy_flow[..., s_idx] *= 0.5 * data.m[s_idx]
-        return energy_flow
-
-    return f_energy_flow
-
-_subfunc_energy_flow_x = _get_subfunc_energy_flow(0)
-_subfunc_energy_flow_y = _get_subfunc_energy_flow(1)
-_subfunc_energy_flow_z = _get_subfunc_energy_flow(2)
+def energy_flow_x(data):
+    # shape = (position_grid.size, species.size)
+    shape = (data.p_size, data.n_spc)
+    result = np.zeros(shape, dtype=float)
+    for (s_idx, [beg, end]) in enumerate(data.v_range):
+        V = data.vG[beg:end, :]
+        V_norm = np.sqrt(np.sum(V ** 2, axis=1))
+        V_dir = data.vG[beg:end, 0]
+        result[..., s_idx] = np.sum(V_norm * V_dir * data.state[..., beg:end],
+                                    axis=1)
+        result[..., s_idx] *= 0.5 * data.m[s_idx]
+    return result
 
 
-def _subfunc_complete_distribution(data):
+def complete_distribution(data):
     """Returns complete distribution of given data
     """
     return data.state
