@@ -202,6 +202,21 @@ class Geometry:
         return state
 
     #####################################
+    #            Computation            #
+    #####################################
+    def collision(self, data):
+        for rule in self.rules:
+            rule.collision(data)
+        return
+
+    def transport(self, data):
+        for rule in self.rules:
+            rule.transport(data)
+        # update data.state (transport writes into data.result)
+        data.state[...] = data.result[...]
+        return
+
+    #####################################
     #           Serialization           #
     #####################################
     @staticmethod

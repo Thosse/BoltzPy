@@ -1,12 +1,5 @@
 
-def transport_function(scheme):
-    if scheme.Transport == "FiniteDifferences_FirstOrder":
-        return _calculate_transport_step
-    else:
-        raise NotImplementedError
-
-
-def _calculate_transport_step(data):
+def fdm_first_order(data, affected_points):
     """Executes single collision step on complete P-Grid"""
     if data.p_dim != 1:
         message = 'Transport is currently only implemented ' \
@@ -16,12 +9,15 @@ def _calculate_transport_step(data):
     dt = data.dt
     dp = data.dp
     offset = data.velocity_offset
+    # Todo is this case separation necessary?
     for (spc, [beg, end]) in enumerate(data.v_range):
-        # Todo removal of boundaries (p in range(1, ... -1))
-        # Todo is only temporary,
-        # Todo until rules for input/output points
-        # Todo or boundary points are set
-        for p in range(1, data.p_size - 1):
+        for p in affected_points:
+            # TODO THESE ARE HACKS remove , after updating the tests
+            if p == 0:
+                continue
+            if p == data.p_size-1:
+                continue
+            # # Todo there should be a faster way -> vectorize, keep old function for testing
             for v in range(beg, end):
                 pv = data.vG[v] + offset
                 if pv[0] <= 0:
@@ -33,5 +29,9 @@ def _calculate_transport_step(data):
                 else:
                     continue
                 data.result[p, v] = new_val
-    data.state[...] = data.result[...]
+    return
+
+
+def no_transport(data, affected_points):
+    """No Transport occurs here"""
     return

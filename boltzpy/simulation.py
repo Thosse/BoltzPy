@@ -1,11 +1,14 @@
 import os
 import h5py
 import numpy as np
+from time import time
 
 import boltzpy.helpers.file_addresses as h_adr
 import boltzpy.helpers.least_common_multiple as h_lcm
 import boltzpy.animation as bp_ani
-import boltzpy.computation.compute as bp_cp
+import boltzpy.computation as bp_cp
+import boltzpy.computation.operator_splitting as bp_os
+import boltzpy.computation.output as bp_out
 import boltzpy.constants as bp_c
 import boltzpy as bp
 
@@ -423,9 +426,9 @@ class Simulation:
                               geometry=self.geometry)
         return
 
-    ###########################
-    #       Computation       #
-    ###########################
+    #####################################
+    #            Computation            #
+    #####################################
     def run_computation(self, hdf5_group_name="Computation"):
         """Compute the fully configured Simulation"""
         self.check_integrity()
@@ -439,10 +442,32 @@ class Simulation:
         #     return
         # else (KeyError, AssertionError):
 
-        # setup destination to write results
-        bp_cp.compute(self.file_address, hdf5_group_name)
+        # Generate Computation data
+        data = bp_cp.Data(self.file_address)
+        data.check_stability_conditions()
+
+        # Generate output functions
+        # Todo move into Scheme
+        f_output = bp_out.generate_output_function(self, hdf5_group_name)
+
+        # Start computation
+        print('Calculating...          ', end='\r')
+        # Todo this might be buggy, if data.tG changes
+        # Todo e.g. in adaptive time schemes
+        # Todo proposition: iterate over length?
+        for (tw_idx, tw) in enumerate(data.tG[:, 0]):
+            while data.t != tw:
+                bp_os.operator_splitting(data,
+                                         self.geometry.transport,
+                                         self.geometry.collision)
+            # generate Output and write it to disk
+            f_output(data, tw_idx)
         return
 
+
+    #####################################
+    #             Animation             #
+    #####################################
     # Todo rework animation module
     def create_animation(self,
                          output_arr=None,

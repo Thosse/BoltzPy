@@ -6,7 +6,8 @@ import math
 
 import boltzpy as bp
 import boltzpy.constants as bp_c
-
+import boltzpy.computation.collisions as bp_collision
+import boltzpy.computation.transport as bp_transport
 
 class Rule:
     """Encapsulates all data to initialize a :class:`~boltzpy.Grid` point.
@@ -126,6 +127,8 @@ class Rule:
     def setup(self, svgrid):
         assert isinstance(svgrid, bp.SVGrid)
         assert self.dimension == svgrid.ndim
+
+        # setup initial state
         self.initial_state = np.zeros(svgrid.size)
         for idx_spc in range(self.number_of_species):
             rho = self.initial_rho[idx_spc]
@@ -146,6 +149,29 @@ class Rule:
             adj = self.initial_state[begin:end].sum()
             self.initial_state[begin:end] *= rho / adj
         return
+
+    #####################################
+    #            Computation            #
+    #####################################
+    def collision(self, data):
+        if self.behaviour_type == 'Inner Point':
+            bp_collision.euler_scheme(data, self.affected_points)
+            return
+        elif self.behaviour_type == 'Boundary Point':
+            bp_collision.euler_scheme(data, self.affected_points)
+            # TODO replace by bp_collision.no_collisions(data, self.affected_points)
+            return
+        else:
+            raise NotImplementedError
+
+    def transport(self, data):
+        if self.behaviour_type == 'Inner Point':
+            bp_transport.fdm_first_order(data, self.affected_points)
+        elif self.behaviour_type == 'Boundary Point':
+            bp_transport.no_transport(data, self.affected_points)
+            return
+        else:
+            raise NotImplementedError
 
     #####################################
     #           Serialization           #

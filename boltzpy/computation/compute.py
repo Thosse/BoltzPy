@@ -70,68 +70,70 @@ import boltzpy.computation as cp
 from boltzpy.computation import operator_splitting as cp_os
 from boltzpy.computation import output as cp_out
 
-
-# Todo Check if file address is a proper hdf5 file
-# Todo check if data can properly generated from the file
-def compute(file_address,
-            hdf5_group_name="Computation"):
-    assert isinstance(file_address, str)
-    # Generate Computation data
-    data = cp.Data(file_address)
-    data.check_stability_conditions()
-    # Generate computation functions
-    f_compute = generate_computation_functions(file_address)
-    sim = bp.Simulation(file_address)
-    f_output = cp_out.generate_output_function(sim,
-                                               hdf5_group_name)
-
-    # Start computation
-    print('Calculating...          ', end='\r')
-    # Todo this might be buggy, if data.tG changes
-    # Todo e.g. in adaptive time schemes
-    # Todo proposition: iterate over length?
-    for (tw_idx, tw) in enumerate(data.tG[:, 0]):
-        while data.t != tw:
-            f_compute(data)
-            _print_time_estimate(data)
-        # generate Output and write it to disk
-        f_output(data, tw_idx)
-
-    time_taken_in_seconds = int(time() - data.dur_total)
-    # large number of spaces necessary to overwrite the old terminal lines
-    print('Calculating... Done'
-          + 40 * ' ' + '\n'
-          + 'Time taken = ' + _format_time(time_taken_in_seconds))
-    return
-
-
-# Todo generate transport and collision seperately
-# Todo generaty operator splitting with functions as parameter
-def generate_computation_functions(file_address):
-    hdf5_group = h5py.File(file_address + ".hdf5")["Scheme"]
-    scheme = bp.Scheme.load(hdf5_group)
-    return cp_os.operator_splitting_function(scheme)
-
-
-# Todo profile this!
-def _print_time_estimate(data):
-    """Prints an estimate of the remaining time to the terminal"""
-    rem_steps = data.tG[-1, 0] - data.t
-    est_step_duration = (time() - data.dur_total) / data.t
-    est_time_in_seconds = int(rem_steps * est_step_duration)
-    print('Calculating... '
-          + _format_time(est_time_in_seconds)
-          + ' remaining',
-          end='\r')
-    return
-
-
-def _format_time(t_in_seconds):
-    (days, t_in_seconds) = divmod(t_in_seconds, 86400)
-    (hours, t_in_seconds) = divmod(t_in_seconds, 3600)
-    (minutes, t_in_seconds) = divmod(t_in_seconds, 60)
-    t_string = '{:2d}d {:2d}h {:2d}m {:2d}s'.format(days,
-                                                    hours,
-                                                    minutes,
-                                                    t_in_seconds)
-    return t_string
+#
+# # Todo Check if file address is a proper hdf5 file
+# # Todo check if data can properly generated from the file
+# def compute(file_address,
+#             hdf5_group_name="Computation"):
+#     assert isinstance(file_address, str)
+#     # Generate Computation data
+#     data = cp.Data(file_address)
+#     data.check_stability_conditions()
+#     # Generate computation functions
+#     f_compute = generate_computation_functions(file_address)
+#     sim = bp.Simulation(file_address)
+#     f_output = cp_out.generate_output_function(sim,
+#                                                hdf5_group_name)
+#
+#     # Start computation
+#     print('Calculating...          ', end='\r')
+#     # Todo this might be buggy, if data.tG changes
+#     # Todo e.g. in adaptive time schemes
+#     # Todo proposition: iterate over length?
+#     for (tw_idx, tw) in enumerate(data.tG[:, 0]):
+#         while data.t != tw:
+#             f_compute(data)
+#             _print_time_estimate(data)
+#         # generate Output and write it to disk
+#         f_output(data, tw_idx)
+#
+#     time_taken_in_seconds = int(time() - data.dur_total)
+#     # large number of spaces necessary to overwrite the old terminal lines
+#     print('Calculating... Done'
+#           + 40 * ' ' + '\n'
+#           + 'Time taken = ' + _format_time(time_taken_in_seconds))
+#     return
+#
+#
+# # Todo generate transport and collision seperately
+# # Todo generaty operator splitting with functions as parameter
+# def generate_computation_functions(file_address):
+#     hdf5_group = h5py.File(file_address + ".hdf5")["Scheme"]
+#     scheme = bp.Scheme.load(hdf5_group)
+#     return cp_os.operator_splitting_function(scheme)
+#
+#
+# # Todo profile this!
+# def _print_time_estimate(data):
+#     """Prints an estimate of the remaining time to the terminal"""
+#     rem_steps = data.tG[-1, 0] - data.t
+#     est_step_duration = (time() - data.dur_total) / data.t
+#     est_time_in_seconds = int(rem_steps * est_step_duration)
+#     print('Calculating... '
+#           + _format_time(est_time_in_seconds)
+#           + ' remaining',
+#           end='\r')
+#     return
+#
+#
+# # TODO Rename properly
+# # TODO use datetime.timedelta(Seconds= t_in_Seconds)
+# def _format_time(t_in_seconds):
+#     (days, t_in_seconds) = divmod(t_in_seconds, 86400)
+#     (hours, t_in_seconds) = divmod(t_in_seconds, 3600)
+#     (minutes, t_in_seconds) = divmod(t_in_seconds, 60)
+#     t_string = '{:2d}d {:2d}h {:2d}m {:2d}s'.format(days,
+#                                                     hours,
+#                                                     minutes,
+#                                                     t_in_seconds)
+#     return t_string
