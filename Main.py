@@ -40,7 +40,7 @@ sim.coll.setup(sim.scheme, sim.sv, sim.s)
 sim.save()
 
 
-sim.run_computation()
+sim.compute()
 
 sim.create_animation()
 # sim.create_animation(np.array([['Mass']]),

@@ -12,7 +12,7 @@ def test_computation(test_case):
     # Compute Output in temporary file
     sim = bp.Simulation(test_case)
     sim.save(bp_c.TEST_TMP_FILE)
-    sim.run_computation("Test")
+    sim.compute("Test")
     # Open old and new file, to compare results
     old_file = h5py.File(test_case, mode='r')
     new_file = h5py.File(bp_c.TEST_TMP_FILE, mode='r')

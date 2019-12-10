@@ -121,6 +121,34 @@ class Data:
     def __getattr__(self, item):
         return self._params[item]
 
+    ##############################
+    #           Timing           #
+    ##############################
+
+    def _print_progress(self):
+        # estimate remaining time in seconds
+        time_taken = time() - self.dur_total
+        mean_time_per_step = time_taken / self.t
+        total_time = int(self.tG[-1, 0] * mean_time_per_step)
+
+        print('Calculating... '
+              + self._format_time(int(time_taken))
+              + '  /  '
+              + self._format_time(total_time),
+              end='\r')
+        return
+
+    @staticmethod
+    def _format_time(seconds):
+        (days, seconds) = divmod(seconds, 86400)
+        (hours, seconds) = divmod(seconds, 3600)
+        (minutes, seconds) = divmod(seconds, 60)
+        t_string = '{:2d}d {:2d}h {:2d}m {:2d}s'.format(days,
+                                                        hours,
+                                                        minutes,
+                                                        seconds)
+        return t_string
+
     # Todo Add more check_integrity / stability conditions?
     # Todo raise Warnings for weird configurations?
     def check_stability_conditions(self):

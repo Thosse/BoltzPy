@@ -116,7 +116,7 @@ class TestCase(dict):
         sim.output_parameters = self["output_parameters"]
         sim.coll = self["coll"]
         sim.save()
-        sim.run_computation()
+        sim.compute()
         return sim
 
     def compare_results(self):

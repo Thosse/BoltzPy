@@ -6,8 +6,8 @@ import math
 
 import boltzpy as bp
 import boltzpy.constants as bp_c
-import boltzpy.computation.collisions as bp_collision
-import boltzpy.computation.transport as bp_transport
+import boltzpy.compute as bp_cp
+
 
 class Rule:
     """Encapsulates all data to initialize a :class:`~boltzpy.Grid` point.
@@ -155,10 +155,10 @@ class Rule:
     #####################################
     def collision(self, data):
         if self.behaviour_type == 'Inner Point':
-            bp_collision.euler_scheme(data, self.affected_points)
+            bp_cp.euler_scheme(data, self.affected_points)
             return
         elif self.behaviour_type == 'Boundary Point':
-            bp_collision.euler_scheme(data, self.affected_points)
+            bp_cp.euler_scheme(data, self.affected_points)
             # TODO replace by bp_collision.no_collisions(data, self.affected_points)
             return
         else:
@@ -166,9 +166,9 @@ class Rule:
 
     def transport(self, data):
         if self.behaviour_type == 'Inner Point':
-            bp_transport.fdm_first_order(data, self.affected_points)
+            bp_cp.fdm_first_order(data, self.affected_points)
         elif self.behaviour_type == 'Boundary Point':
-            bp_transport.no_transport(data, self.affected_points)
+            bp_cp.no_transport(data, self.affected_points)
             return
         else:
             raise NotImplementedError

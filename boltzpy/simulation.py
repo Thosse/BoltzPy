@@ -1,14 +1,12 @@
 import os
 import h5py
 import numpy as np
-from time import time
 
 import boltzpy.helpers.file_addresses as h_adr
 import boltzpy.helpers.least_common_multiple as h_lcm
 import boltzpy.animation as bp_ani
-import boltzpy.computation as bp_cp
-import boltzpy.computation.operator_splitting as bp_os
-import boltzpy.computation.output as bp_out
+import boltzpy.compute as bp_cp
+import boltzpy.output as bp_out
 import boltzpy.constants as bp_c
 import boltzpy as bp
 
@@ -429,7 +427,7 @@ class Simulation:
     #####################################
     #            Computation            #
     #####################################
-    def run_computation(self, hdf5_group_name="Computation"):
+    def compute(self, hdf5_group_name="Computation"):
         """Compute the fully configured Simulation"""
         self.check_integrity()
         # Todo write hash function in Computation folder
@@ -443,7 +441,7 @@ class Simulation:
         # else (KeyError, AssertionError):
 
         # Generate Computation data
-        data = bp_cp.Data(self.file_address)
+        data = bp.Data(self.file_address)
         data.check_stability_conditions()
 
         # Generate output functions
@@ -457,13 +455,15 @@ class Simulation:
         # Todo proposition: iterate over length?
         for (tw_idx, tw) in enumerate(data.tG[:, 0]):
             while data.t != tw:
-                bp_os.operator_splitting(data,
+                bp_cp.operator_splitting(data,
                                          self.geometry.transport,
                                          self.geometry.collision)
+                data._print_progress()
             # generate Output and write it to disk
             f_output(data, tw_idx)
+        # skip over the refreshing line during computation
+        print('\n')
         return
-
 
     #####################################
     #             Animation             #
