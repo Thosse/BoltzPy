@@ -35,8 +35,10 @@ Workflow
 from boltzpy.grid import Grid
 from boltzpy.rule import Rule
 from boltzpy.scheme import Scheme
+from boltzpy.geometry import Geometry
 from boltzpy.simulation import Simulation
 from boltzpy.species import Species
 from boltzpy.specimen import Specimen
 from boltzpy.svgrid import SVGrid
 from boltzpy.collisions import Collisions
+from boltzpy.data import Data

@@ -3,7 +3,6 @@ from time import time
 import numpy as np
 
 import boltzpy as bp
-import boltzpy.initialization as bp_ini
 
 
 # Todo Add vG_squared and vG_norm attributes? faster output?
@@ -68,7 +67,7 @@ class Data:
         # data arrays, this contains all grids
         # Todo Rework initialization (move into rules?)
         # Todo Class for single Space points (V-Grid + 0.Moment)?
-        self.state = bp_ini.create_psv_grid(sim)
+        self.state = sim.geometry.initial_state
         self.result = np.copy(self.state)
 
         # Velocity Grid parameters
@@ -104,12 +103,12 @@ class Data:
         self.col = sim.coll.relations
         self.weight = sim.coll.weights
 
-        # Array, denotes the category of a space point
+        # Array, denotes the behaviour_type of a space point
         # and thus its behaviour
         self.category = sim.init_arr
 
         # Todo add rule arr (only boundary points necessary)
-        #   with initialization scheme (standardized for rho = 1)
+        #   with initialization scheme (standardized for initial_rho = 1)
         # Todo This involves a scheme to determine "sub-rules"
         # Todo as the position of the boundary is important for its
         # todo behaviour / reinitialization
@@ -121,6 +120,34 @@ class Data:
 
     def __getattr__(self, item):
         return self._params[item]
+
+    ##############################
+    #           Timing           #
+    ##############################
+
+    def _print_progress(self):
+        # estimate remaining time in seconds
+        time_taken = time() - self.dur_total
+        mean_time_per_step = time_taken / self.t
+        total_time = int(self.tG[-1, 0] * mean_time_per_step)
+
+        print('Calculating... '
+              + self._format_time(int(time_taken))
+              + '  /  '
+              + self._format_time(total_time),
+              end='\r')
+        return
+
+    @staticmethod
+    def _format_time(seconds):
+        (days, seconds) = divmod(seconds, 86400)
+        (hours, seconds) = divmod(seconds, 3600)
+        (minutes, seconds) = divmod(seconds, 60)
+        t_string = '{:2d}d {:2d}h {:2d}m {:2d}s'.format(days,
+                                                        hours,
+                                                        minutes,
+                                                        seconds)
+        return t_string
 
     # Todo Add more check_integrity / stability conditions?
     # Todo raise Warnings for weird configurations?
