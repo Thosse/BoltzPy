@@ -230,7 +230,7 @@ class Geometry:
 
         Returns
         -------
-        self : :class:`Geometry
+        self : :class:`Geometry`
         """
         assert isinstance(hdf5_group, h5py.Group)
         assert hdf5_group.attrs["class"] == "Geometry"

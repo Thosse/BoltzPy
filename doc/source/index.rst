@@ -9,7 +9,6 @@
 
    classes
    constants
-   computation
    animation
 
 
@@ -19,7 +18,6 @@ Links
 -----
  * :ref:`classes`
  * :ref:`constants`
- * :ref:`computation`
  * :ref:`animation`
  * :ref:`search`
  * :ref:`genindex`

@@ -32,7 +32,8 @@ class Collisions:
         Each collision is a 4-tuple of indices in :attr:`sv.iMG`
         and is in the form
         :math:`\left[ v_0, v_1, w_0, w_1\right]`,
-        where *_0, *_1 are the pre and post collision velocities, respectively.
+        where  :math:`v_0, w_0` are the pre
+        and :math:`v_1, w_1` are the post collision velocities.
     weights : :obj:`~numpy.array` [:obj:`float`]
         Contains the numeric integration weights
         of the respective collision in :attr:`relations`.
