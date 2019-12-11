@@ -97,8 +97,8 @@ SUPP_GRID_DIMENSIONS = {1, 2}
 #          * no transport-step,
 #          * Distribution is freshly initialized in every time step
 SUPP_BEHAVIOUR_TYPES = ['Inner Point',
-                        # 'Boundary Point',
+                        'Constant Point',
+                        'Boundary Point',
                         # 'Ghost Boundary_Point',
-                        # 'Constant_IO_Point',
-                        # 'Time_Variant_IO_Point'
+                        # 'Time_Variant_Point'
                         ]

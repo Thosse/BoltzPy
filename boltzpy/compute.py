@@ -89,11 +89,6 @@ def fdm_first_order(data, affected_points):
     # Todo is this case separation necessary?
     for (spc, [beg, end]) in enumerate(data.v_range):
         for p in affected_points:
-            # TODO THESE ARE HACKS remove , after updating the tests
-            if p == 0:
-                continue
-            if p == data.p_size-1:
-                continue
             # # Todo there should be a faster way -> vectorize, keep old function for testing
             for v in range(beg, end):
                 pv = data.vG[v] + offset

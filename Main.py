@@ -19,16 +19,26 @@ if exisiting_simulation_file is None:
                            shapes=[(5, 5),
                                    (7, 7)])
     sim.geometry = bp.Geometry(ndim=sim.p.ndim, shape=sim.p.shape)
+    sim.add_rule(behaviour_type='Constant Point',
+                 initial_rho=np.array([2.0, 1.0]),
+                 initial_drift=np.array([[0.0, 0.0], [0.0, 0.0]]),
+                 initial_temp=np.array([1.0, 1.0]),
+                 affected_points=np.array([0]))
     sim.add_rule(behaviour_type='Inner Point',
                  initial_rho=np.array([2.0, 1.0]),
                  initial_drift=np.array([[0.0, 0.0], [0.0, 0.0]]),
                  initial_temp=np.array([1.0, 1.0]),
-                 affected_points=np.arange(0, 10))
+                 affected_points=np.arange(1, 10))
     sim.add_rule(behaviour_type='Inner Point',
                  initial_rho=np.array([1.0, 1.0]),
                  initial_drift=np.array([[0.0, 0.0], [0.0, 0.0]]),
                  initial_temp=np.array([1.0, 1.0]),
-                 affected_points=np.arange(10, 21))
+                 affected_points=np.arange(10, 20))
+    sim.add_rule(behaviour_type='Constant Point',
+                 initial_rho=np.array([1.0, 1.0]),
+                 initial_drift=np.array([[0.0, 0.0], [0.0, 0.0]]),
+                 initial_temp=np.array([1.0, 1.0]),
+                 affected_points=np.array([20]))
     sim.geometry.setup(sim.sv)
     sim.scheme.OperatorSplitting = "FirstOrder"
     sim.scheme.Transport = "FiniteDifferences_FirstOrder"

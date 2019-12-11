@@ -158,8 +158,12 @@ class Rule:
             bp_cp.euler_scheme(data, self.affected_points)
             return
         elif self.behaviour_type == 'Boundary Point':
+            bp_cp.no_collisions(data, self.affected_points)
+            return
+        elif self.behaviour_type == 'Constant Point':
             bp_cp.euler_scheme(data, self.affected_points)
-            # TODO replace by bp_collision.no_collisions(data, self.affected_points)
+            # Todo replace by bp_cp.no_collisions(data, self.affected_points)
+            # before that, implement proper initialization
             return
         else:
             raise NotImplementedError
@@ -168,6 +172,8 @@ class Rule:
         if self.behaviour_type == 'Inner Point':
             bp_cp.fdm_first_order(data, self.affected_points)
         elif self.behaviour_type == 'Boundary Point':
+            bp_cp.no_transport(data, self.affected_points)
+        elif self.behaviour_type == 'Constant Point':
             bp_cp.no_transport(data, self.affected_points)
             return
         else:
