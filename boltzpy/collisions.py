@@ -378,3 +378,34 @@ def is_collision(masses,
         return False
     # Accept this Collision
     return True
+
+
+def sort(relations,
+         weights=None,
+         sort_by='index'):
+    size = len(relations)
+    if weights is None:
+        merged_list = ((relations[i],) for i in range(size))
+    else:
+        assert len(relations) == len(weights)
+        merged_list = ((rel, weights[i])
+                       for (i, rel) in enumerate(relations))
+
+    if sort_by == "index":
+        sorted_list = sorted(merged_list, key=lambda x: tuple(x[0]))
+    elif sort_by == "area":
+        sorted_list = sorted(merged_list,
+                             key=lambda x: np.linalg.norm(x[0][0] - x[0][2]))
+    else:
+        msg = ('Unsupported Parameter:\n\t'
+               'sort_by = ' + '{}'.format(sort_by))
+        raise NotImplementedError(msg)
+
+    sorted_relations = np.array([x[0] for x in sorted_list], dtype=int)
+
+    # Return sorted relations and, if given, weights
+    if weights is None:
+        return sorted_relations
+    else:
+        sorted_weights = np.array([x[1] for x in sorted_list], dtype=int)
+        return sorted_relations, sorted_weights
