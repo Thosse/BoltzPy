@@ -380,9 +380,43 @@ def is_collision(masses,
     return True
 
 
-def sort(relations,
-         weights=None,
-         sort_by='index'):
+# Todo move this into model class
+#####################################
+#           Visualization           #
+#####################################
+def plot(svgrid,
+         collisions,
+         plot_object=None,
+         iterative=False):
+    assert isinstance(svgrid, bp.SVGrid)
+    assert svgrid.number_of_grids <= len(svgrid.plot_styles)
+
+    show_plot_directly = plot_object is None
+    if plot_object is None:
+        # Choose standard pyplot
+        import matplotlib.pyplot as plt
+        plot_object = plt
+
+    for coll in collisions:
+        quadrangle = np.array([svgrid.iMG[idx] * svgrid.delta
+                               for idx in list(coll) + [coll[0]]])
+        plot_object.plot(quadrangle[..., 0], quadrangle[..., 1])
+
+        if show_plot_directly and iterative:
+            svgrid.plot(plot_object=plot_object)
+            plot_object.show()
+            plot_object.close()
+
+    if show_plot_directly and not iterative:
+        svgrid.plot(plot_object)
+        plot_object.show()
+    return plot_object
+
+
+def sort_collisions(relations,
+                    svgrid=None,
+                    weights=None,
+                    sort_by='index'):
     size = len(relations)
     if weights is None:
         merged_list = ((relations[i],) for i in range(size))
@@ -395,15 +429,15 @@ def sort(relations,
         sorted_list = sorted(merged_list, key=lambda x: tuple(x[0]))
     elif sort_by == "area":
         sorted_list = sorted(merged_list,
-                             key=lambda x: np.linalg.norm(x[0][0] - x[0][2]))
+                             key=lambda x: np.linalg.norm(
+                                 svgrid.iMG[x[0][0]] - svgrid.iMG[x[0][2]]))
     else:
         msg = ('Unsupported Parameter:\n\t'
                'sort_by = ' + '{}'.format(sort_by))
         raise NotImplementedError(msg)
 
-    sorted_relations = np.array([x[0] for x in sorted_list], dtype=int)
-
     # Return sorted relations and, if given, weights
+    sorted_relations = np.array([x[0] for x in sorted_list], dtype=int)
     if weights is None:
         return sorted_relations
     else:
