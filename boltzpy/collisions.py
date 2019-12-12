@@ -102,7 +102,7 @@ class Collisions:
                 # generate collisions between the specimen,
                 # depending on the collision model
                 if scheme.Collisions_Generation == 'UniformComplete':
-                    [new_rels, new_weights] = self._generate_collisions_complete(
+                    [new_rels, new_weights] = complete(
                         mass_v,
                         grid_v,
                         mass_w,
@@ -129,69 +129,6 @@ class Collisions:
                         n=self.size))
         self.check_integrity()
         return
-
-    def _generate_collisions_complete(self,
-                                      mass_v,
-                                      grid_v,
-                                      mass_w,
-                                      grid_w,
-                                      idx_spc_v,
-                                      idx_spc_w,
-                                      index_offset_v,
-                                      index_offset_w,
-                                      svgrid,
-                                      species):
-        """Generate all possible, non-useless collisions.
-
-        Iterates over all possible velocity combinations
-        and checks whether they are proper collisions.
-
-        All proper collisions are stored in the relations list."""
-        relations = []
-        weights = []
-        for (loc_v0, v0) in enumerate(grid_v.iG):
-            # global index in self.iMG
-            index_v0 = index_offset_v + loc_v0
-            assert np.all(v0 == svgrid.iMG[index_v0])
-            # we choose idx_v0 < idx_v1 to ignore v=(a, a, * , *)
-            # and ignore repeating collisions
-            for (loc_v1, v1) in enumerate(grid_v.iG[loc_v0 + 1:]):
-                # global index in self.iMG
-                index_v1 = index_v0 + 1 + loc_v1
-                assert np.all(v1 == svgrid.iMG[index_v1])
-                # calculate Velocity (index) difference
-                diff_v = v1 - v0
-                for (loc_w0, w0) in enumerate(grid_w.iG):
-                    # global index in self.iMG
-                    index_w0 = index_offset_w + loc_w0
-                    assert np.all(w0 == svgrid.iMG[index_w0])
-                    # Calculate w1, using the momentum invariance
-                    diff_w = -diff_v * mass_v // mass_w
-                    w1 = w0 + diff_w
-                    # find the global index of w1, if its in the grid
-                    index_w1 = svgrid.find_index(idx_spc_w, w1)
-                    if index_w1 is None:
-                        continue
-                    # check if its a proper Collision
-                    new_col_idx = [index_v0,
-                                   index_v1,
-                                   index_w0,
-                                   index_w1]
-                    new_col_val = np.array([v0, v1, w0, w1],
-                                           dtype=int)
-                    is_a_collision = is_collision(
-                        [mass_v, mass_w],
-                        new_col_val,
-                        new_col_idx)
-                    if not is_a_collision:
-                        continue
-                    # Collision is accepted -> Add to List
-                    relations.append(new_col_idx)
-                    new_weight = species.collision_rates[idx_spc_v,
-                                                         idx_spc_w]
-                    weights.append(new_weight)
-        assert len(relations) == len(weights)
-        return [relations, weights]
 
     def generate_collision_matrix(self, dt):
         # Size of complete velocity grid
@@ -318,6 +255,65 @@ class Collisions:
 ##############################################
 #       Collision Generation Functions       #
 ##############################################
+def complete(mass_v,
+             grid_v,
+             mass_w,
+             grid_w,
+             idx_spc_v,
+             idx_spc_w,
+             index_offset_v,
+             index_offset_w,
+             svgrid,
+             species):
+    """Generate all possible, non-useless collisions.
+
+    Iterates over all possible velocity combinations
+    and checks whether they are proper collisions.
+
+    All proper collisions are stored in the relations list."""
+    relations = []
+    weights = []
+    for (loc_v0, v0) in enumerate(grid_v.iG):
+        # global index in self.iMG
+        index_v0 = index_offset_v + loc_v0
+        assert np.all(v0 == svgrid.iMG[index_v0])
+        # we choose idx_v0 < idx_v1 to ignore v=(a, a, * , *)
+        # and ignore repeating collisions
+        for (loc_v1, v1) in enumerate(grid_v.iG[loc_v0 + 1:]):
+            # global index in self.iMG
+            index_v1 = index_v0 + 1 + loc_v1
+            assert np.all(v1 == svgrid.iMG[index_v1])
+            # calculate Velocity (index) difference
+            diff_v = v1 - v0
+            for (loc_w0, w0) in enumerate(grid_w.iG):
+                # global index in self.iMG
+                index_w0 = index_offset_w + loc_w0
+                assert np.all(w0 == svgrid.iMG[index_w0])
+                # Calculate w1, using the momentum invariance
+                diff_w = -diff_v * mass_v // mass_w
+                w1 = w0 + diff_w
+                # find the global index of w1, if its in the grid
+                index_w1 = svgrid.find_index(idx_spc_w, w1)
+                if index_w1 is None:
+                    continue
+                # check if its a proper Collision
+                new_col_idx = [index_v0,
+                               index_v1,
+                               index_w0,
+                               index_w1]
+                new_col_val = np.array([v0, v1, w0, w1],
+                                       dtype=int)
+                if not is_collision([mass_v, mass_w], new_col_val, new_col_idx):
+                    continue
+                # Collision is accepted -> Add to List
+                relations.append(new_col_idx)
+                new_weight = species.collision_rates[idx_spc_v,
+                                                     idx_spc_w]
+                weights.append(new_weight)
+    assert len(relations) == len(weights)
+    return [relations, weights]
+
+
 def is_collision(masses,
                  collision_velocities,
                  collision_indices=None):
