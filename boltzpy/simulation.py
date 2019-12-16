@@ -3,7 +3,6 @@ import h5py
 import numpy as np
 
 import boltzpy.helpers.file_addresses as h_adr
-import boltzpy.helpers.least_common_multiple as h_lcm
 import boltzpy.animation as bp_ani
 import boltzpy.compute as bp_cp
 import boltzpy.output as bp_out
@@ -379,7 +378,7 @@ class Simulation:
         """
         if not self.s.is_configured:
             raise AttributeError
-        lcm = int(h_lcm.lcm(self.s.mass))
+        lcm = int(np.lcm.reduce(self.s.mass))
         if use_identical_spacing:
             spacings = [2] * self.s.size
         else:
