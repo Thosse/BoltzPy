@@ -273,6 +273,7 @@ def complete(mass_v,
     All proper collisions are stored in the relations list."""
     relations = []
     weights = []
+    # Todo only works if spacing is dividable by mass_w
     for (loc_v0, v0) in enumerate(grid_v.iG):
         # global index in self.iMG
         index_v0 = index_offset_v + loc_v0
@@ -290,6 +291,7 @@ def complete(mass_v,
                 index_w0 = index_offset_w + loc_w0
                 assert np.all(w0 == svgrid.iMG[index_w0])
                 # Calculate w1, using the momentum invariance
+                assert all((diff_v * mass_v) % mass_w == 0)
                 diff_w = -diff_v * mass_v // mass_w
                 w1 = w0 + diff_w
                 # find the global index of w1, if its in the grid
