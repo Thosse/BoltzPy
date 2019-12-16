@@ -352,8 +352,7 @@ def is_collision(masses,
     # Todo split this into remove duplicates and remove useless collisions
     # Todo this does not belong into a is_collision!
     if collision_indices is not None:
-        # Value not found in Grid
-        # Todo make this any is None
+        # Any value not found in Grid
         if any(idx is None for idx in collision_indices):
             return False
         # Ignore collisions that were already found
@@ -405,6 +404,7 @@ def plot(svgrid,
         plot_object.plot(quadrangle[..., 0], quadrangle[..., 1])
 
         if show_plot_directly and iterative:
+            print(list(coll))
             svgrid.plot(plot_object=plot_object)
             plot_object.show()
             plot_object.close()
@@ -428,7 +428,8 @@ def sort_collisions(relations,
                        for (i, rel) in enumerate(relations))
 
     if sort_by == "index":
-        sorted_list = sorted(merged_list, key=lambda x: tuple(x[0]))
+        sorted_list = sorted(merged_list,
+                             key=lambda x: tuple(np.sort(x[0])))
     elif sort_by == "area":
         sorted_list = sorted(merged_list,
                              key=lambda x: np.linalg.norm(
