@@ -84,68 +84,58 @@ class Collision:
         return plot_object
 
     @staticmethod
-    def is_collision(masses,
-                     collision_velocities,
-                     collision_indices=None):
+    def is_collision(v_pre,
+                     v_post,
+                     w_pre,
+                     w_post,
+                     mass_v,
+                     mass_w):
         """Check whether the Collision Candidate fulfills all necessary
         Conditions.
 
         Parameters
         ----------
-        collision_indices : :obj:`list` [:obj:`int`]
-            Indices of the colliding velocities in the SV-Grid.
-            Array of shape=(4).
-        collision_velocities : :obj:`~numpy.array` [:obj:`int`]
+
+        v_pre, v_post, w_pre, w_post : :obj:`~numpy.array` [:obj:`int`]
             Colliding velocities in the SV-Grid
             in multitudes of :attr:`SVGrid.delta`.
-            Array of shape=(4, :attr:`SVGrid.ndim`).
-        masses : array(int)
-            Step sizes of the Specimens Velocity-Grids
-            Array of shape=(2,).
+        mass_v, mass_w : int
+            Mass of the respective particles.
 
         Returns
         -------
         bool
             True if collision fulfills all conditions, False otherwise.
         """
-        # Abbreviation
-        v0 = collision_velocities[0]
-        v1 = collision_velocities[1]
-        w0 = collision_velocities[2]
-        w1 = collision_velocities[3]
-        m_v = masses[0]
-        m_w = masses[1]
-
-        # Index arguments
-        # Todo split this into remove duplicates and remove useless collisions
-        # Todo this does not belong into a is_collision!
-        if collision_indices is not None:
-            # Any value not found in Grid
-            if any(idx is None for idx in collision_indices):
-                return False
-            # Ignore collisions that were already found
-            if collision_indices[3] < collision_indices[0]:
-                # Todo maybe add ...[2] < ...[0] as well
-                return False
-            # Ignore v=(X,b,b,X) for same species
-            # as such collisions have no effect
-            if np.all(collision_indices[1] == collision_indices[2]):
-                return False
-
-        # Value arguments
         # Ignore Collisions without changes in velocities
-        if np.all(v0 == v1) and np.all(w0 == w1):
+        if np.all(v_pre == v_post) and np.all(w_pre == w_post):
             return False
-        # Condition: invariance of momentum
+        # Invariance of momentum
         # Todo use functions from output.py instead?
-        if not np.all(m_v * (v1 - v0) == m_w * (w0 - w1)):
+        if not np.all(mass_v * (v_post - v_pre) == mass_w * (w_pre - w_post)):
             return False
-        # invariance of energy
-        energy_0 = np.sum(m_v * v0 ** 2 + m_w * w0 ** 2)
-        energy_1 = np.sum(m_v * v1 ** 2 + m_w * w1 ** 2)
+        # Invariance of energy
+        energy_0 = np.sum(mass_v * v_pre ** 2 + mass_w * w_pre ** 2)
+        energy_1 = np.sum(mass_v * v_post ** 2 + mass_w * w_post ** 2)
         if energy_0 != energy_1:
             return False
         # Accept this Collision
+        return True
+
+    @staticmethod
+    def is_effective(relation):
+        if any(idx is None for idx in relation):
+            return False
+        # Ignore collisions that were already found
+        # if any([relation[3] < relation[0],
+        #         relation[2] < relation[0],
+        #         relation[1] < relation[0]]):
+        #     return False
+        # Ignore v=(X,b,b,X) for same species
+        # as such collisions have no effect
+        if all([relation[1] == relation[2],
+                relation[0] == relation[3]]):
+            return False
         return True
 
 
@@ -471,9 +461,10 @@ def complete(mass_v,
                                index_w1]
                 new_col_val = np.array([v0, v1, w0, w1],
                                        dtype=int)
-                if not Collision.is_collision([mass_v, mass_w],
-                                              new_col_val,
-                                              new_col_idx):
+                if not Collision.is_collision(v0, v1, w0, w1,
+                                              mass_v, mass_w):
+                    continue
+                if not Collision.is_effective(new_col_idx):
                     continue
                 # Collision is accepted -> Add to List
                 relations.append(new_col_idx)
