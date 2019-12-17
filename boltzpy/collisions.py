@@ -36,6 +36,18 @@ class Collision:
     #####################################
     #        Sorting and Ordering       #
     #####################################
+    @staticmethod
+    def get_key_function(mode="index", svgrid=None):
+        if mode == "index":
+            return bp.collisions.Collision.key_index
+        elif mode == "area":
+            assert svgrid is not None
+            return lambda x: bp.collisions.Collision.key_area(x, svgrid)
+        else:
+            msg = ('Unsupported Parameter:\n\t'
+                   'mode = ' + '{}'.format(mode))
+            raise NotImplementedError(msg)
+
     def key_index(self):
         sorted_indices = np.sort(self.relation)
         return tuple(sorted_indices)
@@ -505,17 +517,32 @@ def plot(svgrid,
     return plot_object
 
 
+def group_collisions(collisions,
+                     svgrid=None,
+                     mode="index"):
+    get_key = Collision.get_key_function(mode=mode,
+                                         svgrid=svgrid)
+    grouped_collisions = dict()
+    for coll in collisions:
+        key = get_key(coll)
+        if key in grouped_collisions.keys():
+            grouped_collisions[key].append(coll)
+        else:
+            grouped_collisions[key] = [coll]
+    return grouped_collisions
+
+
+def filter_collisions(collisions):
+    grouped_collisions = group_collisions(collisions,
+                                          mode="index")
+    filtered_collisions = [group[0] for group in grouped_collisions.values()]
+    return np.array(filtered_collisions, dtype=object)
+
+
 def sort_collisions(collisions,
                     svgrid=None,
-                    sort_by='index'):
-    if sort_by == "index":
-        sorted_list = sorted(collisions,
-                             key=lambda x: x.key_index())
-    elif sort_by == "area":
-        sorted_list = sorted(collisions,
-                             key=lambda x: x.key_area(svgrid=svgrid))
-    else:
-        msg = ('Unsupported Parameter:\n\t'
-               'sort_by = ' + '{}'.format(sort_by))
-        raise NotImplementedError(msg)
+                    mode='index'):
+    get_key = Collision.get_key_function(mode=mode,
+                                         svgrid=svgrid)
+    sorted_list = sorted(collisions, key=get_key)
     return np.array(sorted_list, dtype=object)
