@@ -7,6 +7,34 @@ import h5py
 import boltzpy as bp
 
 
+class Collision:
+    r"""Encapsulates the :attr:`relation` and :attr:`weight`
+    of any single Collision.
+
+    Attributes
+    ----------
+    relation : :obj:`~numpy.array` [:obj:`int`]
+        Contains the indices of the colliding velocities.
+        Any relation consists of 4 indices in the following order
+        :math:`\left[ v_0, v_1, w_0, w_1\right]`,
+        where  :math:`v_0, w_0` index the pre
+        and :math:`v_1, w_1` index the post collision velocities.
+    weight : :obj:`float`
+        Contains the numeric integration weights
+        of the respective collision in :attr:`relations`.
+    """
+    def __init__(self, relation, weight):
+        if isinstance(relation, list):
+            relation = np.array(relation, dtype=int)
+        assert isinstance(relation, np.ndarray)
+        assert relation.dtype == int
+        assert relation.size == 4
+        assert isinstance(weight, float)
+        self.relation = relation
+        self. weight = weight
+
+
+# Todo Remove this class, move into model
 class Collisions:
     r"""Generates and encapsulates the collision :attr:`relations`
     and :attr:`weights`.
@@ -39,9 +67,35 @@ class Collisions:
         of the respective collision in :attr:`relations`.
     """
     def __init__(self):
-        self.relations = None
-        self.weights = None
+        self.collisions = None
         return
+
+    @property
+    def relations(self):
+        ret = [coll.relation for coll in self.collisions]
+        return np.array(ret, dtype=int)
+
+    @relations.setter
+    def relations(self, new_relations):
+        new_collisions = [Collision(rel, 0.0) for rel in new_relations]
+        if self.collisions is not None:
+            for (i, old_coll) in enumerate(self.collisions):
+                new_collisions[i].weight = old_coll.weight
+        self.collisions = new_collisions
+
+    @property
+    def weights(self):
+        ret = [coll.weight for coll in self.collisions]
+        return np.array(ret, dtype=float)
+
+    @weights.setter
+    def weights(self, new_weights):
+        new_collisions = [Collision(np.zeros((4,), dtype=int), w)
+                          for w in new_weights]
+        if self.collisions is not None:
+            for (i, old_coll) in enumerate(self.collisions):
+                new_collisions[i].relation = old_coll.relation
+        self.collisions = new_collisions
 
     @property
     def size(self):
@@ -404,7 +458,11 @@ def plot(svgrid,
         plot_object.plot(quadrangle[..., 0], quadrangle[..., 1])
 
         if show_plot_directly and iterative:
-            print(list(coll))
+            print("collision = ", list(coll),
+                  "\n\tv0 = ", list(svgrid.iMG[coll[0]]),
+                  "\n\tv1 = ", list(svgrid.iMG[coll[1]]),
+                  "\n\tw0 = ", list(svgrid.iMG[coll[2]]),
+                  "\n\tv0 = ", list(svgrid.iMG[coll[3]]))
             svgrid.plot(plot_object=plot_object)
             plot_object.show()
             plot_object.close()
