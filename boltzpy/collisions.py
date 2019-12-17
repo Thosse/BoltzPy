@@ -287,6 +287,7 @@ class Collisions:
                 # Todo remove redundant collisions
         self.relations = np.array(relations, dtype=int)
         self.weights = np.array(weights, dtype=float)
+        self.collisions = filter_collisions(self.collisions)
         time_end = time()
         print('Time taken =  {t} seconds\n'
               'Total Number of Collisions = {n}\n'
