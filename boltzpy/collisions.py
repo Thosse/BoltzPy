@@ -39,7 +39,20 @@ class Collision:
     def plot(self,
              svgrid,
              plot_object=None):
-        pass
+        indices = list(self.relation) + [self.relation[0]]
+        quadrangle = svgrid.iMG[indices] * svgrid.delta
+        x_vals = quadrangle[..., 0]
+        y_vals = quadrangle[..., 1]
+        plot_object.plot(x_vals, y_vals)
+        # Todo add a legend to see this data (only if interactive parameter==True
+        # # Todo use svgrid.pMG
+        # [v0, v1, w0, w1] = svgrid.iMG[coll.relation] * svgrid.delta
+        # print("collision = ", list(coll.relation),
+        #       "\n\tv0 = ", list(v0),
+        #       "\n\tv1 = ", list(v1),
+        #       "\n\tw0 = ", list(w0),
+        #       "\n\tv0 = ", list(v1))
+        return plot_object
 
     @staticmethod
     def is_collision(masses,
@@ -459,18 +472,14 @@ def plot(svgrid,
         plot_object = plt
 
     for coll in collisions:
-        quadrangle = np.array([svgrid.iMG[idx] * svgrid.delta
-                               for idx in list(coll) + [coll[0]]])
-        plot_object.plot(quadrangle[..., 0], quadrangle[..., 1])
+        coll.plot(svgrid=svgrid,
+                  plot_object=plot_object)
 
         if show_plot_directly and iterative:
-            print("collision = ", list(coll),
-                  "\n\tv0 = ", list(svgrid.iMG[coll[0]]),
-                  "\n\tv1 = ", list(svgrid.iMG[coll[1]]),
-                  "\n\tw0 = ", list(svgrid.iMG[coll[2]]),
-                  "\n\tv0 = ", list(svgrid.iMG[coll[3]]))
+            # plot Grid on top of collision
             svgrid.plot(plot_object=plot_object)
             plot_object.show()
+            # stop showing this collision (and grid) in next plot
             plot_object.close()
 
     if show_plot_directly and not iterative:
