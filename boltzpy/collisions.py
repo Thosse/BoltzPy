@@ -34,6 +34,23 @@ class Collision:
         self. weight = weight
 
     #####################################
+    #        Sorting and Ordering       #
+    #####################################
+    def key_index(self):
+        sorted_indices = np.sort(self.relation)
+        return tuple(sorted_indices)
+
+    def key_area(self, svgrid):
+        [v0, v1, w0, w1] = svgrid.iMG[self.relation]
+        area_1 = np.linalg.norm(np.cross(v1 - v0, w1 - v0))
+        area_2 = np.linalg.norm(np.cross(w1 - w0, w1 - v0))
+        area = 0.5 * (area_1 + area_2)
+        circumference = (np.linalg.norm(v1 - v0)
+                         + np.linalg.norm(w1 - w0)
+                         + 2 * np.linalg.norm(v0 - w1))
+        return area, circumference
+
+    #####################################
     #           Visualization           #
     #####################################
     def plot(self,
@@ -488,34 +505,17 @@ def plot(svgrid,
     return plot_object
 
 
-def sort_collisions(relations,
+def sort_collisions(collisions,
                     svgrid=None,
-                    weights=None,
                     sort_by='index'):
-    size = len(relations)
-    if weights is None:
-        merged_list = ((relations[i],) for i in range(size))
-    else:
-        assert len(relations) == len(weights)
-        merged_list = ((rel, weights[i])
-                       for (i, rel) in enumerate(relations))
-
     if sort_by == "index":
-        sorted_list = sorted(merged_list,
-                             key=lambda x: tuple(np.sort(x[0])))
+        sorted_list = sorted(collisions,
+                             key=lambda x: x.key_index())
     elif sort_by == "area":
-        sorted_list = sorted(merged_list,
-                             key=lambda x: np.linalg.norm(
-                                 svgrid.iMG[x[0][0]] - svgrid.iMG[x[0][2]]))
+        sorted_list = sorted(collisions,
+                             key=lambda x: x.key_area(svgrid=svgrid))
     else:
         msg = ('Unsupported Parameter:\n\t'
                'sort_by = ' + '{}'.format(sort_by))
         raise NotImplementedError(msg)
-
-    # Return sorted relations and, if given, weights
-    sorted_relations = np.array([x[0] for x in sorted_list], dtype=int)
-    if weights is None:
-        return sorted_relations
-    else:
-        sorted_weights = np.array([x[1] for x in sorted_list], dtype=int)
-        return sorted_relations, sorted_weights
+    return np.array(sorted_list, dtype=object)
