@@ -203,34 +203,29 @@ class SVGrid:
     #####################################
     #               Indexing            #
     #####################################
-    # Todo replace by get_index in respective vGrid?
-    # Todo write Gird.binary_search (iterate over dimensions
     def find_index(self,
                    index_of_specimen,
-                   desired_value):
+                   integer_value):
         """Find index of given grid_entry in :attr:`iMG`
         Returns None, if the value is not in the specified Grid.
 
         Parameters
         ----------
         index_of_specimen : :obj:`int`
-        desired_value : :obj:`~numpy.array` [:obj:`int`]
+        integer_value : :obj:`~numpy.array` [:obj:`int`]
 
         Returns
         -------
         global_index : :obj:`int` of :obj:`None`
 
         """
-        index_grid = self.vGrids[index_of_specimen].iG
-        grid_iterator = (idx for (idx, value) in enumerate(index_grid)
-                         if np.all(value == desired_value))
-        local_index = next(grid_iterator, None)
+        local_index = self.vGrids[index_of_specimen].get_index(integer_value)
         if local_index is None:
             return None
         else:
-            start_of_grid = self.index_range[index_of_specimen, 0]
-            global_index = start_of_grid + local_index
-            assert np.all(self.iMG[global_index] == desired_value)
+            index_offset = self.index_range[index_of_specimen, 0]
+            global_index = index_offset + local_index
+            assert np.all(self.iMG[global_index] == integer_value)
             return global_index
 
     # Todo should be faster with next()

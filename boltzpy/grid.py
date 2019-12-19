@@ -247,6 +247,29 @@ class Grid:
         return
 
     #####################################
+    #               Indexing            #
+    #####################################
+    # Todo write Gird.binary_search (iterate over dimensions
+    # Todo or: compute value by module operations
+    # Todo      write proper tests for this
+    def get_index(self, integer_value):
+        """Find index of given grid_entry in :attr:`iMG`
+        Returns None, if the value is not in the specified Grid.
+
+        Parameters
+        ----------
+        integer_value : :obj:`~numpy.array` [:obj:`int`]
+
+        Returns
+        -------
+        index : :obj:`int` of :obj:`None`
+        """
+        grid_iterator = (idx for (idx, value) in enumerate(self.iG)
+                         if np.all(value == integer_value))
+        local_index = next(grid_iterator, None)
+        return local_index
+
+    #####################################
     #           Visualization           #
     #####################################
     def plot(self, plot_object=None, **plot_style):

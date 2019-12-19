@@ -229,10 +229,11 @@ CASES.append(TestCase("shock_2Species"))
 CASES.append(TestCase("shock_2species_complete",
                       output_parameters=np.array([["Complete_Distribution"]])))
 
+
 ################################################################################
 #                                   Main                                       #
 ################################################################################
-if __name__ == "__main__":
+def update_all_tests():
     for tc in CASES:
         assert isinstance(tc, TestCase)
         tc.update_results()
