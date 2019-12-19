@@ -37,12 +37,22 @@ class Collision:
     #        Sorting and Ordering       #
     #####################################
     @staticmethod
-    def get_key_function(mode="index", svgrid=None):
+    def get_key_function(mode="index",
+                         svgrid=None,
+                         **kwargs):
         if mode == "index":
             return bp.collisions.Collision.key_index
         elif mode == "area":
             assert svgrid is not None
             return lambda x: bp.collisions.Collision.key_area(x, svgrid)
+        elif mode == "angle":
+            assert svgrid is not None
+            if "merge_similar_angles" in kwargs.keys():
+                merge_similar_angles = kwargs["merge_similar_angles"]
+                return lambda x: bp.collisions.Collision.key_angle(
+                    x,
+                    svgrid,
+                    merge_similar_angles)
         else:
             msg = ('Unsupported Parameter:\n\t'
                    'mode = ' + '{}'.format(mode))
@@ -61,6 +71,14 @@ class Collision:
                          + np.linalg.norm(w1 - w0)
                          + 2 * np.linalg.norm(v0 - w1))
         return area, circumference
+
+    def key_angle(self, svgrid, merge_similar_angles=True):
+        (v0, v1, w0, w1) = svgrid.iMG[self.relation]
+        dv = v1 - v0
+        angle = dv // np.gcd.reduce(dv)
+        if merge_similar_angles:
+            angle = sorted(np.abs(angle))
+        return tuple(angle)
 
     #####################################
     #           Visualization           #
@@ -123,14 +141,14 @@ class Collision:
         return True
 
     @staticmethod
-    def is_effective(relation):
+    def is_effective_collision(relation):
         if any(idx is None for idx in relation):
             return False
         # Ignore collisions that were already found
-        # if any([relation[3] < relation[0],
-        #         relation[2] < relation[0],
-        #         relation[1] < relation[0]]):
-        #     return False
+        if any([relation[3] < relation[0],
+                relation[2] < relation[0],
+                relation[1] < relation[0]]):
+            return False
         # Ignore v=(X,b,b,X) for same species
         # as such collisions have no effect
         if all([relation[1] == relation[2],
@@ -219,7 +237,11 @@ class Collisions:
     #####################################
     #           Configuration           #
     #####################################
-    def setup(self, scheme, svgrid, species):
+    def setup(self,
+              scheme,
+              svgrid,
+              species,
+              apply_filter=True):
         """Generates the :attr:`relations` and :attr:`weights`.
 
         Parameters
@@ -274,10 +296,14 @@ class Collisions:
                     msg = ('Unsupported Selection Scheme:'
                            + '{}'.format(scheme.Collisions_Generation))
                     raise NotImplementedError(msg)
-                # Todo remove redundant collisions
         self.relations = np.array(relations, dtype=int)
         self.weights = np.array(weights, dtype=float)
-        self.collisions = filter_collisions(self.collisions)
+        if apply_filter:
+            # remove redundant collisions
+            # intraspecies collisions are counted twice, since
+            # both (v0, v1, w0, w1) and ( v0, w1, w0, v1) are counted
+            # for some tests it is useful to keep these and filter later
+            self.collisions = filter_collisions(self.collisions)
         time_end = time()
         print('Time taken =  {t} seconds\n'
               'Total Number of Collisions = {n}\n'
@@ -459,12 +485,10 @@ def complete(mass_v,
                                index_v1,
                                index_w0,
                                index_w1]
-                new_col_val = np.array([v0, v1, w0, w1],
-                                       dtype=int)
                 if not Collision.is_collision(v0, v1, w0, w1,
                                               mass_v, mass_w):
                     continue
-                if not Collision.is_effective(new_col_idx):
+                if not Collision.is_effective_collision(new_col_idx):
                     continue
                 # Collision is accepted -> Add to List
                 relations.append(new_col_idx)
@@ -511,9 +535,11 @@ def plot(svgrid,
 
 def group_collisions(collisions,
                      svgrid=None,
-                     mode="index"):
+                     mode="index",
+                     **kwargs):
     get_key = Collision.get_key_function(mode=mode,
-                                         svgrid=svgrid)
+                                         svgrid=svgrid,
+                                         **kwargs)
     grouped_collisions = dict()
     for coll in collisions:
         key = get_key(coll)
