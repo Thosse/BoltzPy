@@ -23,15 +23,14 @@ class Collision:
         Contains the numeric integration weights
         of the respective collision in :attr:`relations`.
     """
-    def __init__(self, relation, weight):
+    def __init__(self, relation, weight=1.0):
         if isinstance(relation, list):
             relation = np.array(relation, dtype=int)
         assert isinstance(relation, np.ndarray)
         assert relation.dtype == int
         assert relation.size == 4
-        assert isinstance(weight, float)
         self.relation = relation
-        self. weight = weight
+        self.weight = float(weight)
 
     #####################################
     #        Sorting and Ordering       #
@@ -90,15 +89,7 @@ class Collision:
         quadrangle = svgrid.iMG[indices] * svgrid.delta
         x_vals = quadrangle[..., 0]
         y_vals = quadrangle[..., 1]
-        plot_object.plot(x_vals, y_vals)
-        # Todo add a legend to see this data (only if interactive parameter==True
-        # # Todo use svgrid.pMG
-        # [v0, v1, w0, w1] = svgrid.iMG[coll.relation] * svgrid.delta
-        # print("collision = ", list(coll.relation),
-        #       "\n\tv0 = ", list(v0),
-        #       "\n\tv1 = ", list(v1),
-        #       "\n\tw0 = ", list(w0),
-        #       "\n\tv0 = ", list(v1))
+        plot_object.plot(x_vals, y_vals, c="gray")
         return plot_object
 
     @staticmethod
@@ -505,10 +496,17 @@ def complete(mass_v,
 #####################################
 def plot(svgrid,
          collisions,
-         plot_object=None,
-         iterative=False):
+         iterative=True,
+         plot_object=None):
     assert isinstance(svgrid, bp.SVGrid)
     assert svgrid.number_of_grids <= len(svgrid.plot_styles)
+
+    # make sure its a list of Collisions,
+    # this allows to plot lists of relations
+    if not all(isinstance(coll, Collision) for coll in collisions):
+        collisions = [coll if isinstance(coll, Collision)
+                      else Collision(coll)
+                      for coll in collisions]
 
     show_plot_directly = plot_object is None
     if plot_object is None:
@@ -516,20 +514,23 @@ def plot(svgrid,
         import matplotlib.pyplot as plt
         plot_object = plt
 
+    # show all Collisions together
     for coll in collisions:
         coll.plot(svgrid=svgrid,
                   plot_object=plot_object)
+    svgrid.plot(plot_object)
+    if show_plot_directly:
+        plot_object.show()
 
-        if show_plot_directly and iterative:
+    # show each element one by one
+    if iterative:
+        for coll in collisions:
+            plot_object.close()
+            coll.plot(svgrid=svgrid,
+                      plot_object=plot_object)
             # plot Grid on top of collision
             svgrid.plot(plot_object=plot_object)
             plot_object.show()
-            # stop showing this collision (and grid) in next plot
-            plot_object.close()
-
-    if show_plot_directly and not iterative:
-        svgrid.plot(plot_object)
-        plot_object.show()
     return plot_object
 
 
