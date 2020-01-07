@@ -33,7 +33,7 @@ Workflow
    <boltzpy.SVGrid>`
 """
 from boltzpy.grid import Grid
-from boltzpy.rule import Rule
+from boltzpy.rule import Rule, InnerPointRule, ConstantPointRule, BoundaryPointRule
 from boltzpy.scheme import Scheme
 from boltzpy.geometry import Geometry
 from boltzpy.simulation import Simulation

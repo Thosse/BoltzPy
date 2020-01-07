@@ -111,17 +111,17 @@ class Geometry:
             Contains flat indices of
             :class:`P-Grid <boltzpy.Grid>` points.
         """
-        bp.Rule.check_parameters(behaviour_type=behaviour_type,
-                                 initial_rho=initial_rho,
-                                 initial_drift=initial_drift,
-                                 initial_temp=initial_temp,
-                                 affected_points=affected_points)
+        # create a clean dictionary of parameters, without Nones
+        parameters = {key: value
+                      for (key, value) in locals().items()
+                      if value is not None and key is not 'behaviour_type'}
+
+        # choose derived class for new rule
+        rule_class = bp.Rule.child_class(behaviour_type)
+        rule_class.check_parameters(**parameters)
+
         # create rule and add to rules
-        new_rule = bp.Rule(behaviour_type,
-                           initial_rho,
-                           initial_drift,
-                           initial_temp,
-                           affected_points)
+        new_rule = rule_class(**parameters)
         self.rules = np.append(self.rules, [new_rule])
         self.apply_rule(rule=new_rule, affected_points=affected_points)
         self.check_integrity(complete_check=False)

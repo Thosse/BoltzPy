@@ -24,9 +24,6 @@ class Rule:
 
     Parameters
     ----------
-    behaviour_type : :obj:`str`
-        Determines the behaviour during the simulation.
-        Must be in :const:`~boltzpy.constants.SUPP_BEHAVIOUR_TYPES`.
     initial_rho : :obj:`~numpy.array` [:obj:`float`]
     initial_drift : :obj:`~numpy.array` [:obj:`float`]
     initial_temp : :obj:`~numpy.array` [:obj:`float`]
@@ -37,9 +34,6 @@ class Rule:
 
     Attributes
     ----------
-    behaviour_type : :obj:`str`
-        Determines the behaviour during the simulation.
-        Must be in :const:`~boltzpy.constants.SUPP_BEHAVIOUR_TYPES`.
     initial_rho : :obj:`~numpy.array` [:obj:`float`]
         Correlates to the initial amount of particles in
         :class:`P-Grid <boltzpy.Grid>` point.
@@ -56,19 +50,18 @@ class Rule:
     initial_state : :obj:`~numpy.array` [:obj:`float`]
         Initial state of the simulation model.
     """
+    # Todo test affected points
+    # Todo test initial_state
     def __init__(self,
-                 behaviour_type=None,
                  initial_rho=None,
                  initial_drift=None,
                  initial_temp=None,
                  affected_points=None,
                  initial_state=None):
-        self.check_parameters(behaviour_type=behaviour_type,
-                              initial_rho=initial_rho,
+        self.check_parameters(initial_rho=initial_rho,
                               initial_drift=initial_drift,
                               initial_temp=initial_temp,
                               affected_points=affected_points)
-        self.behaviour_type = behaviour_type
         self.initial_rho = initial_rho
         self.initial_drift = initial_drift
         self.initial_temp = initial_temp
@@ -79,6 +72,26 @@ class Rule:
         self.initial_state = initial_state
         self.check_integrity(complete_check=False)
         return
+
+    @property
+    def behaviour_type(self):
+        """
+        :obj:`str`
+            Determines the behaviour during the simulation.
+            Must be in :const:`~boltzpy.constants.SUPP_BEHAVIOUR_TYPES`.
+        """
+        raise NotImplementedError
+
+    @staticmethod
+    def child_class(behaviour_type):
+        if behaviour_type == 'Inner Point':
+            return InnerPointRule
+        elif behaviour_type == 'Constant Point':
+            return ConstantPointRule
+        elif behaviour_type == 'Boundary Point':
+            return BoundaryPointRule
+        else:
+            raise NotImplementedError
 
     @property
     def dimension(self):
@@ -104,8 +117,8 @@ class Rule:
         return None
 
     # Todo use this function to vecorize setup()
-    def density(self, velocity):
-        pass
+    # def density(self, velocity):
+    #     pass
 
     @property
     def is_set_up(self):
@@ -154,30 +167,10 @@ class Rule:
     #            Computation            #
     #####################################
     def collision(self, data):
-        if self.behaviour_type == 'Inner Point':
-            bp_cp.euler_scheme(data, self.affected_points)
-            return
-        elif self.behaviour_type == 'Boundary Point':
-            bp_cp.no_collisions(data, self.affected_points)
-            return
-        elif self.behaviour_type == 'Constant Point':
-            bp_cp.euler_scheme(data, self.affected_points)
-            # Todo replace by bp_cp.no_collisions(data, self.affected_points)
-            # before that, implement proper initialization
-            return
-        else:
-            raise NotImplementedError
+        raise NotImplementedError
 
     def transport(self, data):
-        if self.behaviour_type == 'Inner Point':
-            bp_cp.fdm_first_order(data, self.affected_points)
-        elif self.behaviour_type == 'Boundary Point':
-            bp_cp.no_transport(data, self.affected_points)
-        elif self.behaviour_type == 'Constant Point':
-            bp_cp.no_transport(data, self.affected_points)
-            return
-        else:
-            raise NotImplementedError
+        raise NotImplementedError
 
     #####################################
     #           Serialization           #
@@ -199,9 +192,7 @@ class Rule:
         assert hdf5_group.attrs["class"] == "Rule"
         # read parameters from file
         params = dict()
-        if "Behaviour Type" in hdf5_group.keys():
-            params["behaviour_type"] = hdf5_group["Behaviour Type"][()]
-        # Rename into Rho / Density
+        # Todo Rename into Rho / Density
         if "Mass" in hdf5_group.keys():
             params["initial_rho"] = hdf5_group["Mass"][()]
         if "Mean Velocity" in hdf5_group.keys():
@@ -213,7 +204,11 @@ class Rule:
         if "Initial State" in hdf5_group.keys():
             params["initial_state"] = hdf5_group["Initial State"][()]
 
-        self = Rule(**params)
+        # choose derived class for new rule
+        behaviour_type = hdf5_group["Behaviour Type"][()]
+        rule_class = bp.Rule.child_class(behaviour_type)
+        # construct rule
+        self = rule_class(**params)
         self.check_integrity(False)
         return self
 
@@ -394,3 +389,88 @@ class Rule:
         description += 'Temperature: \n\t'
         description += self.initial_temp.__str__() + '\n'
         return description
+
+
+class InnerPointRule(Rule):
+    def __init__(self,
+                 initial_rho=None,
+                 initial_drift=None,
+                 initial_temp=None,
+                 affected_points=None,
+                 initial_state=None):
+        super().__init__(initial_rho,
+                         initial_drift,
+                         initial_temp,
+                         affected_points,
+                         initial_state)
+        return
+
+    @property
+    def behaviour_type(self):
+        return 'Inner Point'
+
+    def collision(self, data):
+        bp_cp.euler_scheme(data, self.affected_points)
+        return
+
+    def transport(self, data):
+        bp_cp.fdm_first_order(data, self.affected_points)
+        return
+
+
+class ConstantPointRule(Rule):
+    def __init__(self,
+                 initial_rho=None,
+                 initial_drift=None,
+                 initial_temp=None,
+                 affected_points=None,
+                 initial_state=None):
+        super().__init__(initial_rho,
+                         initial_drift,
+                         initial_temp,
+                         affected_points,
+                         initial_state)
+        return
+
+    @property
+    def behaviour_type(self):
+        return 'Constant Point'
+
+    def collision(self, data):
+        bp_cp.euler_scheme(data, self.affected_points)
+        # Todo replace by bp_cp.no_collisions(data, self.affected_points)
+        # before that, implement proper initialization
+        return
+
+    def transport(self, data):
+        bp_cp.no_transport(data, self.affected_points)
+        return
+
+
+# Todo edit boundary point parameters -> direction
+class BoundaryPointRule(Rule):
+    def __init__(self,
+                 initial_rho=None,
+                 initial_drift=None,
+                 initial_temp=None,
+                 affected_points=None,
+                 initial_state=None):
+        super().__init__(initial_rho,
+                         initial_drift,
+                         initial_temp,
+                         affected_points,
+                         initial_state)
+        return
+
+    @property
+    def behaviour_type(self):
+        return 'Boundary Point'
+
+    def collision(self, data):
+        bp_cp.no_collisions(data, self.affected_points)
+        return
+
+    def transport(self, data):
+        bp_cp.no_transport(data, self.affected_points)
+        return
+
