@@ -69,6 +69,7 @@ class Rule:
             self.affected_points = np.empty((0,), dtype=int)
         else:
             self.affected_points = np.array(affected_points, dtype=int)
+        # if initial state is given, generate the other parameters from it
         self.initial_state = initial_state
         self.check_integrity(complete_check=False)
         return
@@ -305,7 +306,6 @@ class Rule:
             assert isinstance(context, bp.Simulation)
 
         # Set up basic constants
-        n_categories = len(bp_c.SUPP_BEHAVIOUR_TYPES)
         if context is not None:
             n_species = context.s.size
         else:
@@ -361,6 +361,8 @@ class Rule:
 
     def __eq__(self, other):
         if not isinstance(other, Rule):
+            return False
+        if type(self) != type(other):
             return False
         if set(self.__dict__.keys()) != set(other.__dict__.keys()):
             return False
@@ -447,9 +449,15 @@ class ConstantPointRule(Rule):
         return
 
 
-# Todo edit boundary point parameters -> direction
+# Todo add assertions
 class BoundaryPointRule(Rule):
     def __init__(self,
+                 reflection_rate_inverse,
+                 reflection_rate_elastic,
+                 reflection_rate_thermal,
+                 reflection_temperature,
+                 absorption_rate,
+                 surface_normal,    # TODO more complicated in 2d
                  initial_rho=None,
                  initial_drift=None,
                  initial_temp=None,
@@ -460,6 +468,12 @@ class BoundaryPointRule(Rule):
                          initial_temp,
                          affected_points,
                          initial_state)
+        self.reflection_rate_inverse = reflection_rate_inverse
+        self.reflection_rate_elastic = reflection_rate_elastic
+        self.reflection_rate_thermal = reflection_rate_thermal
+        self.reflection_temperature = reflection_temperature
+        self.absorption_rate = absorption_rate
+        self.surface_normal = surface_normal
         return
 
     @property
