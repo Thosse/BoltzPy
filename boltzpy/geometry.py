@@ -114,7 +114,9 @@ class Geometry:
         # create a clean dictionary of parameters, without Nones
         parameters = {key: value
                       for (key, value) in locals().items()
-                      if value is not None and key is not 'behaviour_type'}
+                      if value is not None
+                      and key is not 'behaviour_type'
+                      and key is not 'self'}
 
         # choose derived class for new rule
         rule_class = bp.Rule.child_class(behaviour_type)
