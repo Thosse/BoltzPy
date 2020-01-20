@@ -416,7 +416,7 @@ class InnerPointRule(Rule):
         return
 
     def transport(self, data):
-        bp_cp.fdm_first_order(data, self.affected_points)
+        bp_cp.transport_fdm_inner(data, self.affected_points)
         return
 
 

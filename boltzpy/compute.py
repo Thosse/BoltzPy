@@ -76,6 +76,15 @@ def operator_splitting(data, func_transport, func_collision):
 #################################
 #           Transport           #
 #################################
+def transport_outflow_remains(data, affected_points):
+    # Todo make this an attribute of data? Or just pv = VG + offset?
+    outflow_percentage = (np.abs(data.vG[:, 0] + data.velocity_offset[0])
+                          * data.dt
+                          / data.dp)
+    result = ((1 - outflow_percentage) * data.state[affected_points, :])
+    return result
+
+
 def fdm_first_order(data, affected_points):
     """Executes single collision step on complete P-Grid"""
     if data.p_dim != 1:
@@ -101,6 +110,58 @@ def fdm_first_order(data, affected_points):
                 else:
                     continue
                 data.result[p, v] = new_val
+    return
+
+
+def transport_fdm_inner(data, affected_points):
+    """Executes single transport step for a set of inner points.
+
+    This is a finite differences scheme of order 1 for inner points.
+    It computes a free flow without any reflection or absorption.
+    The results are saved in data.results"""
+    if data.p_dim != 1:
+        message = 'Transport is currently only implemented ' \
+                  'for 1D Problems'
+        raise NotImplementedError(message)
+    # Simulate Outflowing
+    data.result[affected_points, :] = transport_outflow_remains(data,
+                                                                affected_points)
+    # Simulate Inflow
+    # Todo
+    dt = data.dt
+    dp = data.dp
+    offset = data.velocity_offset
+
+    # # Todo move this into data.pv or something, is often needed
+    # pv = data.vG + offset
+    # print("pv=\n", pv)
+    # neg_vels = np.where(pv[:, 0] < 0)
+    # print("neg_vels=\n", neg_vels)
+    # print(pv[neg_vels, 0])
+    # new_inflow_rate = data.dt / data.dp * pv[neg_vels, 0]
+    # print(new_inflow_rate.shape)
+    # data.result[affected_points, neg_vels] -= (new_inflow_rate
+    #                                            * data.state[affected_points + 1,
+    #                                                         neg_vels])
+    # pos_vels = np.where(pv[:, 0] > 0)
+    # data.result[affected_points, neg_vels] += (pv[neg_vels]
+    #                                           * dt / dp
+    #                                           * data.state[affected_points - 1,
+    #                                                        neg_vels])
+
+    v_size = data.v_range[-1, 1]
+    for p in affected_points:
+        # data.result[p, :] = rate_remain * data.state[p, :]
+        # iterate over all v
+        for v in range(v_size):
+            pv = data.vG[v] + offset
+            if pv[0] <= 0:
+                inflow = - pv[0] * dt / dp * data.state[p + 1, v]
+            elif pv[0] > 0:
+                inflow = + pv[0] * dt / dp * data.state[p - 1, v]
+            else:
+                continue
+            data.result[p, v] += inflow
     return
 
 
