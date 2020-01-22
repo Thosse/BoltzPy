@@ -62,11 +62,6 @@ SUPP_COLORS = ['blue', 'red', 'green',
 INVALID_CHARACTERS = {'.', '"', "'", '/', '§', '$', '&',
                       '+', '#', ',', ';', '\\', '`', '´'}
 
-#: :obj:`set` [:obj:`str`] :
-#: Set of all currently supported geometric forms
-#: for :class:`Grids <boltzpy.Grid>`.
-SUPP_GRID_FORMS = {'rectangular'}
-
 #: :obj:`set` [:obj:`int`] :
 #: Set of all currently supported
 #: for :class:`~boltzpy.Grid`
