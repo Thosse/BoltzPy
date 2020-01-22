@@ -401,7 +401,7 @@ class Geometry:
             if type(value) != type(other_value):
                 return False
             if isinstance(value, np.ndarray):
-                if np.all(value != other_value):
+                if np.any(value != other_value):
                     return False
             else:
                 if value != other_value:

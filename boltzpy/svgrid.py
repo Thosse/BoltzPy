@@ -535,18 +535,12 @@ class SVGrid:
             if type(value) != type(other_value):
                 return False
             if isinstance(value, np.ndarray):
-                if np.all(value != other_value):
+                if np.any(value != other_value):
                     return False
             else:
                 if value != other_value:
                     return False
         return True
-
-    def __lt__(self, other):
-        if self.size <= other.size:
-            return True
-        else:
-            return False
 
     def __str__(self,
                 write_physical_grid=False):
