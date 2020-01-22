@@ -328,7 +328,6 @@ class Simulation:
         step_size = max_time / (number_time_steps - 1)
         self.t = bp.Grid(ndim=1,
                          shape=(number_time_steps,),
-                         form='rectangular',
                          physical_spacing=step_size,
                          spacing=calculations_per_time_step)
         return
@@ -348,7 +347,6 @@ class Simulation:
         """
         self.p = bp.Grid(ndim=grid_dimension,
                          shape=grid_shape,
-                         form='rectangular',
                          physical_spacing=grid_spacing)
         # Update shape of initialization_array
         self.geometry.shape = self.p.shape
@@ -358,7 +356,6 @@ class Simulation:
                            grid_dimension,
                            maximum_velocity,
                            shapes,
-                           geometric_form='rectangular',
                            use_identical_spacing=False):
         """Set up :attr:`sv`.
 
@@ -371,7 +368,6 @@ class Simulation:
         grid_dimension : :obj:`int`
         maximum_velocity : :obj:`float`
         shapes : :obj:`list` [:obj:`tuple` [:obj:`int`]]
-        geometric_form : :obj:`str`, optional
         use_identical_spacing : :obj:`bool`, optional
             If True, then all specimen use equal grids.
             If False, then the spacing is adjusted to the mass ratio.
@@ -380,12 +376,10 @@ class Simulation:
             raise AttributeError
         spacings = bp.SVGrid.generate_spacings(self.s.mass,
                                                use_identical_spacing)
-        forms = [geometric_form] * self.s.size
         self.sv = bp.SVGrid(ndim=grid_dimension,
                             maximum_velocity=maximum_velocity,
                             shapes=shapes,
-                            spacings=spacings,
-                            forms=forms)
+                            spacings=spacings)
         return
 
     def add_rule(self,
