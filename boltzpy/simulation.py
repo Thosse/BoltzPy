@@ -378,12 +378,8 @@ class Simulation:
         """
         if not self.s.is_configured:
             raise AttributeError
-        lcm = int(np.lcm.reduce(self.s.mass))
-        if use_identical_spacing:
-            spacings = [2] * self.s.size
-        else:
-            spacings = [2 * lcm // int(m)
-                              for m in self.s.mass]
+        spacings = bp.SVGrid.generate_spacings(self.s.mass,
+                                               use_identical_spacing)
         forms = [geometric_form] * self.s.size
         self.sv = bp.SVGrid(ndim=grid_dimension,
                             maximum_velocity=maximum_velocity,
@@ -397,7 +393,15 @@ class Simulation:
                  initial_rho,
                  initial_drift,
                  initial_temp,
-                 affected_points=None):
+                 affected_points,
+                 # reflection_rate_inverse=None,
+                 # reflection_rate_elastic=None,
+                 # reflection_rate_thermal=None,
+                 # reflection_temperature=None,
+                 # absorption_rate=None,
+                 # surface_normal=None,
+                 # initial_state=None
+                 ):
         """Add a new :class:`initialization rule <Rule>` to :attr:`rule_arr`.
 
         Parameters
@@ -411,12 +415,11 @@ class Simulation:
         affected_points : :obj:`list`[:obj:`int`], optional
             Contains all indices of the space points, where this rule applies
         """
-        self.geometry.add_rule(
-            behaviour_type=behaviour_type,
-            initial_rho=initial_rho,
-            initial_drift=initial_drift,
-            initial_temp=initial_temp,
-            affected_points=affected_points)
+        # create a clean dictionary of parameters, without Nones
+        parameters = {key: value
+                      for (key, value) in locals().items()
+                      if key is not 'self'}
+        self.geometry.add_rule(**parameters)
 
         self.check_parameters(species=self.s,
                               species_velocity_grid=self.sv,

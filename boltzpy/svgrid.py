@@ -155,6 +155,16 @@ class SVGrid:
         self.check_integrity()
         return is_set_up
 
+    @staticmethod
+    def generate_spacings(masses,
+                          use_identical_spacing=False):
+        if use_identical_spacing:
+            spacings = [2] * masses.size
+        else:
+            lcm = int(np.lcm.reduce(masses))
+            spacings = [2 * lcm // int(m) for m in masses]
+        return spacings
+
     #####################################
     #           Configuration           #
     #####################################
