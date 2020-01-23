@@ -53,10 +53,10 @@ class Rule:
     # Todo test affected points
     # Todo test initial_state
     def __init__(self,
-                 initial_rho=None,
-                 initial_drift=None,
-                 initial_temp=None,
-                 affected_points=None,
+                 initial_rho,
+                 initial_drift,
+                 initial_temp,
+                 affected_points,
                  initial_state=None):
         self.check_parameters(initial_rho=initial_rho,
                               initial_drift=initial_drift,

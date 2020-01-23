@@ -69,43 +69,18 @@ class Geometry:
         assert len(set(sizes)) == 1
         return sizes[0]
 
-    # Todo Add test, that old indices are removed
-    def add_rule(self,
-                 behaviour_type,
-                 initial_rho,
-                 initial_drift,
-                 initial_temp,
-                 affected_points):
-        """Add a new :class:`initialization rule <Rule>` to :attr:`rule_arr`.
+    def add_rule(self, new_rule):
+        """Add a :class:`Rule` to :attr:`rules` array.
 
         Parameters
         ----------
-        behaviour_type : :obj:`str`
-            Category of the :class:`P-Grid <boltzpy.Grid>` point.
-            Must be in
-            :const:`~boltzpy.constants.SUPP_BEHAVIOUR_TYPES`.
-        initial_rho : :obj:`~numpy.array` [:obj:`float`]
-        initial_drift : :obj:`~numpy.array` [:obj:`float`]
-        initial_temp : :obj:`~numpy.array` [:obj:`float`]
-        affected_points : :obj:`list` [:obj:`int`]
-            Contains flat indices of
-            :class:`P-Grid <boltzpy.Grid>` points.
+        new_rule : :obj:`~boltzpy.Rule`
+            The Rule object to append
         """
-        # create a clean dictionary of parameters, without Nones
-        parameters = {key: value
-                      for (key, value) in locals().items()
-                      if value is not None
-                      and key is not 'behaviour_type'
-                      and key is not 'self'}
-
-        # choose derived class for new rule
-        rule_class = bp.Rule.child_class(behaviour_type)
-        rule_class.check_parameters(**parameters)
-
-        # create rule and add to rules
-        new_rule = rule_class(**parameters)
+        assert isinstance(new_rule, bp.Rule)
         self.rules = np.append(self.rules, [new_rule])
-        self.apply_rule(rule=new_rule, affected_points=affected_points)
+        self.apply_rule(rule=new_rule,
+                        affected_points=new_rule.affected_points)
         self.check_integrity(complete_check=False)
         return
 

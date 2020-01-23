@@ -382,44 +382,6 @@ class Simulation:
                             spacings=spacings)
         return
 
-    def add_rule(self,
-                 behaviour_type,
-                 initial_rho,
-                 initial_drift,
-                 initial_temp,
-                 affected_points,
-                 # reflection_rate_inverse=None,
-                 # reflection_rate_elastic=None,
-                 # reflection_rate_thermal=None,
-                 # reflection_temperature=None,
-                 # absorption_rate=None,
-                 # surface_normal=None,
-                 # initial_state=None
-                 ):
-        """Add a new :class:`initialization rule <Rule>` to :attr:`rule_arr`.
-
-        Parameters
-        ----------
-        behaviour_type : :obj:`str`
-        Determines the behaviour during the simulation.
-        Must be in :const:`~boltzpy.constants.SUPP_BEHAVIOUR_TYPES`.
-        initial_rho : :obj:`~numpy.array` [:obj:`float`]
-        initial_drift : :obj:`~numpy.array` [:obj:`float`]
-        initial_temp : :obj:`~numpy.array` [:obj:`float`]
-        affected_points : :obj:`list`[:obj:`int`], optional
-            Contains all indices of the space points, where this rule applies
-        """
-        # create a clean dictionary of parameters, without Nones
-        parameters = {key: value
-                      for (key, value) in locals().items()
-                      if key is not 'self'}
-        self.geometry.add_rule(**parameters)
-
-        self.check_parameters(species=self.s,
-                              species_velocity_grid=self.sv,
-                              geometry=self.geometry)
-        return
-
     #####################################
     #            Computation            #
     #####################################
