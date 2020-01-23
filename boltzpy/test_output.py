@@ -21,8 +21,14 @@ def test_computation(test_case):
         for output in sim.output_parameters.flatten():
             results_old = old_file["Computation"][output][()]
             results_new = new_file["Test"][output][()]
-            assert results_old.shape == results_new.shape
-            assert np.array_equal(results_old, results_new)
+            assert results_old.shape == results_new.shape, (
+                "Results differ in shape:\t {} != {}".format(
+                    results_old.shape, results_new.shape)
+            )
+            assert np.array_equal(results_old, results_new), (
+                "Results differ by {} (sum over absolutes)".format(
+                    np.sum(abs(results_old - results_new)))
+            )
     finally:
         os.remove(bp_c.TEST_TMP_FILE)
     return
