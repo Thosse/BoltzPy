@@ -13,56 +13,30 @@ class Geometry:
 
     Parameters
     ----------
-    ndim : :obj:`int`
-        The number of space dimensions.
-        Must be in :const:`~boltzpy.constants.SUPP_GRID_DIMENSIONS`.
-    shape : :obj:`tuple` [:obj:`int`]
+    shape : :obj:`array_like` [:obj:`int`]
         Shape of the space grid.
-        Tuple of length :attr:`ndim`.
-    rules : :obj:`~numpy.array` [:obj:`Rule`], optional
+    rules : :obj:`array_like` [:obj:`Rule`], optional
         List of Initialization :obj:`Rules<Rule>`
 
     Attributes
     ----------
-    ndim : :obj:`int`
-        The number of space dimensions.
-        Must be in :const:`~boltzpy.constants.SUPP_GRID_DIMENSIONS`.
-    shape : :obj:`tuple` [:obj:`int`]
+    shape : :obj:`~numpy.array` [:obj:`int`]
         Shape of the space grid.
-        Tuple of length :attr:`ndim`.
     rules : :obj:`~numpy.array` [:obj:`Rule`], optional
         List of Initialization :obj:`Rules<Rule>`
 
     """
-    def __init__(self, ndim=None, shape=None, rules=None):
-        # TODO move into check_integrity
-        if ndim is not None:
-            assert isinstance(ndim, int)
-            assert ndim in bp_c.SUPP_GRID_DIMENSIONS
-        if shape is not None:
-            assert isinstance(shape, tuple)
-            assert all(isinstance(line_size, int) for line_size in shape)
-            assert all(line_size > 0 for line_size in shape)
-        if ndim is not None and shape is not None:
-            assert len(shape) == ndim
-        if rules is not None:
-            if isinstance(rules, list):
-                rules = np.array(rules, dtype=bp.Rule)
-            assert isinstance(rules, np.ndarray)
-            assert rules.ndim == 1
-            assert rules.dtype == bp.Rule
-            for rule in rules:
-                rule.check_integrity()
-
-        self.ndim = ndim
+    def __init__(self, shape=None, rules=None):
+        if type(shape) in [list, tuple]:
+            shape = np.array(shape)
+        if isinstance(rules, list):
+            rules = np.array(rules, dtype=bp.Rule)
+        self.check_parameters(shape=shape,
+                              rules=rules)
         self.shape = shape
-        if rules is not None:
-            if isinstance(rules, list):
-                self.rules = np.array(rules, dtype=bp.Rule)
-            else:
-                self.rules = rules
-        else:
-            self.rules = np.empty((0,), dtype=bp.Rule)
+        if rules is None:
+            rules = np.empty((0,), dtype=bp.Rule)
+        self.rules = rules
         return
 
     #: :obj:`dict` : Default ascii char, for terminal print
@@ -72,6 +46,12 @@ class Geometry:
                      'Time_Variant_IO_Point': '~',
                      None: '?'
                      }
+
+    @property
+    def ndim(self):
+        if self.shape is None:
+            return None
+        return self.shape.size
 
     @property
     def size(self):
@@ -218,6 +198,7 @@ class Geometry:
         data.state[...] = data.result[...]
         return
 
+
     #####################################
     #           Serialization           #
     #####################################
@@ -239,22 +220,23 @@ class Geometry:
 
         # read parameters from file
         params = dict()
-        if "Dimensions" in hdf5_group.keys():
-            params["ndim"] = int(hdf5_group["Dimensions"][()])
-        if "Shape" in hdf5_group.keys():
-            # cast into tuple of ints
-            shape = hdf5_group["Shape"][()]
-            params["shape"] = tuple(int(width) for width in shape)
-        # load rules
-        n_rules = 0
-        if "Number of Rules" in hdf5_group.attrs.keys():
-            n_rules = hdf5_group.attrs["Number of Rules"][()]
-        params["rules"] = np.empty(shape=(n_rules,), dtype=bp.Rule)
-        # iteratively read the rules
-        for idx_rule in range(n_rules):
-            key = "Rule_" + str(idx_rule)
-            params["rules"][idx_rule] = bp.Rule.load(hdf5_group[key])
+        for (key, value) in hdf5_group.items():
+            # load rules iteratively
+            if key == "rules":
+                assert hdf5_group[key].attrs["class"] == "Array"
+                size = hdf5_group[key].attrs["size"]
+                value = np.empty(size, dtype=object)
+                for (key_rule, group_rule) in hdf5_group[key].items():
+                    # key_rule is a string in ["0", "1", "2",...]
+                    # it denotes is (former) position in the array
+                    idx_rule = int(key_rule)
+                    value[idx_rule] = bp.Rule.load(group_rule)
+                params[key] = value
+            # load everything else directly
+            else:
+                params[key] = value[()]
 
+        # construct Geometry
         self = Geometry(**params)
         self.check_integrity(complete_check=False)
         return self
@@ -275,19 +257,25 @@ class Geometry:
             del hdf5_group[key]
         hdf5_group.attrs["class"] = "Geometry"
 
-        # write all set attributes to file
-        if self.ndim is not None:
-            hdf5_group["Dimensions"] = self.ndim
-        if self.shape is not None:
-            hdf5_group["Shape"] = self.shape
-        hdf5_group.attrs["Number of Rules"] = self.rules.size
-        for (rule_idx, rule) in enumerate(self.rules):
-            hdf5_group.create_group("Rule_" + str(rule_idx))
-            rule.save(hdf5_group["Rule_" + str(rule_idx)])
-
-        # check that the class can be reconstructed from the save
-        other = Geometry.load(hdf5_group)
-        assert self == other
+        # write attributes to file
+        for (key, value) in self.__dict__.items():
+            if key == "rules":
+                # value is an array of rule objects
+                assert isinstance(value, np.ndarray)
+                assert value.dtype == bp.Rule
+                # create group: "rules"
+                hdf5_group.create_group(key)
+                hdf5_group[key].attrs["class"] = "Array"
+                hdf5_group[key].attrs["size"] = value.size
+                # save all rules iteratively
+                for (idx_rule, rule) in enumerate(value):
+                    assert isinstance(rule, bp.Rule)
+                    key_rule = str(idx_rule)
+                    hdf5_group[key].create_group(key_rule)
+                    rule.save(hdf5_group[key][key_rule])
+            # save all other attributes directly
+            else:
+                hdf5_group[key] = value
         return
 
     #####################################
@@ -353,10 +341,9 @@ class Geometry:
             assert ndim in bp_c.SUPP_GRID_DIMENSIONS
 
         if shape is not None:
-            assert isinstance(shape, tuple)
-            assert all(isinstance(width, int) for width in shape)
-            assert (all(width >= 2 for width in shape)
-                    or all(width == 1 for width in shape))
+            assert isinstance(shape, np.ndarray)
+            assert shape.dtype == int
+            assert np.all(shape >= 1)
             if context is not None and context.p.shape is not None:
                 assert shape == context.p.shape
 

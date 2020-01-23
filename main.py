@@ -18,7 +18,7 @@ if exisiting_simulation_file is None:
                            maximum_velocity=1.5,
                            shapes=[(5, 5),
                                    (7, 7)])
-    sim.geometry = bp.Geometry(ndim=sim.p.ndim, shape=sim.p.shape)
+    sim.geometry = bp.Geometry(shape=sim.p.shape)
     sim.add_rule(behaviour_type='Constant Point',
                  initial_rho=np.array([2.0, 1.0]),
                  initial_drift=np.array([[0.0, 0.0], [0.0, 0.0]]),

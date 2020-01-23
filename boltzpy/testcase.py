@@ -81,8 +81,7 @@ class TestCase(dict):
                          initial_temp=initial_temp,
                          affected_points=[p.size - 1])
                      ]
-            geometry = bp.Geometry(ndim=p.ndim,
-                                   shape=p.shape,
+            geometry = bp.Geometry(shape=p.shape,
                                    rules=rules
                                    )
         self["geometry"] = geometry
@@ -136,7 +135,7 @@ class TestCase(dict):
     def compare_results(self):
         address_old = self.address(self["file_name"])
         assert os.path.exists(address_old)
-        address_new = self.address("_tmp")
+        address_new = bp_c.TEST_TMP_FILE
         assert address_old != address_new
         # remove new_Address, if it exists already
         if os.path.exists(address_new):
@@ -213,11 +212,9 @@ def update_all_tests():
         assert isinstance(tc, TestCase)
         tc.update_results()
 
+
 def replace_all_tests():
     for tc in CASES:
         print("TestCase = ", tc["file_name"])
         assert isinstance(tc, TestCase)
         tc.replace_results()
-
-
-
