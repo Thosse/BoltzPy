@@ -191,23 +191,16 @@ class Rule:
         """
         assert isinstance(hdf5_group, h5py.Group)
         assert hdf5_group.attrs["class"] == "Rule"
-        # read parameters from file
-        params = dict()
-        # Todo Rename into Rho / Density
-        if "Mass" in hdf5_group.keys():
-            params["initial_rho"] = hdf5_group["Mass"][()]
-        if "Mean Velocity" in hdf5_group.keys():
-            params["initial_drift"] = hdf5_group["Mean Velocity"][()]
-        if "Temperature" in hdf5_group.keys():
-            params["initial_temp"] = hdf5_group["Temperature"][()]
-        if "Affected Points" in hdf5_group.keys():
-            params["affected_points"] = hdf5_group["Affected Points"][()]
-        if "Initial State" in hdf5_group.keys():
-            params["initial_state"] = hdf5_group["Initial State"][()]
 
         # choose derived class for new rule
-        behaviour_type = hdf5_group["Behaviour Type"][()]
+        behaviour_type = hdf5_group.attrs["behaviour_type"]
         rule_class = bp.Rule.child_class(behaviour_type)
+
+        # read parameters from file
+        params = dict()
+        for (key, value) in hdf5_group.items():
+            params[key] = value[()]
+
         # construct rule
         self = rule_class(**params)
         self.check_integrity(False)
@@ -228,20 +221,12 @@ class Rule:
         for key in hdf5_group.keys():
             del hdf5_group[key]
         hdf5_group.attrs["class"] = "Rule"
+        # save derived class of rule
+        hdf5_group.attrs["behaviour_type"] = self.behaviour_type
 
-        # write all set attributes to file
-        if self.behaviour_type is not None:
-            hdf5_group["Behaviour Type"] = self.behaviour_type
-        if self.initial_rho is not None:
-            hdf5_group["Mass"] = self.initial_rho
-        if self.initial_drift is not None:
-            hdf5_group["Mean Velocity"] = self.initial_drift
-        if self.initial_temp is not None:
-            hdf5_group["Temperature"] = self.initial_temp
-        hdf5_group["Affected Points"] = self.affected_points
-        if self.initial_state is not None:
-            hdf5_group["Initial State"] = self.initial_state
-
+        # write attributes to file
+        for (key, value) in self.__dict__.items():
+            hdf5_group[key] = value
         return
 
     #####################################
