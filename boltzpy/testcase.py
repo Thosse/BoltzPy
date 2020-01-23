@@ -106,8 +106,6 @@ class TestCase(dict):
 
         if coll is None:
             coll = bp.Collisions()
-            # Todo move into save_results?
-            coll.setup(scheme=scheme, svgrid=sv, species=s)
         self["coll"] = coll
         return
 
@@ -128,6 +126,9 @@ class TestCase(dict):
         sim.scheme = self["scheme"]
         sim.output_parameters = self["output_parameters"]
         sim.coll = self["coll"]
+        if sim.coll == bp.Collisions():
+            sim.coll.setup(scheme=sim.scheme, svgrid=sim.sv, species=sim.s)
+        sim.setup()
         sim.save()
         sim.compute()
         return sim
@@ -168,6 +169,16 @@ class TestCase(dict):
         else:
             assert False
 
+    def replace_results(self):
+        msg = input("Are you absolutely sure? "
+                    "You are replacing this test case (yes/no)")
+        if msg == "yes":
+            os.remove(self.address(self["file_name"]))
+            self.save_results()
+            print("Successfully updated: ", self["file_name"])
+        else:
+            print("Abort replacing testcase: ", self["file_name"])
+
 
 ################################################################################
 #                           Implemented TestCases                              #
@@ -198,8 +209,15 @@ CASES.append(TestCase("shock_2species_complete",
 ################################################################################
 def update_all_tests():
     for tc in CASES:
-        print("tc = ", tc["file_name"])
+        print("TestCase = ", tc["file_name"])
         assert isinstance(tc, TestCase)
         tc.update_results()
+
+def replace_all_tests():
+    for tc in CASES:
+        print("TestCase = ", tc["file_name"])
+        assert isinstance(tc, TestCase)
+        tc.replace_results()
+
 
 

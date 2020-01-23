@@ -18,7 +18,7 @@ TEST_CASES = [os.path.join(TEST_DIRECTORY, file)
               for file in os.listdir(TEST_DIRECTORY)
               if os.path.isfile(os.path.join(TEST_DIRECTORY, file))
               and file[-5:] == '.hdf5'
-              and file != '_tmp_.hdf5']
+              and file[-9:] != '_tmp_.hdf5']
 
 #: :obj:`str` : Default file root for simulation files.
 #: If no file name is given at all, then the file root will be this.
