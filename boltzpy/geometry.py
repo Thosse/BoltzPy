@@ -6,7 +6,6 @@ import boltzpy as bp
 import boltzpy.constants as bp_c
 
 
-# TODO edit apply/affected points to be stored as dimensional tuples
 class Geometry:
     r"""Describes the spatial geometry of the Simulation.
 
@@ -61,6 +60,20 @@ class Geometry:
             return None
 
     @property
+    def affected_points(self):
+        result = list()
+        for rule in self.rules:
+            result += list(rule.affected_points)
+        assert len(result) == len(set(result))
+        return result
+
+    @property
+    def unaffected_points(self):
+        possible_points = set(range(int(self.size)))
+        affected_points = set(self.affected_points)
+        return possible_points - affected_points
+
+    @property
     def size_of_model(self):
         sizes = [rule.initial_state.size for rule in self.rules]
         # todo assert all rule.initial_state.size must be equal in check_params
@@ -76,9 +89,8 @@ class Geometry:
             The Rule object to append
         """
         assert isinstance(new_rule, bp.Rule)
+        assert set(new_rule.affected_points).issubset(self.unaffected_points)
         self.rules = np.append(self.rules, [new_rule])
-        self.apply_rule(rule=new_rule,
-                        affected_points=new_rule.affected_points)
         self.check_integrity(complete_check=False)
         return
 
@@ -86,36 +98,11 @@ class Geometry:
     def is_set_up(self):
         if any(attr is None for attr in self.__dict__.values()):
             return False
+        elif len(self.unaffected_points) != 0:
+            return False
         else:
             self.check_integrity()
             return True
-
-    # Todo remove this, this could, potentially hide errors
-    def apply_rule(self,
-                   rule,
-                   affected_points):
-        """Add a new :class:`initialization rule <Rule>` to :attr:`rule_arr`.
-
-        Parameters
-        ----------
-        rule : :obj:`~boltzpy.Rule`
-        affected_points : :obj:`list` [:obj:`int`]
-            Contains flat indices of
-            :class:`P-Grid <boltzpy.Grid>` points.
-        """
-        assert isinstance(rule, bp.Rule)
-        rule.check_integrity(complete_check=False)
-        # remove previous occurrences
-        for r in self.rules:
-            occurrences = np.where(np.isin(r.affected_points, affected_points))
-            r.affected_points = np.delete(r.affected_points, occurrences)
-
-        # add points to rules affected_points
-        rule.affected_points = np.append(rule.affected_points,
-                                         affected_points)
-
-        self.check_integrity(complete_check=False)
-        return
 
     # Todo Only Temporary!
     @property
@@ -164,7 +151,6 @@ class Geometry:
         # update data.state (transport writes into data.result)
         data.state[...] = data.result[...]
         return
-
 
     #####################################
     #           Serialization           #
@@ -323,14 +309,15 @@ class Geometry:
                 rule.check_integrity(complete_check=complete_check,
                                      context=context)
             # all points must be affected at most once
-            affected_points = set()
-            count_affected_points = 0
+            affected_points = list()
             for rule in rules:
-                affected_points.update(rule.affected_points)
-                count_affected_points += rule.affected_points.size
-            assert len(affected_points) == count_affected_points
+                affected_points += list(rule.affected_points)
+            assert len(affected_points) == len(set(affected_points)), (
+                "Some points are affected by more than one rule:"
+                "{}".format(affected_points)
+            )
             if context is not None and context.p.size is not None:
-                assert count_affected_points <= context.p.size
+                assert len(affected_points) <= context.p.size
             # all points must be affected at least once
             if complete_check:
                 assert len(affected_points) == np.prod(shape)
