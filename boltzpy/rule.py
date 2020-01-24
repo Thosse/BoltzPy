@@ -495,6 +495,7 @@ class BoundaryPointRule(Rule):
             self.reflected_indices_inverse = self.compute_reflected_indices_inverse(velocity_grids)
             self.reflected_indices_elastic = self.compute_reflected_indices_elastic(velocity_grids, surface_normal)
         # Todo initial_state must be edited here, better to edit the method
+        self.check_integrity()
         return
 
     @property
@@ -654,14 +655,20 @@ class BoundaryPointRule(Rule):
                 "surface_normal = {}".format(surface_normal)
             )
 
-        index_arrays = [incoming_velocities,
-                        reflected_indices_inverse,
-                        reflected_indices_elastic]
-        for idx_array in index_arrays:
+        for idx_array in [incoming_velocities,
+                          reflected_indices_inverse,
+                          reflected_indices_elastic]:
             if idx_array is not None:
                 assert isinstance(idx_array, np.ndarray)
                 assert idx_array.dtype == int
                 assert len(set(idx_array)) == idx_array.size, (
                     "Index arrays must be unique indices!"
                     "idx_array:\n{}".format(idx_array)
+                )
+        for idx_array in [reflected_indices_inverse,
+                          reflected_indices_elastic]:
+            if idx_array is not None:
+                assert list(range(idx_array.size)) == list(idx_array[idx_array]), (
+                    "Any Reflection applied twice, must return the original."
+                    "idx_array[idx_array]:\n{}".format(idx_array[idx_array])
                 )
