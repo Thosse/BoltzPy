@@ -66,7 +66,7 @@ class Rule:
         else:
             assert velocity_grids is not None
             self.initial_state = self.compute_initial_state(velocity_grids)
-        self.check_integrity(complete_check=False)
+        Rule.check_integrity(self, complete_check=False)
         return
 
     @property
@@ -131,6 +131,13 @@ class Rule:
         raise NotImplementedError
 
     def transport(self, data):
+        """Executes single transport step for the :attr:`affected_points`.
+
+           This is a finite differences scheme.
+           It computes the inflow and outflow and, if necessary,
+           applies reflection or absorption.
+           The Computation reads data.state
+           and writes the results in data.results"""
         raise NotImplementedError
 
     #####################################
@@ -289,7 +296,11 @@ class Rule:
                 assert initial_drift.shape[0] == n_species
             else:
                 n_species = initial_drift.shape[0]
-            assert initial_drift.shape[1] in [2, 3]
+            assert initial_drift.shape[1] in [2, 3], (
+                "Any drift has the same dimension as the velocity grid "
+                "and must be in [2,3]."
+                "initial_drift.shape[1] = {}". format(initial_drift.shape[1])
+            )
             if context is not None and context.sv.ndim is not None:
                 assert initial_drift.shape[1] == context.sv.ndim
 
@@ -380,12 +391,28 @@ class InnerPointRule(Rule):
     def subclass(self):
         return 'InnerPointRule'
 
+    #####################################
+    #            Computation            #
+    #####################################
     def collision(self, data):
         bp_cp.euler_scheme(data, self.affected_points)
         return
 
     def transport(self, data):
-        bp_cp.transport_fdm_inner(data, self.affected_points)
+        if data.p_dim != 1:
+            message = 'Transport is currently only implemented ' \
+                      'for 1D Problems'
+            raise NotImplementedError(message)
+        # Simulate Outflowing
+        data.result[self.affected_points, :] = bp_cp.transport_outflow_remains(
+            data,
+            self.affected_points
+        )
+        # Simulate Inflow
+        data.result[self.affected_points, :] += bp_cp.transport_inflow_innerPoint(
+            data,
+            self.affected_points
+        )
         return
 
 
@@ -409,6 +436,9 @@ class ConstantPointRule(Rule):
     def subclass(self):
         return 'ConstantPointRule'
 
+    #####################################
+    #            Computation            #
+    #####################################
     def collision(self, data):
         bp_cp.euler_scheme(data, self.affected_points)
         # Todo replace by bp_cp.no_collisions(data, self.affected_points)
@@ -416,50 +446,222 @@ class ConstantPointRule(Rule):
         return
 
     def transport(self, data):
-        bp_cp.no_transport(data, self.affected_points)
-        return
+        pass
 
 
-# Todo add assertions
+# Todo This is not tested!
 class BoundaryPointRule(Rule):
     def __init__(self,
                  initial_rho,
+                 initial_drift,
                  initial_temp,
                  reflection_rate_inverse,
                  reflection_rate_elastic,
                  reflection_rate_thermal,
                  absorption_rate,
-                 surface_normal,    # TODO more complicated in 2d
                  affected_points,
+                 surface_normal=None,
+                 incoming_velocities=None,
+                 reflected_indices_inverse=None,
+                 reflected_indices_elastic=None,
                  velocity_grids=None,
                  initial_state=None):
-        # BoundaryPointRules don't have a drift
-        initial_drift = np.zeros((np.array(initial_rho).size,
-                                  np.array(surface_normal).size),
-                                 dtype=float)
         super().__init__(initial_rho,
                          initial_drift,
                          initial_temp,
                          affected_points,
                          velocity_grids,
                          initial_state)
+        self.reflection_rate_inverse = float(reflection_rate_inverse)
+        self.reflection_rate_elastic = float(reflection_rate_elastic)
+        self.reflection_rate_thermal = float(reflection_rate_thermal)
+        self.absorption_rate = float(absorption_rate)
+        # Either the incoming velocities and reflection indices
+        # are given as parameters
+        if surface_normal is None:
+            assert reflected_indices_inverse is not None
+            assert reflected_indices_elastic is not None
+            assert incoming_velocities is not None
+            self.reflected_indices_inverse = np.array(reflected_indices_inverse,
+                                                      dtype=int)
+            self.reflected_indices_elastic = np.array(reflected_indices_elastic,
+                                                      dtype=int)
+            self.incoming_velocities = np.array(incoming_velocities,
+                                                dtype=int)
+        # Or the incoming velocities and reflection indices
+        # must be generated based on the surface normal and the velocity_grid
+        else:
+            self.incoming_velocities = self.compute_incoming_velocities(velocity_grids, surface_normal)
+            self.reflected_indices_inverse = self.compute_reflected_indices_inverse(velocity_grids)
+            self.reflected_indices_elastic = self.compute_reflected_indices_elastic(velocity_grids, surface_normal)
         # Todo initial_state must be edited here, better to edit the method
-        self.reflection_rate_inverse = reflection_rate_inverse
-        self.reflection_rate_elastic = reflection_rate_elastic
-        self.reflection_rate_thermal = reflection_rate_thermal
-        self.absorption_rate = absorption_rate
-        self.surface_normal = surface_normal
         return
 
     @property
     def subclass(self):
         return 'BoundaryPointRule'
 
+    @staticmethod
+    def compute_incoming_velocities(velocity_grids, surface_normal):
+        # the incoming velocities are used to calculate the inflow during transport
+        # we calculate the scalar product for each entry and check if its > 0
+        # thus the velocity points towards the border
+        incoming_velocities = np.where(velocity_grids.iMG @ surface_normal > 0)[0]
+        return incoming_velocities
+
+    @staticmethod
+    def compute_reflected_indices_inverse(velocity_grids):
+        reflected_indices_inverse = np.zeros(velocity_grids.size, dtype=int)
+        for (idx_v, v) in enumerate(velocity_grids.iMG):
+            spc = velocity_grids.get_specimen(idx_v)
+            v_refl = -v
+            idx_v_refl = velocity_grids.find_index(spc, v_refl)
+            reflected_indices_inverse[idx_v] = idx_v_refl
+        return reflected_indices_inverse
+
+    @staticmethod
+    def compute_reflected_indices_elastic(velocity_grids, surface_normal):
+        reflected_indices_elastic = np.zeros(velocity_grids.size, dtype=int)
+        # Todo only works in 1D
+        for (idx_v, v) in enumerate(velocity_grids.iMG):
+            spc = velocity_grids.get_specimen(idx_v)
+            v_refl = np.array([-1, 1]) * v
+            idx_v_refl = velocity_grids.find_index(spc, v_refl)
+            reflected_indices_elastic[idx_v] = idx_v_refl
+        return reflected_indices_elastic
+
+    #####################################
+    #            Computation            #
+    #####################################
     def collision(self, data):
-        bp_cp.no_collisions(data, self.affected_points)
-        return
+        pass
 
     def transport(self, data):
-        bp_cp.no_transport(data, self.affected_points)
+        if data.p_dim != 1:
+            message = 'Transport is currently only implemented ' \
+                      'for 1D Problems'
+            raise NotImplementedError(message)
+        # Simulate Outflowing
+        data.result[self.affected_points, :] = bp_cp.transport_outflow_remains(
+            data,
+            self.affected_points
+        )
+        # Simulate Inflow
+        inflow = bp_cp.transport_inflow_boundaryPoint(data,
+                                                      self.affected_points,
+                                                      self.incoming_velocities
+                                                      )
+        data.result[self.affected_points, :] = self.reflection(inflow)
         return
 
+    def reflection(self, inflow):
+        reflected_inflow = np.zeros(inflow.shape, dtype=float)
+        inverse_inflow = self.reflection_rate_inverse * inflow
+        reflected_inflow[:, self.reflected_indices_inverse] += inverse_inflow
+        elastic_inflow = self.reflection_rate_elastic * inflow
+        reflected_inflow[:, self.reflected_indices_elastic] += elastic_inflow
+        return reflected_inflow
+
+    #####################################
+    #            Verification           #
+    #####################################
+    def check_integrity(self, complete_check=True, context=None):
+        assert isinstance(self.initial_rho, np.ndarray)
+        assert isinstance(self.initial_drift, np.ndarray)
+        assert isinstance(self.initial_temp, np.ndarray)
+        assert isinstance(self.affected_points, np.ndarray)
+        self.check_parameters(
+            subclass=self.subclass,
+            initial_rho=self.initial_rho,
+            initial_drift=self.initial_drift,
+            initial_temp=self.initial_temp,
+            reflection_rate_inverse=self.reflection_rate_inverse,
+            reflection_rate_elastic=self.reflection_rate_elastic,
+            reflection_rate_thermal=self.reflection_rate_thermal,
+            absorption_rate=self.absorption_rate,
+            affected_points=self.affected_points,
+            incoming_velocities=self.incoming_velocities,
+            reflected_indices_inverse=self.reflected_indices_inverse,
+            reflected_indices_elastic=self.reflected_indices_elastic,
+            initial_state=self.initial_state,
+            complete_check=complete_check,
+            context=context)
+        return
+
+    @staticmethod
+    def check_parameters(subclass=None,
+                         initial_rho=None,
+                         initial_drift=None,
+                         initial_temp=None,
+                         reflection_rate_inverse=None,
+                         reflection_rate_elastic=None,
+                         reflection_rate_thermal=None,
+                         absorption_rate=None,
+                         affected_points=None,
+                         surface_normal=None,
+                         incoming_velocities=None,
+                         reflected_indices_inverse=None,
+                         reflected_indices_elastic=None,
+                         velocity_grids=None,
+                         initial_state=None,
+                         complete_check=False,
+                         context=None):
+        Rule.check_parameters(
+            subclass=subclass,
+            initial_rho=initial_rho,
+            initial_drift=initial_drift,
+            initial_temp=initial_temp,
+            affected_points=affected_points,
+            velocity_grids=velocity_grids,
+            initial_state=initial_state,
+            complete_check=complete_check,
+            context=context)
+        if initial_drift is not None:
+            if isinstance(initial_drift, list):
+                initial_drift = np.array(initial_drift, dtype=float)
+            assert np.all(initial_drift == 0), (
+                "BoundaryPointRules must have no drift! Drift ="
+                "{}".format(initial_drift)
+            )
+
+        rates = [reflection_rate_inverse,
+                 reflection_rate_elastic,
+                 reflection_rate_thermal,
+                 absorption_rate]
+        for rate in rates:
+            if rate is not None:
+                if type(rate) == int:
+                    rate = float(rate)
+                assert type(rate) == float, (
+                    "Any reflection/absorption rate must be of type float. "
+                    "type(rate) = {}".format(type(rate))
+                )
+                assert 0 <= rate <= 1, (
+                    "Reflection/Absorption rates must be between 0 and 1. "
+                    "Rates = {}".format(rates)
+                )
+        if all(rate is not None for rate in rates):
+            assert np.sum(rates) == 1.0, (
+                "Reflection/Absorption rates must sum up to 1. "
+                "Rates = {}".format(rates)
+            )
+
+        if surface_normal is not None:
+            assert isinstance(surface_normal, np.ndarray)
+            assert surface_normal.dtype == int
+            assert np.all(np.abs(surface_normal) <= 1), (
+                "A surface normal must have entries from [-1, 0, 1]."
+                "surface_normal = {}".format(surface_normal)
+            )
+
+        index_arrays = [incoming_velocities,
+                        reflected_indices_inverse,
+                        reflected_indices_elastic]
+        for idx_array in index_arrays:
+            if idx_array is not None:
+                assert isinstance(idx_array, np.ndarray)
+                assert idx_array.dtype == int
+                assert len(set(idx_array)) == idx_array.size, (
+                    "Index arrays must be unique indices!"
+                    "idx_array:\n{}".format(idx_array)
+                )

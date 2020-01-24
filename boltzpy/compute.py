@@ -68,7 +68,7 @@ def operator_splitting(data, func_transport, func_collision):
     # executing time step
     func_transport(data)
     func_collision(data)
-    assert np.all(data.state > 0)
+    assert np.all(data.state >= 0)
     data.t += 1
     return
 
@@ -102,6 +102,26 @@ def transport_inflow_innerPoint(data, affected_points):
                            * data.state[np.ix_(affected_points - 1,
                                                pos_vels)]
                            )
+    return result
+
+# Todo test that this is equivalent to innerPoint, with all velocities allowed
+def transport_inflow_boundaryPoint(data,
+                                   affected_points,
+                                   incoming_velocities):
+    # # Todo move this into data.pv or something, is often needed
+    pv = (data.vG + data.velocity_offset)[:, :]
+    inflow_percentage = (data.dt / data.dp * np.abs(pv[:, 0]))
+    result = np.zeros((affected_points.size, data.vG.shape[0]), dtype=float)
+
+    neg_incomings_vels = np.where(pv[incoming_velocities, 0] < 0)[0]
+    neg_vels = incoming_velocities[neg_incomings_vels]
+    result[:, neg_vels] = (inflow_percentage[neg_vels]
+                           * data.state[np.ix_(affected_points + 1, neg_vels)])
+
+    pos_incomings_vels = np.where(pv[incoming_velocities, 0] > 0)[0]
+    pos_vels = incoming_velocities[pos_incomings_vels]
+    result[:, pos_vels] = (inflow_percentage[pos_vels]
+                           * data.state[np.ix_(affected_points - 1, pos_vels)])
     return result
 
 
