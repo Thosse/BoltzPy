@@ -369,11 +369,15 @@ class Geometry:
         """:obj:`str` :
         A human readable string which describes all attributes of the instance."""
         description = ''
-        description += "Dimension = {}\n".format(self.ndim)
-        description += "Shape = {}\n".format(self.shape)
-        description += "Rules:\n\t"
-        for (rule_idx, rule) in enumerate(self.rules):
-            rule_str = rule.__str__(rule_idx).replace('\n', '\n\t')
-            description += '\t' + rule_str
-            description += '\n'
+        for (key, value) in self.__dict__.items():
+            if key == "rules":
+                for (rule_idx, rule) in enumerate(self.rules):
+                    description += "rules[{}]:\n".format(rule_idx)
+                    rule_str = rule.__str__().replace('\n', '\n\t')
+                    description += '\t' + rule_str
+                    description += '\n'
+                continue
+            description += '{key}:\n\t{value}\n'.format(
+                key=key,
+                value=value.__str__().replace('\n', '\n\t'))
         return description

@@ -350,18 +350,13 @@ class Rule:
                     return False
         return True
 
-    def __str__(self, idx=None):
+    def __str__(self):
         """Convert the instance to a string, describing all attributes."""
         description = ''
-        if idx is not None:
-            description += 'Rule_{}:\n'.format(idx)
-        description += 'subclass = ' + self.subclass + '\n'
-        description += 'Rho:\n\t'
-        description += self.initial_rho.__str__() + '\n'
-        description += 'Drift:\n\t'
-        description += self.initial_drift.__str__().replace('\n', '\n\t') + '\n'
-        description += 'Temperature: \n\t'
-        description += self.initial_temp.__str__() + '\n'
+        for (key, value) in self.__dict__.items():
+            description += '{key}:\n\t{value}\n'.format(
+                key=key,
+                value=value.__str__().replace('\n', '\n\t'))
         return description
 
 
