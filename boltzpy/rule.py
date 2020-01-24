@@ -10,17 +10,9 @@ import boltzpy.compute as bp_cp
 
 
 class Rule:
-    """Encapsulates all data to initialize a :class:`~boltzpy.Grid` point.
-
-    A rule must be applied to every point of the
-    :attr:`simulation.p <boltzpy.Simulation>`
-    :class:`boltzpy.Grid`.
-    It determines the points:
-
-        * initial distribution in the velocity space
-          based on :attr:`initial_rho`, :attr:`initial_drift`, and :attr:`initial_temp`.
-        * behaviour (see :const:`~boltzpy.constants.SUPP_BEHAVIOUR_TYPES`)
-          during the :mod:`computation`
+    """Encapsulates the initialization methods
+    and computational behaviour during the Simulation
+    for all points, that are affected by this rule.
 
     Parameters
     ----------
@@ -28,9 +20,10 @@ class Rule:
     initial_drift : :obj:`~numpy.array` [:obj:`float`]
     initial_temp : :obj:`~numpy.array` [:obj:`float`]
     affected_points : :obj:`list`[:obj:`int`]
+    velocity_grids : :obj:`~boltzpy.SVGrid`, optional
+        Used to construct the initial state,
+        if no initial_state parameter is given.
     initial_state : :obj:`~numpy.array` [:obj:`float`], optional
-        Only given for testing purposes. Otherwise this is set by
-        calling the :meth:`setup`
 
     Attributes
     ----------
@@ -57,16 +50,13 @@ class Rule:
                  affected_points,
                  velocity_grids=None,
                  initial_state=None):
-        # Todo test initial state
-        # Todo test affected points
-        # Todo test velocity grids as a parameter
         self.check_parameters(initial_rho=initial_rho,
                               initial_drift=initial_drift,
                               initial_temp=initial_temp,
                               affected_points=affected_points)
-        self.initial_rho = initial_rho
-        self.initial_drift = initial_drift
-        self.initial_temp = initial_temp
+        self.initial_rho = np.array(initial_rho, dtype=float)
+        self.initial_drift = np.array(initial_drift, dtype=float)
+        self.initial_temp = np.array(initial_temp, dtype=float)
         self.affected_points = np.array(affected_points, dtype=int)
         # Either initial_state is given as parameter
         if initial_state is not None:
@@ -216,12 +206,16 @@ class Rule:
             The Simulation, which this instance belongs to.
             This allows additional checks.
         """
+        assert isinstance(self.initial_rho, np.ndarray)
+        assert isinstance(self.initial_drift, np.ndarray)
+        assert isinstance(self.initial_temp, np.ndarray)
         assert isinstance(self.affected_points, np.ndarray)
         self.check_parameters(subclass=self.subclass,
                               initial_rho=self.initial_rho,
                               initial_drift=self.initial_drift,
                               initial_temp=self.initial_temp,
                               affected_points=self.affected_points,
+                              initial_state=self.initial_state,
                               complete_check=complete_check,
                               context=context)
         return
@@ -232,6 +226,8 @@ class Rule:
                          initial_drift=None,
                          initial_temp=None,
                          affected_points=None,
+                         velocity_grids=None,
+                         initial_state=None,
                          complete_check=False,
                          context=None):
         """Sanity Check.
@@ -244,6 +240,8 @@ class Rule:
         initial_drift : :obj:`~numpy.array` [:obj:`float`], optional
         initial_temp : :obj:`~numpy.array` [:obj:`float`], optional
         affected_points : :obj:`list`[:obj:`int`]
+        velocity_grids : :obj:`~boltzpy.SVGrid`, optional
+        initial_state : :obj:`~numpy.array` [:obj:`float`], optional
         complete_check : :obj:`bool`, optional
             If True, then all parameters must be set (not None).
             If False, then unassigned parameters are ignored.
@@ -256,12 +254,10 @@ class Rule:
         if complete_check is True:
             assert all(param_val is not None
                        for (param_key, param_val) in locals().items()
-                       if param_key != "context")
-        if context is not None:
-            assert isinstance(context, bp.Simulation)
-
+                       if param_key not in ["context", "velocity_grids"])
         # Set up basic constants
         if context is not None:
+            assert isinstance(context, bp.Simulation)
             n_species = context.s.size
         else:
             n_species = None
@@ -272,33 +268,42 @@ class Rule:
             assert subclass in bp_c.SUPP_RULE_SUBCLASSES
 
         if initial_rho is not None:
+            if isinstance(initial_rho, list):
+                initial_rho = np.array(initial_rho, dtype=float)
             assert isinstance(initial_rho, np.ndarray)
             assert initial_rho.dtype == float
             assert initial_rho.ndim == 1
             assert np.min(initial_rho) > 0
             if n_species is not None:
-                assert initial_rho.shape == (n_species,)
-            n_species = initial_rho.shape[0]
+                assert n_species == initial_rho.size
+            else:
+                n_species = initial_rho.size
 
         if initial_drift is not None:
+            if isinstance(initial_drift, list):
+                initial_drift = np.array(initial_drift, dtype=float)
             assert isinstance(initial_drift, np.ndarray)
             assert initial_drift.dtype == float
             assert initial_drift.ndim == 2
             if n_species is not None:
                 assert initial_drift.shape[0] == n_species
-            n_species = initial_drift.shape[0]
+            else:
+                n_species = initial_drift.shape[0]
             assert initial_drift.shape[1] in [2, 3]
             if context is not None and context.sv.ndim is not None:
                 assert initial_drift.shape[1] == context.sv.ndim
 
         if initial_temp is not None:
+            if isinstance(initial_temp, list):
+                initial_temp = np.array(initial_temp, dtype=float)
             assert isinstance(initial_temp, np.ndarray)
             assert initial_temp.dtype == float
             assert initial_temp.ndim == 1
             assert np.min(initial_temp) > 0
             if n_species is not None:
-                assert initial_temp.shape == (n_species,)
-            # n_species = initial_temp.shape[0]
+                assert n_species == initial_temp.size
+            else:
+                n_species = initial_temp.size
 
         if affected_points is not None:
             if isinstance(affected_points, list):
@@ -306,12 +311,24 @@ class Rule:
             assert isinstance(affected_points, np.ndarray)
             assert affected_points.ndim == 1
             assert affected_points.dtype == int
-            if affected_points.size != 0:
-                assert np.min(affected_points) >= 0
+            assert affected_points.size > 0
+            assert np.min(affected_points) >= 0
             if context is not None and context.geometry.shape is not None:
                 assert np.max(affected_points) < context.geometry.size
-            assert affected_points.size == len(set(affected_points))
+            assert affected_points.size == len(set(affected_points)), (
+                "Some points are affected twice be the same Rule:"
+                "{}".format(affected_points)
+            )
 
+        if velocity_grids is not None:
+            assert isinstance(velocity_grids, bp.SVGrid)
+            velocity_grids.check_integrity(context=context)
+
+        if initial_state is not None:
+            assert isinstance(initial_state, np.ndarray)
+            assert initial_state.dtype == float
+            assert np.all(initial_state >= 0)
+            # Todo test initial state, moments should be matching (up to 10^-x)
         return
 
     def __eq__(self, other):
