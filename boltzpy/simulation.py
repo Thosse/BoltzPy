@@ -167,8 +167,6 @@ class Simulation:
                                                ['Energy',
                                                 'Energy_Flow_X']])
         file.close()
-        # Todo check what happens if sv is not initialzed
-        self.setup()
         # Todo remove this, replace usage by geometry
         self.init_arr = self.geometry.init_array
         self.rule_arr = self.geometry.rules
@@ -230,10 +228,6 @@ class Simulation:
                 and self.geometry.is_set_up
                 and self.sv.is_set_up
                 and self.coll.is_set_up)
-
-    def setup(self):
-        self.geometry.setup(self.sv)
-        return
 
     #############################
     #       Configuration       #

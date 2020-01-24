@@ -62,10 +62,8 @@ class Geometry:
 
     @property
     def size_of_model(self):
-        if self.rules.size == 0:
-            return None
-        sizes = [rule.size_of_model for rule in self.rules]
-        # all model_sizes must be equal
+        sizes = [rule.initial_state.size for rule in self.rules]
+        # todo assert all rule.initial_state.size must be equal in check_params
         assert len(set(sizes)) == 1
         return sizes[0]
 
@@ -88,17 +86,11 @@ class Geometry:
     def is_set_up(self):
         if any(attr is None for attr in self.__dict__.values()):
             return False
-        if any(not rule.is_set_up for rule in self.rules):
-            return False
         else:
             self.check_integrity()
             return True
 
-    def setup(self, sv_grid):
-        for rule in self.rules:
-            rule.setup(sv_grid)
-        return
-
+    # Todo remove this, this could, potentially hide errors
     def apply_rule(self,
                    rule,
                    affected_points):
@@ -343,9 +335,12 @@ class Geometry:
             if complete_check:
                 assert len(affected_points) == np.prod(shape)
             # All rules must work on the same model
-            size_of_model = set(rule.size_of_model
-                                for rule in rules)
-            assert len(size_of_model) in [0, 1]
+            sizes_of_model = list(rule.initial_state.size
+                                  for rule in rules)
+            assert len(set(sizes_of_model)) in [0, 1], (
+                "Not all rules have equal model size: "
+                "{}".format(sizes_of_model)
+            )
 
         # check correct attribute relations
         if ndim is not None and shape is not None:

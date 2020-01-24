@@ -50,14 +50,16 @@ class Rule:
     initial_state : :obj:`~numpy.array` [:obj:`float`]
         Initial state of the simulation model.
     """
-    # Todo test affected points
-    # Todo test initial_state
     def __init__(self,
                  initial_rho,
                  initial_drift,
                  initial_temp,
                  affected_points,
+                 velocity_grids=None,
                  initial_state=None):
+        # Todo test initial state
+        # Todo test affected points
+        # Todo test velocity grids as a parameter
         self.check_parameters(initial_rho=initial_rho,
                               initial_drift=initial_drift,
                               initial_temp=initial_temp,
@@ -65,12 +67,15 @@ class Rule:
         self.initial_rho = initial_rho
         self.initial_drift = initial_drift
         self.initial_temp = initial_temp
-        if affected_points is None:
-            self.affected_points = np.empty((0,), dtype=int)
+        self.affected_points = np.array(affected_points, dtype=int)
+        # Either initial_state is given as parameter
+        if initial_state is not None:
+            assert velocity_grids is None
+            self.initial_state = initial_state
+        # or it is constructed based on the velocity_grids
         else:
-            self.affected_points = np.array(affected_points, dtype=int)
-        # if initial state is given, generate the other parameters from it
-        self.initial_state = initial_state
+            assert velocity_grids is not None
+            self.initial_state = self.compute_initial_state(velocity_grids)
         self.check_integrity(complete_check=False)
         return
 
@@ -95,74 +100,39 @@ class Rule:
             raise NotImplementedError
 
     @property
-    def dimension(self):
-        self.check_parameters(initial_rho=self.initial_rho,
-                              initial_drift=self.initial_drift,
-                              initial_temp=self.initial_temp)
-        if self.initial_drift is None:
-            return None
-        else:
-            return self.initial_drift.shape[1]
+    def ndim(self):
+        return self.initial_drift.shape[1]
 
     @property
-    def number_of_species(self):
-        self.check_parameters(initial_rho=self.initial_rho,
-                              initial_drift=self.initial_drift,
-                              initial_temp=self.initial_temp)
-        if self.initial_rho is not None:
-            return self.initial_rho.size
-        if self.initial_temp is not None:
-            return self.initial_temp.size
-        if self.initial_drift is not None:
-            return self.initial_drift.shape[0]
-        return None
-
-    # Todo use this function to vecorize setup()
-    # def density(self, velocity):
-    #     pass
-
-    @property
-    def is_set_up(self):
-        if any(attr is None for attr in self.__dict__.values()):
-            return False
-        else:
-            self.check_integrity()
-            return True
-
-    @property
-    def size_of_model(self):
-        if self.initial_state is not None:
-            return self.initial_state.size
-        else:
-            return None
+    def number_of_specimen(self):
+        return self.initial_drift.shape[0]
 
     # Todo (ST) use correct initialization form (mass in exponent)
     # Todo (LT) use a Newton Scheme for correct values
-    def setup(self, svgrid):
-        assert isinstance(svgrid, bp.SVGrid)
-        assert self.dimension == svgrid.ndim
+    def compute_initial_state(self, velocity_grids):
+        assert isinstance(velocity_grids, bp.SVGrid)
+        assert self.ndim == velocity_grids.ndim
+        assert self.number_of_specimen == velocity_grids.number_of_grids
+        initial_state = np.zeros(velocity_grids.size)
 
-        # setup initial state
-        self.initial_state = np.zeros(svgrid.size)
-        for idx_spc in range(self.number_of_species):
+        for idx_spc in range(self.number_of_specimen):
             rho = self.initial_rho[idx_spc]
             drift = self.initial_drift[idx_spc]
             temp = self.initial_temp[idx_spc]
-
-            [begin, end] = svgrid.index_range[idx_spc]
-            v_grid = svgrid.iMG[begin:end]
-            dv = svgrid.delta
+            [begin, end] = velocity_grids.index_range[idx_spc]
+            v_grid = velocity_grids.iMG[begin:end]
+            dv = velocity_grids.delta
             for (i_v, v) in enumerate(v_grid):
                 # Physical Velocity
                 pv = np.array(dv * v)
                 diff_v = np.sum((pv - drift) ** 2)
-                self.initial_state[begin + i_v] = rho * math.exp(-0.5 * (diff_v / temp))
+                initial_state[begin + i_v] = rho * math.exp(-0.5 * (diff_v / temp))
             # Todo read into Rjasanov's script and do this correctly
             # Todo THIS IS CURRENTLY WRONG! ONLY TEMPORARY FIX
             # Adjust initialized values, to match configurations
-            adj = self.initial_state[begin:end].sum()
-            self.initial_state[begin:end] *= rho / adj
-        return
+            adj = initial_state[begin:end].sum()
+            initial_state[begin:end] *= rho / adj
+        return initial_state
 
     #####################################
     #            Computation            #
@@ -384,11 +354,13 @@ class InnerPointRule(Rule):
                  initial_drift=None,
                  initial_temp=None,
                  affected_points=None,
+                 velocity_grids=None,
                  initial_state=None):
         super().__init__(initial_rho,
                          initial_drift,
                          initial_temp,
                          affected_points,
+                         velocity_grids,
                          initial_state)
         return
 
@@ -407,15 +379,17 @@ class InnerPointRule(Rule):
 
 class ConstantPointRule(Rule):
     def __init__(self,
-                 initial_rho=None,
-                 initial_drift=None,
-                 initial_temp=None,
-                 affected_points=None,
+                 initial_rho,
+                 initial_drift,
+                 initial_temp,
+                 affected_points,
+                 velocity_grids=None,
                  initial_state=None):
         super().__init__(initial_rho,
                          initial_drift,
                          initial_temp,
                          affected_points,
+                         velocity_grids,
                          initial_state)
         return
 
@@ -437,26 +411,30 @@ class ConstantPointRule(Rule):
 # Todo add assertions
 class BoundaryPointRule(Rule):
     def __init__(self,
+                 initial_rho,
+                 initial_temp,
                  reflection_rate_inverse,
                  reflection_rate_elastic,
                  reflection_rate_thermal,
-                 reflection_temperature,
                  absorption_rate,
                  surface_normal,    # TODO more complicated in 2d
-                 initial_rho=None,
-                 initial_drift=None,
-                 initial_temp=None,
-                 affected_points=None,
+                 affected_points,
+                 velocity_grids=None,
                  initial_state=None):
+        # BoundaryPointRules don't have a drift
+        initial_drift = np.zeros((np.array(initial_rho).size,
+                                  np.array(surface_normal).size),
+                                 dtype=float)
         super().__init__(initial_rho,
                          initial_drift,
                          initial_temp,
                          affected_points,
+                         velocity_grids,
                          initial_state)
+        # Todo initial_state must be edited here, better to edit the method
         self.reflection_rate_inverse = reflection_rate_inverse
         self.reflection_rate_elastic = reflection_rate_elastic
         self.reflection_rate_thermal = reflection_rate_thermal
-        self.reflection_temperature = reflection_temperature
         self.absorption_rate = absorption_rate
         self.surface_normal = surface_normal
         return

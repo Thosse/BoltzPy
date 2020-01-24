@@ -60,27 +60,32 @@ class TestCase(dict):
             right_rho = np.ones(s.size)
             initial_drift = np.zeros((s.size, sv.ndim))
             initial_temp = np.ones(s.size)
-            rules = [bp.ConstantPointRule(
-                         initial_rho=left_rho,
-                         initial_drift=initial_drift,
-                         initial_temp=initial_temp,
-                         affected_points=[0]),
-                     bp.InnerPointRule(
-                         initial_rho=left_rho,
-                         initial_drift=initial_drift,
-                         initial_temp=initial_temp,
-                         affected_points=np.arange(1, p.size // 2)),
-                     bp.InnerPointRule(
-                         initial_rho=right_rho,
-                         initial_drift=initial_drift,
-                         initial_temp=initial_temp,
-                         affected_points=np.arange(p.size // 2, p.size - 1)),
-                     bp.ConstantPointRule(
-                         initial_rho=right_rho,
-                         initial_drift=initial_drift,
-                         initial_temp=initial_temp,
-                         affected_points=[p.size - 1])
-                     ]
+            rules = [
+                bp.ConstantPointRule(
+                    initial_rho=left_rho,
+                    initial_drift=initial_drift,
+                    initial_temp=initial_temp,
+                    affected_points=[0],
+                    velocity_grids=sv),
+                bp.InnerPointRule(
+                    initial_rho=left_rho,
+                    initial_drift=initial_drift,
+                    initial_temp=initial_temp,
+                    affected_points=np.arange(1, p.size // 2),
+                    velocity_grids=sv),
+                bp.InnerPointRule(
+                    initial_rho=right_rho,
+                    initial_drift=initial_drift,
+                    initial_temp=initial_temp,
+                    affected_points=np.arange(p.size // 2, p.size - 1),
+                    velocity_grids=sv),
+                bp.ConstantPointRule(
+                    initial_rho=right_rho,
+                    initial_drift=initial_drift,
+                    initial_temp=initial_temp,
+                    affected_points=[p.size - 1],
+                    velocity_grids=sv)
+                ]
             geometry = bp.Geometry(shape=p.shape,
                                    rules=rules
                                    )
@@ -127,7 +132,6 @@ class TestCase(dict):
         sim.coll = self["coll"]
         if sim.coll == bp.Collisions():
             sim.coll.setup(scheme=sim.scheme, svgrid=sim.sv, species=sim.s)
-        sim.setup()
         sim.save()
         sim.compute()
         return sim
