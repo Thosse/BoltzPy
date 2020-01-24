@@ -80,21 +80,21 @@ class Rule:
         return
 
     @property
-    def behaviour_type(self):
+    def subclass(self):
         """
         :obj:`str`
-            Determines the behaviour during the simulation.
-            Must be in :const:`~boltzpy.constants.SUPP_BEHAVIOUR_TYPES`.
+            Used fore load() and save() to initialize as the correct subclass.
+            Must be in :const:`~boltzpy.constants.SUPP_RULE_SUBCLASSES`.
         """
         raise NotImplementedError
 
     @staticmethod
-    def child_class(behaviour_type):
-        if behaviour_type == 'Inner Point':
+    def get_subclass(behaviour_type):
+        if behaviour_type == 'InnerPointRule':
             return InnerPointRule
-        elif behaviour_type == 'Constant Point':
+        elif behaviour_type == 'ConstantPointRule':
             return ConstantPointRule
-        elif behaviour_type == 'Boundary Point':
+        elif behaviour_type == 'BoundaryPointRule':
             return BoundaryPointRule
         else:
             raise NotImplementedError
@@ -164,7 +164,7 @@ class Rule:
 
         # choose derived class for new rule
         behaviour_type = hdf5_group.attrs["behaviour_type"]
-        rule_class = bp.Rule.child_class(behaviour_type)
+        rule_class = bp.Rule.get_subclass(behaviour_type)
 
         # read parameters from file
         params = dict()
@@ -192,7 +192,7 @@ class Rule:
             del hdf5_group[key]
         hdf5_group.attrs["class"] = "Rule"
         # save derived class of rule
-        hdf5_group.attrs["behaviour_type"] = self.behaviour_type
+        hdf5_group.attrs["behaviour_type"] = self.subclass
 
         # write attributes to file
         for (key, value) in self.__dict__.items():
@@ -217,7 +217,7 @@ class Rule:
             This allows additional checks.
         """
         assert isinstance(self.affected_points, np.ndarray)
-        self.check_parameters(behaviour_type=self.behaviour_type,
+        self.check_parameters(subclass=self.subclass,
                               initial_rho=self.initial_rho,
                               initial_drift=self.initial_drift,
                               initial_temp=self.initial_temp,
@@ -227,7 +227,7 @@ class Rule:
         return
 
     @staticmethod
-    def check_parameters(behaviour_type=None,
+    def check_parameters(subclass=None,
                          initial_rho=None,
                          initial_drift=None,
                          initial_temp=None,
@@ -239,7 +239,7 @@ class Rule:
 
         Parameters
         ----------
-        behaviour_type : :obj:`str`, optional
+        subclass : :obj:`str`, optional
         initial_rho : :obj:`~numpy.array` [:obj:`float`], optional
         initial_drift : :obj:`~numpy.array` [:obj:`float`], optional
         initial_temp : :obj:`~numpy.array` [:obj:`float`], optional
@@ -267,9 +267,9 @@ class Rule:
             n_species = None
 
         # check all parameters, if set
-        if behaviour_type is not None:
-            assert isinstance(behaviour_type, str)
-            assert behaviour_type in bp_c.SUPP_BEHAVIOUR_TYPES
+        if subclass is not None:
+            assert isinstance(subclass, str)
+            assert subclass in bp_c.SUPP_RULE_SUBCLASSES
 
         if initial_rho is not None:
             assert isinstance(initial_rho, np.ndarray)
@@ -338,7 +338,7 @@ class Rule:
         description = ''
         if idx is not None:
             description += 'Rule_{}:\n'.format(idx)
-        description += 'Behaviour Type = ' + self.behaviour_type + '\n'
+        description += 'subclass = ' + self.subclass + '\n'
         description += 'Rho:\n\t'
         description += self.initial_rho.__str__() + '\n'
         description += 'Drift:\n\t'
@@ -365,8 +365,8 @@ class InnerPointRule(Rule):
         return
 
     @property
-    def behaviour_type(self):
-        return 'Inner Point'
+    def subclass(self):
+        return 'InnerPointRule'
 
     def collision(self, data):
         bp_cp.euler_scheme(data, self.affected_points)
@@ -394,8 +394,8 @@ class ConstantPointRule(Rule):
         return
 
     @property
-    def behaviour_type(self):
-        return 'Constant Point'
+    def subclass(self):
+        return 'ConstantPointRule'
 
     def collision(self, data):
         bp_cp.euler_scheme(data, self.affected_points)
@@ -440,8 +440,8 @@ class BoundaryPointRule(Rule):
         return
 
     @property
-    def behaviour_type(self):
-        return 'Boundary Point'
+    def subclass(self):
+        return 'BoundaryPointRule'
 
     def collision(self, data):
         bp_cp.no_collisions(data, self.affected_points)

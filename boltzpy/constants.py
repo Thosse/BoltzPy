@@ -91,9 +91,9 @@ SUPP_GRID_DIMENSIONS = {1, 2}
 #          * no collision-step,
 #          * no transport-step,
 #          * Distribution is freshly initialized in every time step
-SUPP_BEHAVIOUR_TYPES = ['Inner Point',
-                        'Constant Point',
-                        'Boundary Point',
+SUPP_RULE_SUBCLASSES = ['InnerPointRule',
+                        'ConstantPointRule',
+                        'BoundaryPointRule',
                         # 'Ghost Boundary_Point',
                         # 'Time_Variant_Point'
                         ]
