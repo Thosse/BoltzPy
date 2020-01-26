@@ -109,10 +109,12 @@ class Animation:
         ani.save(self._sim.file_address + '.mp4',
                  self._writer,
                  dpi=figure.dpi)
+        # Todo move format_time into helpers.py
+        time_taken = bp.Data._format_time(int(time() - ani_time))
 
         print('Animating....Done\n'
               'Time taken =  {} seconds'
-              '\n'.format(round(time() - ani_time, 3)))
+              '\n'.format(time_taken))
         return
 
     def _update_data(self,

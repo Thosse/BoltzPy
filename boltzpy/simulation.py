@@ -167,8 +167,6 @@ class Simulation:
                                                ['Energy',
                                                 'Energy_Flow_X']])
         file.close()
-        # Todo check what happens if sv is not initialzed
-        self.setup()
         # Todo remove this, replace usage by geometry
         self.init_arr = self.geometry.init_array
         self.rule_arr = self.geometry.rules
@@ -230,10 +228,6 @@ class Simulation:
                 and self.geometry.is_set_up
                 and self.sv.is_set_up
                 and self.coll.is_set_up)
-
-    def setup(self):
-        self.geometry.setup(self.sv)
-        return
 
     #############################
     #       Configuration       #
@@ -328,7 +322,6 @@ class Simulation:
         step_size = max_time / (number_time_steps - 1)
         self.t = bp.Grid(ndim=1,
                          shape=(number_time_steps,),
-                         form='rectangular',
                          physical_spacing=step_size,
                          spacing=calculations_per_time_step)
         return
@@ -348,7 +341,6 @@ class Simulation:
         """
         self.p = bp.Grid(ndim=grid_dimension,
                          shape=grid_shape,
-                         form='rectangular',
                          physical_spacing=grid_spacing)
         # Update shape of initialization_array
         self.geometry.shape = self.p.shape
@@ -358,7 +350,6 @@ class Simulation:
                            grid_dimension,
                            maximum_velocity,
                            shapes,
-                           geometric_form='rectangular',
                            use_identical_spacing=False):
         """Set up :attr:`sv`.
 
@@ -371,56 +362,18 @@ class Simulation:
         grid_dimension : :obj:`int`
         maximum_velocity : :obj:`float`
         shapes : :obj:`list` [:obj:`tuple` [:obj:`int`]]
-        geometric_form : :obj:`str`, optional
         use_identical_spacing : :obj:`bool`, optional
             If True, then all specimen use equal grids.
             If False, then the spacing is adjusted to the mass ratio.
         """
         if not self.s.is_configured:
             raise AttributeError
-        lcm = int(np.lcm.reduce(self.s.mass))
-        if use_identical_spacing:
-            spacings = [2] * self.s.size
-        else:
-            spacings = [2 * lcm // int(m)
-                              for m in self.s.mass]
-        forms = [geometric_form] * self.s.size
+        spacings = bp.SVGrid.generate_spacings(self.s.mass,
+                                               use_identical_spacing)
         self.sv = bp.SVGrid(ndim=grid_dimension,
                             maximum_velocity=maximum_velocity,
                             shapes=shapes,
-                            spacings=spacings,
-                            forms=forms)
-        return
-
-    def add_rule(self,
-                 behaviour_type,
-                 initial_rho,
-                 initial_drift,
-                 initial_temp,
-                 affected_points=None):
-        """Add a new :class:`initialization rule <Rule>` to :attr:`rule_arr`.
-
-        Parameters
-        ----------
-        behaviour_type : :obj:`str`
-        Determines the behaviour during the simulation.
-        Must be in :const:`~boltzpy.constants.SUPP_BEHAVIOUR_TYPES`.
-        initial_rho : :obj:`~numpy.array` [:obj:`float`]
-        initial_drift : :obj:`~numpy.array` [:obj:`float`]
-        initial_temp : :obj:`~numpy.array` [:obj:`float`]
-        affected_points : :obj:`list`[:obj:`int`], optional
-            Contains all indices of the space points, where this rule applies
-        """
-        self.geometry.add_rule(
-            behaviour_type=behaviour_type,
-            initial_rho=initial_rho,
-            initial_drift=initial_drift,
-            initial_temp=initial_temp,
-            affected_points=affected_points)
-
-        self.check_parameters(species=self.s,
-                              species_velocity_grid=self.sv,
-                              geometry=self.geometry)
+                            spacings=spacings)
         return
 
     #####################################
@@ -773,6 +726,23 @@ class Simulation:
         if scheme is not None:
             scheme.check_integrity(complete_check)
         return
+
+    def __eq__(self, other):
+        if not isinstance(other, Simulation):
+            return False
+        if set(self.__dict__.keys()) != set(other.__dict__.keys()):
+            return False
+        for (key, value) in self.__dict__.items():
+            other_value = other.__dict__[key]
+            if type(value) != type(other_value):
+                return False
+            if isinstance(value, np.ndarray):
+                if np.any(value != other_value):
+                    return False
+            else:
+                if value != other_value:
+                    return False
+        return True
 
     def __str__(self,
                 write_physical_grids=False):

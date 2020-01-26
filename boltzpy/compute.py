@@ -68,7 +68,7 @@ def operator_splitting(data, func_transport, func_collision):
     # executing time step
     func_transport(data)
     func_collision(data)
-    assert np.all(data.state > 0)
+    assert np.all(data.state >= 0)
     data.t += 1
     return
 
@@ -76,6 +76,55 @@ def operator_splitting(data, func_transport, func_collision):
 #################################
 #           Transport           #
 #################################
+def transport_outflow_remains(data, affected_points):
+    # Todo make this an attribute of data? Or just pv = VG + offset?
+    outflow_percentage = (np.abs(data.vG[:, 0] + data.velocity_offset[0])
+                          * data.dt
+                          / data.dp)
+    result = ((1 - outflow_percentage) * data.state[affected_points, :])
+    return result
+
+
+def transport_inflow_innerPoint(data, affected_points):
+    # # Todo move this into data.pv or something, is often needed
+    pv = data.vG + data.velocity_offset
+    inflow_percentage = (data.dt / data.dp * np.abs(pv[:, 0]))
+    result = np.zeros((affected_points.size, data.vG.shape[0]), dtype=float)
+
+    neg_vels = np.where(pv[:, 0] < 0)[0]
+    result[:, neg_vels] = (inflow_percentage[neg_vels]
+                           * data.state[np.ix_(affected_points + 1,
+                                               neg_vels)]
+                           )
+
+    pos_vels = np.where(pv[:, 0] > 0)[0]
+    result[:, pos_vels] = (inflow_percentage[pos_vels]
+                           * data.state[np.ix_(affected_points - 1,
+                                               pos_vels)]
+                           )
+    return result
+
+# Todo test that this is equivalent to innerPoint, with all velocities allowed
+def transport_inflow_boundaryPoint(data,
+                                   affected_points,
+                                   incoming_velocities):
+    # # Todo move this into data.pv or something, is often needed
+    pv = (data.vG + data.velocity_offset)[:, :]
+    inflow_percentage = (data.dt / data.dp * np.abs(pv[:, 0]))
+    result = np.zeros((affected_points.size, data.vG.shape[0]), dtype=float)
+
+    neg_incomings_vels = np.where(pv[incoming_velocities, 0] < 0)[0]
+    neg_vels = incoming_velocities[neg_incomings_vels]
+    result[:, neg_vels] = (inflow_percentage[neg_vels]
+                           * data.state[np.ix_(affected_points + 1, neg_vels)])
+
+    pos_incomings_vels = np.where(pv[incoming_velocities, 0] > 0)[0]
+    pos_vels = incoming_velocities[pos_incomings_vels]
+    result[:, pos_vels] = (inflow_percentage[pos_vels]
+                           * data.state[np.ix_(affected_points - 1, pos_vels)])
+    return result
+
+
 def fdm_first_order(data, affected_points):
     """Executes single collision step on complete P-Grid"""
     if data.p_dim != 1:
@@ -86,21 +135,41 @@ def fdm_first_order(data, affected_points):
     dt = data.dt
     dp = data.dp
     offset = data.velocity_offset
-    # Todo is this case separation necessary?
-    for (spc, [beg, end]) in enumerate(data.v_range):
-        for p in affected_points:
-            # # Todo there should be a faster way -> vectorize, keep old function for testing
-            for v in range(beg, end):
-                pv = data.vG[v] + offset
-                if pv[0] <= 0:
-                    new_val = ((1 + pv[0] * dt / dp) * data.state[p, v]
-                               - pv[0] * dt / dp * data.state[p + 1, v])
-                elif pv[0] > 0:
-                    new_val = ((1 - pv[0] * dt / dp) * data.state[p, v]
-                               + pv[0] * dt / dp * data.state[p - 1, v])
-                else:
-                    continue
-                data.result[p, v] = new_val
+    v_size = data.v_range[-1, 1]
+    for p in affected_points:
+        for v in range(v_size):
+            pv = data.vG[v] + offset
+            if pv[0] <= 0:
+                new_val = ((1 + pv[0] * dt / dp) * data.state[p, v]
+                           - pv[0] * dt / dp * data.state[p + 1, v])
+            elif pv[0] > 0:
+                new_val = ((1 - pv[0] * dt / dp) * data.state[p, v]
+                           + pv[0] * dt / dp * data.state[p - 1, v])
+            else:
+                continue
+            data.result[p, v] = new_val
+    return
+
+
+def transport_fdm_inner(data, affected_points):
+    """Executes single transport step for a set of inner points.
+
+    This is a finite differences scheme of order 1 for inner points.
+    It computes a free flow without any reflection or absorption.
+    The results are saved in data.results"""
+    if data.p_dim != 1:
+        message = 'Transport is currently only implemented ' \
+                  'for 1D Problems'
+        raise NotImplementedError(message)
+    # Simulate Outflowing
+    data.result[affected_points, :] = transport_outflow_remains(data,
+                                                                affected_points)
+    # Simulate Inflow
+    data.result[affected_points, :] += transport_inflow_innerPoint(
+        data,
+        affected_points
+    )
+
     return
 
 

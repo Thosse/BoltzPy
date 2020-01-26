@@ -39,11 +39,6 @@ class SVGrid:
         Contains the shape of each sub grid.
     spacings : :obj:`list` [:obj:`int`]
         Contains the index spacing of each sub grid.
-    forms : :obj:`list` [:obj:`str`]
-        Contains the geometric form of each sub grid
-        Every element must be in
-        :const:`~boltzpy.constants.SUPP_GRID_FORMS`.
-
     Attributes
     ----------
     ndim : :obj:`int`
@@ -51,8 +46,6 @@ class SVGrid:
         Must be in :const:`~boltzpy.constants.SUPP_GRID_DIMENSIONS`.
     maximum_velocity : :obj:`float`
         Maximum physical velocity for every sub grid.
-    forms : :obj:`list` [:obj:`str`]
-        Contains the :attr:`Grid.form` of each sub grid.
     shapes : :obj:`list` [:obj:`tuple` [:obj:`int`]]
         Contains the :attr:`Grid.shape` of each sub grid.
     spacings : :obj:`list` [:obj:`int`]
@@ -80,18 +73,15 @@ class SVGrid:
                  ndim=None,
                  maximum_velocity=None,
                  shapes=None,
-                 spacings=None,
-                 forms=None):
+                 spacings=None):
         self.check_parameters(ndim=ndim,
                               shapes=shapes,
                               spacings=None,
-                              maximum_velocity=maximum_velocity,
-                              forms=forms)
+                              maximum_velocity=maximum_velocity)
         self.ndim = ndim
         self.maximum_velocity = maximum_velocity
         self.shapes = shapes
         self.spacings = spacings
-        self.forms = forms
         # the following attributes are set in setup()
         self.delta = None
         self.index_range = None
@@ -135,8 +125,7 @@ class SVGrid:
         """
         necessary_params = [self.ndim,
                             self.shapes,
-                            self.spacings,
-                            self.forms]
+                            self.spacings]
         if any([val is None for val in necessary_params]):
             return False
         else:
@@ -154,6 +143,16 @@ class SVGrid:
                      and self.vGrids is not None)
         self.check_integrity()
         return is_set_up
+
+    @staticmethod
+    def generate_spacings(masses,
+                          use_identical_spacing=False):
+        if use_identical_spacing:
+            spacings = [2] * masses.size
+        else:
+            lcm = int(np.lcm.reduce(masses))
+            spacings = [2 * lcm // int(m) for m in masses]
+        return spacings
 
     #####################################
     #           Configuration           #
@@ -176,7 +175,6 @@ class SVGrid:
             # Todo the physical spacing is only a dummy so far
             new_grid = bp.Grid(ndim=self.ndim,
                                shape=self.shapes[i],
-                               form=self.forms[i],
                                physical_spacing=1.0,
                                spacing=self.spacings[i],
                                is_centered=True)
@@ -320,8 +318,6 @@ class SVGrid:
             spacings = [int(spacing)
                         for spacing in hdf5_group["Spacings"]]
             params["spacings"] = spacings
-        if "Forms" in hdf5_group.keys():
-            params["forms"] = list(hdf5_group["Forms"][()])
 
         self = SVGrid(**params)
         return self
@@ -351,9 +347,6 @@ class SVGrid:
             hdf5_group["Shapes"] = self.shapes
         if self.spacings is not None:
             hdf5_group["Spacings"] = self.spacings
-        if self.forms is not None:
-            hdf5_group["Forms"] = np.array(self.forms,
-                                           dtype=h5py.special_dtype(vlen=str))
 
         # check that the class can be reconstructed from the save
         other = SVGrid.load(hdf5_group)
@@ -384,7 +377,6 @@ class SVGrid:
                               delta=self.delta,
                               shapes=self.shapes,
                               spacings=self.spacings,
-                              forms=self.forms,
                               index_range=self.index_range,
                               vGrids=self.vGrids,
                               iMG=self.iMG,
@@ -400,7 +392,6 @@ class SVGrid:
                          delta=None,
                          shapes=None,
                          spacings=None,
-                         forms=None,
                          vGrids=None,
                          index_range=None,
                          iMG=None,
@@ -418,7 +409,6 @@ class SVGrid:
         delta : :obj:`float`, optional
         shapes : :obj:`list` [:obj:`tuple` [:obj:`int`]], optional
         spacings : :obj:`list` [:obj:`int`], optional
-        forms : :obj:`list` [:obj:`str`], optional
         vGrids : :obj:`~numpy.array` [:class:`Grid`], optional
         index_range : :obj:`~numpy.array` [:obj:`int`], optional
         iMG : :obj:`~numpy.array` [:obj:`int`], optional
@@ -478,17 +468,6 @@ class SVGrid:
                                          spacing=spacing,
                                          context=context)
 
-        if forms is not None:
-            assert isinstance(forms, list)
-            if number_of_grids is not None:
-                assert number_of_grids == len(forms)
-            else:
-                number_of_grids = len(forms)
-            for form in forms:
-                bp.Grid.check_parameters(ndim=ndim,
-                                         form=form,
-                                         context=context)
-
         if vGrids is not None:
             assert isinstance(vGrids, np.ndarray)
             if number_of_grids is not None:
@@ -505,10 +484,6 @@ class SVGrid:
                 spacings = [G.spacing for G in vGrids]
             else:
                 assert spacings == [G.spacing for G in vGrids]
-            if forms is None:
-                forms = [G.form for G in vGrids]
-            else:
-                assert forms == [G.form for G in vGrids]
             for (idx_G, G) in enumerate(vGrids):
                 isinstance(G, bp.Grid)
                 G.check_integrity()
@@ -560,18 +535,12 @@ class SVGrid:
             if type(value) != type(other_value):
                 return False
             if isinstance(value, np.ndarray):
-                if np.all(value != other_value):
+                if np.any(value != other_value):
                     return False
             else:
                 if value != other_value:
                     return False
         return True
-
-    def __lt__(self, other):
-        if self.size <= other.size:
-            return True
-        else:
-            return False
 
     def __str__(self,
                 write_physical_grid=False):

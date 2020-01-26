@@ -27,12 +27,13 @@ class TestCase(dict):
                   collision_rate=np.array([50], dtype=float))
             s.add(mass=3,
                   collision_rate=np.array([50, 50], dtype=float))
+        else:
+            assert isinstance(s, bp.Species)
         self["s"] = s
 
         if t is None:
             t = bp.Grid(ndim=1,
                         shape=(5,),
-                        form='rectangular',
                         physical_spacing=0.01,
                         spacing=3)
         self["t"] = t
@@ -41,47 +42,51 @@ class TestCase(dict):
             p = bp.Grid(ndim=1,
                         shape=(6,),
                         spacing=1,
-                        form='rectangular',
                         physical_spacing=0.5)
         self["p"] = p
 
         if sv is None:
+            spacings = bp.SVGrid.generate_spacings(s.mass)
+            shapes = [(int(2*m + 1), int(2*m + 1)) for m in s.mass]
             sv = bp.SVGrid(ndim=2,
                            maximum_velocity=1.5,
-                           shapes=[(5, 5), (7, 7)],
-                           spacings=[3, 2],
-                           forms=["rectangular", "rectangular"],
+                           shapes=shapes,
+                           spacings=spacings,
                            )
         self["sv"] = sv
 
         if geometry is None:
-            rules = [bp.Rule(behaviour_type="Constant Point",
-                             initial_rho=np.array([2.0, 1.0]),
-                             initial_drift=np.array([[0.0, 0.0],
-                                                     [0.0, 0.0]]),
-                             initial_temp=np.array([1.0, 1.0]),
-                             affected_points=[0]),
-                     bp.Rule(behaviour_type="Inner Point",
-                             initial_rho=np.array([2.0, 1.0]),
-                             initial_drift=np.array([[0.0, 0.0],
-                                                     [0.0, 0.0]]),
-                             initial_temp=np.array([1.0, 1.0]),
-                             affected_points=[1, 2]),
-                     bp.Rule(behaviour_type="Inner Point",
-                             initial_rho=np.array([1.0, 1.0]),
-                             initial_drift=np.array([[0.0, 0.0],
-                                                     [0.0, 0.0]]),
-                             initial_temp=np.array([1.0, 1.0]),
-                             affected_points=[3, 4]),
-                     bp.Rule(behaviour_type="Constant Point",
-                             initial_rho=np.array([1.0, 1.0]),
-                             initial_drift=np.array([[0.0, 0.0],
-                                                     [0.0, 0.0]]),
-                             initial_temp=np.array([1.0, 1.0]),
-                             affected_points=[5])
-                     ]
-            geometry = bp.Geometry(ndim=p.ndim,
-                                   shape=p.shape,
+            left_rho = 2*np.ones(s.size)
+            right_rho = np.ones(s.size)
+            initial_drift = np.zeros((s.size, sv.ndim))
+            initial_temp = np.ones(s.size)
+            rules = [
+                bp.ConstantPointRule(
+                    initial_rho=left_rho,
+                    initial_drift=initial_drift,
+                    initial_temp=initial_temp,
+                    affected_points=[0],
+                    velocity_grids=sv),
+                bp.InnerPointRule(
+                    initial_rho=left_rho,
+                    initial_drift=initial_drift,
+                    initial_temp=initial_temp,
+                    affected_points=np.arange(1, p.size // 2),
+                    velocity_grids=sv),
+                bp.InnerPointRule(
+                    initial_rho=right_rho,
+                    initial_drift=initial_drift,
+                    initial_temp=initial_temp,
+                    affected_points=np.arange(p.size // 2, p.size - 1),
+                    velocity_grids=sv),
+                bp.ConstantPointRule(
+                    initial_rho=right_rho,
+                    initial_drift=initial_drift,
+                    initial_temp=initial_temp,
+                    affected_points=[p.size - 1],
+                    velocity_grids=sv)
+                ]
+            geometry = bp.Geometry(shape=p.shape,
                                    rules=rules
                                    )
         self["geometry"] = geometry
@@ -105,8 +110,6 @@ class TestCase(dict):
 
         if coll is None:
             coll = bp.Collisions()
-            # Todo move into save_results?
-            coll.setup(scheme=scheme, svgrid=sv, species=s)
         self["coll"] = coll
         return
 
@@ -127,6 +130,8 @@ class TestCase(dict):
         sim.scheme = self["scheme"]
         sim.output_parameters = self["output_parameters"]
         sim.coll = self["coll"]
+        if sim.coll == bp.Collisions():
+            sim.coll.setup(scheme=sim.scheme, svgrid=sim.sv, species=sim.s)
         sim.save()
         sim.compute()
         return sim
@@ -134,11 +139,14 @@ class TestCase(dict):
     def compare_results(self):
         address_old = self.address(self["file_name"])
         assert os.path.exists(address_old)
-        address_new = self.address("_tmp")
+        address_new = bp_c.TEST_TMP_FILE
         assert address_old != address_new
+        # remove new_Address, if it exists already
+        if os.path.exists(address_new):
+            os.remove(address_new)
+        self.save_results(address_new)
         output = "No comparison done so far"
         try:
-            self.save_results(address_new)
             # Open old and new file
             old_file = h5py.File(address_old, mode='r')
             new_file = h5py.File(address_new, mode='r')
@@ -164,6 +172,16 @@ class TestCase(dict):
         else:
             assert False
 
+    def replace_results(self):
+        msg = input("Are you absolutely sure? "
+                    "You are replacing this test case (yes/no)")
+        if msg == "yes":
+            os.remove(self.address(self["file_name"]))
+            self.save_results()
+            print("Successfully updated: ", self["file_name"])
+        else:
+            print("Abort replacing testcase: ", self["file_name"])
+
 
 ################################################################################
 #                           Implemented TestCases                              #
@@ -172,58 +190,17 @@ CASES = list()
 
 # Mono Species, shock
 tc1_s = bp.Species()
-tc1_s.add(mass=1, collision_rate=np.array([50], dtype=float))
-tc1_sv = bp.SVGrid(ndim=2,
-                   maximum_velocity=1.5,
-                   shapes=[(5, 5)],
-                   spacings=[2],
-                   forms=["rectangular"],
-                   )
-tc1_rules = [bp.Rule(behaviour_type="Constant Point",
-                     initial_rho=np.array([1.0]),
-                     initial_drift=np.array([[0.0, 0.0]]),
-                     initial_temp=np.array([1.0]),
-                     affected_points=[0]),
-             bp.Rule(behaviour_type="Inner Point",
-                     initial_rho=np.array([1.0]),
-                     initial_drift=np.array([[0.0, 0.0]]),
-                     initial_temp=np.array([1.0]),
-                     affected_points=[1, 2]),
-             bp.Rule(behaviour_type="Inner Point",
-                     initial_rho=np.array([1.0]),
-                     initial_drift=np.array([[0.0, 0.0]]),
-                     initial_temp=np.array([1.0]),
-                     affected_points=[3, 4]),
-             bp.Rule(behaviour_type="Constant Point",
-                     initial_rho=np.array([1.0]),
-                     initial_drift=np.array([[0.0, 0.0]]),
-                     initial_temp=np.array([1.0]),
-                     affected_points=[5])
-             ]
-tc1_geometry = bp.Geometry(ndim=1,
-                           shape=(6,),
-                           rules=tc1_rules)
+tc1_s.add(mass=2, collision_rate=np.array([50], dtype=float))
 CASES.append(TestCase("shock_monospecies",
-                      s=tc1_s,
-                      sv=tc1_sv,
-                      geometry=tc1_geometry))
+                      s=tc1_s)
+             )
 
 # Two Species, eqal mass, shock
 tc2_s = bp.Species()
-tc2_s.add(mass=3, collision_rate=np.array([50], dtype=float))
-tc2_s.add(mass=3, collision_rate=np.array([50, 50], dtype=float))
-tc2_sv = bp.SVGrid(ndim=2,
-                   maximum_velocity=1.5,
-                   shapes=[(5, 5), (5, 5)],
-                   spacings=[6, 6],
-                   forms=["rectangular", "rectangular"],
-                   )
+tc2_s.add(mass=2, collision_rate=np.array([50], dtype=float))
+tc2_s.add(mass=2, collision_rate=np.array([50, 50], dtype=float))
 CASES.append(TestCase("shock_2Species_equalMass",
-                      s=tc2_s,
-                      sv=tc2_sv))
-
-# Two Species, shock
-CASES.append(TestCase("shock_2Species"))
+                      s=tc2_s))
 
 # Two Species, shock, complete distribution
 CASES.append(TestCase("shock_2species_complete",
@@ -235,5 +212,13 @@ CASES.append(TestCase("shock_2species_complete",
 ################################################################################
 def update_all_tests():
     for tc in CASES:
+        print("TestCase = ", tc["file_name"])
         assert isinstance(tc, TestCase)
         tc.update_results()
+
+
+def replace_all_tests():
+    for tc in CASES:
+        print("TestCase = ", tc["file_name"])
+        assert isinstance(tc, TestCase)
+        tc.replace_results()

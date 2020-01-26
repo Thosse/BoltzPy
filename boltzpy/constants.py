@@ -18,7 +18,7 @@ TEST_CASES = [os.path.join(TEST_DIRECTORY, file)
               for file in os.listdir(TEST_DIRECTORY)
               if os.path.isfile(os.path.join(TEST_DIRECTORY, file))
               and file[-5:] == '.hdf5'
-              and file != '_tmp_.hdf5']
+              and file[-10:] != '_tmp_.hdf5']
 
 #: :obj:`str` : Default file root for simulation files.
 #: If no file name is given at all, then the file root will be this.
@@ -62,11 +62,6 @@ SUPP_COLORS = ['blue', 'red', 'green',
 INVALID_CHARACTERS = {'.', '"', "'", '/', '§', '$', '&',
                       '+', '#', ',', ';', '\\', '`', '´'}
 
-#: :obj:`set` [:obj:`str`] :
-#: Set of all currently supported geometric forms
-#: for :class:`Grids <boltzpy.Grid>`.
-SUPP_GRID_FORMS = {'rectangular'}
-
 #: :obj:`set` [:obj:`int`] :
 #: Set of all currently supported
 #: for :class:`~boltzpy.Grid`
@@ -96,9 +91,9 @@ SUPP_GRID_DIMENSIONS = {1, 2}
 #          * no collision-step,
 #          * no transport-step,
 #          * Distribution is freshly initialized in every time step
-SUPP_BEHAVIOUR_TYPES = ['Inner Point',
-                        'Constant Point',
-                        'Boundary Point',
+SUPP_RULE_SUBCLASSES = ['InnerPointRule',
+                        'ConstantPointRule',
+                        'BoundaryPointRule',
                         # 'Ghost Boundary_Point',
                         # 'Time_Variant_Point'
                         ]

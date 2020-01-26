@@ -17,10 +17,6 @@ class Grid:
           this forces possibles errors to occur in development.
         - add spacing documentation
         - Add unit tests
-        - Add grid.plot() method
-        - Add form = "circular"
-            - Create circular shape from rectangle, by cutting
-            - construct collisions from rectangular grid, then adjust to circular grid
         - Add rotation of grid (useful for velocities)
         - Enable non-uniform/adaptive Grids
           (see :class:`~boltzpy.computation.Calculation`)
@@ -41,10 +37,6 @@ class Grid:
     shape : :obj:`tuple` [:obj:`int`]
         Number of :obj:`Grid` points for each dimension.
         Tuple of length :attr:`ndim`.
-    form : :obj:`str`
-        Geometric form of the :class:`Grid`.
-        Must be an element of
-        :const:`~boltzpy.constants.SUPP_GRID_FORMS`.
     physical_spacing : :obj:`float`
         Step size for the physical grid points.
     spacing : :obj:`int`, optional
@@ -62,8 +54,6 @@ class Grid:
         The number of :obj:`Grid` dimensions.
     shape : :obj:`tuple` [:obj:`int`]
         Number of :obj:`Grid` points for each dimension.
-    form : :obj:`str`
-        Geometric form of the :class:`Grid`.
     delta : :obj:`float`
         Smallest possible step size of the :obj:`Grid`.
     spacing : :obj:`int`, optional
@@ -84,19 +74,16 @@ class Grid:
     def __init__(self,
                  ndim=None,
                  shape=None,
-                 form=None,
                  physical_spacing=None,
                  spacing=2,
                  is_centered=False):
         self.check_parameters(ndim=ndim,
                               shape=shape,
-                              form=form,
                               physical_spacing=physical_spacing,
                               spacing=spacing,
                               is_centered=is_centered)
         self.ndim = ndim
         self.shape = shape
-        self.form = form
         if physical_spacing is not None:
             self.delta = physical_spacing / spacing
         else:
@@ -160,7 +147,6 @@ class Grid:
         necessary_params = [self.ndim,
                             self.shape,
                             self.delta,
-                            self.form,
                             self.spacing,
                             self.is_centered]
         if any([val is None for val in necessary_params]):
@@ -212,17 +198,6 @@ class Grid:
         assert grid.shape == tuple(self.shape) + (self.ndim,)
         self.iG = grid.reshape((np.prod(self.shape),
                                 self.ndim))
-
-        # Cut into the desired geometric form
-        if self.form == 'rectangular':
-            pass
-        elif self.form == 'circular':
-            raise NotImplementedError
-            # Todo just cut off all unwanted indices
-        else:
-            msg = "Error - Unsupported Grid form: " \
-                  "{}".format(self.form)
-            raise AttributeError(msg)
 
         # center the Grid if necessary
         if self.is_centered:
@@ -325,8 +300,6 @@ class Grid:
         # Todo remove physical spacing as attribute(parameter
         if "Physical_Spacing" in hdf5_group.keys():
             params["physical_spacing"] = float(hdf5_group["Physical_Spacing"][()])
-        if "Form" in hdf5_group.keys():
-            params["form"] = hdf5_group["Form"][()]
         if "Spacing" in hdf5_group.keys():
             params["spacing"] = int(hdf5_group["Spacing"][()])
         else:
@@ -362,8 +335,6 @@ class Grid:
             hdf5_group["Shape"] = self.shape
         if self.physical_spacing is not None:
             hdf5_group["Physical_Spacing"] = self.physical_spacing
-        if self.form is not None:
-            hdf5_group["Form"] = self.form
         if self.spacing is not None:
             hdf5_group["Spacing"] = self.spacing
         if self.is_centered is not None:
@@ -396,7 +367,6 @@ class Grid:
         self.check_parameters(ndim=self.ndim,
                               shape=self.shape,
                               physical_spacing=self.physical_spacing,
-                              form=self.form,
                               spacing=self.spacing,
                               is_centered=self.is_centered,
                               delta=self.delta,
@@ -410,7 +380,6 @@ class Grid:
     def check_parameters(ndim=None,
                          shape=None,
                          physical_spacing=None,
-                         form=None,
                          spacing=None,
                          is_centered=None,
                          delta=None,
@@ -427,7 +396,6 @@ class Grid:
         ndim : :obj:`int`, optional
         shape : :obj:`tuple` [:obj:`int`], optional
         physical_spacing : :obj:`float`, optional
-        form : :obj:`str`, optional
         spacing : :obj:`int`, optional
         is_centered : :obj:`bool`, optional
         delta : :obj:`float`, optional
@@ -464,10 +432,6 @@ class Grid:
             assert isinstance(physical_spacing, float)
             assert physical_spacing > 0
 
-        if form is not None:
-            assert isinstance(form, str)
-            assert form in bp_c.SUPP_GRID_FORMS
-
         if spacing is not None:
             assert isinstance(spacing, int)
             assert spacing > 0
@@ -482,7 +446,7 @@ class Grid:
         if size is not None:
             assert isinstance(size, int)
             assert size >= 1
-            if form is 'rectangular' and shape is not None:
+            if shape is not None:
                 assert np.prod(shape) == size
 
         if iG is not None:
@@ -526,7 +490,7 @@ class Grid:
             if type(value) != type(other_value):
                 return False
             if isinstance(value, np.ndarray):
-                if np.all(value != other_value):
+                if np.any(value != other_value):
                     return False
             else:
                 if value != other_value:
@@ -539,7 +503,6 @@ class Grid:
         description = ''
         description += "Dimension = {}\n".format(self.ndim)
         description += "Shape = {}\n".format(self.shape)
-        description += "Geometric Form = {}\n".format(self.form)
         description += "Total Size = {}\n".format(self.size)
         description += "Physical_Spacing = {}\n".format(self.physical_spacing)
         description += "Spacing = {}\n".format(self.spacing)

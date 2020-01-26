@@ -189,16 +189,16 @@ class Scheme:
     def __eq__(self, other):
         if not isinstance(other, Scheme):
             return False
-        # can't compare __dict__ because comparing the offset arrays
-        # returns list of bools. This leads to errors.
-        if self.__dict__.keys() != other.__dict__.keys():
+        if set(self.__dict__.keys()) != set(other.__dict__.keys()):
             return False
-        if any(self.__dict__[key] != other.__dict__[key]
-               for key in self.__dict__.keys()
-               if key != "Transport_VelocityOffset"):
-            return False
-        if not np.allclose(self.Transport_VelocityOffset,
-                           other.Transport_VelocityOffset,
-                           atol=1e-14):
-            return False
+        for (key, value) in self.__dict__.items():
+            other_value = other.__dict__[key]
+            if type(value) != type(other_value):
+                return False
+            if isinstance(value, np.ndarray):
+                if np.any(value != other_value):
+                    return False
+            else:
+                if value != other_value:
+                    return False
         return True
