@@ -65,8 +65,7 @@ class Rule:
         # or it is constructed based on the velocity_grids
         else:
             assert velocity_grids is not None
-            self.initial_state = Rule.compute_initial_state(self,
-                                                            velocity_grids)
+            self.initial_state = self.compute_initial_state(velocity_grids)
         Rule.check_integrity(self, complete_check=False)
         return
 
@@ -467,12 +466,6 @@ class BoundaryPointRule(Rule):
                  reflected_indices_elastic=None,
                  velocity_grids=None,
                  initial_state=None):
-        super().__init__(initial_rho,
-                         initial_drift,
-                         initial_temp,
-                         affected_points,
-                         velocity_grids,
-                         initial_state)
         self.reflection_rate_inverse = float(reflection_rate_inverse)
         self.reflection_rate_elastic = float(reflection_rate_elastic)
         self.reflection_rate_thermal = float(reflection_rate_thermal)
@@ -495,7 +488,12 @@ class BoundaryPointRule(Rule):
             self.incoming_velocities = self.compute_incoming_velocities(velocity_grids, surface_normal)
             self.reflected_indices_inverse = self.compute_reflected_indices_inverse(velocity_grids)
             self.reflected_indices_elastic = self.compute_reflected_indices_elastic(velocity_grids, surface_normal)
-        # Todo initial_state must be edited here, better to edit the method
+        super().__init__(initial_rho,
+                         initial_drift,
+                         initial_temp,
+                         affected_points,
+                         velocity_grids,
+                         initial_state)
         self.check_integrity()
         return
 
