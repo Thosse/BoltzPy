@@ -552,7 +552,7 @@ class BoundaryPointRule(Rule):
                                                       self.affected_points,
                                                       self.incoming_velocities
                                                       )
-        data.result[self.affected_points, :] = self.reflection(inflow)
+        data.result[self.affected_points, :] += self.reflection(inflow)
         return
 
     def reflection(self, inflow):
