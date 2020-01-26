@@ -65,7 +65,8 @@ class Rule:
         # or it is constructed based on the velocity_grids
         else:
             assert velocity_grids is not None
-            self.initial_state = self.compute_initial_state(velocity_grids)
+            self.initial_state = Rule.compute_initial_state(self,
+                                                            velocity_grids)
         Rule.check_integrity(self, complete_check=False)
         return
 
@@ -530,6 +531,12 @@ class BoundaryPointRule(Rule):
             idx_v_refl = velocity_grids.find_index(spc, v_refl)
             reflected_indices_elastic[idx_v] = idx_v_refl
         return reflected_indices_elastic
+
+
+    def compute_initial_state(self, velocity_grids):
+        initial_state = super().compute_initial_state(velocity_grids)
+        initial_state[self.incoming_velocities] = 0
+        return initial_state
 
     #####################################
     #            Computation            #
