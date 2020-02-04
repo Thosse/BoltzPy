@@ -1,12 +1,12 @@
 
 import numpy as np
 import h5py
-# TODO only temporary, replace with vectorized np method
-import math
 
 import boltzpy as bp
 import boltzpy.constants as bp_c
 import boltzpy.compute as bp_cp
+import boltzpy.plot as bp_p
+import boltzpy.initialization as bp_i
 
 
 class Rule:
@@ -49,6 +49,7 @@ class Rule:
                  initial_temp,
                  affected_points,
                  velocity_grids=None,
+                 species=None,
                  initial_state=None):
         self.check_parameters(initial_rho=initial_rho,
                               initial_drift=initial_drift,
@@ -65,7 +66,8 @@ class Rule:
         # or it is constructed based on the velocity_grids
         else:
             assert velocity_grids is not None
-            self.initial_state = self.compute_initial_state(velocity_grids)
+            self.initial_state = self.compute_initial_state(velocity_grids,
+                                                            species)
         Rule.check_integrity(self, complete_check=False)
         return
 
@@ -97,31 +99,25 @@ class Rule:
     def number_of_specimen(self):
         return self.initial_drift.shape[0]
 
-    # Todo (ST) use correct initialization form (mass in exponent)
-    # Todo (LT) use a Newton Scheme for correct values
-    def compute_initial_state(self, velocity_grids):
+    def compute_initial_state(self, velocity_grids, species):
         assert isinstance(velocity_grids, bp.SVGrid)
         assert self.ndim == velocity_grids.ndim
         assert self.number_of_specimen == velocity_grids.number_of_grids
-        initial_state = np.zeros(velocity_grids.size)
 
+        initial_state = np.zeros(velocity_grids.size, dtype=float)
         for idx_spc in range(self.number_of_specimen):
-            rho = self.initial_rho[idx_spc]
-            drift = self.initial_drift[idx_spc]
-            temp = self.initial_temp[idx_spc]
-            [begin, end] = velocity_grids.index_range[idx_spc]
-            v_grid = velocity_grids.iMG[begin:end]
-            dv = velocity_grids.delta
-            for (i_v, v) in enumerate(v_grid):
-                # Physical Velocity
-                pv = np.array(dv * v)
-                diff_v = np.sum((pv - drift) ** 2)
-                initial_state[begin + i_v] = rho * math.exp(-0.5 * (diff_v / temp))
-            # Todo read into Rjasanov's script and do this correctly
-            # Todo THIS IS CURRENTLY WRONG! ONLY TEMPORARY FIX
-            # Adjust initialized values, to match configurations
-            adj = initial_state[begin:end].sum()
-            initial_state[begin:end] *= rho / adj
+            mass = species[idx_spc].mass
+            velocities = velocity_grids.vGrids[idx_spc].pG
+            delta_v = velocity_grids.vGrids[idx_spc].physical_spacing
+            [beg, end] = velocity_grids.index_range[idx_spc]
+            initial_state[beg:end] = bp_i.compute_initial_distribution(
+                velocities,
+                delta_v,
+                mass,
+                self.initial_rho[idx_spc],
+                self.initial_drift[idx_spc],
+                self.initial_temp[idx_spc])
+
         return initial_state
 
     #####################################
@@ -140,6 +136,59 @@ class Rule:
            and writes the results in data.results"""
         raise NotImplementedError
 
+    #####################################
+    #           Visualization           #
+    #####################################
+    def plot(self,
+             velocity_grid,
+             species,
+             index_of_specimen,
+             plot_object=None,
+             **plot_style):
+        """Plot the initial state of a single specimen using matplotlib 3D.
+
+        Parameters
+        ----------
+        plot_object : TODO Figure? matplotlib.pyplot?
+        """
+        assert isinstance(velocity_grid, bp.SVGrid)
+        assert isinstance(index_of_specimen, int)
+        assert 0 <= index_of_specimen < self.number_of_specimen
+        assert self.ndim == 2, (
+            "3D Plots are only implemented for 2D velocity spaces")
+        # show plot directly, if no object to store in is specified
+        show_plot_directly = plot_object is None
+
+        # Construct default plot object if None was given
+        if plot_object is None:
+            # Choose standard pyplot
+            import matplotlib.pyplot as plt
+            plot_object = plt
+
+        # plot continuous maxwellian as a surface plot
+        mass = species[index_of_specimen].mass
+        maximum_velocity = velocity_grid.maximum_velocity
+        plot_object = bp_p.plot_continuous_maxwellian(
+            self.initial_rho[index_of_specimen],
+            self.initial_drift[index_of_specimen],
+            self.initial_temp[index_of_specimen],
+            mass,
+            -maximum_velocity,
+            maximum_velocity,
+            100,
+            plot_object)
+
+        # plot discrete distribution as a 3D bar plot
+        beg, end = velocity_grid.index_range[index_of_specimen]
+        plot_object = bp_p.plot_discrete_distribution(
+            self.initial_state[beg:end],
+            velocity_grid.vGrids[index_of_specimen].pG,
+            velocity_grid.vGrids[index_of_specimen].physical_spacing,
+            plot_object,
+        )
+        if show_plot_directly:
+            plot_object.show()
+        return plot_object
     #####################################
     #           Serialization           #
     #####################################
@@ -378,12 +427,14 @@ class InnerPointRule(Rule):
                  initial_temp=None,
                  affected_points=None,
                  velocity_grids=None,
+                 species=None,
                  initial_state=None):
         super().__init__(initial_rho,
                          initial_drift,
                          initial_temp,
                          affected_points,
                          velocity_grids,
+                         species,
                          initial_state)
         return
 
@@ -423,12 +474,14 @@ class ConstantPointRule(Rule):
                  initial_temp,
                  affected_points,
                  velocity_grids=None,
+                 species=None,
                  initial_state=None):
         super().__init__(initial_rho,
                          initial_drift,
                          initial_temp,
                          affected_points,
                          velocity_grids,
+                         species,
                          initial_state)
         return
 
@@ -465,6 +518,7 @@ class BoundaryPointRule(Rule):
                  reflected_indices_inverse=None,
                  reflected_indices_elastic=None,
                  velocity_grids=None,
+                 species=None,
                  initial_state=None):
         self.reflection_rate_inverse = float(reflection_rate_inverse)
         self.reflection_rate_elastic = float(reflection_rate_elastic)
@@ -493,6 +547,7 @@ class BoundaryPointRule(Rule):
                          initial_temp,
                          affected_points,
                          velocity_grids,
+                         species,
                          initial_state)
         self.check_integrity()
         return
@@ -530,9 +585,8 @@ class BoundaryPointRule(Rule):
             reflected_indices_elastic[idx_v] = idx_v_refl
         return reflected_indices_elastic
 
-
-    def compute_initial_state(self, velocity_grids):
-        initial_state = super().compute_initial_state(velocity_grids)
+    def compute_initial_state(self, velocity_grids, species):
+        initial_state = super().compute_initial_state(velocity_grids, species)
         initial_state[self.incoming_velocities] = 0
         return initial_state
 

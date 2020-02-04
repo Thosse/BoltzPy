@@ -66,25 +66,29 @@ class TestCase(dict):
                     initial_drift=initial_drift,
                     initial_temp=initial_temp,
                     affected_points=[0],
-                    velocity_grids=sv),
+                    velocity_grids=sv,
+                    species=s),
                 bp.InnerPointRule(
                     initial_rho=left_rho,
                     initial_drift=initial_drift,
                     initial_temp=initial_temp,
                     affected_points=np.arange(1, p.size // 2),
-                    velocity_grids=sv),
+                    velocity_grids=sv,
+                    species=s),
                 bp.InnerPointRule(
                     initial_rho=right_rho,
                     initial_drift=initial_drift,
                     initial_temp=initial_temp,
                     affected_points=np.arange(p.size // 2, p.size - 1),
-                    velocity_grids=sv),
+                    velocity_grids=sv,
+                    species=s),
                 bp.ConstantPointRule(
                     initial_rho=right_rho,
                     initial_drift=initial_drift,
                     initial_temp=initial_temp,
                     affected_points=[p.size - 1],
-                    velocity_grids=sv)
+                    velocity_grids=sv,
+                    species=s)
                 ]
             geometry = bp.Geometry(shape=p.shape,
                                    rules=rules
@@ -116,6 +120,21 @@ class TestCase(dict):
     @staticmethod
     def address(file_name):
         return bp_c.TEST_DIRECTORY + file_name + ".hdf5"
+
+    def create_simulation(self):
+        address = self.address(self["file_name"])
+        sim = bp.Simulation(address)
+        sim.s = self["s"]
+        sim.t = self["t"]
+        sim.p = self["p"]
+        sim.sv = self["sv"]
+        sim.geometry = self["geometry"]
+        sim.scheme = self["scheme"]
+        sim.output_parameters = self["output_parameters"]
+        sim.coll = self["coll"]
+        if sim.coll == bp.Collisions():
+            sim.coll.setup(scheme=sim.scheme, svgrid=sim.sv, species=sim.s)
+
 
     def save_results(self, address=None):
         if address is None:
