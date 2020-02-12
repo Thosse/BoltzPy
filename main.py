@@ -8,9 +8,9 @@ sim = bp.Simulation(exisiting_simulation_file)
 if exisiting_simulation_file is None:
     sim.add_specimen(mass=2, collision_rate=[50])
     sim.add_specimen(mass=3, collision_rate=[50, 50])
-    sim.setup_time_grid(max_time=100,
+    sim.setup_time_grid(max_time=10,
                         number_time_steps=201,
-                        calculations_per_time_step=500)
+                        calculations_per_time_step=50)
     sim.setup_position_grid(grid_dimension=1,
                             grid_shape=(31, ),
                             grid_spacing=0.5)
