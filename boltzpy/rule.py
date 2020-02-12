@@ -7,6 +7,7 @@ import boltzpy.constants as bp_c
 import boltzpy.compute as bp_cp
 import boltzpy.plot as bp_p
 import boltzpy.initialization as bp_i
+import boltzpy.momenta as bp_m
 
 
 class Rule:
@@ -586,8 +587,12 @@ class BoundaryPointRule(Rule):
         return reflected_indices_elastic
 
     def compute_initial_state(self, velocity_grids, species):
-        initial_state = super().compute_initial_state(velocity_grids, species)
-        initial_state[self.incoming_velocities] = 0
+        full_initial_state = super().compute_initial_state(velocity_grids, species)
+        # compute outgoing velocities, by relfecting incoming velocities
+        outgoing_velocities = self.reflected_indices_inverse[self.incoming_velocities]
+        # Set initial state to zero for all non-outgoing velocities
+        initial_state = np.zeros(full_initial_state.shape)
+        initial_state[outgoing_velocities] = full_initial_state[outgoing_velocities]
         return initial_state
 
     #####################################
@@ -611,15 +616,30 @@ class BoundaryPointRule(Rule):
                                                       self.affected_points,
                                                       self.incoming_velocities
                                                       )
-        data.result[self.affected_points, :] += self.reflection(inflow)
+        data.result[self.affected_points, :] += self.reflection(inflow,
+                                                                data)
         return
 
-    def reflection(self, inflow):
+    def reflection(self, inflow, data):
         reflected_inflow = np.zeros(inflow.shape, dtype=float)
         inverse_inflow = self.reflection_rate_inverse * inflow
         reflected_inflow[:, self.reflected_indices_inverse] += inverse_inflow
         elastic_inflow = self.reflection_rate_elastic * inflow
         reflected_inflow[:, self.reflected_indices_elastic] += elastic_inflow
+        # compute thermal reflection,
+        # separately for every species
+        for idx_spc in range(data.n_spc):
+            beg, end = data.v_range[idx_spc]
+            thermal_inflow = bp_m.particle_number(
+                self.reflection_rate_thermal * inflow[..., beg:end],
+                data.dv[idx_spc])
+            initial_particles = bp_m.particle_number(
+                self.initial_state[np.newaxis, beg:end],
+                data.dv[idx_spc])
+            reflected_inflow[..., beg:end] += (
+                thermal_inflow / initial_particles
+                * self.initial_state[beg:end]
+            )
         return reflected_inflow
 
     #####################################
