@@ -404,7 +404,7 @@ class Rule:
             if type(value) != type(other_value):
                 return False
             if isinstance(value, np.ndarray):
-                if np.all(value != other_value):
+                if np.any(value != other_value):
                     return False
             else:
                 if value != other_value:
@@ -521,10 +521,17 @@ class BoundaryPointRule(Rule):
                  velocity_grids=None,
                  species=None,
                  initial_state=None):
-        self.reflection_rate_inverse = float(reflection_rate_inverse)
-        self.reflection_rate_elastic = float(reflection_rate_elastic)
-        self.reflection_rate_thermal = float(reflection_rate_thermal)
-        self.absorption_rate = float(absorption_rate)
+        params = {key: value for (key, value) in locals().items()
+                  if key not in ["self", "__class__"]}
+        self.check_parameters(**params)
+        self.reflection_rate_inverse = np.array(reflection_rate_inverse,
+                                                dtype=float)
+        self.reflection_rate_elastic = np.array(reflection_rate_elastic,
+                                                dtype=float)
+        self.reflection_rate_thermal = np.array(reflection_rate_thermal,
+                                                dtype=float)
+        self.absorption_rate = np.array(absorption_rate,
+                                        dtype=float)
         # Either the incoming velocities and reflection indices
         # are given as parameters
         if surface_normal is None:
@@ -622,16 +629,17 @@ class BoundaryPointRule(Rule):
 
     def reflection(self, inflow, data):
         reflected_inflow = np.zeros(inflow.shape, dtype=float)
-        inverse_inflow = self.reflection_rate_inverse * inflow
-        reflected_inflow[:, self.reflected_indices_inverse] += inverse_inflow
-        elastic_inflow = self.reflection_rate_elastic * inflow
-        reflected_inflow[:, self.reflected_indices_elastic] += elastic_inflow
-        # compute thermal reflection,
-        # separately for every species
+        # compute each reflection separately for every species
         for idx_spc in range(data.n_spc):
             beg, end = data.v_range[idx_spc]
+            inverse_inflow = self.reflection_rate_inverse[idx_spc] * inflow
+            reflected_inflow[:, self.reflected_indices_inverse] += inverse_inflow
+
+            elastic_inflow = self.reflection_rate_elastic[idx_spc] * inflow
+            reflected_inflow[:, self.reflected_indices_elastic] += elastic_inflow
+
             thermal_inflow = bp_m.particle_number(
-                self.reflection_rate_thermal * inflow[..., beg:end],
+                self.reflection_rate_thermal[idx_spc] * inflow[..., beg:end],
                 data.dv[idx_spc])
             initial_particles = bp_m.particle_number(
                 self.initial_state[np.newaxis, beg:end],
@@ -683,6 +691,7 @@ class BoundaryPointRule(Rule):
                          reflected_indices_inverse=None,
                          reflected_indices_elastic=None,
                          velocity_grids=None,
+                         species=None,
                          initial_state=None,
                          complete_check=False,
                          context=None):
@@ -710,19 +719,28 @@ class BoundaryPointRule(Rule):
                  absorption_rate]
         for rate in rates:
             if rate is not None:
-                if type(rate) == int:
-                    rate = float(rate)
-                assert type(rate) == float, (
+                if isinstance(rate, list):
+                    rate = np.array(rate, dtype=float)
+                assert isinstance(rate, np.ndarray)
+                assert rate.dtype == float, (
                     "Any reflection/absorption rate must be of type float. "
                     "type(rate) = {}".format(type(rate))
                 )
-                assert 0 <= rate <= 1, (
+                assert rate.ndim == 1, (
+                    "All rates must be 1 dimensional arrays."
+                    "A single float for each species."
+                )
+                assert np.all(0 <= rate) and np.all(rate <= 1), (
                     "Reflection/Absorption rates must be between 0 and 1. "
                     "Rates = {}".format(rates)
                 )
         if all(rate is not None for rate in rates):
-            assert np.sum(rates) == 1.0, (
-                "Reflection/Absorption rates must sum up to 1. "
+            assert len({len(rate) for rate in rates}) == 1, (
+                "All rates must have the same length (number of species)."
+                "Rates = {}".format(rates)
+            )
+            assert np.all(np.sum(rates, axis=0) == 1.0), (
+                "Reflection/Absorption rates must sum up to 1 for each species."
                 "Rates = {}".format(rates)
             )
 
@@ -744,10 +762,11 @@ class BoundaryPointRule(Rule):
                     "Index arrays must be unique indices!"
                     "idx_array:\n{}".format(idx_array)
                 )
+
         for idx_array in [reflected_indices_inverse,
                           reflected_indices_elastic]:
             if idx_array is not None:
-                assert list(range(idx_array.size)) == list(idx_array[idx_array]), (
-                    "Any Reflection applied twice, must return the original."
-                    "idx_array[idx_array]:\n{}".format(idx_array[idx_array])
-                )
+                assert np.all(idx_array[idx_array] == np.arange(idx_array.size)), (
+                        "Any Reflection applied twice, must return the original."
+                        "idx_array[idx_array]:\n{}".format(idx_array[idx_array])
+                    )

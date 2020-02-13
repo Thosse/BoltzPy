@@ -16,6 +16,6 @@ def test_reflected_indices_inverse(test_case):
             continue
         refl = r.reflected_indices_inverse
         assert np.all(refl[refl] == np.arange(refl.size))
-        for (idx_v, v) in sim.sv.iMG:
+        for (idx_v, v) in enumerate(sim.sv.iMG):
             v_refl = sim.sv.iMG[refl[idx_v]]
             assert np.all(v == -v_refl)
