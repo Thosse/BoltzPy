@@ -38,7 +38,7 @@ def generate_output_function(simulation,
                                    'Species',
                                    'Time_grid',
                                    'Velocity_Grids'}
-    hdf5_file = h5py.File(simulation.file_address + '.hdf5')
+    hdf5_file = h5py.File(simulation.file_address + '.hdf5', 'w')
     if hdf5_group_name not in hdf5_file.keys():
         hdf5_file.create_group(hdf5_group_name)
     hdf5_group = hdf5_file[hdf5_group_name]
