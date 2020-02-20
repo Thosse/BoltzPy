@@ -23,39 +23,35 @@ if exisiting_simulation_file is None:
         [bp.BoundaryPointRule(
             initial_rho=[1.0, 1.0],
             initial_drift=[[0.0, 0.0], [0.0, 0.0]],
-            initial_temp=[1.0, 1.0],
+            initial_temp=[.60, .60],
             affected_points=[0],
-            reflection_rate_inverse=0.5,
-            reflection_rate_elastic=0.5,
-            reflection_rate_thermal=0,
-            absorption_rate=0,
+            reflection_rate_inverse=[0, 0],
+            reflection_rate_elastic=[0, 0],
+            reflection_rate_thermal=[1, 1],
+            absorption_rate=[0, 0],
             surface_normal=np.array([-1, 0], dtype=int),
-            velocity_grids=sim.sv),
+            velocity_grids=sim.sv,
+            species=sim.s),
          bp.InnerPointRule(
             initial_rho=[1.0, 1.0],
             initial_drift=[[0.0, 0.0], [0.0, 0.0]],
-            initial_temp=[1.0, 1.0],
-            affected_points=np.arange(1, 15),
-            velocity_grids=sim.sv),
-         bp.InnerPointRule(
-            initial_rho=[1.0, 1.0],
-            initial_drift=[[0.0, 0.0], [0.0, 0.0]],
-            initial_temp=[1.0, 1.0],
-            affected_points=np.arange(15, 30),
-            velocity_grids=sim.sv),
+            initial_temp=[.50, .50],
+            affected_points=np.arange(1, 30),
+            velocity_grids=sim.sv,
+            species=sim.s),
          bp.BoundaryPointRule(
             initial_rho=[1.0, 1.0],
             initial_drift=[[0.0, 0.0], [0.0, 0.0]],
-            initial_temp=[1.0, 1.0],
+            initial_temp=[.40, .40],
             affected_points=[30],
-            reflection_rate_inverse=0.5,
-            reflection_rate_elastic=0.5,
-            reflection_rate_thermal=0,
-            absorption_rate=0,
+            reflection_rate_inverse=[0, 0],
+            reflection_rate_elastic=[0, 0],
+            reflection_rate_thermal=[1, 1],
+            absorption_rate=[0, 0],
             surface_normal=np.array([1, 0], dtype=int),
-            velocity_grids=sim.sv)
+            velocity_grids=sim.sv,
+            species=sim.s)
          ]
-
     )
     sim.scheme.OperatorSplitting = "FirstOrder"
     sim.scheme.Transport = "FiniteDifferences_FirstOrder"

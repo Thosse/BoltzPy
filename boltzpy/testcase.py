@@ -66,25 +66,34 @@ class TestCase(dict):
                     initial_drift=initial_drift,
                     initial_temp=initial_temp,
                     affected_points=[0],
-                    velocity_grids=sv),
+                    velocity_grids=sv,
+                    species=s),
                 bp.InnerPointRule(
                     initial_rho=left_rho,
                     initial_drift=initial_drift,
                     initial_temp=initial_temp,
                     affected_points=np.arange(1, p.size // 2),
-                    velocity_grids=sv),
+                    velocity_grids=sv,
+                    species=s),
                 bp.InnerPointRule(
                     initial_rho=right_rho,
                     initial_drift=initial_drift,
                     initial_temp=initial_temp,
                     affected_points=np.arange(p.size // 2, p.size - 1),
-                    velocity_grids=sv),
-                bp.ConstantPointRule(
+                    velocity_grids=sv,
+                    species=s),
+                bp.BoundaryPointRule(
                     initial_rho=right_rho,
                     initial_drift=initial_drift,
                     initial_temp=initial_temp,
                     affected_points=[p.size - 1],
-                    velocity_grids=sv)
+                    velocity_grids=sv,
+                    reflection_rate_inverse=np.full(s.size, 0.25, dtype=float),
+                    reflection_rate_elastic=np.full(s.size, 0.25, dtype=float),
+                    reflection_rate_thermal=np.full(s.size, 0.25, dtype=float),
+                    absorption_rate=np.full(s.size, 0.25, dtype=float),
+                    surface_normal=np.array([1, 0], dtype=int),
+                    species=s)
                 ]
             geometry = bp.Geometry(shape=p.shape,
                                    rules=rules
@@ -116,6 +125,20 @@ class TestCase(dict):
     @staticmethod
     def address(file_name):
         return bp_c.TEST_DIRECTORY + file_name + ".hdf5"
+
+    def create_simulation(self):
+        address = self.address(self["file_name"])
+        sim = bp.Simulation(address)
+        sim.s = self["s"]
+        sim.t = self["t"]
+        sim.p = self["p"]
+        sim.sv = self["sv"]
+        sim.geometry = self["geometry"]
+        sim.scheme = self["scheme"]
+        sim.output_parameters = self["output_parameters"]
+        sim.coll = self["coll"]
+        if sim.coll == bp.Collisions():
+            sim.coll.setup(scheme=sim.scheme, svgrid=sim.sv, species=sim.s)
 
     def save_results(self, address=None):
         if address is None:
@@ -195,7 +218,7 @@ CASES.append(TestCase("shock_monospecies",
                       s=tc1_s)
              )
 
-# Two Species, eqal mass, shock
+# Two Species, eqal mass, shock,
 tc2_s = bp.Species()
 tc2_s.add(mass=2, collision_rate=np.array([50], dtype=float))
 tc2_s.add(mass=2, collision_rate=np.array([50, 50], dtype=float))
@@ -203,6 +226,7 @@ CASES.append(TestCase("shock_2Species_equalMass",
                       s=tc2_s))
 
 # Two Species, shock, complete distribution
+# Todo Remove this, complete distribution should be default for tests
 CASES.append(TestCase("shock_2species_complete",
                       output_parameters=np.array([["Complete_Distribution"]])))
 

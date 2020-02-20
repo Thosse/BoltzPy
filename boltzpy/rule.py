@@ -1,12 +1,13 @@
 
 import numpy as np
 import h5py
-# TODO only temporary, replace with vectorized np method
-import math
 
 import boltzpy as bp
 import boltzpy.constants as bp_c
 import boltzpy.compute as bp_cp
+import boltzpy.plot as bp_p
+import boltzpy.initialization as bp_i
+import boltzpy.momenta as bp_m
 
 
 class Rule:
@@ -49,6 +50,7 @@ class Rule:
                  initial_temp,
                  affected_points,
                  velocity_grids=None,
+                 species=None,
                  initial_state=None):
         self.check_parameters(initial_rho=initial_rho,
                               initial_drift=initial_drift,
@@ -65,7 +67,8 @@ class Rule:
         # or it is constructed based on the velocity_grids
         else:
             assert velocity_grids is not None
-            self.initial_state = self.compute_initial_state(velocity_grids)
+            self.initial_state = self.compute_initial_state(velocity_grids,
+                                                            species)
         Rule.check_integrity(self, complete_check=False)
         return
 
@@ -97,31 +100,25 @@ class Rule:
     def number_of_specimen(self):
         return self.initial_drift.shape[0]
 
-    # Todo (ST) use correct initialization form (mass in exponent)
-    # Todo (LT) use a Newton Scheme for correct values
-    def compute_initial_state(self, velocity_grids):
+    def compute_initial_state(self, velocity_grids, species):
         assert isinstance(velocity_grids, bp.SVGrid)
         assert self.ndim == velocity_grids.ndim
         assert self.number_of_specimen == velocity_grids.number_of_grids
-        initial_state = np.zeros(velocity_grids.size)
 
+        initial_state = np.zeros(velocity_grids.size, dtype=float)
         for idx_spc in range(self.number_of_specimen):
-            rho = self.initial_rho[idx_spc]
-            drift = self.initial_drift[idx_spc]
-            temp = self.initial_temp[idx_spc]
-            [begin, end] = velocity_grids.index_range[idx_spc]
-            v_grid = velocity_grids.iMG[begin:end]
-            dv = velocity_grids.delta
-            for (i_v, v) in enumerate(v_grid):
-                # Physical Velocity
-                pv = np.array(dv * v)
-                diff_v = np.sum((pv - drift) ** 2)
-                initial_state[begin + i_v] = rho * math.exp(-0.5 * (diff_v / temp))
-            # Todo read into Rjasanov's script and do this correctly
-            # Todo THIS IS CURRENTLY WRONG! ONLY TEMPORARY FIX
-            # Adjust initialized values, to match configurations
-            adj = initial_state[begin:end].sum()
-            initial_state[begin:end] *= rho / adj
+            mass = species[idx_spc].mass
+            velocities = velocity_grids.vGrids[idx_spc].pG
+            delta_v = velocity_grids.vGrids[idx_spc].physical_spacing
+            [beg, end] = velocity_grids.index_range[idx_spc]
+            initial_state[beg:end] = bp_i.compute_initial_distribution(
+                velocities,
+                delta_v,
+                mass,
+                self.initial_rho[idx_spc],
+                self.initial_drift[idx_spc],
+                self.initial_temp[idx_spc])
+
         return initial_state
 
     #####################################
@@ -140,6 +137,59 @@ class Rule:
            and writes the results in data.results"""
         raise NotImplementedError
 
+    #####################################
+    #           Visualization           #
+    #####################################
+    def plot(self,
+             velocity_grid,
+             species,
+             index_of_specimen,
+             plot_object=None,
+             **plot_style):
+        """Plot the initial state of a single specimen using matplotlib 3D.
+
+        Parameters
+        ----------
+        plot_object : TODO Figure? matplotlib.pyplot?
+        """
+        assert isinstance(velocity_grid, bp.SVGrid)
+        assert isinstance(index_of_specimen, int)
+        assert 0 <= index_of_specimen < self.number_of_specimen
+        assert self.ndim == 2, (
+            "3D Plots are only implemented for 2D velocity spaces")
+        # show plot directly, if no object to store in is specified
+        show_plot_directly = plot_object is None
+
+        # Construct default plot object if None was given
+        if plot_object is None:
+            # Choose standard pyplot
+            import matplotlib.pyplot as plt
+            plot_object = plt
+
+        # plot continuous maxwellian as a surface plot
+        mass = species[index_of_specimen].mass
+        maximum_velocity = velocity_grid.maximum_velocity
+        plot_object = bp_p.plot_continuous_maxwellian(
+            self.initial_rho[index_of_specimen],
+            self.initial_drift[index_of_specimen],
+            self.initial_temp[index_of_specimen],
+            mass,
+            -maximum_velocity,
+            maximum_velocity,
+            100,
+            plot_object)
+
+        # plot discrete distribution as a 3D bar plot
+        beg, end = velocity_grid.index_range[index_of_specimen]
+        plot_object = bp_p.plot_discrete_distribution(
+            self.initial_state[beg:end],
+            velocity_grid.vGrids[index_of_specimen].pG,
+            velocity_grid.vGrids[index_of_specimen].physical_spacing,
+            plot_object,
+        )
+        if show_plot_directly:
+            plot_object.show()
+        return plot_object
     #####################################
     #           Serialization           #
     #####################################
@@ -354,7 +404,7 @@ class Rule:
             if type(value) != type(other_value):
                 return False
             if isinstance(value, np.ndarray):
-                if np.all(value != other_value):
+                if np.any(value != other_value):
                     return False
             else:
                 if value != other_value:
@@ -378,12 +428,14 @@ class InnerPointRule(Rule):
                  initial_temp=None,
                  affected_points=None,
                  velocity_grids=None,
+                 species=None,
                  initial_state=None):
         super().__init__(initial_rho,
                          initial_drift,
                          initial_temp,
                          affected_points,
                          velocity_grids,
+                         species,
                          initial_state)
         return
 
@@ -423,12 +475,14 @@ class ConstantPointRule(Rule):
                  initial_temp,
                  affected_points,
                  velocity_grids=None,
+                 species=None,
                  initial_state=None):
         super().__init__(initial_rho,
                          initial_drift,
                          initial_temp,
                          affected_points,
                          velocity_grids,
+                         species,
                          initial_state)
         return
 
@@ -465,11 +519,19 @@ class BoundaryPointRule(Rule):
                  reflected_indices_inverse=None,
                  reflected_indices_elastic=None,
                  velocity_grids=None,
+                 species=None,
                  initial_state=None):
-        self.reflection_rate_inverse = float(reflection_rate_inverse)
-        self.reflection_rate_elastic = float(reflection_rate_elastic)
-        self.reflection_rate_thermal = float(reflection_rate_thermal)
-        self.absorption_rate = float(absorption_rate)
+        params = {key: value for (key, value) in locals().items()
+                  if key not in ["self", "__class__"]}
+        self.check_parameters(**params)
+        self.reflection_rate_inverse = np.array(reflection_rate_inverse,
+                                                dtype=float)
+        self.reflection_rate_elastic = np.array(reflection_rate_elastic,
+                                                dtype=float)
+        self.reflection_rate_thermal = np.array(reflection_rate_thermal,
+                                                dtype=float)
+        self.absorption_rate = np.array(absorption_rate,
+                                        dtype=float)
         # Either the incoming velocities and reflection indices
         # are given as parameters
         if surface_normal is None:
@@ -493,6 +555,7 @@ class BoundaryPointRule(Rule):
                          initial_temp,
                          affected_points,
                          velocity_grids,
+                         species,
                          initial_state)
         self.check_integrity()
         return
@@ -530,10 +593,13 @@ class BoundaryPointRule(Rule):
             reflected_indices_elastic[idx_v] = idx_v_refl
         return reflected_indices_elastic
 
-
-    def compute_initial_state(self, velocity_grids):
-        initial_state = super().compute_initial_state(velocity_grids)
-        initial_state[self.incoming_velocities] = 0
+    def compute_initial_state(self, velocity_grids, species):
+        full_initial_state = super().compute_initial_state(velocity_grids, species)
+        # compute outgoing velocities, by relfecting incoming velocities
+        outgoing_velocities = self.reflected_indices_inverse[self.incoming_velocities]
+        # Set initial state to zero for all non-outgoing velocities
+        initial_state = np.zeros(full_initial_state.shape)
+        initial_state[outgoing_velocities] = full_initial_state[outgoing_velocities]
         return initial_state
 
     #####################################
@@ -557,15 +623,31 @@ class BoundaryPointRule(Rule):
                                                       self.affected_points,
                                                       self.incoming_velocities
                                                       )
-        data.result[self.affected_points, :] += self.reflection(inflow)
+        data.result[self.affected_points, :] += self.reflection(inflow,
+                                                                data)
         return
 
-    def reflection(self, inflow):
+    def reflection(self, inflow, data):
         reflected_inflow = np.zeros(inflow.shape, dtype=float)
-        inverse_inflow = self.reflection_rate_inverse * inflow
-        reflected_inflow[:, self.reflected_indices_inverse] += inverse_inflow
-        elastic_inflow = self.reflection_rate_elastic * inflow
-        reflected_inflow[:, self.reflected_indices_elastic] += elastic_inflow
+        # compute each reflection separately for every species
+        for idx_spc in range(data.n_spc):
+            beg, end = data.v_range[idx_spc]
+            inverse_inflow = self.reflection_rate_inverse[idx_spc] * inflow
+            reflected_inflow[:, self.reflected_indices_inverse] += inverse_inflow
+
+            elastic_inflow = self.reflection_rate_elastic[idx_spc] * inflow
+            reflected_inflow[:, self.reflected_indices_elastic] += elastic_inflow
+
+            thermal_inflow = bp_m.particle_number(
+                self.reflection_rate_thermal[idx_spc] * inflow[..., beg:end],
+                data.dv[idx_spc])
+            initial_particles = bp_m.particle_number(
+                self.initial_state[np.newaxis, beg:end],
+                data.dv[idx_spc])
+            reflected_inflow[..., beg:end] += (
+                thermal_inflow / initial_particles
+                * self.initial_state[beg:end]
+            )
         return reflected_inflow
 
     #####################################
@@ -609,6 +691,7 @@ class BoundaryPointRule(Rule):
                          reflected_indices_inverse=None,
                          reflected_indices_elastic=None,
                          velocity_grids=None,
+                         species=None,
                          initial_state=None,
                          complete_check=False,
                          context=None):
@@ -636,19 +719,28 @@ class BoundaryPointRule(Rule):
                  absorption_rate]
         for rate in rates:
             if rate is not None:
-                if type(rate) == int:
-                    rate = float(rate)
-                assert type(rate) == float, (
+                if isinstance(rate, list):
+                    rate = np.array(rate, dtype=float)
+                assert isinstance(rate, np.ndarray)
+                assert rate.dtype == float, (
                     "Any reflection/absorption rate must be of type float. "
                     "type(rate) = {}".format(type(rate))
                 )
-                assert 0 <= rate <= 1, (
+                assert rate.ndim == 1, (
+                    "All rates must be 1 dimensional arrays."
+                    "A single float for each species."
+                )
+                assert np.all(0 <= rate) and np.all(rate <= 1), (
                     "Reflection/Absorption rates must be between 0 and 1. "
                     "Rates = {}".format(rates)
                 )
         if all(rate is not None for rate in rates):
-            assert np.sum(rates) == 1.0, (
-                "Reflection/Absorption rates must sum up to 1. "
+            assert len({len(rate) for rate in rates}) == 1, (
+                "All rates must have the same length (number of species)."
+                "Rates = {}".format(rates)
+            )
+            assert np.all(np.sum(rates, axis=0) == 1.0), (
+                "Reflection/Absorption rates must sum up to 1 for each species."
                 "Rates = {}".format(rates)
             )
 
@@ -670,10 +762,11 @@ class BoundaryPointRule(Rule):
                     "Index arrays must be unique indices!"
                     "idx_array:\n{}".format(idx_array)
                 )
+
         for idx_array in [reflected_indices_inverse,
                           reflected_indices_elastic]:
             if idx_array is not None:
-                assert list(range(idx_array.size)) == list(idx_array[idx_array]), (
-                    "Any Reflection applied twice, must return the original."
-                    "idx_array[idx_array]:\n{}".format(idx_array[idx_array])
-                )
+                assert np.all(idx_array[idx_array] == np.arange(idx_array.size)), (
+                        "Any Reflection applied twice, must return the original."
+                        "idx_array[idx_array]:\n{}".format(idx_array[idx_array])
+                    )

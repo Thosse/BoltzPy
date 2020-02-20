@@ -686,7 +686,7 @@ class Simulation:
                     "{}".format(char, file_directory)
             # Assert file is a simulation file
             if os.path.exists(file_directory + file_root + '.hdf5'):
-                hdf5_file = h5py.File(file_directory + file_root + '.hdf5')
+                hdf5_file = h5py.File(file_directory + file_root + '.hdf5', 'r')
                 assert hdf5_file.attrs["class"] == "Simulation"
 
         if species is not None:

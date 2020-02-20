@@ -1,6 +1,8 @@
 
 import numpy as np
 import h5py
+import matplotlib as mpl
+mpl.use('Agg')
 import matplotlib.animation as mpl_ani
 import matplotlib.axes as mpl_axes
 import matplotlib.lines as mpl_lines
@@ -148,7 +150,7 @@ class Animation:
         -------
         :obj:`matplotlib.pyplot.figure`
         """
-        if self._sim.p.ndim is not 1:
+        if self._sim.p.ndim != 1:
             message = 'Animation is currently only implemented ' \
                       'for 1D Problems'
             raise NotImplementedError(message)
@@ -187,7 +189,7 @@ class Animation:
         -------
         :obj:`~numpy.ndarray` [:obj:`matplotlib.axes.Axes`]
         """
-        if self._sim.p.ndim is not 1:
+        if self._sim.p.ndim != 1:
             message = 'Animation is currently only implemented ' \
                       'for 1D Problems'
             raise NotImplementedError(message)
@@ -260,7 +262,7 @@ class Animation:
         return
 
     def _set_tick_labels(self, axes, i_m):
-        if self._sim.p.ndim is not 1:
+        if self._sim.p.ndim != 1:
             message = 'Animation is currently only implemented ' \
                       'for 1D Problems' \
                       'This needs to be done for 3D plots'
@@ -291,7 +293,7 @@ class Animation:
         -------
         :obj:`~numpy.ndarray` [:obj:`matplotlib.lines.Line2D`]
         """
-        if self._sim.p.ndim is not 1:
+        if self._sim.p.ndim != 1:
             message = 'Animation is currently only implemented ' \
                       'for 1D Problems' \
                       'This needs to be done for 3D plots'

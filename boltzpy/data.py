@@ -78,7 +78,8 @@ class Data:
         self.velocity_offset = np.array(sim.scheme.Transport_VelocityOffset)
         # Todo Add this as property to SVGRID
         # Todo test if it faster to compute velocity (pv) on the fly
-        # self.dv = np.array([sim.sv.vGrids[s].d for s in range(sim.s.size)])
+        self.dv = np.array([sim.sv.vGrids[s].physical_spacing
+                            for s in range(sim.s.size)])
 
         self.n_spc = sim.s.size
         self.m = sim.s.mass
