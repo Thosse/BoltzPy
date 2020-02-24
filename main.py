@@ -20,17 +20,12 @@ if exisiting_simulation_file is None:
                                    (7, 7)])
     sim.geometry = bp.Geometry(
         sim.p.shape,
-        [bp.BoundaryPointRule(
+        [bp.ConstantPointRule(
             initial_rho=[1.0, 1.0],
             initial_drift=[[0.0, 0.0], [0.0, 0.0]],
             initial_temp=[.60, .60],
-            affected_points=[0],
-            reflection_rate_inverse=[0, 0],
-            reflection_rate_elastic=[0, 0],
-            reflection_rate_thermal=[1, 1],
-            absorption_rate=[0, 0],
-            surface_normal=np.array([-1, 0], dtype=int),
             velocity_grids=sim.sv,
+            affected_points=[0],
             species=sim.s),
          bp.InnerPointRule(
             initial_rho=[1.0, 1.0],
@@ -42,17 +37,18 @@ if exisiting_simulation_file is None:
          bp.BoundaryPointRule(
             initial_rho=[1.0, 1.0],
             initial_drift=[[0.0, 0.0], [0.0, 0.0]],
-            initial_temp=[.40, .40],
+            initial_temp=[.6, .6],
             affected_points=[30],
-            reflection_rate_inverse=[0, 0],
-            reflection_rate_elastic=[0, 0],
-            reflection_rate_thermal=[1, 1],
-            absorption_rate=[0, 0],
+            reflection_rate_inverse=[.3, .3],
+            reflection_rate_elastic=[.3, .3],
+            reflection_rate_thermal=[0.3, .3],
+            absorption_rate=[0.1, .1],
             surface_normal=np.array([1, 0], dtype=int),
             velocity_grids=sim.sv,
             species=sim.s)
          ]
     )
+    # sim.geometry.rules[0].plot(sim.sv, sim.s, 0)
     sim.scheme.OperatorSplitting = "FirstOrder"
     sim.scheme.Transport = "FiniteDifferences_FirstOrder"
     sim.scheme.Transport_VelocityOffset = np.array([0.0, 0.0])

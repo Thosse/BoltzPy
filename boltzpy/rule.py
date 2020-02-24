@@ -163,6 +163,8 @@ class Rule:
         # Construct default plot object if None was given
         if plot_object is None:
             # Choose standard pyplot
+            import matplotlib as mpl
+            mpl.use('TkAgg')
             import matplotlib.pyplot as plt
             plot_object = plt
 
@@ -739,9 +741,10 @@ class BoundaryPointRule(Rule):
                 "All rates must have the same length (number of species)."
                 "Rates = {}".format(rates)
             )
-            assert np.all(np.sum(rates, axis=0) == 1.0), (
-                "Reflection/Absorption rates must sum up to 1 for each species."
-                "Rates = {}".format(rates)
+            assert np.allclose(np.sum(rates, axis=0), 1.0, atol=1e-12), (
+                "Reflection/Absorption rates must sum up to 1 for each species.\n"
+                "Rates = {}\n"
+                "Sums = {}".format(rates, np.sum(rates, axis=0))
             )
 
         if surface_normal is not None:
