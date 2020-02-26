@@ -1,4 +1,3 @@
-from time import time
 
 import numpy as np
 
@@ -54,12 +53,6 @@ class Data:
     category : :obj:`~numpy.array` [:obj:`int`]
         Defines the behaviour of each point in P-Space
         in the computation.
-    dur_total : :obj:`float`
-        Stores total computation time.
-    dur_col : :obj:`float`
-        Stores computation time spent on collision step.
-    dur_transp : :obj:`float`
-        Stores computation time spent on transport step.
     """
     def __init__(self, file_address):
         # create temporary Simulation instance
@@ -92,11 +85,6 @@ class Data:
         self.p_dim = sim.p.ndim
         self.p_size = sim.p.size
 
-        # Todo maybe a bad name -> denotes start time, not duration!
-        self.dur_total = time()
-        self.dur_col = 0.0
-        self.dur_transp = 0.0
-
         # Collision arrays
         # Todo create struct -> 4 ints and 1 float together -> possible?
         if not sim.coll.is_set_up:
@@ -122,34 +110,6 @@ class Data:
     def __getattr__(self, item):
         return self._params[item]
 
-    ##############################
-    #           Timing           #
-    ##############################
-
-    def _print_progress(self):
-        # estimate remaining time in seconds
-        time_taken = time() - self.dur_total
-        mean_time_per_step = time_taken / self.t
-        total_time = int(self.tG[-1, 0] * mean_time_per_step)
-
-        print('Calculating... '
-              + self._format_time(int(time_taken))
-              + '  /  '
-              + self._format_time(total_time),
-              end='\r')
-        return
-
-    @staticmethod
-    def _format_time(seconds):
-        (days, seconds) = divmod(seconds, 86400)
-        (hours, seconds) = divmod(seconds, 3600)
-        (minutes, seconds) = divmod(seconds, 60)
-        t_string = '{:2d}d {:2d}h {:2d}m {:2d}s'.format(days,
-                                                        hours,
-                                                        minutes,
-                                                        seconds)
-        return t_string
-
     # Todo Add more check_integrity / stability conditions?
     # Todo raise Warnings for weird configurations?
     def check_stability_conditions(self):
@@ -160,7 +120,7 @@ class Data:
         AssertionError
             If any necessary condition is not satisfied."""
         # check Courant-Friedrichs-Levy-Condition
-        max_v = np.linalg.norm(self.vG, axis=1).max()
+        max_v = np.max(np.linalg.norm(self.vG, axis=1))
         # Courant–Friedrichs–Lewy (CFL) condition
         assert max_v * (self.dt/self.dp) < 1/2
         return

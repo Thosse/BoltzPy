@@ -18,7 +18,7 @@ def plot_discrete_distribution(discrete_distribution,
     """
     if "color" not in plot_style.keys():
         plot_style["color"] = "green"
-    if "alhpa" not in plot_style.keys():
+    if "alpha" not in plot_style.keys():
         plot_style["alpha"] = 0.4
 
     # show plot directly, if no object to store in is specified

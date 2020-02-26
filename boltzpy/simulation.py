@@ -3,7 +3,8 @@ import h5py
 import numpy as np
 
 import boltzpy.helpers.file_addresses as h_adr
-import boltzpy.animation as bp_ani
+import boltzpy.helpers.TimeTracker as h_tt
+import boltzpy.AnimatedFigure as bp_af
 import boltzpy.compute as bp_cp
 import boltzpy.output as bp_out
 import boltzpy.constants as bp_c
@@ -401,7 +402,8 @@ class Simulation:
         f_output = bp_out.generate_output_function(self, hdf5_group_name)
 
         # Start computation
-        print('Calculating...          ', end='\r')
+        print('Computing:')
+        time_tracker = h_tt.TimeTracker()
         # Todo this might be buggy, if data.tG changes
         # Todo e.g. in adaptive time schemes
         # Todo proposition: iterate over length?
@@ -410,103 +412,31 @@ class Simulation:
                 bp_cp.operator_splitting(data,
                                          self.geometry.transport,
                                          self.geometry.collision)
-                data._print_progress()
+            # print time estimate
+            time_tracker.print(tw, data.tG[-1, 0])
             # generate Output and write it to disk
             f_output(data, tw_idx)
-        # skip over the refreshing line during computation
-        print('\n')
         return
 
     #####################################
     #             Animation             #
     #####################################
-    # Todo rework animation module
-    def create_animation(self,
-                         output_arr=None,
-                         specimen_arr=None):
-        """Create animated plot and saves it to disk.
-
-        Sets up :obj:`matplotlib.animation.FuncAnimation` instance
-        based on a figure with separate subplots
-        for every moment in *output_arr*
-        and separate lines for every specimen and moment.
-        """
-        # Todo Assert Computation ran successfully
-        if output_arr is None:
-            output_arr = self.output_parameters
-        else:
-            assert isinstance(output_arr, np.ndarray)
-            assert output_arr.ndim == 2
-            assert all([output in self.output_parameters.flatten()
-                        for output in output_arr.flatten()])
-        if "Complete_Distribution" in output_arr.flatten():
-            raise NotImplementedError
-        if specimen_arr is None:
-            specimen_arr = self.s.specimen_arr
-        else:
-            assert isinstance(specimen_arr, np.ndarray)
-            assert specimen_arr.ndim == 1
-            assert all([isinstance(specimen, bp.Specimen)
-                        for specimen in specimen_arr])
-            assert all([specimen.name in self.s.names
-                        for specimen in self.s])
-        animation = bp_ani.Animation(self)
-        animation.animate(output_arr, specimen_arr)
-        return
-
-    # Todo choose proper parameters
-    def create_snapshot(self,
-                        time_step,
-                        output_arr=None,
-                        specimen_arr=None,
-                        snapshot_name=None,
-                        # Todo p_space -> cut of boundary effects,
-                        # Todo color -> color some Specimen differently,
-                        # Todo legend -> setup legend in the image?
-                        ):
-        """Creates a vector plot of the simulation
-        at the desired time_step.
-        Saves the file as *snapshot_name*.eps in the Simulation folder.
-
-        Parameters
-        ----------
-        time_step : :obj:`int`
-        output_arr : :obj:`~numpy.array` [:obj:`str`], optional
-        specimen_arr : :obj:`~numpy.array` [:class:`~boltzpy.Specimen`], optional
-        snapshot_name : :obj:`str`, optional
-            File name of the vector image.
-        """
-        # Todo Reasonable asserts for time_step
-
-        if output_arr is None:
-            output_arr = self.output_parameters
-        else:
-            assert isinstance(output_arr, np.ndarray)
-            assert all([output in self.output_parameters.flatten()
-                        for output in output_arr])
-        if "Complete_Distribution" in output_arr.flatten():
-            raise NotImplementedError
-        if specimen_arr is None:
-            specimen_arr = self.s.specimen_arr
-        else:
-            assert isinstance(specimen_arr, np.ndarray)
-            assert specimen_arr.ndim == 1
-            assert all([isinstance(specimen, bp.Specimen)
-                        for specimen in specimen_arr])
-            assert all([specimen.name in self.s.names
-                        for specimen in self.s])
-        if snapshot_name is None:
-            snapshot_name = (self.file_address + '_t={}.eps'.format(time_step))
-        else:
-            (file_dir,) = h_adr.split_address(snapshot_name)
-            assert os.path.isdir(file_dir)
-            assert os.access(file_dir, os.W_OK)
-
-        animation = bp_ani.Animation(self)
-        animation.snapshot(time_step,
-                           output_arr,
-                           specimen_arr,
-                           snapshot_name)
+    def animate(self, shape=(3, 2)):
+        figure = bp_af.AnimatedFigure(tmax=self.t.size)
+        specimen_names = [specimen.name for specimen in self.s.specimen_arr]
+        moments = self.output_parameters.flatten()
+        file = h5py.File(self.file_address + '.hdf5', mode='r')
+        hdf5_group = file["Computation"]
+        for (moment_idx, moment) in enumerate(moments):
+            ax = figure.add_subplot(shape + (1 + moment_idx,),
+                                    title=moment
+                                    )
+            # Todo This flatten() should NOT be necessary, fix with model/geometry
+            xdata = (self.p.iG * self.p.delta).flatten()[1:-1]
+            for (specimen_idx, specimen) in enumerate(specimen_names):
+                ydata = hdf5_group[moment][..., 1:-1, specimen_idx]
+                ax.plot(xdata, ydata)
+        figure.save(self.file_address + '.mp4')
         return
 
     #####################################
