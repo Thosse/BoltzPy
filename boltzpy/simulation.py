@@ -633,7 +633,7 @@ class Simulation:
             position_grid.check_integrity(complete_check)
             # Todo Remove this, when implementing 2D Transport
             if position_grid.ndim is not None \
-                    and position_grid.ndim is not 1:
+                    and position_grid.ndim != 1:
                 msg = "Currently only 1D Simulations are supported!"
                 raise NotImplementedError(msg)
 
@@ -649,7 +649,7 @@ class Simulation:
 
         if output_parameters is not None:
             assert isinstance(output_parameters, np.ndarray)
-            assert len(output_parameters.shape) is 2
+            assert len(output_parameters.shape) == 2
             assert all([mom in bp_c.SUPP_OUTPUT
                         for mom in output_parameters.flatten()])
 
