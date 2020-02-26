@@ -3,6 +3,7 @@ import h5py
 import numpy as np
 
 import boltzpy.helpers.file_addresses as h_adr
+import boltzpy.helpers.TimeTracker as h_tt
 import boltzpy.AnimatedFigure as bp_af
 import boltzpy.compute as bp_cp
 import boltzpy.output as bp_out
@@ -401,7 +402,8 @@ class Simulation:
         f_output = bp_out.generate_output_function(self, hdf5_group_name)
 
         # Start computation
-        print('Calculating...          ', end='\r')
+        print('Computing:')
+        time_tracker = h_tt.TimeTracker()
         # Todo this might be buggy, if data.tG changes
         # Todo e.g. in adaptive time schemes
         # Todo proposition: iterate over length?
@@ -410,11 +412,10 @@ class Simulation:
                 bp_cp.operator_splitting(data,
                                          self.geometry.transport,
                                          self.geometry.collision)
-                data._print_progress()
+            # print time estimate
+            time_tracker.print(tw, data.tG[-1, 0])
             # generate Output and write it to disk
             f_output(data, tw_idx)
-        # skip over the refreshing line during computation
-        print('\n')
         return
 
     #####################################

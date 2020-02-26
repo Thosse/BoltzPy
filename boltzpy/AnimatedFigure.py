@@ -2,7 +2,7 @@
 import numpy as np
 import matplotlib as mpl
 import matplotlib.animation as mpl_ani
-from time import time
+import boltzpy.helpers.TimeTracker as h_tt
 
 
 # Todo merge plots und animationen (tmax=0 -> plot)
@@ -23,6 +23,7 @@ class AnimatedFigure:
         self.tmax = int(tmax)
         self.writer = mpl.animation.writers[writer](fps=15, bitrate=1800)
         self.animated_axes = []
+        self._time_tracker = h_tt.TimeTracker()
         return
 
     def add_subplot(self, position, **kwargs):
@@ -36,11 +37,14 @@ class AnimatedFigure:
     def update(self, i):
         for ax in self.animated_axes:
             ax.update(i)
+        # print time estimate
+        self._time_tracker.print(i + 1, self.tmax)
         return
 
-    # Todo Edit update -> print time estimate
     def plot(self):
         self.figure.tight_layout()
+        print('Animating:')
+        self._time_tracker = h_tt.TimeTracker()
         animation = mpl.animation.FuncAnimation(
             self.figure,
             self.update,
