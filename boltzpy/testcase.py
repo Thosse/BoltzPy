@@ -173,15 +173,18 @@ class TestCase(dict):
             # Open old and new file
             old_file = h5py.File(address_old, mode='r')
             new_file = h5py.File(address_new, mode='r')
-            # compare results
-            for output in self["output_parameters"].flatten():
-                results_old = old_file["Computation"][output][()]
-                results_new = new_file["Computation"][output][()]
-                assert results_old.shape == results_new.shape
-                assert np.array_equal(results_old, results_new)
+            for species_name in new_file["results"].keys():
+                for output in new_file["results"][species_name].keys():
+                    key = "results/{}/{}".format(species_name, output)
+                    old_results = old_file[key][()]
+                    new_results = new_file[key][()]
+                    assert old_results.shape == new_results.shape
+                    assert np.array_equal(old_results, new_results)
         except AssertionError:
             print("Update failed: ", self["file_name"])
-            print("\tDifferences found in: ", output)
+            print("\tDifferences found in:",
+                  "\nspecies: ", species_name,
+                  "\noutput: ", output)
             return False
         finally:
             os.remove(address_new)

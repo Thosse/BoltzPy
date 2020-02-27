@@ -12,23 +12,25 @@ def test_computation(test_case):
     # Compute Output in temporary file
     sim = bp.Simulation(test_case)
     sim.save(bp_c.TEST_TMP_FILE)
-    sim.compute("Test")
+    sim.compute()
     # Open old and new file, to compare results
     old_file = h5py.File(test_case, mode='r')
     new_file = h5py.File(bp_c.TEST_TMP_FILE, mode='r')
     # compare results
     try:
-        for output in sim.output_parameters.flatten():
-            results_old = old_file["Computation"][output][()]
-            results_new = new_file["Test"][output][()]
-            assert results_old.shape == results_new.shape, (
-                "Results differ in shape:\t {} != {}".format(
-                    results_old.shape, results_new.shape)
-            )
-            assert np.array_equal(results_old, results_new), (
-                "Results differ by {} (sum over absolutes)".format(
-                    np.sum(abs(results_old - results_new)))
-            )
+        for species_name in new_file["results"].keys():
+            for output in new_file["results"][species_name].keys():
+                key = "results/{}/{}".format(species_name, output)
+                old_results = old_file[key][()]
+                new_results = new_file[key][()]
+                assert old_results.shape == new_results.shape, (
+                    "Results differ in shape:\t {} != {}".format(
+                        old_results.shape, new_results.shape)
+                )
+                assert np.array_equal(old_results, new_results), (
+                    "Results differ by {} (sum over absolutes)".format(
+                        np.sum(abs(old_results - new_results)))
+                )
     finally:
         os.remove(bp_c.TEST_TMP_FILE)
     return
