@@ -6,6 +6,7 @@ import boltzpy.helpers.file_addresses as h_adr
 import boltzpy.helpers.TimeTracker as h_tt
 import boltzpy.AnimatedFigure as bp_af
 import boltzpy.compute as bp_cp
+import boltzpy.momenta as bp_m
 import boltzpy.output as bp_out
 import boltzpy.constants as bp_c
 import boltzpy as bp
@@ -155,7 +156,8 @@ class Simulation:
             self.scheme = bp.Scheme.load(file[key])
         except KeyError:
             self.scheme = bp.Scheme()
-        # load output params Todo Move these into Scheme, as a (1D) Set
+        # Todo remove this
+        # load output params
         try:
             key = "Computation/Output_Parameters"
             shape = file[key].attrs["shape"]
@@ -195,6 +197,20 @@ class Simulation:
                                                    new_file_root]
         self.check_parameters(file_address=self.file_address)
         return
+
+    @property
+    def results(self):
+        file = h5py.File(self.file_address + '.hdf5', mode='r+')
+        return file["results"]
+
+    @property
+    def output_shape(self):
+        return {'particle_number': (self.t.size, self.p.size),
+                'mean_velocity': (self.t.size, self.p.size, self.sv.ndim),
+                'Momentum_Flow_X': (self.t.size, self.p.size),
+                'temperature': (self.t.size, self.p.size),
+                'Energy_Flow_X': (self.t.size, self.p.size)
+                }
 
     @property
     def n_rules(self):
@@ -380,29 +396,23 @@ class Simulation:
     #####################################
     #            Computation            #
     #####################################
-    def compute(self, hdf5_group_name="Computation"):
+    # Todo write hash function in Computation folder
+    #     file = h5py.File(self.file_address + '.hdf5')
+    #     # hash = file["Computation"].attrs["Hash_Value"]
+    #     # Todo define hashing method
+    #     assert hash == self.__hash__()
+    #     print("The saved results are up to date!"
+    #           "A new computation is not necessary")
+    #     return
+    # else (KeyError, AssertionError):
+    def compute(self):
         """Compute the fully configured Simulation"""
         self.check_integrity()
-        # Todo write hash function in Computation folder
-        #     file = h5py.File(self.file_address + '.hdf5')
-        #     # hash = file["Computation"].attrs["Hash_Value"]
-        #     # Todo define hashing method
-        #     assert hash == self.__hash__()
-        #     print("The saved results are up to date!"
-        #           "A new computation is not necessary")
-        #     return
-        # else (KeyError, AssertionError):
-
         # Generate Computation data
         data = bp.Data(self.file_address)
         data.check_stability_conditions()
 
-        # Generate output functions
-        # Todo move into Scheme
-        f_output = bp_out.generate_output_function(self, hdf5_group_name)
-
-        # Start computation
-        print('Computing:')
+        print('Start Computation:')
         time_tracker = h_tt.TimeTracker()
         # Todo this might be buggy, if data.tG changes
         # Todo e.g. in adaptive time schemes
@@ -412,29 +422,75 @@ class Simulation:
                 bp_cp.operator_splitting(data,
                                          self.geometry.transport,
                                          self.geometry.collision)
+            self.write_results(data, tw_idx)
             # print time estimate
             time_tracker.print(tw, data.tG[-1, 0])
-            # generate Output and write it to disk
-            f_output(data, tw_idx)
+        return
+
+    def write_results(self, data, tw_idx):
+        for (s, species_name) in enumerate(self.s.names):
+            (beg, end) = self.sv.index_range[s]
+            dv = data.dv[s]
+            mass = data.m[s]
+            velocities = data.vG[beg:end, :]
+            hdf_group = self.results[species_name]
+            # particle_number
+            particle_number = bp_m.particle_number(data.state[..., beg:end], dv)
+            hdf_group["particle_number"][tw_idx] = particle_number
+
+            # mean velocity
+            mean_velocity = bp_m.mean_velocity(data.state[..., beg:end],
+                                               dv,
+                                               velocities,
+                                               particle_number)
+            hdf_group["mean_velocity"][tw_idx] = mean_velocity
+
+            # temperature
+            temperature = bp_m.temperature(data.state[..., beg:end],
+                                           dv,
+                                           velocities,
+                                           mass,
+                                           particle_number,
+                                           mean_velocity)
+            hdf_group["temperature"][tw_idx] = temperature
+
+            Momentum_Flow_X = bp_out.momentum_flow_x(data)
+            hdf_group["Momentum_Flow_X"][tw_idx] = Momentum_Flow_X[..., s]
+            Energy_Flow_X = bp_out.energy_flow_x(data)
+            hdf_group["Energy_Flow_X"][tw_idx] = Energy_Flow_X[..., s]
+        # update index of current time step
+        self.results.attrs["t"] = tw_idx + 1
         return
 
     #####################################
     #             Animation             #
     #####################################
-    def animate(self, shape=(3, 2)):
-        figure = bp_af.AnimatedFigure(tmax=self.t.size)
-        specimen_names = [specimen.name for specimen in self.s.specimen_arr]
-        moments = self.output_parameters.flatten()
-        file = h5py.File(self.file_address + '.hdf5', mode='r')
-        hdf5_group = file["Computation"]
-        for (moment_idx, moment) in enumerate(moments):
-            ax = figure.add_subplot(shape + (1 + moment_idx,),
-                                    title=moment
-                                    )
-            # Todo This flatten() should NOT be necessary, fix with model/geometry
-            xdata = (self.p.iG * self.p.delta).flatten()[1:-1]
-            for (specimen_idx, specimen) in enumerate(specimen_names):
-                ydata = hdf5_group[moment][..., 1:-1, specimen_idx]
+    def animate(self, shape=(3, 2), *moments):
+        tmax = int(self.results.attrs["t"])
+        figure = bp_af.AnimatedFigure(tmax=tmax)
+        if not moments:
+            moments = ['particle_number',
+                       'mean_velocity',
+                       'mean_velocity',
+                       'Momentum_Flow_X',
+                       'temperature',
+                       'Energy_Flow_X']
+        else:
+            assert len(moments) <= np.prod(shape)
+        # xdata (geometry) is shared over all plots
+        # Todo flatten() should NOT be necessary, fix with model/geometry
+        xdata = (self.p.iG * self.p.delta).flatten()[1:-1]
+        for (m, moment) in enumerate(moments):
+            ax = figure.add_subplot(shape + (1 + m,),
+                                    title=moment)
+            for species_name in self.s.names:
+                hdf_group = self.results[species_name]
+                if hdf_group[moment].ndim == 2:
+                    ydata = hdf_group[moment][..., 1:-1]
+                elif hdf_group[moment].ndim == 3:
+                    ydata = hdf_group[moment][..., 1:-1, 0]
+                else:
+                    raise Exception
                 ax.plot(xdata, ydata)
         figure.save(self.file_address + '.mp4')
         return
@@ -442,7 +498,6 @@ class Simulation:
     #####################################
     #           Serialization           #
     #####################################
-    # Todo Create __is_equal__ method, compare to default  params -> dont save
     def save(self, file_address=None):
         """Write all parameters of the :class:`Simulation` instance
         to a HDF5 file.
@@ -469,8 +524,8 @@ class Simulation:
         # Sanity Check before saving
         self.check_integrity(False)
 
-        # Todo if sv and collision parameters are the same -> keep Collisions
-        # Create new HDF5 file (deletes old data, if any)
+        # Todo if results exist -> don't overwrite! force=False?
+        # Create new HDF5 file (deletes all old data, if any)
         file = h5py.File(self.file_address + ".hdf5", mode='w')
         file.attrs["class"] = "Simulation"
 
@@ -504,11 +559,10 @@ class Simulation:
         file.create_group(key)
         self.coll.save(file[key])
 
-        # Save Computation Parameters
-        if "Scheme" not in file.keys():
-            file.create_group("Scheme")
-        # Save scheme
-        self.scheme.save(file["Scheme"])
+        # Save Scheme
+        key = "Scheme"
+        file.create_group(key)
+        self.scheme.save(file[key])
 
         if self.output_parameters is not None:
             #  noinspection PyUnresolvedReferences
@@ -518,6 +572,20 @@ class Simulation:
                                  dtype=h5py_string_type).flatten()
             file[key].attrs["shape"] = self.output_parameters.shape
 
+        # Prepare results
+        key = "results"
+        file.create_group(key)
+        # store index of current time step
+        self.results.attrs["t"] = 1
+        # set up separate subgroup for each species
+        for species_name in self.s.names:
+            file[key].create_group(species_name)
+            hdf_group = file[key][species_name]
+            # set up separate dataset for each moment
+            for (mom_name, mom_shape) in self.output_shape.items():
+                hdf_group.create_dataset(mom_name,
+                                         shape=mom_shape,
+                                         dtype=float)
         file.close()
         return
 
