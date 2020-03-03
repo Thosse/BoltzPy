@@ -1,12 +1,12 @@
 import pytest
 
-import boltzpy.constants as bp_c
+import boltzpy.testcase as bp_t
 import boltzpy as bp
 
 
-@pytest.mark.parametrize("test_case", bp_c.TEST_CASES)
-def test_eval_of_repr_is_equal(test_case):
-    sim = bp.Simulation(test_case)
+@pytest.mark.parametrize("tf", bp_t.FILES)
+def test_eval_of_repr_is_equal(tf):
+    sim = bp.Simulation(file_address=tf)
     scheme_old = sim.scheme
     scheme_new = eval(scheme_old.__repr__('bp'))
     assert isinstance(scheme_old, bp.Scheme)

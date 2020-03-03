@@ -1,9 +1,23 @@
 
 import boltzpy as bp
-import boltzpy.constants as bp_c
 import numpy as np
 import h5py
 import os
+
+
+#: :obj:`str` : Default directory for all test files.
+#: All data used for testing purposes is stored in this directory.
+DIRECTORY = __file__[:-19] + 'test_data/'
+
+#: :obj:`str` : Default file (address) for temporary test results.
+TMP_FILE = DIRECTORY + '_tmp_.hdf5'
+
+#: :obj:`list` [:obj:`str`] : Contains all available test cases
+#: in the :const:`TEST_DIRECTORY`.
+TEST_CASES = [os.path.join(DIRECTORY, file)
+              for file in os.listdir(DIRECTORY)
+              if os.path.isfile(os.path.join(DIRECTORY, file))
+              and os.path.join(DIRECTORY, file) != TMP_FILE]
 
 
 class TestCase(dict):
@@ -122,13 +136,14 @@ class TestCase(dict):
         self["coll"] = coll
         return
 
-    @staticmethod
-    def address(file_name):
-        return bp_c.TEST_DIRECTORY + file_name + ".hdf5"
+    @property
+    def file_address(self):
+        return DIRECTORY + self["file_name"] + ".hdf5"
 
-    def create_simulation(self):
-        address = self.address(self["file_name"])
-        sim = bp.Simulation(address)
+    def create_simulation(self, file_address=None):
+        if file_address is None:
+            file_address = self.file_address
+        sim = bp.Simulation(file_address)
         sim.s = self["s"]
         sim.t = self["t"]
         sim.p = self["p"]
@@ -139,74 +154,16 @@ class TestCase(dict):
         sim.coll = self["coll"]
         if sim.coll == bp.Collisions():
             sim.coll.setup(scheme=sim.scheme, svgrid=sim.sv, species=sim.s)
-
-    def save_results(self, address=None):
-        if address is None:
-            address = self.address(self["file_name"])
-        assert not os.path.exists(address), address
-        sim = bp.Simulation(address)
-        sim.s = self["s"]
-        sim.t = self["t"]
-        sim.p = self["p"]
-        sim.sv = self["sv"]
-        sim.geometry = self["geometry"]
-        sim.scheme = self["scheme"]
-        sim.output_parameters = self["output_parameters"]
-        sim.coll = self["coll"]
-        if sim.coll == bp.Collisions():
-            sim.coll.setup(scheme=sim.scheme, svgrid=sim.sv, species=sim.s)
-        sim.save()
-        sim.compute()
         return sim
 
-    def compare_results(self):
-        address_old = self.address(self["file_name"])
-        assert os.path.exists(address_old)
-        address_new = bp_c.TEST_TMP_FILE
-        assert address_old != address_new
-        # remove new_Address, if it exists already
-        if os.path.exists(address_new):
-            os.remove(address_new)
-        self.save_results(address_new)
-        output = "No comparison done so far"
-        try:
-            # Open old and new file
-            old_file = h5py.File(address_old, mode='r')
-            new_file = h5py.File(address_new, mode='r')
-            for species_name in new_file["results"].keys():
-                for output in new_file["results"][species_name].keys():
-                    key = "results/{}/{}".format(species_name, output)
-                    old_results = old_file[key][()]
-                    new_results = new_file[key][()]
-                    assert old_results.shape == new_results.shape
-                    assert np.array_equal(old_results, new_results)
-        except AssertionError:
-            print("Update failed: ", self["file_name"])
-            print("\tDifferences found in:",
-                  "\nspecies: ", species_name,
-                  "\noutput: ", output)
-            return False
-        finally:
-            os.remove(address_new)
-        return True
-
-    def update_results(self):
-        if self.compare_results():
-            os.remove(self.address(self["file_name"]))
-            self.save_results()
-            print("Successfully updated: ", self["file_name"])
-        else:
-            assert False
-
-    def replace_results(self):
-        msg = input("Are you absolutely sure? "
-                    "You are replacing this test case (yes/no)")
-        if msg == "yes":
-            os.remove(self.address(self["file_name"]))
-            self.save_results()
-            print("Successfully updated: ", self["file_name"])
-        else:
-            print("Abort replacing testcase: ", self["file_name"])
+    def create_file(self, file_address=None):
+        if file_address is None:
+            file_address = self.file_address
+        assert not os.path.exists(file_address)
+        sim = self.create_simulation(file_address=file_address)
+        sim.save()
+        sim.compute()
+        return h5py.File(sim.file_address + ".hdf5", mode='r')
 
 
 ################################################################################
@@ -233,19 +190,19 @@ CASES.append(TestCase("shock_2Species_equalMass",
 CASES.append(TestCase("shock_2species_complete",
                       output_parameters=np.array([["Complete_Distribution"]])))
 
-
+FILES = [tc.file_address for tc in CASES]
 ################################################################################
 #                                   Main                                       #
 ################################################################################
-def update_all_tests():
-    for tc in CASES:
-        print("TestCase = ", tc["file_name"])
-        assert isinstance(tc, TestCase)
-        tc.update_results()
-
 
 def replace_all_tests():
-    for tc in CASES:
-        print("TestCase = ", tc["file_name"])
-        assert isinstance(tc, TestCase)
-        tc.replace_results()
+    msg = input("Are you absolutely sure? "
+                "You are about to replace all test cases (yes/no)")
+    if msg == "yes":
+        for tc in CASES:
+            print("TestCase = ", tc["file_name"])
+            assert isinstance(tc, TestCase)
+            os.remove(tc.file_address)
+            tc.create_file()
+    else:
+        print("Aborted replacing testcases!")

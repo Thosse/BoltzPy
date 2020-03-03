@@ -2,14 +2,14 @@ import h5py
 import numpy as np
 import pytest
 
-import boltzpy.constants as bp_c
+import boltzpy.testcase as bp_t
 import boltzpy as bp
 
 
-@pytest.mark.parametrize("test_case", bp_c.TEST_CASES)
-def test_collisions(test_case):
+@pytest.mark.parametrize("tf", bp_t.FILES)
+def test_collisions(tf):
     # Compute Output in temporary file
-    sim = bp.Simulation(test_case)
+    sim = bp.Simulation(file_address=tf)
     coll = bp.Collisions()
     coll.setup(sim.scheme, sim.sv, sim.s)
     # compare results
