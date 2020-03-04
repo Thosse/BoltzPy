@@ -3,7 +3,8 @@ import numpy as np
 
 class BaseClass:
     def __eq__(self, other, print_message=True):
-        if not type(self) == type(other):
+        # This explicitly allows other to be an child class of self
+        if not isinstance(other, type(self)):
             if print_message:
                 print("Objects are of different type:",
                       "\n\ttype(self) = ", type(self),

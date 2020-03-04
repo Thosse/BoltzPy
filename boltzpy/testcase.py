@@ -5,22 +5,7 @@ import h5py
 import os
 
 
-#: :obj:`str` : Default directory for all test files.
-#: All data used for testing purposes is stored in this directory.
-DIRECTORY = __file__[:-19] + 'test_data/'
-
-#: :obj:`str` : Default file (address) for temporary test results.
-TMP_FILE = DIRECTORY + '_tmp_.hdf5'
-
-#: :obj:`list` [:obj:`str`] : Contains all available test cases
-#: in the :const:`TEST_DIRECTORY`.
-TEST_CASES = [os.path.join(DIRECTORY, file)
-              for file in os.listdir(DIRECTORY)
-              if os.path.isfile(os.path.join(DIRECTORY, file))
-              and os.path.join(DIRECTORY, file) != TMP_FILE]
-
-
-class TestCase(dict):
+class TestCase(bp.Simulation):
     def __init__(self,
                  file_name,
                  s=None,
@@ -31,9 +16,7 @@ class TestCase(dict):
                  geometry=None,
                  scheme=None,
                  output_parameters=None):
-        super().__init__(self)
-
-        self["file_name"] = file_name
+        super().__init__(file_name)
 
         if s is None:
             s = bp.Species()
@@ -43,21 +26,21 @@ class TestCase(dict):
                   collision_rate=np.array([50, 50], dtype=float))
         else:
             assert isinstance(s, bp.Species)
-        self["s"] = s
+        self.s = s
 
         if t is None:
             t = bp.Grid(ndim=1,
                         shape=(5,),
                         physical_spacing=0.01,
                         spacing=3)
-        self["t"] = t
+        self.t = t
 
         if p is None:
             p = bp.Grid(ndim=1,
                         shape=(6,),
                         spacing=1,
                         physical_spacing=0.5)
-        self["p"] = p
+        self.p = p
 
         if sv is None:
             spacings = bp.SVGrid.generate_spacings(s.mass)
@@ -67,7 +50,7 @@ class TestCase(dict):
                            shapes=shapes,
                            spacings=spacings,
                            )
-        self["sv"] = sv
+        self.sv = sv
 
         if geometry is None:
             left_rho = 2*np.ones(s.size)
@@ -112,7 +95,7 @@ class TestCase(dict):
             geometry = bp.Geometry(shape=p.shape,
                                    rules=rules
                                    )
-        self["geometry"] = geometry
+        self.geometry = geometry
 
         if scheme is None:
             scheme = bp.Scheme(OperatorSplitting="FirstOrder",
@@ -120,7 +103,7 @@ class TestCase(dict):
                                Transport_VelocityOffset=np.array([-0.2, 0.0]),
                                Collisions_Generation="UniformComplete",
                                Collisions_Computation="EulerScheme")
-        self["scheme"] = scheme
+        self.scheme = scheme
 
         if output_parameters is None:
             output_parameters = np.array([['Mass',
@@ -129,31 +112,37 @@ class TestCase(dict):
                                            'Momentum_Flow_X'],
                                           ['Energy',
                                            'Energy_Flow_X']])
-        self["output_parameters"] = output_parameters
+        self.output_parameters = output_parameters
 
         if coll is None:
             coll = bp.Collisions()
-        self["coll"] = coll
+            coll.setup(scheme=self.scheme, svgrid=self.sv, species=self.s)
+        self.coll = coll
         return
 
     @property
-    def file_address(self):
-        return DIRECTORY + self["file_name"] + ".hdf5"
+    def default_directory(self):
+        return __file__[:-19] + 'test_data/'
+
+    @property
+    def temporary_file(self):
+        """:obj:`str` :
+        Default file address for temporary test results.
+        """
+        return self.default_directory + '_tmp_.hdf5'
 
     def create_simulation(self, file_address=None):
         if file_address is None:
             file_address = self.file_address
         sim = bp.Simulation(file_address)
-        sim.s = self["s"]
-        sim.t = self["t"]
-        sim.p = self["p"]
-        sim.sv = self["sv"]
-        sim.geometry = self["geometry"]
-        sim.scheme = self["scheme"]
-        sim.output_parameters = self["output_parameters"]
-        sim.coll = self["coll"]
-        if sim.coll == bp.Collisions():
-            sim.coll.setup(scheme=sim.scheme, svgrid=sim.sv, species=sim.s)
+        sim.s = self.s
+        sim.t = self.t
+        sim.p = self.p
+        sim.sv = self.sv
+        sim.geometry = self.geometry
+        sim.scheme = self.scheme
+        sim.output_parameters = self.output_parameters
+        sim.coll = self.coll
         return sim
 
     def create_file(self, file_address=None):
@@ -201,7 +190,7 @@ def replace_all_tests():
                 "You are about to replace all test cases (yes/no)")
     if msg == "yes":
         for tc in CASES:
-            print("TestCase = ", tc["file_name"])
+            print("TestCase = ", tc.file_address)
             assert isinstance(tc, TestCase)
             os.remove(tc.file_address)
             tc.create_file()

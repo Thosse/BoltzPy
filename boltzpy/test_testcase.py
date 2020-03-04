@@ -13,16 +13,19 @@ def test_file_exists(tc):
     assert os.path.exists(tc.file_address)
 
 
-@pytest.mark.parametrize("test_case", bp_t.CASES)
-def test_file_initializes_the_correct_simulation(test_case):
-    sim = bp.Simulation.load(test_case.file_address)
-    assert test_case["s"] == sim.s
-    assert test_case["t"] == sim.t
-    assert test_case["p"] == sim.p
-    assert test_case["sv"] == sim.sv
-    assert test_case["geometry"] == sim.geometry
-    assert test_case["scheme"] == sim.scheme
-    assert np.all(test_case["output_parameters"] == sim.output_parameters)
+@pytest.mark.parametrize("tc", bp_t.CASES)
+def test_file_initializes_the_correct_simulation(tc):
+    sim = bp.Simulation.load(tc.file_address)
+    assert tc.s == sim.s
+    assert tc.t == sim.t
+    assert tc.p == sim.p
+    assert tc.sv == sim.sv
+    assert tc.geometry == sim.geometry
+    assert tc.scheme == sim.scheme
+    assert np.all(tc.output_parameters == sim.output_parameters)
+    assert sim.__eq__(tc, True)
+    assert not tc.__eq__(sim, False)
+
 
 
 @pytest.mark.parametrize("tc", bp_t.CASES)
@@ -30,11 +33,11 @@ def test_new_file_is_equal_to_current_one(tc):
     assert isinstance(tc, bp_t.TestCase)
     # TODO move this into prerun of pytest
     # remove new_Address, if it exists already
-    if os.path.exists(bp_t.TMP_FILE):
-        os.remove(bp_t.TMP_FILE)
+    if os.path.exists(tc.temporary_file):
+        os.remove(tc.temporary_file)
 
     # create new file
-    new_file = tc.create_file(bp_t.TMP_FILE)
+    new_file = tc.create_file(tc.temporary_file)
     old_file = h5py.File(tc.file_address, mode='r')
     # Todo Check ALL keys, not just results
     for species_name in new_file["results"].keys():
@@ -50,4 +53,4 @@ def test_new_file_is_equal_to_current_one(tc):
             #           "\nspecies: ", species_name,
             #           "\noutput: ", output)
 
-    os.remove(bp_t.TMP_FILE)
+    os.remove(tc.temporary_file)
