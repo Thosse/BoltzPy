@@ -94,86 +94,33 @@ class Simulation:
         # set file address (using a setter method)
         [self._file_directory, self._file_name] = ['', '']
         self.file_address = file_address
-        del file_address  # not needed anymore, could lead to typos
 
-        # Open HDF5 file
-        if os.path.exists(self.file_address):
-            file = h5py.File(self.file_address, mode='r')
-        else:
-            file = h5py.File(self.file_address, mode='w-')
-            file.attrs["class"] = "Simulation"
-
-        #######################
-        #   Grid Attributes   #
-        #######################
-        # load Species
-        try:
-            key = "Species"
-            self.s = bp.Species.load(file[key])
-        except KeyError:
-            self.s = bp.Species()
-
-        # load Time Grid
-        try:
-            key = "Time_Grid"
-            self.t = bp.Grid.load(file[key])
-        except KeyError:
-            self.t = bp.Grid()
+        self.s = bp.Species()
+        self.t = bp.Grid()
         self.t.ndim = 1
-
-        # load Position Grid
-        try:
-            key = "Position_Grid"
-            self.p = bp.Grid().load(file[key])
-        except KeyError:
-            self.p = bp.Grid()
-
-        # load geometry
-        try:
-            key = "Geometry"
-            self.geometry = bp.Geometry.load(file[key])
-        except KeyError:
-            self.geometry = bp.Geometry()
-
-        # load Velocity Grids
-        try:
-            key = "Velocity_Grids"
-            self.sv = bp.SVGrid.load(file[key])
-        except KeyError:
-            self.sv = bp.SVGrid()
-
-        # load Collisions, if any
-        try:
-            key = "Collisions"
-            self.coll = bp.Collisions.load(file[key])
-        except KeyError:
-            self.coll = bp.Collisions()
-
-        # load Scheme
-        try:
-            key = "Scheme"
-            self.scheme = bp.Scheme.load(file[key])
-        except KeyError:
-            self.scheme = bp.Scheme()
-        # Todo remove this
-        # load output params
-        try:
-            key = "Computation/Output_Parameters"
-            shape = file[key].attrs["shape"]
-            self.output_parameters = file[key][()].reshape(shape)
-        except KeyError:
-            self.output_parameters = np.array([['Mass',
-                                                'Momentum_X'],
-                                               ['Momentum_X',
-                                                'Momentum_Flow_X'],
-                                               ['Energy',
-                                                'Energy_Flow_X']])
-        file.close()
-        # Todo remove this, replace usage by geometry
-        self.init_arr = self.geometry.init_array
-        self.rule_arr = self.geometry.rules
+        self.p = bp.Grid()
+        self.geometry = bp.Geometry()
+        self.sv = bp.SVGrid()
+        self.coll = bp.Collisions()
+        self.scheme = bp.Scheme()
+        self.output_parameters = np.array([['Mass',
+                                            'Momentum_X'],
+                                           ['Momentum_X',
+                                            'Momentum_Flow_X'],
+                                           ['Energy',
+                                            'Energy_Flow_X']])
         self.check_integrity(complete_check=False)
         return
+
+    # Todo remove this, replace usage by geometry
+    @property
+    def init_arr(self):
+        return self.geometry.init_array
+
+    # Todo remove this, replace usage by geometry
+    @property
+    def rule_arr(self):
+        return self.geometry.rules
 
     @property
     def default_directory(self):
@@ -509,8 +456,59 @@ class Simulation:
     #####################################
     #           Serialization           #
     #####################################
-    def save(self,
-             file_address=None):
+    @staticmethod
+    def load(file_address):
+        """Set up and return a :class:`Grid` instance
+        based on the parameters in the given HDF5 group.
+
+        Parameters
+        ----------
+        file_address : :obj:`str`, optional
+            The full path to the simulation (hdf5) file.
+
+        Returns
+        -------
+        self : :class:`Simulation`
+        """
+        assert isinstance(file_address, str)
+        assert os.path.exists(file_address)
+        # Open HDF5 file
+        file = h5py.File(file_address, mode='r')
+        assert file.attrs["class"] == "Simulation"
+        self = Simulation(file_address)
+
+        key = "Species"
+        self.s = bp.Species.load(file[key])
+
+        key = "Time_Grid"
+        self.t = bp.Grid.load(file[key])
+        # Todo this should (needs to) be unnecessary
+        self.t.ndim = 1
+
+        key = "Position_Grid"
+        self.p = bp.Grid().load(file[key])
+
+        key = "Geometry"
+        self.geometry = bp.Geometry.load(file[key])
+
+        key = "Velocity_Grids"
+        self.sv = bp.SVGrid.load(file[key])
+
+        key = "Collisions"
+        self.coll = bp.Collisions.load(file[key])
+
+        key = "Scheme"
+        self.scheme = bp.Scheme.load(file[key])
+
+        key = "Computation/Output_Parameters"
+        shape = file[key].attrs["shape"]
+        self.output_parameters = file[key][()].reshape(shape)
+
+        file.close()
+        self.check_integrity(complete_check=False)
+        return self
+
+    def save(self, file_address=None):
         """Write all parameters of the :class:`Simulation` instance
         to a HDF5 file.
 
@@ -592,6 +590,10 @@ class Simulation:
                 hdf_group.create_dataset(mom_name,
                                          shape=mom_shape,
                                          dtype=float)
+
+        # check that the class can be reconstructed from the save
+        other = Simulation.load(file_address)
+        assert self == other
         file.close()
         return
 

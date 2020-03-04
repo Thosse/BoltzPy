@@ -9,7 +9,7 @@ import boltzpy as bp
 @pytest.mark.parametrize("tf", bp_t.FILES)
 def test_collisions(tf):
     # Compute Output in temporary file
-    sim = bp.Simulation(file_address=tf)
+    sim = bp.Simulation.load(file_address=tf)
     coll = bp.Collisions()
     coll.setup(sim.scheme, sim.sv, sim.s)
     # compare results

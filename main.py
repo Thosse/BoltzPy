@@ -4,8 +4,10 @@ import boltzpy as bp
 import numpy as np
 
 exisiting_simulation_file = None
-sim = bp.Simulation(exisiting_simulation_file)
-if exisiting_simulation_file is None:
+if exisiting_simulation_file is not None:
+    sim = bp.Simulation.load(exisiting_simulation_file)
+else:
+    sim = bp.Simulation(exisiting_simulation_file)
     sim.add_specimen(mass=2, collision_rate=[50])
     sim.add_specimen(mass=3, collision_rate=[50, 50])
     sim.setup_time_grid(max_time=1,

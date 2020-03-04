@@ -204,7 +204,9 @@ class Collisions:
 
     @relations.setter
     def relations(self, new_relations):
-        new_collisions = [Collision(rel, 0.0) for rel in new_relations]
+        new_collisions = np.array(
+            [Collision(rel, 0.0) for rel in new_relations],
+            dtype=object)
         if self.collisions is not None:
             for (i, old_coll) in enumerate(self.collisions):
                 new_collisions[i].weight = old_coll.weight
@@ -217,8 +219,9 @@ class Collisions:
 
     @weights.setter
     def weights(self, new_weights):
-        new_collisions = [Collision(np.zeros((4,), dtype=int), w)
-                          for w in new_weights]
+        new_collisions = np.array(
+            [Collision(np.zeros((4,), dtype=int), w) for w in new_weights],
+            dtype=object)
         if self.collisions is not None:
             for (i, old_coll) in enumerate(self.collisions):
                 new_collisions[i].relation = old_coll.relation
@@ -409,6 +412,10 @@ class Collisions:
             hdf5_group["Relations"] = self.relations
         if self.weights is not None:
             hdf5_group["Weights"] = self.weights
+
+        # check that the class can be reconstructed from the save
+        other = Collisions.load(hdf5_group)
+        assert self == other
         return
 
     #####################################

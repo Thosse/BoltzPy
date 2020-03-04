@@ -15,7 +15,7 @@ def test_file_exists(tc):
 
 @pytest.mark.parametrize("test_case", bp_t.CASES)
 def test_file_initializes_the_correct_simulation(test_case):
-    sim = bp.Simulation(test_case.file_address)
+    sim = bp.Simulation.load(test_case.file_address)
     assert test_case["s"] == sim.s
     assert test_case["t"] == sim.t
     assert test_case["p"] == sim.p

@@ -10,7 +10,7 @@ import boltzpy as bp
 @pytest.mark.parametrize("tf", bp_t.FILES)
 def test_reflected_indices_inverse(tf):
     # Compute Output in temporary file
-    sim = bp.Simulation(file_address=tf)
+    sim = bp.Simulation.load(file_address=tf)
     for r in sim.geometry.rules:
         if not isinstance(r, bp.BoundaryPointRule):
             continue
