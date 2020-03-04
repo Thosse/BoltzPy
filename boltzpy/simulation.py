@@ -509,31 +509,30 @@ class Simulation:
     #####################################
     #           Serialization           #
     #####################################
-    def save(self, file_address=None):
+    def save(self,
+             file_address=None):
         """Write all parameters of the :class:`Simulation` instance
         to a HDF5 file.
 
         Parameters
         ----------
         file_address : :obj:`str`, optional
-            Change the instances :attr:`file_address` to this value.
-
             Is either a full path, a base file name or a file root.
             If it is a base file name or a file root,
             then the file is placed in the
-            :attr:`~boltzpy.constants.DEFAULT_DIRECTORY`.
+            :attr:`~Simulation.default_directory`.
         """
         # Change Simulation.file_name, if file_address is given
-        if file_address is not None:
-            self.file_address = file_address
-        del file_address
-
+        if file_address is None:
+            file_address = self.file_address
+        else:
+            assert isinstance(file_address, str)
+            assert not os.path.exists(file_address)
         # Sanity Check before saving
         self.check_integrity(False)
 
-        # Todo if results exist -> don't overwrite! force=False?
         # Create new HDF5 file (deletes all old data, if any)
-        file = h5py.File(self.file_address, mode='w')
+        file = h5py.File(file_address, mode='w')
         file.attrs["class"] = "Simulation"
 
         # Save Species
