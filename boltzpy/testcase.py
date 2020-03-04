@@ -163,7 +163,7 @@ class TestCase(dict):
         sim = self.create_simulation(file_address=file_address)
         sim.save()
         sim.compute()
-        return h5py.File(sim.file_address + ".hdf5", mode='r')
+        return h5py.File(sim.file_address, mode='r')
 
 
 ################################################################################
@@ -191,10 +191,11 @@ CASES.append(TestCase("shock_2species_complete",
                       output_parameters=np.array([["Complete_Distribution"]])))
 
 FILES = [tc.file_address for tc in CASES]
+
+
 ################################################################################
 #                                   Main                                       #
 ################################################################################
-
 def replace_all_tests():
     msg = input("Are you absolutely sure? "
                 "You are about to replace all test cases (yes/no)")

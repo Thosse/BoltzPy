@@ -2,7 +2,6 @@ import os
 import h5py
 import numpy as np
 
-import boltzpy.helpers.file_addresses as h_adr
 import boltzpy.helpers.TimeTracker as h_tt
 import boltzpy.AnimatedFigure as bp_af
 import boltzpy.compute as bp_cp
@@ -93,15 +92,15 @@ class Simulation:
 
     def __init__(self, file_address=None):
         # set file address (using a setter method)
-        [self._file_directory, self._file_root] = ['', '']
+        [self._file_directory, self._file_name] = ['', '']
         self.file_address = file_address
         del file_address  # not needed anymore, could lead to typos
 
         # Open HDF5 file
-        if os.path.exists(self.file_address + '.hdf5'):
-            file = h5py.File(self.file_address + '.hdf5', mode='r')
+        if os.path.exists(self.file_address):
+            file = h5py.File(self.file_address, mode='r')
         else:
-            file = h5py.File(self.file_address + '.hdf5', mode='w-')
+            file = h5py.File(self.file_address, mode='w-')
             file.attrs["class"] = "Simulation"
 
         #######################
@@ -177,30 +176,42 @@ class Simulation:
         return
 
     @property
+    def default_directory(self):
+        return __file__[:-21] + 'Simulations/'
+
+    @property
     def file_address(self):
         """:obj:`str` :
         Full path of the :class:`Simulation` file.
         """
-        return self._file_directory + self._file_root
+        return self._file_directory + self._file_name
 
     @file_address.setter
-    def file_address(self, new_file_address):
-        # separate file directory and file root, using a helper function
-        # This standardizes the naming scheme
-        h_separate = h_adr.split_address
-        [new_file_directory, new_file_root] = h_separate(new_file_address)
-        new_file_address = new_file_directory + new_file_root
-        # Sanity check on (standardized) file address
-        self.check_parameters(file_address=new_file_address)
-        # change file_address
-        [self._file_directory, self._file_root] = [new_file_directory,
-                                                   new_file_root]
+    def file_address(self, address):
+        if address is None:
+            self._file_directory = self.default_directory
+            idx = 0
+            self._file_name = str(idx) + ".hdf5"
+            while os.path.exists(self.file_address):
+                idx += 1
+                self._file_name = str(idx) + ".hdf5"
+        else:
+            # separate file directory and file root
+            begin_filename = address.rfind("/") + 1
+            self._file_directory = address[0: begin_filename]
+            self._file_name = address[begin_filename:]
+            # if no directory given -> put it in the default directory
+            if self._file_directory == '':
+                self._file_directory = self.default_directory
+            # remove hdf5 ending, if any
+            if self._file_name[-5:] != '.hdf5':
+                self._file_name = self._file_name + ".hdf5"
         self.check_parameters(file_address=self.file_address)
         return
 
     @property
     def results(self):
-        file = h5py.File(self.file_address + '.hdf5', mode='r+')
+        file = h5py.File(self.file_address, mode='r+')
         return file["results"]
 
     @property
@@ -492,7 +503,7 @@ class Simulation:
                 else:
                     raise Exception
                 ax.plot(xdata, ydata)
-        figure.save(self.file_address + '.mp4')
+        figure.save(self.file_address[:-5] + '.mp4')
         return
 
     #####################################
@@ -501,10 +512,6 @@ class Simulation:
     def save(self, file_address=None):
         """Write all parameters of the :class:`Simulation` instance
         to a HDF5 file.
-
-        If a *file_address* is given, then this method works as a 'save as'.
-        In this case the :attr:`file_address` of the instance is changed
-        and the newly named instance is saved to a new .hdf5 file.
 
         Parameters
         ----------
@@ -526,7 +533,7 @@ class Simulation:
 
         # Todo if results exist -> don't overwrite! force=False?
         # Create new HDF5 file (deletes all old data, if any)
-        file = h5py.File(self.file_address + ".hdf5", mode='w')
+        file = h5py.File(self.file_address, mode='w')
         file.attrs["class"] = "Simulation"
 
         # Save Species
@@ -748,7 +755,7 @@ class Simulation:
         A human readable string which describes all attributes of the instance.
         """
         description = ''
-        description += 'Simulation File = ' + self.file_address + '.hdf5\n'
+        description += 'Simulation File = ' + self.file_address + '\n'
         description += 'Species\n'
         description += '-------\n'
         description += '\t' + self.s.__str__().replace('\n', '\n\t')

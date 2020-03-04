@@ -1,15 +1,5 @@
 import os
 
-#: :obj:`str` : Default directory for simulation files.
-#: If no full path is given,
-#: then the file will be located in this directory.
-DEFAULT_DIRECTORY = __file__[:-20] + 'Simulations/'
-
-
-#: :obj:`str` : Default file root for simulation files.
-#: If no file name is given at all, then the file root will be this.
-DEFAULT_FILE_ROOT = "_unnamed_"
-
 #: :obj:`tuple` [:obj:`int`] : Default aspect ratio for plots in
 #: :class:`~boltzpy.animation.Animation`.
 DEFAULT_FIGSIZE = (16, 9)
@@ -45,7 +35,7 @@ SUPP_COLORS = ['blue', 'red', 'green',
 
 #: :obj:`set` [:obj:`str`] :
 #: Set of all characters, that are forbidden in any file addresses.
-INVALID_CHARACTERS = {'.', '"', "'", '/', '§', '$', '&',
+INVALID_CHARACTERS = {'"', "'", '/', '§', '$', '&',
                       '+', '#', ',', ';', '\\', '`', '´'}
 
 #: :obj:`set` [:obj:`int`] :
