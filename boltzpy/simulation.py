@@ -11,7 +11,7 @@ import boltzpy.constants as bp_c
 import boltzpy as bp
 
 
-class Simulation:
+class Simulation(bp.BaseClass):
     r"""Handles all aspects of a single simulation.
 
     Each instance correlates to a single file
@@ -732,23 +732,6 @@ class Simulation:
         if scheme is not None:
             scheme.check_integrity(complete_check)
         return
-
-    def __eq__(self, other):
-        if not isinstance(other, Simulation):
-            return False
-        if set(self.__dict__.keys()) != set(other.__dict__.keys()):
-            return False
-        for (key, value) in self.__dict__.items():
-            other_value = other.__dict__[key]
-            if type(value) != type(other_value):
-                return False
-            if isinstance(value, np.ndarray):
-                if np.any(value != other_value):
-                    return False
-            else:
-                if value != other_value:
-                    return False
-        return True
 
     def __str__(self,
                 write_physical_grids=False):

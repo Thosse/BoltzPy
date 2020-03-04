@@ -7,7 +7,7 @@ import h5py
 import boltzpy as bp
 
 
-class Collision:
+class Collision(bp.BaseClass):
     r"""Encapsulates the :attr:`relation` and :attr:`weight`
     of any single Collision.
 
@@ -147,26 +147,9 @@ class Collision:
             return False
         return True
 
-    def __eq__(self, other):
-        if not isinstance(other, Collision):
-            return False
-        if set(self.__dict__.keys()) != set(other.__dict__.keys()):
-            return False
-        for (key, value) in self.__dict__.items():
-            other_value = other.__dict__[key]
-            if type(value) != type(other_value):
-                return False
-            if isinstance(value, np.ndarray):
-                if np.any(value != other_value):
-                    return False
-            else:
-                if value != other_value:
-                    return False
-        return True
-
 
 # Todo Remove this class, move into model
-class Collisions:
+class Collisions(bp.BaseClass):
     r"""Generates and encapsulates the collision :attr:`relations`
     and :attr:`weights`.
 
@@ -447,23 +430,6 @@ class Collisions:
                     # Todo add conserves energy check
             assert all(w > 0 for w in self.weights.flatten())
         return
-    
-    def __eq__(self, other):
-        if not isinstance(other, Collisions):
-            return False
-        if set(self.__dict__.keys()) != set(other.__dict__.keys()):
-            return False
-        for (key, value) in self.__dict__.items():
-            other_value = other.__dict__[key]
-            if type(value) != type(other_value):
-                return False
-            if isinstance(value, np.ndarray):
-                if np.any(value != other_value):
-                    return False
-            else:
-                if value != other_value:
-                    return False
-        return True
 
 
 ##############################################

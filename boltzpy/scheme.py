@@ -5,7 +5,7 @@ import boltzpy as bp
 
 # Todo Scheme might needs a data (cpu/GPU) parameter
 # noinspection PyPep8Naming
-class Scheme:
+class Scheme(bp.BaseClass):
     """Encapsulates all parameters related to the
     choice or adjustment of computation algorithms.
 
@@ -185,20 +185,3 @@ class Scheme:
         rep = rep[:-2]
         rep += ')'
         return rep
-
-    def __eq__(self, other):
-        if not isinstance(other, Scheme):
-            return False
-        if set(self.__dict__.keys()) != set(other.__dict__.keys()):
-            return False
-        for (key, value) in self.__dict__.items():
-            other_value = other.__dict__[key]
-            if type(value) != type(other_value):
-                return False
-            if isinstance(value, np.ndarray):
-                if np.any(value != other_value):
-                    return False
-            else:
-                if value != other_value:
-                    return False
-        return True

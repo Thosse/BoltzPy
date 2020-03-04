@@ -5,7 +5,7 @@ import boltzpy as bp
 import boltzpy.constants as bp_c
 
 
-class SVGrid:
+class SVGrid(bp.BaseClass):
     r"""Manages the Velocity Grids of all
     :class:`~boltzpy.Species`.
 
@@ -524,23 +524,6 @@ class SVGrid:
                 for G in vGrids:
                     assert np.shares_memory(iMG, G.iG)
         return
-
-    def __eq__(self, other):
-        if not isinstance(other, SVGrid):
-            return False
-        if set(self.__dict__.keys()) != set(other.__dict__.keys()):
-            return False
-        for (key, value) in self.__dict__.items():
-            other_value = other.__dict__[key]
-            if type(value) != type(other_value):
-                return False
-            if isinstance(value, np.ndarray):
-                if np.any(value != other_value):
-                    return False
-            else:
-                if value != other_value:
-                    return False
-        return True
 
     def __str__(self,
                 write_physical_grid=False):
