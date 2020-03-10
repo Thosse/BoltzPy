@@ -131,28 +131,36 @@ class TestCase(bp.Simulation):
         """
         return self.default_directory + '_tmp_.hdf5'
 
-    def create_simulation(self, file_address=None):
-        if file_address is None:
-            file_address = self.file_address
-        sim = bp.Simulation(file_address)
-        sim.s = self.s
-        sim.t = self.t
-        sim.p = self.p
-        sim.sv = self.sv
-        sim.geometry = self.geometry
-        sim.scheme = self.scheme
-        sim.output_parameters = self.output_parameters
-        sim.coll = self.coll
-        return sim
+    # @property
+    # def results(self):
+    #     output = super().results
+    #     for (s, species_name) in enumerate(self.s.names):
+    #         [beg, end] = self.sv.index_range[s]
+    #         velocities = end - beg
+    #         shape = (self.t.size, self.p.size, velocities)
+    #         output[species_name]['complete_distribution'] = shape
+    #     return output
 
-    def create_file(self, file_address=None):
-        if file_address is None:
-            file_address = self.file_address
-        assert not os.path.exists(file_address)
-        sim = self.create_simulation(file_address=file_address)
-        sim.save()
-        sim.compute()
-        return h5py.File(sim.file_address, mode='r')
+    @staticmethod
+    def load(file_address):
+        """Set up and return a :class:`TestCase` instance
+        based on the parameters in the given HDF5 group.
+
+        Parameters
+        ----------
+        file_address : :obj:`str`, optional
+            The full path to the simulation (hdf5) file.
+
+        Returns
+        -------
+        self : :class:`TestCase`
+        """
+        simulation = bp.Simulation.load(file_address)
+        self = TestCase(file_address)
+        for (key, value) in simulation.__dict__.items():
+            self.__setattr__(key, value)
+        self.check_integrity(complete_check=False)
+        return self
 
 
 ################################################################################
@@ -193,6 +201,6 @@ def replace_all_tests():
             print("TestCase = ", tc.file_address)
             assert isinstance(tc, TestCase)
             os.remove(tc.file_address)
-            tc.create_file()
+            tc.save()
     else:
         print("Aborted replacing testcases!")

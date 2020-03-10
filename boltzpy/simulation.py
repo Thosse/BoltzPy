@@ -157,18 +157,21 @@ class Simulation(bp.BaseClass):
         return
 
     @property
-    def results(self):
-        file = h5py.File(self.file_address, mode='r+')
-        return file["results"]
+    def file(self):
+        return h5py.File(self.file_address, mode="r+")
 
     @property
-    def output_shape(self):
-        return {'particle_number': (self.t.size, self.p.size),
+    def results(self):
+        output = dict()
+        for (s, species_name) in enumerate(self.s.names):
+            output[species_name] = {
+                'particle_number': (self.t.size, self.p.size),
                 'mean_velocity': (self.t.size, self.p.size, self.sv.ndim),
                 'Momentum_Flow_X': (self.t.size, self.p.size),
                 'temperature': (self.t.size, self.p.size),
                 'Energy_Flow_X': (self.t.size, self.p.size)
-                }
+            }
+        return output
 
     @property
     def n_rules(self):
@@ -363,9 +366,33 @@ class Simulation(bp.BaseClass):
     #           "A new computation is not necessary")
     #     return
     # else (KeyError, AssertionError):
-    def compute(self):
+    def compute(self,
+                file_address=None):
         """Compute the fully configured Simulation"""
         self.check_integrity()
+        if file_address is None:
+            file_address = self.file_address
+        # Save current state to a hdf file
+        self.save(file_address)
+        hdf_file = h5py.File(file_address, mode="r+")
+        # Prepare storage of results
+        # Todo move this into separate method, replace results?
+        key = "results"
+        hdf_file.create_group(key)
+        hdf_group = hdf_file[key]
+        # store index of current time step
+        hdf_group.attrs["t"] = 1
+        # set up separate subgroup for each species
+        for species_name in self.s.names:
+            hdf_group.create_group(species_name)
+            spc_group = hdf_group[species_name]
+            spc_results = self.results[species_name]
+            # set up separate dataset for each moment
+            for (name, shape) in spc_results.items():
+                spc_group.create_dataset(name,
+                                         shape=shape,
+                                         dtype=float)
+
         # Generate Computation data
         data = bp.Data(self.file_address)
         data.check_stability_conditions()
@@ -380,28 +407,28 @@ class Simulation(bp.BaseClass):
                 bp_cp.operator_splitting(data,
                                          self.geometry.transport,
                                          self.geometry.collision)
-            self.write_results(data, tw_idx)
+            self.write_results(data, tw_idx, hdf_group)
             # print time estimate
             time_tracker.print(tw, data.tG[-1, 0])
         return
 
-    def write_results(self, data, tw_idx):
+    def write_results(self, data, tw_idx, hdf_group):
         for (s, species_name) in enumerate(self.s.names):
             (beg, end) = self.sv.index_range[s]
             dv = data.dv[s]
             mass = data.m[s]
             velocities = data.vG[beg:end, :]
-            hdf_group = self.results[species_name]
+            spc_group = hdf_group[species_name]
             # particle_number
             particle_number = bp_m.particle_number(data.state[..., beg:end], dv)
-            hdf_group["particle_number"][tw_idx] = particle_number
+            spc_group["particle_number"][tw_idx] = particle_number
 
             # mean velocity
             mean_velocity = bp_m.mean_velocity(data.state[..., beg:end],
                                                dv,
                                                velocities,
                                                particle_number)
-            hdf_group["mean_velocity"][tw_idx] = mean_velocity
+            spc_group["mean_velocity"][tw_idx] = mean_velocity
 
             # temperature
             temperature = bp_m.temperature(data.state[..., beg:end],
@@ -410,21 +437,22 @@ class Simulation(bp.BaseClass):
                                            mass,
                                            particle_number,
                                            mean_velocity)
-            hdf_group["temperature"][tw_idx] = temperature
+            spc_group["temperature"][tw_idx] = temperature
 
             Momentum_Flow_X = bp_out.momentum_flow_x(data)
-            hdf_group["Momentum_Flow_X"][tw_idx] = Momentum_Flow_X[..., s]
+            spc_group["Momentum_Flow_X"][tw_idx] = Momentum_Flow_X[..., s]
             Energy_Flow_X = bp_out.energy_flow_x(data)
-            hdf_group["Energy_Flow_X"][tw_idx] = Energy_Flow_X[..., s]
+            spc_group["Energy_Flow_X"][tw_idx] = Energy_Flow_X[..., s]
         # update index of current time step
-        self.results.attrs["t"] = tw_idx + 1
+        hdf_group.attrs["t"] = tw_idx + 1
         return
 
     #####################################
     #             Animation             #
     #####################################
     def animate(self, shape=(3, 2), *moments):
-        tmax = int(self.results.attrs["t"])
+        hdf_group = self.file["result"]
+        tmax = int(hdf_group.attrs["t"])
         figure = bp_af.AnimatedFigure(tmax=tmax)
         if not moments:
             moments = ['particle_number',
@@ -442,11 +470,11 @@ class Simulation(bp.BaseClass):
             ax = figure.add_subplot(shape + (1 + m,),
                                     title=moment)
             for species_name in self.s.names:
-                hdf_group = self.results[species_name]
-                if hdf_group[moment].ndim == 2:
-                    ydata = hdf_group[moment][..., 1:-1]
-                elif hdf_group[moment].ndim == 3:
-                    ydata = hdf_group[moment][..., 1:-1, 0]
+                spc_group = hdf_group[species_name]
+                if spc_group[moment].ndim == 2:
+                    ydata = spc_group[moment][..., 1:-1]
+                elif spc_group[moment].ndim == 3:
+                    ydata = spc_group[moment][..., 1:-1, 0]
                 else:
                     raise Exception
                 ax.plot(xdata, ydata)
@@ -458,7 +486,7 @@ class Simulation(bp.BaseClass):
     #####################################
     @staticmethod
     def load(file_address):
-        """Set up and return a :class:`Grid` instance
+        """Set up and return a :class:`Simulation` instance
         based on the parameters in the given HDF5 group.
 
         Parameters
@@ -576,24 +604,15 @@ class Simulation(bp.BaseClass):
                                  dtype=h5py_string_type).flatten()
             file[key].attrs["shape"] = self.output_parameters.shape
 
-        # Prepare results
-        key = "results"
-        file.create_group(key)
-        # store index of current time step
-        self.results.attrs["t"] = 1
-        # set up separate subgroup for each species
-        for species_name in self.s.names:
-            file[key].create_group(species_name)
-            hdf_group = file[key][species_name]
-            # set up separate dataset for each moment
-            for (mom_name, mom_shape) in self.output_shape.items():
-                hdf_group.create_dataset(mom_name,
-                                         shape=mom_shape,
-                                         dtype=float)
-
-        # check that the class can be reconstructed from the save
+        # assert that the instance can be reconstructed from the save
         other = Simulation.load(file_address)
-        assert self == other
+        # if a different file name is given then, the check MUST fail
+        if file_address == self.file_address:
+            # self might be a child class, other is a Simulation
+            # this lets child classes
+            assert other.__eq__(self)
+        else:
+            assert not other.__eq__(self)
         file.close()
         return
 
