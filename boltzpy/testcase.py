@@ -7,7 +7,7 @@ import os
 
 class TestCase(bp.Simulation):
     def __init__(self,
-                 file_name,
+                 file_address,
                  s=None,
                  t=None,
                  p=None,
@@ -16,7 +16,7 @@ class TestCase(bp.Simulation):
                  geometry=None,
                  scheme=None,
                  output_parameters=None):
-        super().__init__(file_name)
+        super().__init__(file_address)
 
         if s is None:
             s = bp.Species()
@@ -156,9 +156,12 @@ class TestCase(bp.Simulation):
         self : :class:`TestCase`
         """
         simulation = bp.Simulation.load(file_address)
-        self = TestCase(file_address)
-        for (key, value) in simulation.__dict__.items():
-            self.__setattr__(key, value)
+        # ignore private attributes
+        params = {key: value
+                  for (key, value) in simulation.__dict__.items()
+                  if key[0] == "_"}
+        params["file_address"] = simulation.file_address
+        self = TestCase(**params)
         self.check_integrity(complete_check=False)
         return self
 
@@ -201,6 +204,6 @@ def replace_all_tests():
             print("TestCase = ", tc.file_address)
             assert isinstance(tc, TestCase)
             os.remove(tc.file_address)
-            tc.save()
+            tc.compute()
     else:
         print("Aborted replacing testcases!")
