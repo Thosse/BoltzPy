@@ -18,6 +18,8 @@ def test_file_initializes_the_correct_simulation(tc):
     sim = bp.Simulation.load(tc.file_address)
     assert sim.__eq__(tc, True)
     assert not tc.__eq__(sim, False)
+    new_tc = bp_t.TestCase.load(tc.file_address)
+    assert new_tc == tc
 
 
 @pytest.mark.parametrize("tc", bp_t.CASES)

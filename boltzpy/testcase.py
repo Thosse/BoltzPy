@@ -131,15 +131,26 @@ class TestCase(bp.Simulation):
         """
         return self.default_directory + '_tmp_.hdf5'
 
-    # @property
-    # def results(self):
-    #     output = super().results
-    #     for (s, species_name) in enumerate(self.s.names):
-    #         [beg, end] = self.sv.index_range[s]
-    #         velocities = end - beg
-    #         shape = (self.t.size, self.p.size, velocities)
-    #         output[species_name]['complete_distribution'] = shape
-    #     return output
+    @property
+    def shape_of_results(self):
+        shape_of_results = super().shape_of_results
+        for (s, species_name) in enumerate(self.s.names):
+            [beg, end] = self.sv.index_range[s]
+            velocities = end - beg
+            shape = (self.t.size, self.p.size, velocities)
+            shape_of_results[species_name]['state'] = shape
+        return shape_of_results
+
+    def write_results(self, data, tw_idx, hdf_group):
+        super().write_results(data, tw_idx, hdf_group)
+        for (s, species_name) in enumerate(self.s.names):
+            (beg, end) = self.sv.index_range[s]
+            spc_group = hdf_group[species_name]
+            # complete distribution
+            spc_group["state"][tw_idx] = data.state[..., beg:end]
+        # update index of current time step
+        hdf_group.attrs["t"] = tw_idx + 1
+        return
 
     @staticmethod
     def load(file_address):
@@ -159,7 +170,7 @@ class TestCase(bp.Simulation):
         # ignore private attributes
         params = {key: value
                   for (key, value) in simulation.__dict__.items()
-                  if key[0] == "_"}
+                  if key[0] != "_"}
         params["file_address"] = simulation.file_address
         self = TestCase(**params)
         self.check_integrity(complete_check=False)

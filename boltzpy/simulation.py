@@ -161,7 +161,7 @@ class Simulation(bp.BaseClass):
         return h5py.File(self.file_address, mode="r+")
 
     @property
-    def results(self):
+    def shape_of_results(self):
         output = dict()
         for (s, species_name) in enumerate(self.s.names):
             output[species_name] = {
@@ -386,7 +386,7 @@ class Simulation(bp.BaseClass):
         for species_name in self.s.names:
             hdf_group.create_group(species_name)
             spc_group = hdf_group[species_name]
-            spc_results = self.results[species_name]
+            spc_results = self.shape_of_results[species_name]
             # set up separate dataset for each moment
             for (name, shape) in spc_results.items():
                 spc_group.create_dataset(name,
@@ -605,14 +605,12 @@ class Simulation(bp.BaseClass):
             file[key].attrs["shape"] = self.output_parameters.shape
 
         # assert that the instance can be reconstructed from the save
-        other = Simulation.load(file_address)
+        other = self.load(file_address)
         # if a different file name is given then, the check MUST fail
         if file_address == self.file_address:
-            # self might be a child class, other is a Simulation
-            # this lets child classes
-            assert other.__eq__(self)
+            assert self == other
         else:
-            assert not other.__eq__(self)
+            assert not self == other
         file.close()
         return
 
