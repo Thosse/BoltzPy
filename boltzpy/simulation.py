@@ -167,9 +167,11 @@ class Simulation(bp.BaseClass):
             output[species_name] = {
                 'particle_number': (self.t.size, self.p.size),
                 'mean_velocity': (self.t.size, self.p.size, self.sv.ndim),
-                'Momentum_Flow_X': (self.t.size, self.p.size),
+                'momentum': (self.t.size, self.p.size, self.sv.ndim),
+                'momentum_flow': (self.t.size, self.p.size, self.sv.ndim),
                 'temperature': (self.t.size, self.p.size),
-                'Energy_Flow_X': (self.t.size, self.p.size)
+                'energy': (self.t.size, self.p.size),
+                'energy_flow': (self.t.size, self.p.size, self.sv.ndim)
             }
         return output
 
@@ -441,10 +443,30 @@ class Simulation(bp.BaseClass):
                                            mean_velocity)
             spc_group["temperature"][tw_idx] = temperature
 
-            Momentum_Flow_X = bp_out.momentum_flow_x(data)
-            spc_group["Momentum_Flow_X"][tw_idx] = Momentum_Flow_X[..., s]
-            Energy_Flow_X = bp_out.energy_flow_x(data)
-            spc_group["Energy_Flow_X"][tw_idx] = Energy_Flow_X[..., s]
+            # momentum
+            spc_group["momentum"][tw_idx] = bp_out.momentum(
+                spc_state,
+                dv,
+                velocities,
+                mass)
+            # momentum flow
+            spc_group["momentum_flow"][tw_idx] = bp_out.momentum_flow(
+                spc_state,
+                dv,
+                velocities,
+                mass)
+            # energy
+            spc_group["energy"][tw_idx] = bp_out.energy(
+                spc_state,
+                dv,
+                velocities,
+                mass)
+            # energy flow
+            spc_group["energy_flow"][tw_idx] = bp_out.energy_flow(
+                spc_state,
+                dv,
+                velocities,
+                mass)
         # update index of current time step
         hdf_group.attrs["t"] = tw_idx + 1
         return
@@ -452,17 +474,17 @@ class Simulation(bp.BaseClass):
     #####################################
     #             Animation             #
     #####################################
-    def animate(self, shape=(3, 2), *moments):
+    def animate(self, shape=(3, 2), moments=None):
         hdf_group = self.file["results"]
         tmax = int(hdf_group.attrs["t"])
         figure = bp_af.AnimatedFigure(tmax=tmax)
-        if not moments:
+        if moments is None:
             moments = ['particle_number',
                        'mean_velocity',
-                       'mean_velocity',
-                       'Momentum_Flow_X',
+                       'momentum',
+                       'momentum_flow',
                        'temperature',
-                       'Energy_Flow_X']
+                       'energy']
         else:
             assert len(moments) <= np.prod(shape)
         # xdata (geometry) is shared over all plots

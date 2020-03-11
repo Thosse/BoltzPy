@@ -94,7 +94,9 @@ def temperature(distribution,
         """
     assert distribution.ndim == 2
     dimension = velocities.shape[1]
+    velocities = velocities[np.newaxis, ...]
+    mean_velocities = mean_velocities[:, np.newaxis, :]
     factor = mass * delta_v**2 / (dimension * particle_numbers)
-    deviation = np.sum((velocities[np.newaxis, ...] - mean_velocities[:, np.newaxis, :]) ** 2,
+    deviation = np.sum((velocities - mean_velocities) ** 2,
                        axis=2)
     return factor * np.sum(deviation * distribution, axis=1)

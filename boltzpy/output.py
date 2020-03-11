@@ -1,106 +1,126 @@
 
 import numpy as np
-import boltzpy.momenta as bp_m
-
-# Todo separate the moment functions to work on a single (spc) grid
-#  and return that result, move for loop into call
 
 
-# Todo Multiply by some constant, for realistic values
-def density(data):
-    """Calculates and returns the particle density"""
-    # shape = (position_grid.size, species.size)
-    shape = (data.p_size, data.n_spc)
-    result = np.empty(shape, dtype=float)
-    for (s_idx, [beg, end]) in enumerate(data.v_range):
-        # mass is the sum over velocity grid of specimen
-        result[..., s_idx] = np.sum(data.state[..., beg:end], axis=-1)
-    return result
+def momentum(state,
+             delta_v,
+             velocities,
+             mass):
+    r"""Compute the momentum of the current distribution.
 
+    Note
+    ----
+    Be aware that this must be computed separately for each single specimen.
 
-def mass(data):
-    """Calculates and returns the mass"""
-    # shape = (position_grid.size, species.size)
-    shape = (data.p_size, data.n_spc)
-    result = np.empty(shape, dtype=float)
-    for (s_idx, [beg, end]) in enumerate(data.v_range):
-        # mass is the sum over velocity grid of specimen
-        result[..., s_idx] = np.sum(data.state[..., beg:end],
-                                    axis=-1)
-        dv = data.dv[s_idx]
-        particles = bp_m.particle_number(data.state[..., beg:end],
-                                         dv)
-        result[..., s_idx] = particles
-    return result
-
-
-def momentum_x(data):
-    # shape = (position_grid.size, species.size)
-    shape = (data.p_size, data.n_spc)
-    result = np.zeros(shape, dtype=float)
-    for (s_idx, [beg, end]) in enumerate(data.v_range):
-        velocities = data.vG[beg:end, :]
-        dv = data.dv[s_idx]
-        particles = bp_m.particle_number(data.state[..., beg:end],
-                                         dv)
-        mean_velocity = bp_m.mean_velocity(data.state[..., beg:end],
-                                           dv,
-                                           velocities,
-                                           particles)
-        result[..., s_idx] = mean_velocity[..., 0]
-    return result
-
-
-def momentum_flow_x(data):
-    # shape = (position_grid.size, species.size)
-    shape = (data.p_size, data.n_spc)
-    result = np.zeros(shape, dtype=float)
-    for (s_idx, [beg, end]) in enumerate(data.v_range):
-        V_dir = data.vG[beg:end, 0]
-        result[..., s_idx] = np.sum(V_dir ** 2 * data.state[..., beg:end],
-                                    axis=1)
-        result[..., s_idx] *= data.m[s_idx]
-    return result
-
-def energy(data):
-    """Calculates and returns the energy"""
-    # shape = (position_grid.size, species.size)
-    shape = (data.p_size, data.n_spc)
-    result = np.zeros(shape, dtype=float)
-    for (s_idx, [beg, end]) in enumerate(data.v_range):
-        velocities = data.vG[beg:end, :]
-        mass = data.m[s_idx]
-        dv = data.dv[s_idx]
-        particles = bp_m.particle_number(data.state[..., beg:end],
-                                         dv)
-        mean_velocity = bp_m.mean_velocity(data.state[..., beg:end],
-                                           dv,
-                                           velocities,
-                                           particles)
-        result[..., s_idx] = bp_m.temperature(data.state[..., beg:end],
-                                              dv,
-                                              velocities,
-                                              mass,
-                                              particles,
-                                              mean_velocity)
-    return result
-
-
-def energy_flow_x(data):
-    # shape = (position_grid.size, species.size)
-    shape = (data.p_size, data.n_spc)
-    result = np.zeros(shape, dtype=float)
-    for (s_idx, [beg, end]) in enumerate(data.v_range):
-        V = data.vG[beg:end, :]
-        V_norm = np.sqrt(np.sum(V ** 2, axis=1))
-        V_dir = data.vG[beg:end, 0]
-        result[..., s_idx] = np.sum(V_norm * V_dir * data.state[..., beg:end],
-                                    axis=1)
-        result[..., s_idx] *= 0.5 * data.m[s_idx]
-    return result
-
-
-def complete_distribution(data):
-    """Returns complete distribution of given data
+    Parameters
+    ----------
+    state : :obj:`~numpy.ndarray` [:obj:`float`]
+        A discretized velocity distribution function.
+        Must be 2D array.
+        For homogeneous case, add a np.newaxis.
+    delta_v : :obj:`float`
+        The physical spacing of the respective velocity grid.
+    velocities: :obj:`~numpy.ndarray` [:obj:`float`]
+        An array of all velocities.
+        Each velocity is either 2 or 3 dimensional.
+        Must be a 2D array.
+    mass : :obj:`int`
+        The particle mass of the species.
     """
-    return data.state
+    assert state.ndim == 2
+    weighted_state = state * mass * delta_v**2
+    return np.dot(weighted_state, velocities)
+
+
+def energy(state,
+           delta_v,
+           velocities,
+           mass):
+    r"""Compute the energy of the current distribution.
+
+    Note
+    ----
+    Be aware that this must be computed separately for each single specimen.
+
+    Parameters
+    ----------
+    state : :obj:`~numpy.ndarray` [:obj:`float`]
+        A discretized velocity distribution function.
+        Must be 2D array.
+        For homogeneous case, add a np.newaxis.
+    delta_v : :obj:`float`
+        The physical spacing of the respective velocity grid.
+    velocities: :obj:`~numpy.ndarray` [:obj:`float`]
+        An array of all velocities.
+        Each velocity is either 2 or 3 dimensional.
+        Must be a 2D array.
+    mass : :obj:`int`
+        The particle mass of the species.
+    """
+    assert state.ndim == 2
+    dim = velocities.shape[1]
+    energies = 0.5 * mass * np.sum(velocities**2, axis=1)
+    weighted_state = state * delta_v**dim
+    return np.dot(weighted_state, energies)
+
+
+def momentum_flow(state,
+                  delta_v,
+                  velocities,
+                  mass):
+    r"""Compute the momentum flow of the current distribution.
+
+    Note
+    ----
+    Be aware that this must be computed separately for each single specimen.
+
+    Parameters
+    ----------
+    state : :obj:`~numpy.ndarray` [:obj:`float`]
+        A discretized velocity distribution function.
+        Must be 2D array.
+        For homogeneous case, add a np.newaxis.
+    delta_v : :obj:`float`
+        The physical spacing of the respective velocity grid.
+    velocities: :obj:`~numpy.ndarray` [:obj:`float`]
+        An array of all velocities.
+        Each velocity is either 2 or 3 dimensional.
+        Must be a 2D array.
+    mass : :obj:`int`
+        The particle mass of the species.
+    """
+    assert state.ndim == 2
+    weighted_state = state * mass * delta_v**2
+    return np.dot(weighted_state, velocities**2)
+
+
+def energy_flow(state,
+                delta_v,
+                velocities,
+                mass):
+    r"""Compute the energy flow of the current distribution.
+
+    Note
+    ----
+    Be aware that this must be computed separately for each single specimen.
+
+    Parameters
+    ----------
+    state : :obj:`~numpy.ndarray` [:obj:`float`]
+        A discretized velocity distribution function.
+        Must be 2D array.
+        For homogeneous case, add a np.newaxis.
+    delta_v : :obj:`float`
+        The physical spacing of the respective velocity grid.
+    velocities: :obj:`~numpy.ndarray` [:obj:`float`]
+        An array of all velocities.
+        Each velocity is either 2 or 3 dimensional.
+        Must be a 2D array.
+    mass : :obj:`int`
+        The particle mass of the species.
+    """
+    assert state.ndim == 2
+    dim = velocities.shape[1]
+    energies = 0.5 * mass * np.sum(velocities**2, axis=1)[:, np.newaxis]
+    weighted_state = state * delta_v**dim
+    return np.dot(weighted_state, energies * velocities)
