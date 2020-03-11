@@ -408,6 +408,7 @@ class Simulation(bp.BaseClass):
                                          self.geometry.transport,
                                          self.geometry.collision)
             self.write_results(data, tw_idx, hdf_group)
+            hdf_file.flush()
             # print time estimate
             time_tracker.print(tw, data.tG[-1, 0])
         return
@@ -451,7 +452,7 @@ class Simulation(bp.BaseClass):
     #             Animation             #
     #####################################
     def animate(self, shape=(3, 2), *moments):
-        hdf_group = self.file["result"]
+        hdf_group = self.file["results"]
         tmax = int(hdf_group.attrs["t"])
         figure = bp_af.AnimatedFigure(tmax=tmax)
         if not moments:
@@ -472,9 +473,9 @@ class Simulation(bp.BaseClass):
             for species_name in self.s.names:
                 spc_group = hdf_group[species_name]
                 if spc_group[moment].ndim == 2:
-                    ydata = spc_group[moment][..., 1:-1]
+                    ydata = spc_group[moment][0:tmax, 1:-1]
                 elif spc_group[moment].ndim == 3:
-                    ydata = spc_group[moment][..., 1:-1, 0]
+                    ydata = spc_group[moment][0:tmax, 1:-1, 0]
                 else:
                     raise Exception
                 ax.plot(xdata, ydata)
@@ -553,7 +554,8 @@ class Simulation(bp.BaseClass):
             file_address = self.file_address
         else:
             assert isinstance(file_address, str)
-            assert not os.path.exists(file_address)
+            if file_address != self.file_address:
+                assert not os.path.exists(file_address)
         # Sanity Check before saving
         self.check_integrity(False)
 
