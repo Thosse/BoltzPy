@@ -416,23 +416,24 @@ class Simulation(bp.BaseClass):
     def write_results(self, data, tw_idx, hdf_group):
         for (s, species_name) in enumerate(self.s.names):
             (beg, end) = self.sv.index_range[s]
-            dv = data.dv[s]
-            mass = data.m[s]
-            velocities = data.vG[beg:end, :]
+            spc_state = data.state[..., beg:end]
+            dv = self.sv.vGrids[s].physical_spacing
+            mass = self.s.mass[s]
+            velocities = self.sv.vGrids[s].pG
             spc_group = hdf_group[species_name]
             # particle_number
-            particle_number = bp_m.particle_number(data.state[..., beg:end], dv)
+            particle_number = bp_m.particle_number(spc_state, dv)
             spc_group["particle_number"][tw_idx] = particle_number
 
             # mean velocity
-            mean_velocity = bp_m.mean_velocity(data.state[..., beg:end],
+            mean_velocity = bp_m.mean_velocity(spc_state,
                                                dv,
                                                velocities,
                                                particle_number)
             spc_group["mean_velocity"][tw_idx] = mean_velocity
 
             # temperature
-            temperature = bp_m.temperature(data.state[..., beg:end],
+            temperature = bp_m.temperature(spc_state,
                                            dv,
                                            velocities,
                                            mass,
