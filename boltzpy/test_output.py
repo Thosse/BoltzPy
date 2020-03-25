@@ -71,3 +71,85 @@ def test_temperature(tf):
             assert np.array_equal(old_result, new_result)
 
 
+@pytest.mark.parametrize("tf", bp_t.FILES)
+def test_momentum(tf):
+    simulation = bp.Simulation.load(tf)
+    # load results
+    hdf_file = h5py.File(tf, mode="r")
+    hdf_group = hdf_file["results"]
+    for (s, species_name) in enumerate(simulation.s.names):
+        dv = simulation.sv.vGrids[s].physical_spacing
+        mass = simulation.s.mass[s]
+        velocities = simulation.sv.vGrids[s].pG
+        spc_group = hdf_group[species_name]
+        for t in range(simulation.t.size):
+            state = spc_group["state"][t]
+            old_result = spc_group["momentum"][t]
+            new_result = bp_o.momentum(state,
+                                       dv,
+                                       velocities,
+                                       mass)
+            assert np.array_equal(old_result, new_result)
+
+
+@pytest.mark.parametrize("tf", bp_t.FILES)
+def test_energy(tf):
+    simulation = bp.Simulation.load(tf)
+    # load results
+    hdf_file = h5py.File(tf, mode="r")
+    hdf_group = hdf_file["results"]
+    for (s, species_name) in enumerate(simulation.s.names):
+        dv = simulation.sv.vGrids[s].physical_spacing
+        mass = simulation.s.mass[s]
+        velocities = simulation.sv.vGrids[s].pG
+        spc_group = hdf_group[species_name]
+        for t in range(simulation.t.size):
+            state = spc_group["state"][t]
+            old_result = spc_group["energy"][t]
+            new_result = bp_o.energy(state,
+                                     dv,
+                                     velocities,
+                                     mass)
+            assert np.array_equal(old_result, new_result)
+
+
+@pytest.mark.parametrize("tf", bp_t.FILES)
+def test_momentum_flow(tf):
+    simulation = bp.Simulation.load(tf)
+    # load results
+    hdf_file = h5py.File(tf, mode="r")
+    hdf_group = hdf_file["results"]
+    for (s, species_name) in enumerate(simulation.s.names):
+        dv = simulation.sv.vGrids[s].physical_spacing
+        mass = simulation.s.mass[s]
+        velocities = simulation.sv.vGrids[s].pG
+        spc_group = hdf_group[species_name]
+        for t in range(simulation.t.size):
+            state = spc_group["state"][t]
+            old_result = spc_group["momentum_flow"][t]
+            new_result = bp_o.momentum_flow(state,
+                                            dv,
+                                            velocities,
+                                            mass)
+            assert np.array_equal(old_result, new_result)
+
+
+@pytest.mark.parametrize("tf", bp_t.FILES)
+def test_energy_flow(tf):
+    simulation = bp.Simulation.load(tf)
+    # load results
+    hdf_file = h5py.File(tf, mode="r")
+    hdf_group = hdf_file["results"]
+    for (s, species_name) in enumerate(simulation.s.names):
+        dv = simulation.sv.vGrids[s].physical_spacing
+        mass = simulation.s.mass[s]
+        velocities = simulation.sv.vGrids[s].pG
+        spc_group = hdf_group[species_name]
+        for t in range(simulation.t.size):
+            state = spc_group["state"][t]
+            old_result = spc_group["energy_flow"][t]
+            new_result = bp_o.energy_flow(state,
+                                          dv,
+                                          velocities,
+                                          mass)
+            assert np.array_equal(old_result, new_result)
