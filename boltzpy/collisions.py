@@ -7,7 +7,7 @@ import h5py
 import boltzpy as bp
 
 
-class Collision:
+class Collision(bp.BaseClass):
     r"""Encapsulates the :attr:`relation` and :attr:`weight`
     of any single Collision.
 
@@ -147,26 +147,9 @@ class Collision:
             return False
         return True
 
-    def __eq__(self, other):
-        if not isinstance(other, Collision):
-            return False
-        if set(self.__dict__.keys()) != set(other.__dict__.keys()):
-            return False
-        for (key, value) in self.__dict__.items():
-            other_value = other.__dict__[key]
-            if type(value) != type(other_value):
-                return False
-            if isinstance(value, np.ndarray):
-                if np.any(value != other_value):
-                    return False
-            else:
-                if value != other_value:
-                    return False
-        return True
-
 
 # Todo Remove this class, move into model
-class Collisions:
+class Collisions(bp.BaseClass):
     r"""Generates and encapsulates the collision :attr:`relations`
     and :attr:`weights`.
 
@@ -204,7 +187,9 @@ class Collisions:
 
     @relations.setter
     def relations(self, new_relations):
-        new_collisions = [Collision(rel, 0.0) for rel in new_relations]
+        new_collisions = np.array(
+            [Collision(rel, 0.0) for rel in new_relations],
+            dtype=object)
         if self.collisions is not None:
             for (i, old_coll) in enumerate(self.collisions):
                 new_collisions[i].weight = old_coll.weight
@@ -217,8 +202,9 @@ class Collisions:
 
     @weights.setter
     def weights(self, new_weights):
-        new_collisions = [Collision(np.zeros((4,), dtype=int), w)
-                          for w in new_weights]
+        new_collisions = np.array(
+            [Collision(np.zeros((4,), dtype=int), w) for w in new_weights],
+            dtype=object)
         if self.collisions is not None:
             for (i, old_coll) in enumerate(self.collisions):
                 new_collisions[i].relation = old_coll.relation
@@ -409,6 +395,10 @@ class Collisions:
             hdf5_group["Relations"] = self.relations
         if self.weights is not None:
             hdf5_group["Weights"] = self.weights
+
+        # check that the class can be reconstructed from the save
+        other = Collisions.load(hdf5_group)
+        assert self == other
         return
 
     #####################################
@@ -440,23 +430,6 @@ class Collisions:
                     # Todo add conserves energy check
             assert all(w > 0 for w in self.weights.flatten())
         return
-    
-    def __eq__(self, other):
-        if not isinstance(other, Collisions):
-            return False
-        if set(self.__dict__.keys()) != set(other.__dict__.keys()):
-            return False
-        for (key, value) in self.__dict__.items():
-            other_value = other.__dict__[key]
-            if type(value) != type(other_value):
-                return False
-            if isinstance(value, np.ndarray):
-                if np.any(value != other_value):
-                    return False
-            else:
-                if value != other_value:
-                    return False
-        return True
 
 
 ##############################################

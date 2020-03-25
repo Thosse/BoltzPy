@@ -2,16 +2,15 @@ import os
 import h5py
 import numpy as np
 
-import boltzpy.helpers.file_addresses as h_adr
 import boltzpy.helpers.TimeTracker as h_tt
 import boltzpy.AnimatedFigure as bp_af
 import boltzpy.compute as bp_cp
-import boltzpy.output as bp_out
+import boltzpy.output as bp_o
 import boltzpy.constants as bp_c
 import boltzpy as bp
 
 
-class Simulation:
+class Simulation(bp.BaseClass):
     r"""Handles all aspects of a single simulation.
 
     Each instance correlates to a single file
@@ -92,109 +91,88 @@ class Simulation:
 
     def __init__(self, file_address=None):
         # set file address (using a setter method)
-        [self._file_directory, self._file_root] = ['', '']
+        [self._file_directory, self._file_name] = ['', '']
         self.file_address = file_address
-        del file_address  # not needed anymore, could lead to typos
 
-        # Open HDF5 file
-        if os.path.exists(self.file_address + '.hdf5'):
-            file = h5py.File(self.file_address + '.hdf5', mode='r')
-        else:
-            file = h5py.File(self.file_address + '.hdf5', mode='w-')
-            file.attrs["class"] = "Simulation"
-
-        #######################
-        #   Grid Attributes   #
-        #######################
-        # load Species
-        try:
-            key = "Species"
-            self.s = bp.Species.load(file[key])
-        except KeyError:
-            self.s = bp.Species()
-
-        # load Time Grid
-        try:
-            key = "Time_Grid"
-            self.t = bp.Grid.load(file[key])
-        except KeyError:
-            self.t = bp.Grid()
+        self.s = bp.Species()
+        self.t = bp.Grid()
         self.t.ndim = 1
-
-        # load Position Grid
-        try:
-            key = "Position_Grid"
-            self.p = bp.Grid().load(file[key])
-        except KeyError:
-            self.p = bp.Grid()
-
-        # load geometry
-        try:
-            key = "Geometry"
-            self.geometry = bp.Geometry.load(file[key])
-        except KeyError:
-            self.geometry = bp.Geometry()
-
-        # load Velocity Grids
-        try:
-            key = "Velocity_Grids"
-            self.sv = bp.SVGrid.load(file[key])
-        except KeyError:
-            self.sv = bp.SVGrid()
-
-        # load Collisions, if any
-        try:
-            key = "Collisions"
-            self.coll = bp.Collisions.load(file[key])
-        except KeyError:
-            self.coll = bp.Collisions()
-
-        # load Scheme
-        try:
-            key = "Scheme"
-            self.scheme = bp.Scheme.load(file[key])
-        except KeyError:
-            self.scheme = bp.Scheme()
-        # load output params Todo Move these into Scheme, as a (1D) Set
-        try:
-            key = "Computation/Output_Parameters"
-            shape = file[key].attrs["shape"]
-            self.output_parameters = file[key][()].reshape(shape)
-        except KeyError:
-            self.output_parameters = np.array([['Mass',
-                                                'Momentum_X'],
-                                               ['Momentum_X',
-                                                'Momentum_Flow_X'],
-                                               ['Energy',
-                                                'Energy_Flow_X']])
-        file.close()
-        # Todo remove this, replace usage by geometry
-        self.init_arr = self.geometry.init_array
-        self.rule_arr = self.geometry.rules
+        self.p = bp.Grid()
+        self.geometry = bp.Geometry()
+        self.sv = bp.SVGrid()
+        self.coll = bp.Collisions()
+        self.scheme = bp.Scheme()
+        self.output_parameters = np.array([['Mass',
+                                            'Momentum_X'],
+                                           ['Momentum_X',
+                                            'Momentum_Flow_X'],
+                                           ['Energy',
+                                            'Energy_Flow_X']])
         self.check_integrity(complete_check=False)
         return
+
+    # Todo remove this, replace usage by geometry
+    @property
+    def init_arr(self):
+        return self.geometry.init_array
+
+    # Todo remove this, replace usage by geometry
+    @property
+    def rule_arr(self):
+        return self.geometry.rules
+
+    @property
+    def default_directory(self):
+        return __file__[:-21] + 'Simulations/'
 
     @property
     def file_address(self):
         """:obj:`str` :
         Full path of the :class:`Simulation` file.
         """
-        return self._file_directory + self._file_root
+        return self._file_directory + self._file_name
 
     @file_address.setter
-    def file_address(self, new_file_address):
-        # separate file directory and file root, using a helper function
-        # This standardizes the naming scheme
-        h_separate = h_adr.split_address
-        [new_file_directory, new_file_root] = h_separate(new_file_address)
-        new_file_address = new_file_directory + new_file_root
-        # Sanity check on (standardized) file address
-        self.check_parameters(file_address=new_file_address)
-        # change file_address
-        [self._file_directory, self._file_root] = [new_file_directory,
-                                                   new_file_root]
+    def file_address(self, address):
+        if address is None:
+            self._file_directory = self.default_directory
+            idx = 0
+            self._file_name = str(idx) + ".hdf5"
+            while os.path.exists(self.file_address):
+                idx += 1
+                self._file_name = str(idx) + ".hdf5"
+        else:
+            # separate file directory and file root
+            begin_filename = address.rfind("/") + 1
+            self._file_directory = address[0: begin_filename]
+            self._file_name = address[begin_filename:]
+            # if no directory given -> put it in the default directory
+            if self._file_directory == '':
+                self._file_directory = self.default_directory
+            # remove hdf5 ending, if any
+            if self._file_name[-5:] != '.hdf5':
+                self._file_name = self._file_name + ".hdf5"
         self.check_parameters(file_address=self.file_address)
         return
+
+    @property
+    def file(self):
+        return h5py.File(self.file_address, mode="r+")
+
+    @property
+    def shape_of_results(self):
+        output = dict()
+        for (s, species_name) in enumerate(self.s.names):
+            output[species_name] = {
+                'particle_number': (self.t.size, self.p.size),
+                'mean_velocity': (self.t.size, self.p.size, self.sv.ndim),
+                'momentum': (self.t.size, self.p.size, self.sv.ndim),
+                'momentum_flow': (self.t.size, self.p.size, self.sv.ndim),
+                'temperature': (self.t.size, self.p.size),
+                'energy': (self.t.size, self.p.size),
+                'energy_flow': (self.t.size, self.p.size, self.sv.ndim)
+            }
+        return output
 
     @property
     def n_rules(self):
@@ -380,29 +358,47 @@ class Simulation:
     #####################################
     #            Computation            #
     #####################################
-    def compute(self, hdf5_group_name="Computation"):
+    # Todo write hash function in Computation folder
+    #     file = h5py.File(self.file_address + '.hdf5')
+    #     # hash = file["Computation"].attrs["Hash_Value"]
+    #     # Todo define hashing method
+    #     assert hash == self.__hash__()
+    #     print("The saved results are up to date!"
+    #           "A new computation is not necessary")
+    #     return
+    # else (KeyError, AssertionError):
+    def compute(self,
+                file_address=None):
         """Compute the fully configured Simulation"""
         self.check_integrity()
-        # Todo write hash function in Computation folder
-        #     file = h5py.File(self.file_address + '.hdf5')
-        #     # hash = file["Computation"].attrs["Hash_Value"]
-        #     # Todo define hashing method
-        #     assert hash == self.__hash__()
-        #     print("The saved results are up to date!"
-        #           "A new computation is not necessary")
-        #     return
-        # else (KeyError, AssertionError):
+        if file_address is None:
+            file_address = self.file_address
+        # Save current state to a hdf file
+        self.save(file_address)
+        hdf_file = h5py.File(file_address, mode="r+")
+        # Prepare storage of results
+        # Todo move this into separate method, replace results?
+        key = "results"
+        hdf_file.create_group(key)
+        hdf_group = hdf_file[key]
+        # store index of current time step
+        hdf_group.attrs["t"] = 1
+        # set up separate subgroup for each species
+        for species_name in self.s.names:
+            hdf_group.create_group(species_name)
+            spc_group = hdf_group[species_name]
+            spc_results = self.shape_of_results[species_name]
+            # set up separate dataset for each moment
+            for (name, shape) in spc_results.items():
+                spc_group.create_dataset(name,
+                                         shape=shape,
+                                         dtype=float)
 
         # Generate Computation data
         data = bp.Data(self.file_address)
         data.check_stability_conditions()
 
-        # Generate output functions
-        # Todo move into Scheme
-        f_output = bp_out.generate_output_function(self, hdf5_group_name)
-
-        # Start computation
-        print('Computing:')
+        print('Start Computation:')
         time_tracker = h_tt.TimeTracker()
         # Todo this might be buggy, if data.tG changes
         # Todo e.g. in adaptive time schemes
@@ -412,66 +408,181 @@ class Simulation:
                 bp_cp.operator_splitting(data,
                                          self.geometry.transport,
                                          self.geometry.collision)
+            self.write_results(data, tw_idx, hdf_group)
+            hdf_file.flush()
             # print time estimate
             time_tracker.print(tw, data.tG[-1, 0])
-            # generate Output and write it to disk
-            f_output(data, tw_idx)
+        return
+
+    def write_results(self, data, tw_idx, hdf_group):
+        for (s, species_name) in enumerate(self.s.names):
+            (beg, end) = self.sv.index_range[s]
+            spc_state = data.state[..., beg:end]
+            dv = self.sv.vGrids[s].physical_spacing
+            mass = self.s.mass[s]
+            velocities = self.sv.vGrids[s].pG
+            spc_group = hdf_group[species_name]
+            # particle_number
+            particle_number = bp_o.particle_number(spc_state, dv)
+            spc_group["particle_number"][tw_idx] = particle_number
+
+            # mean velocity
+            mean_velocity = bp_o.mean_velocity(spc_state,
+                                               dv,
+                                               velocities,
+                                               particle_number)
+            spc_group["mean_velocity"][tw_idx] = mean_velocity
+
+            # temperature
+            temperature = bp_o.temperature(spc_state,
+                                           dv,
+                                           velocities,
+                                           mass,
+                                           particle_number,
+                                           mean_velocity)
+            spc_group["temperature"][tw_idx] = temperature
+
+            # momentum
+            spc_group["momentum"][tw_idx] = bp_o.momentum(
+                spc_state,
+                dv,
+                velocities,
+                mass)
+            # momentum flow
+            spc_group["momentum_flow"][tw_idx] = bp_o.momentum_flow(
+                spc_state,
+                dv,
+                velocities,
+                mass)
+            # energy
+            spc_group["energy"][tw_idx] = bp_o.energy(
+                spc_state,
+                dv,
+                velocities,
+                mass)
+            # energy flow
+            spc_group["energy_flow"][tw_idx] = bp_o.energy_flow(
+                spc_state,
+                dv,
+                velocities,
+                mass)
+        # update index of current time step
+        hdf_group.attrs["t"] = tw_idx + 1
         return
 
     #####################################
     #             Animation             #
     #####################################
-    def animate(self, shape=(3, 2)):
-        figure = bp_af.AnimatedFigure(tmax=self.t.size)
-        specimen_names = [specimen.name for specimen in self.s.specimen_arr]
-        moments = self.output_parameters.flatten()
-        file = h5py.File(self.file_address + '.hdf5', mode='r')
-        hdf5_group = file["Computation"]
-        for (moment_idx, moment) in enumerate(moments):
-            ax = figure.add_subplot(shape + (1 + moment_idx,),
-                                    title=moment
-                                    )
-            # Todo This flatten() should NOT be necessary, fix with model/geometry
-            xdata = (self.p.iG * self.p.delta).flatten()[1:-1]
-            for (specimen_idx, specimen) in enumerate(specimen_names):
-                ydata = hdf5_group[moment][..., 1:-1, specimen_idx]
+    def animate(self, shape=(3, 2), moments=None):
+        hdf_group = self.file["results"]
+        tmax = int(hdf_group.attrs["t"])
+        figure = bp_af.AnimatedFigure(tmax=tmax)
+        if moments is None:
+            moments = ['particle_number',
+                       'mean_velocity',
+                       'momentum',
+                       'momentum_flow',
+                       'temperature',
+                       'energy']
+        else:
+            assert len(moments) <= np.prod(shape)
+        # xdata (geometry) is shared over all plots
+        # Todo flatten() should NOT be necessary, fix with model/geometry
+        xdata = (self.p.iG * self.p.delta).flatten()[1:-1]
+        for (m, moment) in enumerate(moments):
+            ax = figure.add_subplot(shape + (1 + m,),
+                                    title=moment)
+            for species_name in self.s.names:
+                spc_group = hdf_group[species_name]
+                if spc_group[moment].ndim == 2:
+                    ydata = spc_group[moment][0:tmax, 1:-1]
+                elif spc_group[moment].ndim == 3:
+                    ydata = spc_group[moment][0:tmax, 1:-1, 0]
+                else:
+                    raise Exception
                 ax.plot(xdata, ydata)
-        figure.save(self.file_address + '.mp4')
+        figure.save(self.file_address[:-5] + '.mp4')
         return
 
     #####################################
     #           Serialization           #
     #####################################
-    # Todo Create __is_equal__ method, compare to default  params -> dont save
-    def save(self, file_address=None):
-        """Write all parameters of the :class:`Simulation` instance
-        to a HDF5 file.
-
-        If a *file_address* is given, then this method works as a 'save as'.
-        In this case the :attr:`file_address` of the instance is changed
-        and the newly named instance is saved to a new .hdf5 file.
+    @staticmethod
+    def load(file_address):
+        """Set up and return a :class:`Simulation` instance
+        based on the parameters in the given HDF5 group.
 
         Parameters
         ----------
         file_address : :obj:`str`, optional
-            Change the instances :attr:`file_address` to this value.
+            The full path to the simulation (hdf5) file.
 
+        Returns
+        -------
+        self : :class:`Simulation`
+        """
+        assert isinstance(file_address, str)
+        assert os.path.exists(file_address)
+        # Open HDF5 file
+        file = h5py.File(file_address, mode='r')
+        assert file.attrs["class"] == "Simulation"
+        self = Simulation(file_address)
+
+        key = "Species"
+        self.s = bp.Species.load(file[key])
+
+        key = "Time_Grid"
+        self.t = bp.Grid.load(file[key])
+        # Todo this should (needs to) be unnecessary
+        self.t.ndim = 1
+
+        key = "Position_Grid"
+        self.p = bp.Grid().load(file[key])
+
+        key = "Geometry"
+        self.geometry = bp.Geometry.load(file[key])
+
+        key = "Velocity_Grids"
+        self.sv = bp.SVGrid.load(file[key])
+
+        key = "Collisions"
+        self.coll = bp.Collisions.load(file[key])
+
+        key = "Scheme"
+        self.scheme = bp.Scheme.load(file[key])
+
+        key = "Computation/Output_Parameters"
+        shape = file[key].attrs["shape"]
+        self.output_parameters = file[key][()].reshape(shape)
+
+        file.close()
+        self.check_integrity(complete_check=False)
+        return self
+
+    def save(self, file_address=None):
+        """Write all parameters of the :class:`Simulation` instance
+        to a HDF5 file.
+
+        Parameters
+        ----------
+        file_address : :obj:`str`, optional
             Is either a full path, a base file name or a file root.
             If it is a base file name or a file root,
             then the file is placed in the
-            :attr:`~boltzpy.constants.DEFAULT_DIRECTORY`.
+            :attr:`~Simulation.default_directory`.
         """
         # Change Simulation.file_name, if file_address is given
-        if file_address is not None:
-            self.file_address = file_address
-        del file_address
-
+        if file_address is None:
+            file_address = self.file_address
+        else:
+            assert isinstance(file_address, str)
+            if file_address != self.file_address:
+                assert not os.path.exists(file_address)
         # Sanity Check before saving
         self.check_integrity(False)
 
-        # Todo if sv and collision parameters are the same -> keep Collisions
-        # Create new HDF5 file (deletes old data, if any)
-        file = h5py.File(self.file_address + ".hdf5", mode='w')
+        # Create new HDF5 file (deletes all old data, if any)
+        file = h5py.File(file_address, mode='w')
         file.attrs["class"] = "Simulation"
 
         # Save Species
@@ -504,11 +615,10 @@ class Simulation:
         file.create_group(key)
         self.coll.save(file[key])
 
-        # Save Computation Parameters
-        if "Scheme" not in file.keys():
-            file.create_group("Scheme")
-        # Save scheme
-        self.scheme.save(file["Scheme"])
+        # Save Scheme
+        key = "Scheme"
+        file.create_group(key)
+        self.scheme.save(file[key])
 
         if self.output_parameters is not None:
             #  noinspection PyUnresolvedReferences
@@ -518,6 +628,13 @@ class Simulation:
                                  dtype=h5py_string_type).flatten()
             file[key].attrs["shape"] = self.output_parameters.shape
 
+        # assert that the instance can be reconstructed from the save
+        other = self.load(file_address)
+        # if a different file name is given then, the check MUST fail
+        if file_address == self.file_address:
+            assert self == other
+        else:
+            assert not self == other
         file.close()
         return
 
@@ -657,30 +774,13 @@ class Simulation:
             scheme.check_integrity(complete_check)
         return
 
-    def __eq__(self, other):
-        if not isinstance(other, Simulation):
-            return False
-        if set(self.__dict__.keys()) != set(other.__dict__.keys()):
-            return False
-        for (key, value) in self.__dict__.items():
-            other_value = other.__dict__[key]
-            if type(value) != type(other_value):
-                return False
-            if isinstance(value, np.ndarray):
-                if np.any(value != other_value):
-                    return False
-            else:
-                if value != other_value:
-                    return False
-        return True
-
     def __str__(self,
                 write_physical_grids=False):
         """:obj:`str` :
         A human readable string which describes all attributes of the instance.
         """
         description = ''
-        description += 'Simulation File = ' + self.file_address + '.hdf5\n'
+        description += 'Simulation File = ' + self.file_address + '\n'
         description += 'Species\n'
         description += '-------\n'
         description += '\t' + self.s.__str__().replace('\n', '\n\t')
