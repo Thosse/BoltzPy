@@ -5,8 +5,7 @@ import numpy as np
 import boltzpy.helpers.TimeTracker as h_tt
 import boltzpy.AnimatedFigure as bp_af
 import boltzpy.compute as bp_cp
-import boltzpy.momenta as bp_m
-import boltzpy.output as bp_out
+import boltzpy.output as bp_o
 import boltzpy.constants as bp_c
 import boltzpy as bp
 
@@ -424,18 +423,18 @@ class Simulation(bp.BaseClass):
             velocities = self.sv.vGrids[s].pG
             spc_group = hdf_group[species_name]
             # particle_number
-            particle_number = bp_m.particle_number(spc_state, dv)
+            particle_number = bp_o.particle_number(spc_state, dv)
             spc_group["particle_number"][tw_idx] = particle_number
 
             # mean velocity
-            mean_velocity = bp_m.mean_velocity(spc_state,
+            mean_velocity = bp_o.mean_velocity(spc_state,
                                                dv,
                                                velocities,
                                                particle_number)
             spc_group["mean_velocity"][tw_idx] = mean_velocity
 
             # temperature
-            temperature = bp_m.temperature(spc_state,
+            temperature = bp_o.temperature(spc_state,
                                            dv,
                                            velocities,
                                            mass,
@@ -444,25 +443,25 @@ class Simulation(bp.BaseClass):
             spc_group["temperature"][tw_idx] = temperature
 
             # momentum
-            spc_group["momentum"][tw_idx] = bp_out.momentum(
+            spc_group["momentum"][tw_idx] = bp_o.momentum(
                 spc_state,
                 dv,
                 velocities,
                 mass)
             # momentum flow
-            spc_group["momentum_flow"][tw_idx] = bp_out.momentum_flow(
+            spc_group["momentum_flow"][tw_idx] = bp_o.momentum_flow(
                 spc_state,
                 dv,
                 velocities,
                 mass)
             # energy
-            spc_group["energy"][tw_idx] = bp_out.energy(
+            spc_group["energy"][tw_idx] = bp_o.energy(
                 spc_state,
                 dv,
                 velocities,
                 mass)
             # energy flow
-            spc_group["energy_flow"][tw_idx] = bp_out.energy_flow(
+            spc_group["energy_flow"][tw_idx] = bp_o.energy_flow(
                 spc_state,
                 dv,
                 velocities,

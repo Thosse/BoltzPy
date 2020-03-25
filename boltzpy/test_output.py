@@ -4,7 +4,7 @@ import h5py
 
 import boltzpy.testcase as bp_t
 import boltzpy as bp
-import boltzpy.momenta as bp_m
+import boltzpy.output as bp_o
 
 
 @pytest.mark.parametrize("tf", bp_t.FILES)
@@ -19,7 +19,7 @@ def test_particle_number(tf):
         for t in range(simulation.t.size):
             state = spc_group["state"][t]
             old_result = spc_group["particle_number"][t]
-            new_result = bp_m.particle_number(state, dv)
+            new_result = bp_o.particle_number(state, dv)
             assert np.array_equal(old_result, new_result)
 
 
@@ -37,7 +37,7 @@ def test_mean_velocity(tf):
             state = spc_group["state"][t]
             particle_number = spc_group["particle_number"][t]
             old_result = spc_group["mean_velocity"][t]
-            new_result = bp_m.mean_velocity(state,
+            new_result = bp_o.mean_velocity(state,
                                             dv,
                                             velocities,
                                             particle_number)
@@ -61,7 +61,7 @@ def test_temperature(tf):
             particle_number = spc_group["particle_number"][t]
             mean_velocity = spc_group["mean_velocity"][t]
             old_result = spc_group["temperature"][t]
-            new_result = bp_m.temperature(state,
+            new_result = bp_o.temperature(state,
                                           dv,
                                           velocities,
                                           mass,
