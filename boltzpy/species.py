@@ -290,8 +290,8 @@ class Species(bp.BaseClass):
             masses = hdf5_group["Masses"][()]
             col_rate = hdf5_group["collision_rates"][()]
             colors = hdf5_group["Colors"][()]
-            assert names.ndim is 1
-            assert col_rate.ndim is 2
+            assert names.ndim == 1
+            assert col_rate.ndim == 2
             assert names.shape == colors.shape == masses.shape
             assert col_rate.shape == (names.size, names.size)
             # setup s iteratively

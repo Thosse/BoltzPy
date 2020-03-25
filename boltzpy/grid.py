@@ -452,11 +452,11 @@ class Grid(bp.BaseClass):
         if iG is not None:
             assert isinstance(iG, np.ndarray)
             assert iG.dtype == int
-            assert iG.ndim is 2
+            assert iG.ndim == 2
 
         # check correct attribute relations
         if ndim is not None and shape is not None:
-                assert len(shape) == ndim
+            assert len(shape) == ndim
 
         if all(attr is not None
                for attr in [physical_spacing, spacing, delta]):
