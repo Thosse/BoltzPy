@@ -58,7 +58,7 @@ else:
     sim.scheme.Collisions_Computation = "EulerScheme"
     # print(sim.__str__(write_physical_grids=True))
     sim.coll.setup(sim.scheme, sim.sv, sim.s)
-    bp.collisions.plot(sim.sv, sim.coll.relations)
+    # bp.collisions.plot(sim.sv, sim.coll.relations)
     sim.save()
     sim.compute()
 
