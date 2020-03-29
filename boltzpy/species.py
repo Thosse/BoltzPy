@@ -5,7 +5,7 @@ import boltzpy as bp
 import boltzpy.constants as bp_c
 
 
-class Species:
+class Species(bp.BaseClass):
     """Array of all simulated :class:`Specimen`.
 
     ..todo::
@@ -290,8 +290,8 @@ class Species:
             masses = hdf5_group["Masses"][()]
             col_rate = hdf5_group["collision_rates"][()]
             colors = hdf5_group["Colors"][()]
-            assert names.ndim is 1
-            assert col_rate.ndim is 2
+            assert names.ndim == 1
+            assert col_rate.ndim == 2
             assert names.shape == colors.shape == masses.shape
             assert col_rate.shape == (names.size, names.size)
             # setup s iteratively
@@ -383,23 +383,6 @@ class Species:
             assert np.all(s_col_rate == row)
             assert np.all(s_col_rate == column)
         return
-
-    def __eq__(self, other):
-        if not isinstance(other, Species):
-            return False
-        if set(self.__dict__.keys()) != set(other.__dict__.keys()):
-            return False
-        for (key, value) in self.__dict__.items():
-            other_value = other.__dict__[key]
-            if type(value) != type(other_value):
-                return False
-            if isinstance(value, np.ndarray):
-                if np.any(value != other_value):
-                    return False
-            else:
-                if value != other_value:
-                    return False
-        return True
 
     def __str__(self):
         """:obj:`str` :

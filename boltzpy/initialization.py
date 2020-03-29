@@ -1,5 +1,5 @@
 import numpy as np
-import boltzpy.momenta as bp_m
+import boltzpy.output as bp_o
 from scipy.optimize import newton as sp_newton
 
 
@@ -56,13 +56,13 @@ def _maxwellian_iteration(input_momenta,
                                      mass,
                                      input_momenta)[np.newaxis, :]
     # compute momenta
-    cmp_particle_number = bp_m.particle_number(discrete_maxwellian,
+    cmp_particle_number = bp_o.particle_number(discrete_maxwellian,
                                                delta_v)
-    cmp_mean_velocity = bp_m.mean_velocity(discrete_maxwellian,
+    cmp_mean_velocity = bp_o.mean_velocity(discrete_maxwellian,
                                            delta_v,
                                            velocities,
                                            cmp_particle_number)
-    cmp_temperature = bp_m.temperature(discrete_maxwellian,
+    cmp_temperature = bp_o.temperature(discrete_maxwellian,
                                        delta_v,
                                        velocities,
                                        mass,

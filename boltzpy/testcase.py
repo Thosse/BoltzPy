@@ -1,14 +1,13 @@
 
 import boltzpy as bp
-import boltzpy.constants as bp_c
 import numpy as np
 import h5py
 import os
 
 
-class TestCase(dict):
+class TestCase(bp.Simulation):
     def __init__(self,
-                 file_name,
+                 file_address,
                  s=None,
                  t=None,
                  p=None,
@@ -17,9 +16,7 @@ class TestCase(dict):
                  geometry=None,
                  scheme=None,
                  output_parameters=None):
-        super().__init__(self)
-
-        self["file_name"] = file_name
+        super().__init__(file_address)
 
         if s is None:
             s = bp.Species()
@@ -29,21 +26,21 @@ class TestCase(dict):
                   collision_rate=np.array([50, 50], dtype=float))
         else:
             assert isinstance(s, bp.Species)
-        self["s"] = s
+        self.s = s
 
         if t is None:
             t = bp.Grid(ndim=1,
                         shape=(5,),
                         physical_spacing=0.01,
                         spacing=3)
-        self["t"] = t
+        self.t = t
 
         if p is None:
             p = bp.Grid(ndim=1,
                         shape=(6,),
                         spacing=1,
                         physical_spacing=0.5)
-        self["p"] = p
+        self.p = p
 
         if sv is None:
             spacings = bp.SVGrid.generate_spacings(s.mass)
@@ -53,7 +50,7 @@ class TestCase(dict):
                            shapes=shapes,
                            spacings=spacings,
                            )
-        self["sv"] = sv
+        self.sv = sv
 
         if geometry is None:
             left_rho = 2*np.ones(s.size)
@@ -98,7 +95,7 @@ class TestCase(dict):
             geometry = bp.Geometry(shape=p.shape,
                                    rules=rules
                                    )
-        self["geometry"] = geometry
+        self.geometry = geometry
 
         if scheme is None:
             scheme = bp.Scheme(OperatorSplitting="FirstOrder",
@@ -106,7 +103,7 @@ class TestCase(dict):
                                Transport_VelocityOffset=np.array([-0.2, 0.0]),
                                Collisions_Generation="UniformComplete",
                                Collisions_Computation="EulerScheme")
-        self["scheme"] = scheme
+        self.scheme = scheme
 
         if output_parameters is None:
             output_parameters = np.array([['Mass',
@@ -115,95 +112,69 @@ class TestCase(dict):
                                            'Momentum_Flow_X'],
                                           ['Energy',
                                            'Energy_Flow_X']])
-        self["output_parameters"] = output_parameters
+        self.output_parameters = output_parameters
 
         if coll is None:
             coll = bp.Collisions()
-        self["coll"] = coll
+            coll.setup(scheme=self.scheme, svgrid=self.sv, species=self.s)
+        self.coll = coll
+        return
+
+    @property
+    def default_directory(self):
+        return __file__[:-19] + 'test_data/'
+
+    @property
+    def temporary_file(self):
+        """:obj:`str` :
+        Default file address for temporary test results.
+        """
+        return self.default_directory + '_tmp_.hdf5'
+
+    @property
+    def shape_of_results(self):
+        shape_of_results = super().shape_of_results
+        for (s, species_name) in enumerate(self.s.names):
+            [beg, end] = self.sv.index_range[s]
+            velocities = end - beg
+            shape = (self.t.size, self.p.size, velocities)
+            shape_of_results[species_name]['state'] = shape
+        return shape_of_results
+
+    def write_results(self, data, tw_idx, hdf_group):
+        super().write_results(data, tw_idx, hdf_group)
+        for (s, species_name) in enumerate(self.s.names):
+            (beg, end) = self.sv.index_range[s]
+            spc_group = hdf_group[species_name]
+            # complete distribution
+            spc_group["state"][tw_idx] = data.state[..., beg:end]
+        # update index of current time step
+        hdf_group.attrs["t"] = tw_idx + 1
         return
 
     @staticmethod
-    def address(file_name):
-        return bp_c.TEST_DIRECTORY + file_name + ".hdf5"
+    def load(file_address):
+        """Set up and return a :class:`TestCase` instance
+        based on the parameters in the given HDF5 group.
 
-    def create_simulation(self):
-        address = self.address(self["file_name"])
-        sim = bp.Simulation(address)
-        sim.s = self["s"]
-        sim.t = self["t"]
-        sim.p = self["p"]
-        sim.sv = self["sv"]
-        sim.geometry = self["geometry"]
-        sim.scheme = self["scheme"]
-        sim.output_parameters = self["output_parameters"]
-        sim.coll = self["coll"]
-        if sim.coll == bp.Collisions():
-            sim.coll.setup(scheme=sim.scheme, svgrid=sim.sv, species=sim.s)
+        Parameters
+        ----------
+        file_address : :obj:`str`, optional
+            The full path to the simulation (hdf5) file.
 
-    def save_results(self, address=None):
-        if address is None:
-            address = self.address(self["file_name"])
-        assert not os.path.exists(address), address
-        sim = bp.Simulation(address)
-        sim.s = self["s"]
-        sim.t = self["t"]
-        sim.p = self["p"]
-        sim.sv = self["sv"]
-        sim.geometry = self["geometry"]
-        sim.scheme = self["scheme"]
-        sim.output_parameters = self["output_parameters"]
-        sim.coll = self["coll"]
-        if sim.coll == bp.Collisions():
-            sim.coll.setup(scheme=sim.scheme, svgrid=sim.sv, species=sim.s)
-        sim.save()
-        sim.compute()
-        return sim
-
-    def compare_results(self):
-        address_old = self.address(self["file_name"])
-        assert os.path.exists(address_old)
-        address_new = bp_c.TEST_TMP_FILE
-        assert address_old != address_new
-        # remove new_Address, if it exists already
-        if os.path.exists(address_new):
-            os.remove(address_new)
-        self.save_results(address_new)
-        output = "No comparison done so far"
-        try:
-            # Open old and new file
-            old_file = h5py.File(address_old, mode='r')
-            new_file = h5py.File(address_new, mode='r')
-            # compare results
-            for output in self["output_parameters"].flatten():
-                results_old = old_file["Computation"][output][()]
-                results_new = new_file["Computation"][output][()]
-                assert results_old.shape == results_new.shape
-                assert np.array_equal(results_old, results_new)
-        except AssertionError:
-            print("Update failed: ", self["file_name"])
-            print("\tDifferences found in: ", output)
-            return False
-        finally:
-            os.remove(address_new)
-        return True
-
-    def update_results(self):
-        if self.compare_results():
-            os.remove(self.address(self["file_name"]))
-            self.save_results()
-            print("Successfully updated: ", self["file_name"])
-        else:
-            assert False
-
-    def replace_results(self):
-        msg = input("Are you absolutely sure? "
-                    "You are replacing this test case (yes/no)")
-        if msg == "yes":
-            os.remove(self.address(self["file_name"]))
-            self.save_results()
-            print("Successfully updated: ", self["file_name"])
-        else:
-            print("Abort replacing testcase: ", self["file_name"])
+        Returns
+        -------
+        self : :class:`TestCase`
+        """
+        simulation = bp.Simulation.load(file_address)
+        # ignore private attributes
+        params = {key: value
+                  for (key, value) in simulation.__dict__.items()
+                  if key[0] != "_"}
+        params["file_address"] = simulation.file_address
+        self = TestCase(**params)
+        self.check_integrity(complete_check=False)
+        return self
 
 
 ################################################################################
@@ -230,19 +201,20 @@ CASES.append(TestCase("shock_2Species_equalMass",
 CASES.append(TestCase("shock_2species_complete",
                       output_parameters=np.array([["Complete_Distribution"]])))
 
+FILES = [tc.file_address for tc in CASES]
+
 
 ################################################################################
 #                                   Main                                       #
 ################################################################################
-def update_all_tests():
-    for tc in CASES:
-        print("TestCase = ", tc["file_name"])
-        assert isinstance(tc, TestCase)
-        tc.update_results()
-
-
 def replace_all_tests():
-    for tc in CASES:
-        print("TestCase = ", tc["file_name"])
-        assert isinstance(tc, TestCase)
-        tc.replace_results()
+    msg = input("Are you absolutely sure? "
+                "You are about to replace all test cases (yes/no)")
+    if msg == "yes":
+        for tc in CASES:
+            print("TestCase = ", tc.file_address)
+            assert isinstance(tc, TestCase)
+            os.remove(tc.file_address)
+            tc.compute()
+    else:
+        print("Aborted replacing testcases!")

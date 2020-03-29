@@ -56,7 +56,7 @@ class Data:
     """
     def __init__(self, file_address):
         # create temporary Simulation instance
-        sim = bp.Simulation(file_address)
+        sim = bp.Simulation.load(file_address)
         # data arrays, this contains all grids
         # Todo Rework initialization (move into rules?)
         # Todo Class for single Space points (V-Grid + 0.Moment)?

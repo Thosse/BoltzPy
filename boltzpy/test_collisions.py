@@ -2,18 +2,19 @@ import h5py
 import numpy as np
 import pytest
 
-import boltzpy.constants as bp_c
+import boltzpy.testcase as bp_t
 import boltzpy as bp
 
 
-@pytest.mark.parametrize("test_case", bp_c.TEST_CASES)
-def test_collisions(test_case):
+@pytest.mark.parametrize("tc", bp_t.CASES)
+def test_collisions(tc):
     # Compute Output in temporary file
-    sim = bp.Simulation(test_case)
-    coll = bp.Collisions()
-    coll.setup(sim.scheme, sim.sv, sim.s)
+    sim = bp.Simulation.load(file_address=tc.file_address)
+    old_coll = sim.coll
+    # new collisions are generated in the testcases already
+    new_coll = tc.coll
     # compare results
-    assert sim.coll.size == coll.size
-    assert np.array_equal(sim.coll.relations, coll.relations)
-    assert np.array_equal(sim.coll.weights, coll.weights)
+    assert old_coll.size == new_coll.size
+    assert np.array_equal(old_coll.relations, new_coll.relations)
+    assert np.array_equal(old_coll.weights, new_coll.weights)
     return

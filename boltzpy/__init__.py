@@ -32,6 +32,7 @@ Workflow
  * Configure :py:class:`Specimen-Velocity-Grids
    <boltzpy.SVGrid>`
 """
+from boltzpy.BaseClass import BaseClass
 from boltzpy.grid import Grid
 from boltzpy.rule import Rule, InnerPointRule, ConstantPointRule, BoundaryPointRule
 from boltzpy.scheme import Scheme

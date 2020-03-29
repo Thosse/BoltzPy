@@ -8,7 +8,7 @@ import boltzpy.constants as bp_c
 
 
 # noinspection PyPep8Naming
-class Grid:
+class Grid(bp.BaseClass):
     r"""Basic class for all Grids.
 
     .. todo::
@@ -452,11 +452,11 @@ class Grid:
         if iG is not None:
             assert isinstance(iG, np.ndarray)
             assert iG.dtype == int
-            assert iG.ndim is 2
+            assert iG.ndim == 2
 
         # check correct attribute relations
         if ndim is not None and shape is not None:
-                assert len(shape) == ndim
+            assert len(shape) == ndim
 
         if all(attr is not None
                for attr in [physical_spacing, spacing, delta]):
@@ -479,23 +479,6 @@ class Grid:
                 assert np.all(iG[0] == 0)
 
         return
-
-    def __eq__(self, other):
-        if not isinstance(other, Grid):
-            return False
-        if set(self.__dict__.keys()) != set(other.__dict__.keys()):
-            return False
-        for (key, value) in self.__dict__.items():
-            other_value = other.__dict__[key]
-            if type(value) != type(other_value):
-                return False
-            if isinstance(value, np.ndarray):
-                if np.any(value != other_value):
-                    return False
-            else:
-                if value != other_value:
-                    return False
-        return True
 
     def __str__(self, write_physical_grids=False):
         """:obj:`str` :

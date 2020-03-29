@@ -7,10 +7,10 @@ import boltzpy.constants as bp_c
 import boltzpy.compute as bp_cp
 import boltzpy.plot as bp_p
 import boltzpy.initialization as bp_i
-import boltzpy.momenta as bp_m
+import boltzpy.output as bp_o
 
 
-class Rule:
+class Rule(bp.BaseClass):
     """Encapsulates the initialization methods
     and computational behaviour during the Simulation
     for all points, that are affected by this rule.
@@ -394,25 +394,6 @@ class Rule:
             # Todo test initial state, moments should be matching (up to 10^-x)
         return
 
-    def __eq__(self, other):
-        if not isinstance(other, Rule):
-            return False
-        if type(self) != type(other):
-            return False
-        if set(self.__dict__.keys()) != set(other.__dict__.keys()):
-            return False
-        for (key, value) in self.__dict__.items():
-            other_value = other.__dict__[key]
-            if type(value) != type(other_value):
-                return False
-            if isinstance(value, np.ndarray):
-                if np.any(value != other_value):
-                    return False
-            else:
-                if value != other_value:
-                    return False
-        return True
-
     def __str__(self):
         """Convert the instance to a string, describing all attributes."""
         description = ''
@@ -640,10 +621,10 @@ class BoundaryPointRule(Rule):
             elastic_inflow = self.reflection_rate_elastic[idx_spc] * inflow
             reflected_inflow[:, self.reflected_indices_elastic] += elastic_inflow
 
-            thermal_inflow = bp_m.particle_number(
+            thermal_inflow = bp_o.particle_number(
                 self.reflection_rate_thermal[idx_spc] * inflow[..., beg:end],
                 data.dv[idx_spc])
-            initial_particles = bp_m.particle_number(
+            initial_particles = bp_o.particle_number(
                 self.initial_state[np.newaxis, beg:end],
                 data.dv[idx_spc])
             reflected_inflow[..., beg:end] += (

@@ -6,7 +6,7 @@ import boltzpy as bp
 import boltzpy.constants as bp_c
 
 
-class Geometry:
+class Geometry(bp.BaseClass):
     r"""Describes the spatial geometry of the Simulation.
 
 
@@ -334,23 +334,6 @@ class Geometry:
             assert len(shape) == ndim
 
         return
-
-    def __eq__(self, other):
-        if not isinstance(other, Geometry):
-            return False
-        if set(self.__dict__.keys()) != set(other.__dict__.keys()):
-            return False
-        for (key, value) in self.__dict__.items():
-            other_value = other.__dict__[key]
-            if type(value) != type(other_value):
-                return False
-            if isinstance(value, np.ndarray):
-                if np.any(value != other_value):
-                    return False
-            else:
-                if value != other_value:
-                    return False
-        return True
 
     def __str__(self):
         """:obj:`str` :
