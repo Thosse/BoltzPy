@@ -18,8 +18,8 @@ else:
                             grid_spacing=0.5)
     sim.set_velocity_grids(grid_dimension=2,
                            maximum_velocity=1.5,
-                           shapes=[(5, 5),
-                                   (7, 7)])
+                           shapes=[(7, 7),
+                                   (9, 9)])     # shapes were before :(5, 5),(7, 7)
     sim.geometry = bp.Geometry(
         sim.p.shape,
         [bp.ConstantPointRule(
@@ -54,10 +54,11 @@ else:
     sim.scheme.OperatorSplitting = "FirstOrder"
     sim.scheme.Transport = "FiniteDifferences_FirstOrder"
     sim.scheme.Transport_VelocityOffset = np.array([0.0, 0.0])
-    sim.scheme.Collisions_Generation = "UniformComplete"
+    sim.scheme.Collisions_Generation = "Simple"     # "UniformComplete"
     sim.scheme.Collisions_Computation = "EulerScheme"
     # print(sim.__str__(write_physical_grids=True))
     sim.coll.setup(sim.scheme, sim.sv, sim.s)
+    # bp.collisions.plot(sim.sv, sim.coll.relations)
     sim.save()
     sim.compute()
 
