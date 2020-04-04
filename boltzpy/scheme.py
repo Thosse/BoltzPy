@@ -43,6 +43,7 @@ class Scheme(bp.BaseClass):
                               ],
         "Transport": ["FiniteDifferences_FirstOrder"],
         "Collisions_Generation": ["UniformComplete",
+                                  "Convergent"
                                   # "NoCollisions",
                                   ],
         "Collisions_Computation": ["EulerScheme",
