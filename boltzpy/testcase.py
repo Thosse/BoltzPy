@@ -201,6 +201,15 @@ CASES.append(TestCase("shock_2Species_equalMass",
 CASES.append(TestCase("shock_2species_complete",
                       output_parameters=np.array([["Complete_Distribution"]])))
 
+# Convergent Collision model
+convergent_scheme = bp.Scheme(OperatorSplitting="FirstOrder",
+                              Transport="FiniteDifferences_FirstOrder",
+                              Transport_VelocityOffset=np.array([-0.2, 0.0]),
+                              Collisions_Generation="Convergent",
+                              Collisions_Computation="EulerScheme")
+CASES.append(TestCase("shock_2species_convergent",
+                      scheme=convergent_scheme))
+
 FILES = [tc.file_address for tc in CASES]
 
 
