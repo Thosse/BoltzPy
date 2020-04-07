@@ -164,6 +164,16 @@ class Collisions(bp.BaseClass):
         """
         return self.size > 0
 
+    def issubset(self, other):
+        assert isinstance(other, Collisions)
+        # group/filter by index
+        grp_self = self.group(mode="index")
+        grp_other = other.group(mode="index")
+        # use set of keys to check for subset relationship
+        set_self = set(grp_self.keys())
+        set_other = set(grp_other.keys())
+        return set_self.issubset(set_other)
+
     #####################################
     #        Sorting and Ordering       #
     #####################################
