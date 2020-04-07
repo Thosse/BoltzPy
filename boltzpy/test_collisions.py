@@ -17,4 +17,13 @@ def test_collisions(tc):
     assert old_coll.size == new_coll.size
     assert np.array_equal(old_coll.relations, new_coll.relations)
     assert np.array_equal(old_coll.weights, new_coll.weights)
+    assert old_coll == new_coll
+    return
+
+
+def test_issubset():
+    tc1 = bp_t.CASES[2]
+    tc2 = bp_t.CASES[3]
+    assert tc2.coll.issubset(tc1.coll)
+    assert not tc1.coll.issubset(tc2.coll)
     return

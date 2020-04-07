@@ -165,10 +165,24 @@ class Collisions(bp.BaseClass):
         return self.size > 0
 
     def issubset(self, other):
+        """Checks if self.relations are a subset of other.relations.
+        Weights are not checked and may differ.
+
+        Parameters
+        ----------
+        other : :class:`Collisions`
+
+        Returns
+        -------
+        :obj:`bool`
+        """
         assert isinstance(other, Collisions)
         # group/filter by index
         grp_self = self.group(mode="index")
         grp_other = other.group(mode="index")
+        # assert that each keys has only a single value
+        assert all([len(value) == 1 for value in grp_self.values()])
+        assert all([len(value) == 1 for value in grp_other.values()])
         # use set of keys to check for subset relationship
         set_self = set(grp_self.keys())
         set_other = set(grp_other.keys())
