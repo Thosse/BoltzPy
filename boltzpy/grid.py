@@ -164,6 +164,22 @@ class Grid(bp.BaseClass):
         return self.is_configured and self.iG is not None
 
     #####################################
+    #        Sorting and Ordering       #
+    #####################################
+    def key_distance(self, velocities):
+        assert isinstance(velocities, np.ndarray)
+        # grids of even shape don't contain 0
+        # thus need to be shifted into 0 for modulo operations
+        # TODO np.where faster here? allows rectangular shapes as well (probably unecessary)
+        if self.shape[0] % 2 == 0:
+            velocities = velocities - self.spacing // 2
+        distance = np.mod(velocities, self.spacing)
+        distance = np.where(distance > self.spacing // 2,
+                            distance - self.spacing,
+                            distance)
+        return distance
+
+    #####################################
     #           Configuration           #
     #####################################
     # Todo this should be simpler -> use np.mgrid?
@@ -243,6 +259,7 @@ class Grid(bp.BaseClass):
                          if np.all(value == integer_value))
         local_index = next(grid_iterator, None)
         return local_index
+
 
     #####################################
     #           Visualization           #

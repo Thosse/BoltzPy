@@ -155,6 +155,24 @@ class SVGrid(bp.BaseClass):
         return spacings
 
     #####################################
+    #        Sorting and Ordering       #
+    #####################################
+    def key_distance(self, velocities):
+        distances = np.array([grid.key_distance(velocities) for grid in self.vGrids],
+                             dtype=int)
+        if distances.ndim > 2:
+            assert distances.ndim == 3, (
+                "The vectorized version is only tested for 2D velocity arrays!"
+            )
+            distances = distances.transpose((1, 0, 2))
+        return distances
+
+    @staticmethod
+    def key_norm(velocities):
+        norm = (velocities**2).sum(axis=-1)
+        return norm
+
+    #####################################
     #           Configuration           #
     #####################################
     def setup(self):
