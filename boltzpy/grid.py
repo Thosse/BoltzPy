@@ -170,7 +170,7 @@ class Grid(bp.BaseClass):
         assert isinstance(velocities, np.ndarray)
         # grids of even shape don't contain 0
         # thus need to be shifted into 0 for modulo operations
-        # TODO np.where faster here? allows rectangular shapes as well (probably unecessary)
+        assert len(set(self.shape)) == 1, "only works for square/cubic grids"
         if self.shape[0] % 2 == 0:
             velocities = velocities - self.spacing // 2
         distance = np.mod(velocities, self.spacing)
@@ -178,6 +178,25 @@ class Grid(bp.BaseClass):
                             distance - self.spacing,
                             distance)
         return distance
+
+    @staticmethod
+    def key_norm(velocities):
+        norm = (velocities**2).sum(axis=-1)
+        return norm
+
+    def group(self, velocities):
+        grouped_velocities = dict()
+        keys = self.key_distance(velocities)
+        for (i, v) in enumerate(velocities):
+            key = tuple(keys[i])
+            if key in grouped_velocities.keys():
+                grouped_velocities[key].append(v)
+            else:
+                grouped_velocities[key] = [v]
+        for (key, item) in grouped_velocities.items():
+            item = sorted(item, key=self.key_norm)
+            grouped_velocities[key] = np.array(item)
+        return grouped_velocities
 
     #####################################
     #           Configuration           #
