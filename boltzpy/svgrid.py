@@ -172,6 +172,21 @@ class SVGrid(bp.BaseClass):
         norm = (velocities**2).sum(axis=-1)
         return norm
 
+    def group(self):
+        distances = self.key_distance(self.iMG)
+        grouped_velocities = dict()
+        for (i, v_i) in enumerate(self.iMG):
+            spc = self.get_specimen(i)
+            key = tuple([spc, *distances[i].flatten()])
+            if key in grouped_velocities.keys():
+                grouped_velocities[key].append(v_i)
+            else:
+                grouped_velocities[key] = [v_i]
+        for (key, item) in grouped_velocities.items():
+            item = sorted(item, key=self.key_norm)
+            grouped_velocities[key] = np.array(item)
+        return grouped_velocities
+
     #####################################
     #           Configuration           #
     #####################################
