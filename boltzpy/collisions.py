@@ -46,45 +46,6 @@ class Collision(bp.BaseClass):
         return plot_object
 
     @staticmethod
-    def is_collision(v_pre,
-                     v_post,
-                     w_pre,
-                     w_post,
-                     mass_v,
-                     mass_w):
-        """Check whether the Collision Candidate fulfills all necessary
-        Conditions.
-
-        Parameters
-        ----------
-
-        v_pre, v_post, w_pre, w_post : :obj:`~numpy.array` [:obj:`int`]
-            Colliding velocities in the SV-Grid
-            in multitudes of :attr:`SVGrid.delta`.
-        mass_v, mass_w : int
-            Mass of the respective particles.
-
-        Returns
-        -------
-        bool
-            True if collision fulfills all conditions, False otherwise.
-        """
-        # Ignore Collisions without changes in velocities
-        if np.all(v_pre == v_post) and np.all(w_pre == w_post):
-            return False
-        # Invariance of momentum
-        # Todo use functions from output.py instead?
-        if not np.all(mass_v * (v_post - v_pre) == mass_w * (w_pre - w_post)):
-            return False
-        # Invariance of energy
-        energy_0 = np.sum(mass_v * v_pre ** 2 + mass_w * w_pre ** 2)
-        energy_1 = np.sum(mass_v * v_post ** 2 + mass_w * w_post ** 2)
-        if energy_0 != energy_1:
-            return False
-        # Accept this Collision
-        return True
-
-    @staticmethod
     def is_effective_collision(relation):
         if any(idx is None for idx in relation):
             return False
@@ -280,6 +241,26 @@ class Collisions(bp.BaseClass):
     #####################################
     #           Configuration           #
     #####################################
+    @staticmethod
+    def is_collision(velocities,
+                     masses):
+        (v0, v1, w0, w1) = velocities
+        [m_v, m_w] = masses
+        # Ignore Collisions without changes in velocities
+        if np.all(v0 == v1) and np.all(w0 == w1):
+            return False
+        # Invariance of momentum
+        if not np.array_equal(masses[0] * (v1 - v0),
+                              masses[1] * (w0 - w1)):
+            return False
+        # Invariance of energy
+        energy_0 = np.sum(m_v * v0 ** 2 + m_w * w0 ** 2)
+        energy_1 = np.sum(m_v * v1 ** 2 + m_w * w1 ** 2)
+        if energy_0 != energy_1:
+            return False
+        # Accept this Collision
+        return True
+
     def setup(self,
               scheme,
               svgrid,
@@ -405,8 +386,8 @@ class Collisions(bp.BaseClass):
                                idx_v1,
                                idx_w0,
                                idx_w1]
-                if not Collision.is_collision(v0, v1, w0, w1,
-                                              mass[0], mass[1]):
+                if not Collisions.is_collision([v0, v1, w0, w1],
+                                               mass):
                     continue
                 if not Collision.is_effective_collision(new_col_idx):
                     continue
@@ -494,8 +475,8 @@ class Collisions(bp.BaseClass):
                                        index_v1,
                                        index_w0,
                                        index_w1]
-                        if not Collision.is_collision(v0, v1, w0, w1,
-                                                      mass_v, mass_w):
+                        if not Collisions.is_collision([v0, v1, w0, w1],
+                                                       [mass_v, mass_w]):
                             continue
                         if not Collision.is_effective_collision(new_col_idx):
                             continue
