@@ -144,7 +144,7 @@ class Collisions(bp.BaseClass):
 
     @property
     def list(self):
-        return [tuple([*self.relations[i], self.weights[i]])
+        return [list([*self.relations[i], self.weights[i]])
                 for i in range(self.size)]
 
     @property
