@@ -197,6 +197,12 @@ class Collisions(bp.BaseClass):
         return tuple(sorted_indices)
 
     @staticmethod
+    def key_species(collision_tuple, svgrid):
+        indices = [svgrid.get_specimen(col_idx)
+                   for col_idx in collision_tuple[0:4]]
+        return tuple(sorted(indices))
+
+    @staticmethod
     def key_area(collision_tuple, svgrid):
         [v0, v1, w0, w1] = svgrid.iMG[collision_tuple[0:4]]
         area_1 = np.linalg.norm(np.cross(v1 - v0, w1 - v0))
@@ -228,6 +234,9 @@ class Collisions(bp.BaseClass):
             return lambda x: Collisions.key_angle(
                 x,
                 svgrid)
+        elif mode == "species":
+            assert svgrid is not None
+            return lambda x: Collisions.key_species(x, svgrid)
         else:
             msg = ('Unsupported Parameter:\n\t'
                    'mode = ' + '{}'.format(mode))
