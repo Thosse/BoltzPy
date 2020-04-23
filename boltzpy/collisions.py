@@ -357,8 +357,8 @@ class Collisions(bp.BaseClass):
                  masses,
                  v0,
                  collision_rate):
-        # colliding velocities
-        colvels= []
+        # store results in lists
+        colvels= []     # colliding velocities
         weights = []
         # iterate over all v1 (post collision of v0)
         for v1 in grids[1].iG:
@@ -386,94 +386,65 @@ class Collisions(bp.BaseClass):
         return [colvels, weights]
 
     @staticmethod
-    def convergent(mass_v,
-                   grid_v,
-                   mass_w,
-                   grid_w,
-                   idx_spc_v,
-                   idx_spc_w,
-                   index_offset_v,
-                   svgrid,
-                   species):
-        """Generate some possible, non-useless collisions.
-
-        Iterates over possible velocity combinations in the directions / with the angles given in angles
-        and checks whether they are proper collisions.
-
-        All proper collisions are stored in the relations list."""
-        angles = np.array([[1, -1], [1, 0], [1, 1], [0, 1]])  # effectively checks [[1, 0], [1, 1], [0, 1], [-1, 1],
-        # [-1, 0], [-1, -1], [0, -1], [1, -1]]
-        relations = []
+    def convergent(grids,
+                   masses,
+                   v0,
+                   collision_rate):
+        # effectively checks [[1, 0], [1, 1], [0, 1], [-1, 1],
+        #                     [-1, 0], [-1, -1], [0, -1], [1, -1]]
+        angles = np.array([[1, -1], [1, 0], [1, 1], [0, 1]])
+        # store results in lists
+        colvels = []    # colliding velocities
         weights = []
-        # Todo only works if spacing is dividable by 2*mass_w
-        for (loc_v0, v0) in enumerate(grid_v.iG):
-            # global index in self.iMG
-            index_v0 = index_offset_v + loc_v0
-            assert np.all(v0 == svgrid.iMG[index_v0])
-            # we choose idx_v0 < idx_v1 to ignore v=(a, a, * , *)
-            # and ignore repeating collisions
+        # iterate over the given angles
+        for axis_x in angles:
+            axis_y = np.matmul(np.array([[0, -1], [1, 0]]), axis_x)
+            # choose v1 from the grid points on v0 + X * axis_x
+            # just in positive direction because of symmetry and to avoid v1=v0
+            for steps_x in np.arange(1, np.max(grids[0].shape)):
+                diff_v = steps_x * grids[0].spacing * axis_x
+                v1 = v0 + diff_v
+                # skip, if v1 is not in the v-grid
+                if grids[1].get_idx(v1) == -1:
+                    continue
 
-            # iterate over the given angles
-            for angle_v in angles:
-                # iterate over the possible v1 in the given direction / for the given angle
-                # just in positive direction because of symmetry and to avoid v1=v0
-                for diff_x in np.arange(1, np.max(grid_v.shape)):
-                    diff_v = diff_x * grid_v.spacing * angle_v
-                    v1 = v0 + diff_v
-                    # global index in self.iMG if it exists
-                    index_v1 = svgrid.find_index(idx_spc_v, v1)
-                    if index_v1 is None:
-                        continue
-                    # calculating starting points for w0 and w1
-                    v_med = v0 + diff_v // 2
-                    # diff_w = diff_v * mass_v // mass_w
-                    w0_start = v_med + diff_v * mass_v // mass_w // 2
-                    w1_start = v_med - diff_v * mass_v // mass_w // 2
-                    # iterate over possible points for w0 and w1 and check, if they are in the grid and possible collisions
-                    # angle_w axis 90° to the angle axis
-                    angle_w = np.matmul(np.array([[0, -1], [1, 0]]), angle_v)
-                    # searching for one possible starting velocity pair (w0,w1)
-                    index_w0 = None
-                    index_w1 = None
-                    for point in np.arange(- grid_w.spacing, grid_w.spacing):
-                        w0 = w0_start + point * angle_w
-                        w1 = w1_start + point * angle_w
-                        # find global indices in self.iMG if they exist
-                        index_w0 = svgrid.find_index(idx_spc_w, w0)
-                        index_w1 = svgrid.find_index(idx_spc_w, w1)
-                        if index_w0 is None or index_w1 is None:
-                            continue
+                # calculating starting points for w0 and w1
+                # Note: w_candidates are not necessarily grid points
+                v_middle = v0 + diff_v // 2
+                diff_w = diff_v * masses[0] // masses[2]
+                w_candidates = np.array([v_middle + diff_w // 2,
+                                         v_middle - diff_w // 2])
+                # Todo maybe use a next() method for this?
+                # shift w_candidates until the are located on grid points
+                (w0_start, w1_start) = (None, None)
+                for steps_y in np.arange(- grids[2].spacing, grids[2].spacing):
+                    shifted_w_candidates = w_candidates + steps_y * axis_y
+                    # check if the points are on the grid
+                    if all(grids[2].get_idx(shifted_w_candidates) != -1):
+                        (w0_start, w1_start) = shifted_w_candidates
                         break
-                    if index_w0 is None or index_w1 is None:
+                if w0_start is None or w1_start is None:
+                    continue
+
+                # find all other collisions along axis_y
+                for diff_y in np.arange(- np.max(grids[2].shape),
+                                        np.max(grids[2].shape)):
+                    w0 = w0_start + diff_y * grids[2].spacing * axis_y
+                    w1 = w1_start + diff_y * grids[2].spacing * axis_y
+                    # skip, if w0 or w1 are not in their grids
+                    if any(grids[2].get_idx(np.array([w0, w1])) == -1):
                         continue
-                    w0_start = w0
-                    w1_start = w1
-                    # from the found possible starting collision generate further possible collisions
-                    for diff_y in np.arange(- np.max(grid_w.shape), np.max(grid_w.shape)):
-                        w0 = w0_start + diff_y * grid_w.spacing * angle_w
-                        w1 = w1_start + diff_y * grid_w.spacing * angle_w
-                        # find global indices in self.iMG if they exist
-                        index_w0 = svgrid.find_index(idx_spc_w, w0)
-                        index_w1 = svgrid.find_index(idx_spc_w, w1)
-                        if index_w0 is None or index_w1 is None:
-                            continue
-                        # check if its a proper Collision
-                        new_col_idx = [index_v0,
-                                       index_v1,
-                                       index_w0,
-                                       index_w1]
-                        if not Collisions.is_collision([v0, v1, w0, w1],
-                                                       [mass_v, mass_w]):
-                            continue
-                        if not Collisions.is_effective_collision(new_col_idx):
-                            continue
-                        # Collision is accepted -> Add to List
-                        relations.append(new_col_idx)
-                        new_weight = species.collision_rates[idx_spc_v,
-                                                             idx_spc_w]
-                        weights.append(new_weight)
-        assert len(relations) == len(weights)
-        return [relations, weights]
+                    # check if its a proper Collision
+                    if not Collisions.is_collision([v0, v1, w0, w1],
+                                                   masses):
+                        continue
+                    # Collision is accepted -> Add to List
+                    colvels.append([v0, v1, w0, w1])
+                    weights.append(collision_rate)
+        assert len(colvels) == len(weights)
+        colvels = np.array(colvels)
+        weights = np.array(weights)
+        return [colvels, weights]
 
     def generate_collision_matrix(self, dt):
         # Size of complete velocity grid
