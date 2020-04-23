@@ -45,22 +45,6 @@ class Collision(bp.BaseClass):
         plot_object.plot(x_vals, y_vals, c="gray")
         return plot_object
 
-    @staticmethod
-    def is_effective_collision(relation):
-        if any(idx is None for idx in relation):
-            return False
-        # Ignore collisions that were already found
-        if any([relation[3] < relation[0],
-                relation[2] < relation[0],
-                relation[1] < relation[0]]):
-            return False
-        # Ignore v=(X,b,b,X) for same species
-        # as such collisions have no effect
-        if all([relation[1] == relation[2],
-                relation[0] == relation[3]]):
-            return False
-        return True
-
 
 # Todo move this class into model(velocity_grid, collisions)
 class Collisions(bp.BaseClass):
@@ -261,6 +245,17 @@ class Collisions(bp.BaseClass):
         # Accept this Collision
         return True
 
+    # Todo Move into filter method?
+    @staticmethod
+    def is_effective_collision(indices):
+        assert all(idx >= 0 for idx in indices)
+        # Ignore v=(a,b,b,a) for same species
+        # as such collisions have no effect
+        if all([indices[1] == indices[2],
+                indices[0] == indices[3]]):
+            return False
+        return True
+
     def setup(self,
               scheme,
               svgrid,
@@ -389,7 +384,7 @@ class Collisions(bp.BaseClass):
                 if not Collisions.is_collision([v0, v1, w0, w1],
                                                mass):
                     continue
-                if not Collision.is_effective_collision(new_col_idx):
+                if not Collisions.is_effective_collision(new_col_idx):
                     continue
                 # Collision is accepted -> Add to List
                 relations.append(new_col_idx)
@@ -478,7 +473,7 @@ class Collisions(bp.BaseClass):
                         if not Collisions.is_collision([v0, v1, w0, w1],
                                                        [mass_v, mass_w]):
                             continue
-                        if not Collision.is_effective_collision(new_col_idx):
+                        if not Collisions.is_effective_collision(new_col_idx):
                             continue
                         # Collision is accepted -> Add to List
                         relations.append(new_col_idx)
