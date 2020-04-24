@@ -370,8 +370,7 @@ class Collisions(bp.BaseClass):
                 assert all((diff_v * masses[0]) % masses[2] == 0)
                 diff_w = -diff_v * masses[0] // masses[2]
                 w1 = w0 + diff_w
-                # skip, if w1 is not in the w-grid
-                if grids[3].get_idx(w1) == -1:
+                if w1 not in grids[3]:
                     continue
                 # check if its a proper Collision
                 if not Collisions.is_collision([v0, v1, w0, w1],
@@ -398,14 +397,18 @@ class Collisions(bp.BaseClass):
         weights = []
         # iterate over the given angles
         for axis_x in angles:
-            axis_y = np.matmul(np.array([[0, -1], [1, 0]]), axis_x)
-            # choose v1 from the grid points on v0 + X * axis_x
+            # get y axis by rotating x axis 90°
+            axis_y = np.array([[0, -1], [1, 0]])@axis_x
+            assert np.dot(axis_x, axis_y) == 0, (
+                "axis_x and axis_y must be orthogonal"
+            )
+            # Todo use a generator for v1 instead?
+            # choose v1 from the grid points on the x-axis (through v0)
             # just in positive direction because of symmetry and to avoid v1=v0
-            for steps_x in np.arange(1, np.max(grids[0].shape)):
+            for steps_x in range(grids[0].shape[0]):
                 diff_v = steps_x * grids[0].spacing * axis_x
                 v1 = v0 + diff_v
-                # skip, if v1 is not in the v-grid
-                if grids[1].get_idx(v1) == -1:
+                if v1 not in grids[1]:
                     continue
 
                 # calculating starting points for w0 and w1
@@ -414,25 +417,26 @@ class Collisions(bp.BaseClass):
                 diff_w = diff_v * masses[0] // masses[2]
                 w_candidates = np.array([v_middle + diff_w // 2,
                                          v_middle - diff_w // 2])
-                # Todo maybe use a next() method for this?
+                # Todo use a generator + next() method for this?
                 # shift w_candidates until the are located on grid points
                 (w0_start, w1_start) = (None, None)
                 for steps_y in np.arange(- grids[2].spacing, grids[2].spacing):
                     shifted_w_candidates = w_candidates + steps_y * axis_y
                     # check if the points are on the grid
-                    if all(grids[2].get_idx(shifted_w_candidates) != -1):
+                    if shifted_w_candidates in grids[2]:
                         (w0_start, w1_start) = shifted_w_candidates
                         break
                 if w0_start is None or w1_start is None:
                     continue
 
+                # Todo use a generator method for this?
                 # find all other collisions along axis_y
                 for diff_y in np.arange(- np.max(grids[2].shape),
                                         np.max(grids[2].shape)):
                     w0 = w0_start + diff_y * grids[2].spacing * axis_y
                     w1 = w1_start + diff_y * grids[2].spacing * axis_y
                     # skip, if w0 or w1 are not in their grids
-                    if any(grids[2].get_idx(np.array([w0, w1])) == -1):
+                    if np.array([w0, w1]) not in grids[2]:
                         continue
                     # check if its a proper Collision
                     if not Collisions.is_collision([v0, v1, w0, w1],

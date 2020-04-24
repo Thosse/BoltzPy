@@ -235,6 +235,13 @@ class Grid(bp.BaseClass):
         return idx
 
     #####################################
+    #              Utility              #
+    #####################################
+    def __contains__(self, item):
+        assert isinstance(item, np.ndarray)
+        return np.all(self.get_idx(item) != -1)
+
+    #####################################
     #           Configuration           #
     #####################################
     # Todo this should be simpler -> use np.mgrid?
