@@ -16,11 +16,29 @@ def test_collisions(tc):
     # sort collisions, to ignore different orders
     old_coll.sort()
     new_coll.sort()
+    # a single collision can be ordered in different ways
+    intraspecies_permutations = np.array([[0, 1, 2, 3], [1, 2, 3, 0],
+                                          [2, 3, 0, 1], [3, 0, 1, 2],
+                                          [3, 2, 1, 0], [0, 3, 2, 1],
+                                          [1, 0, 3, 2], [2, 1, 0, 3]],
+                                         dtype=int)
+    interspecies_permutations = np.array([[0, 1, 2, 3],
+                                          [2, 3, 0, 1],
+                                          [3, 2, 1, 0],
+                                          [1, 0, 3, 2]],
+                                         dtype=int)
     # compare results
     assert old_coll.size == new_coll.size
-    assert np.array_equal(old_coll.relations, new_coll.relations)
-    assert np.array_equal(old_coll.weights, new_coll.weights)
-    assert old_coll == new_coll
+    for (c, coll) in enumerate(old_coll.relations):
+        assert sorted(coll) == sorted(new_coll.relations[c])
+        colliding_species = {tc.sv.get_specimen(idx) for idx in coll}
+        if len(colliding_species) == 1:
+            permutations = intraspecies_permutations
+        else:
+            permutations = interspecies_permutations
+        assert any(np.all(coll[p] == new_coll.relations[c])
+                   for p in permutations)
+        assert old_coll.weights[c] == new_coll.weights[c]
     return
 
 
