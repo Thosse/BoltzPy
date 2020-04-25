@@ -13,6 +13,9 @@ def test_collisions(tc):
     old_coll = sim.coll
     # new collisions are generated in the testcases already
     new_coll = tc.coll
+    # sort collisions, to ignore different orders
+    old_coll.sort()
+    new_coll.sort()
     # compare results
     assert old_coll.size == new_coll.size
     assert np.array_equal(old_coll.relations, new_coll.relations)

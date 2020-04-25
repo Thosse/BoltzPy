@@ -341,6 +341,8 @@ class Collisions(bp.BaseClass):
         # for some tests it is useful to keep these and filter later
         if apply_filter:
             self.filter()
+        # sort Collisions fore easier comparisons
+        self.sort()
         time_end = time()
         print('Time taken =  {t} seconds\n'
               'Total Number of Collisions = {n}\n'
