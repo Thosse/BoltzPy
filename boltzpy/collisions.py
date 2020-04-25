@@ -389,8 +389,9 @@ class Collisions(bp.BaseClass):
                    masses,
                    v0,
                    collision_rate):
-        # effectively checks [[1, 0], [1, 1], [0, 1], [-1, 1],
-        #                     [-1, 0], [-1, -1], [0, -1], [1, -1]]
+        # angles = np.array([[1, 0], [1, 1], [0, 1], [-1, 1],
+        #                    [-1, 0], [-1, -1], [0, -1], [1, -1]])
+        # Todo This is sufficient, until real weights are used
         angles = np.array([[1, -1], [1, 0], [1, 1], [0, 1]])
         # store results in lists
         colvels = []    # colliding velocities
@@ -402,41 +403,31 @@ class Collisions(bp.BaseClass):
             assert np.dot(axis_x, axis_y) == 0, (
                 "axis_x and axis_y must be orthogonal"
             )
-            # Todo use a generator for v1 instead?
             # choose v1 from the grid points on the x-axis (through v0)
             # just in positive direction because of symmetry and to avoid v1=v0
-            for steps_x in range(grids[0].shape[0]):
-                diff_v = steps_x * grids[0].spacing * axis_x
-                v1 = v0 + diff_v
-                if v1 not in grids[1]:
-                    continue
-
-                # calculating starting points for w0 and w1
-                # Note: w_candidates are not necessarily grid points
-                v_middle = v0 + diff_v // 2
+            for v1 in grids[1].line(v0,
+                                    grids[1].spacing * axis_x,
+                                    range(1, grids[1].shape[0])):
+                diff_v = v1 - v0
                 diff_w = diff_v * masses[0] // masses[2]
-                w_candidates = np.array([v_middle + diff_w // 2,
-                                         v_middle - diff_w // 2])
-                # Todo use a generator + next() method for this?
-                # shift w_candidates until the are located on grid points
-                (w0_start, w1_start) = (None, None)
-                for steps_y in np.arange(- grids[2].spacing, grids[2].spacing):
-                    shifted_w_candidates = w_candidates + steps_y * axis_y
-                    # check if the points are on the grid
-                    if shifted_w_candidates in grids[2]:
-                        (w0_start, w1_start) = shifted_w_candidates
-                        break
-                if w0_start is None or w1_start is None:
+                # find starting point for w0,
+                w0_projected_on_axis_x = v0 + diff_v // 2 + diff_w // 2
+                w0_start = next(grids[2].line(w0_projected_on_axis_x,
+                                              axis_y,
+                                              range(- grids[2].spacing,
+                                                    grids[2].spacing)),
+                                None)
+                if w0_start is None:
                     continue
 
-                # Todo use a generator method for this?
                 # find all other collisions along axis_y
-                for diff_y in np.arange(- np.max(grids[2].shape),
-                                        np.max(grids[2].shape)):
-                    w0 = w0_start + diff_y * grids[2].spacing * axis_y
-                    w1 = w1_start + diff_y * grids[2].spacing * axis_y
-                    # skip, if w0 or w1 are not in their grids
-                    if np.array([w0, w1]) not in grids[2]:
+                for w0 in grids[2].line(w0_start,
+                                        grids[2].spacing * axis_y,
+                                        range(-grids[2].shape[0],
+                                              grids[2].shape[0])):
+                    w1 = w0 - diff_w
+                    # skip, if w1 is not in the grid (can be out of bounds)
+                    if np.array(w1) not in grids[3]:
                         continue
                     # check if its a proper Collision
                     if not Collisions.is_collision([v0, v1, w0, w1],
@@ -448,6 +439,7 @@ class Collisions(bp.BaseClass):
         assert len(colvels) == len(weights)
         colvels = np.array(colvels)
         weights = np.array(weights)
+        # Todo assert colvels.size != 0
         return [colvels, weights]
 
     def generate_collision_matrix(self, dt):

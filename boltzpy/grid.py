@@ -241,6 +241,10 @@ class Grid(bp.BaseClass):
         assert isinstance(item, np.ndarray)
         return np.all(self.get_idx(item) != -1)
 
+    def line(self, start, direction, steps):
+        return (start + step * direction for step in steps
+                if start + step * direction in self)
+
     #####################################
     #           Configuration           #
     #####################################
