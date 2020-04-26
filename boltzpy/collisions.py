@@ -341,6 +341,7 @@ class Collisions(bp.BaseClass):
                 species_idx[2:4] = idx_w
                 masses[:] = species.mass[species_idx]
                 collision_rate = species.collision_rates[idx_v, idx_w]
+                index_offset = np.array(svgrid.index_range[species_idx, 0])
                 # Todo may be bad for differing weights
                 # skip already computed combinations
                 if idx_w < idx_v:
@@ -355,22 +356,23 @@ class Collisions(bp.BaseClass):
                         masses,
                         v0_repr,
                         collision_rate)
-                    # shift extended colvels into other class elements
+                    # Get relations for other class elements by shifting
                     for v0 in equivalence_class:
+                        # shift extended colvels
                         new_colvels = repr_colvels + (v0 - v0_repr)
-                        # add all correct relations to the list
-                        for (idx, col) in enumerate(new_colvels):
-                            # get indices of colliding velocities
-                            rel = np.array([grids[i].get_idx(col[i])
-                                            for i in range(4)],
-                                           dtype=int)
-                            if np.any(rel == -1):
+                        # get indices
+                        new_rels = np.zeros(new_colvels.shape[0:2], dtype=int)
+                        for i in range(4):
+                            new_rels[:, i] = grids[i].get_idx(new_colvels[:, i, :])
+                        new_rels += index_offset
+                        for (r, rel) in enumerate(new_rels):
+                            # skip, if not in grid
+                            if np.any(rel < index_offset):
                                 continue
-                            rel += + svgrid.index_range[species_idx, 0]
                             if not Collisions.is_effective_collision(rel):
                                 continue
                             relations.append(rel)
-                            weights.append(extended_weights[idx])
+                            weights.append(extended_weights[r])
                     # relations += new_rels
                     # weights += new_weights
         self.relations = np.array(relations, dtype=int)
