@@ -1,4 +1,3 @@
-import h5py
 import numpy as np
 import pytest
 
@@ -16,26 +15,15 @@ def test_collisions(tc):
     # sort collisions, to ignore different orders
     old_coll.sort()
     new_coll.sort()
-    # a single collision can be ordered in different ways
-    intraspecies_permutations = np.array([[0, 1, 2, 3], [1, 2, 3, 0],
-                                          [2, 3, 0, 1], [3, 0, 1, 2],
-                                          [3, 2, 1, 0], [0, 3, 2, 1],
-                                          [1, 0, 3, 2], [2, 1, 0, 3]],
-                                         dtype=int)
-    interspecies_permutations = np.array([[0, 1, 2, 3],
-                                          [2, 3, 0, 1],
-                                          [3, 2, 1, 0],
-                                          [1, 0, 3, 2]],
-                                         dtype=int)
     # compare results
     assert old_coll.size == new_coll.size
     for (c, coll) in enumerate(old_coll.relations):
         assert sorted(coll) == sorted(new_coll.relations[c])
         colliding_species = {tc.sv.get_specimen(idx) for idx in coll}
         if len(colliding_species) == 1:
-            permutations = intraspecies_permutations
+            permutations = bp.Collisions.INTRASPECIES_PERMUTATION
         else:
-            permutations = interspecies_permutations
+            permutations = bp.Collisions.INTERSPECIES_PERMUTATION
         assert any(np.all(coll[p] == new_coll.relations[c])
                    for p in permutations)
         assert old_coll.weights[c] == new_coll.weights[c]

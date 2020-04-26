@@ -87,6 +87,19 @@ class Collisions(bp.BaseClass):
         assert self.relations.ndim == 2
         return
 
+    # Any single relation can be permutated without changing its effect
+    INTRASPECIES_PERMUTATION = np.array([[0, 1, 2, 3], [1, 2, 3, 0],
+                                         [2, 3, 0, 1], [3, 0, 1, 2],
+                                         [3, 2, 1, 0], [0, 3, 2, 1],
+                                         [1, 0, 3, 2], [2, 1, 0, 3]],
+                                        dtype=int)
+
+    INTERSPECIES_PERMUTATION = np.array([[0, 1, 2, 3],
+                                         [2, 3, 0, 1],
+                                         [3, 2, 1, 0],
+                                         [1, 0, 3, 2]],
+                                        dtype=int)
+
     @property
     def list(self):
         return [list([*self.relations[i], self.weights[i]])
