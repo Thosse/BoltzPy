@@ -258,8 +258,7 @@ class Collisions(bp.BaseClass):
     def setup(self,
               scheme,
               svgrid,
-              species,
-              apply_filter=True):
+              species):
         """Generates the :attr:`relations` and :attr:`weights`.
 
         Parameters
@@ -295,15 +294,37 @@ class Collisions(bp.BaseClass):
             )
 
         grids = np.empty((4,), dtype=object)
+        # use larger grids to shift within equivalence classes
+        extended_grids = np.empty((4,), dtype=object)
         # Todo rename into species, after Model update
         species_idx = np.zeros(4, dtype=int)
         masses = np.zeros(4, dtype=int)
         # Iterate over Specimen pairs
         for (idx_v, grid_v) in enumerate(svgrid.vGrids):
             grids[0:2] = grid_v
+            assert grids[0].shape[0] % 2 == 1, (
+                "extended grids are always uneven. "
+                "Even grids need an extended even grid as well"
+            )
+            extended_grids[0:2] = bp.Grid(grids[0].ndim,
+                                          (2 * grids[0].shape[0] - 1,
+                                           2 * grids[0].shape[1] - 1),
+                                          grids[0].physical_spacing,
+                                          grids[0].spacing,
+                                          grids[0].is_centered)
             species_idx[0:2] = idx_v
             for (idx_w, grid_w) in enumerate(svgrid.vGrids):
                 grids[2:4] = grid_w
+                assert grids[2].shape[0] % 2 == 1, (
+                    "extended grids are always uneven. "
+                    "Even grids need an extended even grid as well"
+                )
+                extended_grids[2:4] = bp.Grid(grids[2].ndim,
+                                              (2 * grids[2].shape[0] - 1,
+                                               2 * grids[2].shape[1] - 1),
+                                              grids[2].physical_spacing,
+                                              grids[2].spacing,
+                                              grids[2].is_centered)
                 species_idx[2:4] = idx_w
                 masses[:] = species.mass[species_idx]
                 collision_rate = species.collision_rates[idx_v, idx_w]
@@ -311,37 +332,39 @@ class Collisions(bp.BaseClass):
                 # skip already computed combinations
                 if idx_w < idx_v:
                     continue
-                # generate colliding velocities(colvels) between the grids,
-                for v0 in grid_v.iG:
-                    [new_colvels, new_weights] = coll_func(grids,
-                                                           masses,
-                                                           v0,
-                                                           collision_rate)
-                    # get indices of colliding velocities
-                    new_rels = np.array(
-                        [[svgrid.find_index(species_idx[i], vels[i])
-                          for i in range(4)]
-                         for vels in new_colvels],
-                        dtype=int)
-                    # add all relations (that have an index) to the list
-                    for (idx, col) in enumerate(new_rels):
-                        condition = (np.all(col != -1)
-                                     and Collisions.is_effective_collision(col))
-                        if condition:
-                            relations.append(col)
-                            weights.append(new_weights[idx])
+                # group grid[0] points by distance to grid[2]
+                for equivalence_class in grids[2].group(grids[0].iG).values():
+                    # only generate colliding velocities(colvels)
+                    # for a representative v0 of its group,
+                    v0_repr = equivalence_class[0]
+                    [repr_colvels, extended_weights] = coll_func(
+                        extended_grids,
+                        masses,
+                        v0_repr,
+                        collision_rate)
+                    # shift extended colvels into other class elements
+                    for v0 in equivalence_class:
+                        new_colvels = repr_colvels + (v0 - v0_repr)
+                        # add all correct relations to the list
+                        for (idx, col) in enumerate(new_colvels):
+                            # get indices of colliding velocities
+                            rel = np.array([grids[i].get_idx(col[i])
+                                            for i in range(4)],
+                                           dtype=int)
+                            if np.any(rel == -1):
+                                continue
+                            rel += + svgrid.index_range[species_idx, 0]
+                            if not Collisions.is_effective_collision(rel):
+                                continue
+                            relations.append(rel)
+                            weights.append(extended_weights[idx])
                     # relations += new_rels
                     # weights += new_weights
         self.relations = np.array(relations, dtype=int)
         self.weights = np.array(weights, dtype=float)
-
         # remove redundant collisions
-        # intraspecies collisions are counted twice, since
-        # both (v0, v1, w0, w1) and ( v0, w1, w0, v1) are counted
-        # for some tests it is useful to keep these and filter later
-        if apply_filter:
-            self.filter()
-        # sort Collisions fore easier comparisons
+        self.filter()
+        # sort collisions for better comparability
         self.sort()
         time_end = time()
         print('Time taken =  {t} seconds\n'
@@ -553,8 +576,8 @@ class Collisions(bp.BaseClass):
             assert self.weights.ndim == 1
             assert self.relations.shape == (self.weights.size, 4)
             for col in self.relations:
-                assert col[0] < col[1]
-                assert col[0] < col[2]
+                # assert col[0] < col[1]
+                # assert col[0] < col[2]
                 if context is not None:
                     sv = context.sv
                     di_0 = (sv.iMG[col[1]] - sv.iMG[col[0]])
@@ -602,6 +625,10 @@ def plot(svgrid,
     # show each element one by one
     if iterative:
         for coll in collisions:
+            print("Relation:\n\t",
+                  str(coll.relation))
+            print("Velocities:\n\t",
+                  str(svgrid.iMG[coll.relation]).replace('\n', '\n\t'))
             plot_object.close()
             coll.plot(svgrid=svgrid,
                       plot_object=plot_object)

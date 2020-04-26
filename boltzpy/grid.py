@@ -194,6 +194,7 @@ class Grid(bp.BaseClass):
                 grouped_velocities[key].append(v)
             else:
                 grouped_velocities[key] = [v]
+        # Each Group is sorted by norm
         for (key, item) in grouped_velocities.items():
             item = sorted(item, key=self.key_norm)
             grouped_velocities[key] = np.array(item)
