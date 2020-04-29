@@ -256,16 +256,6 @@ class Collisions(bp.BaseClass):
         # Accept this Collision
         return True
 
-    # Todo Move into filter method?
-    @staticmethod
-    def is_effective_collision(indices):
-        # assert all(idx >= 0 for idx in indices)
-        # Ignore v=(a,b,b,a) for same species
-        # as such collisions have no effect
-        cond1 = indices[..., 1] != indices[..., 2]
-        cond2 = indices[..., 0] != indices[..., 3]
-        return cond1 | cond2
-
     def setup(self,
               scheme,
               svgrid,
@@ -363,10 +353,14 @@ class Collisions(bp.BaseClass):
                         for i in range(4):
                             new_rels[:, i] = grids[i].get_idx(new_colvels[:, i, :])
                         new_rels += index_offset
-                        # choose only effective Collisions in the grid:
-                        is_in_grid = np.all(new_rels >= index_offset, axis=1)
-                        is_effective = Collisions.is_effective_collision(new_rels)
-                        choice = np.where(is_in_grid & is_effective)
+                        # remove out-of-bounds or useless collisions
+                        choice = np.where(
+                            # must be in the grid
+                            np.all(new_rels >= index_offset, axis=1)
+                            # must be effective
+                            & (new_rels[..., 0] != new_rels[..., 3])
+                            & (new_rels[..., 0] != new_rels[..., 1])
+                        )
                         # Add chosen Relations/Weights to the list
                         relations.extend(new_rels[choice])
                         weights.extend(extended_weights[choice])
