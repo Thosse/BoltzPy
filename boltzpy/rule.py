@@ -390,7 +390,13 @@ class Rule(bp.BaseClass):
         if initial_state is not None:
             assert isinstance(initial_state, np.ndarray)
             assert initial_state.dtype == float
-            assert np.all(initial_state >= 0)
+            assert not np.any(np.isnan(initial_state)), (
+                "Initial state contains NAN values!"
+            )
+            assert np.all(initial_state >= 0), (
+                "Minimal value = {}\n"
+                "Initial values:\n{}".format(np.min(initial_state), initial_state)
+            )
             # Todo test initial state, moments should be matching (up to 10^-x)
         return
 
@@ -624,12 +630,14 @@ class BoundaryPointRule(Rule):
             thermal_inflow = bp_o.particle_number(
                 self.reflection_rate_thermal[idx_spc] * inflow[..., beg:end],
                 data.dv[idx_spc])
+            # Todo this should be an attribute, shoult be a float, not an array
             initial_particles = bp_o.particle_number(
                 self.initial_state[np.newaxis, beg:end],
                 data.dv[idx_spc])
+            thermal_factor = (thermal_inflow / initial_particles)
             reflected_inflow[..., beg:end] += (
-                thermal_inflow / initial_particles
-                * self.initial_state[beg:end]
+                thermal_factor[:, np.newaxis]
+                * self.initial_state[np.newaxis, beg:end]
             )
         return reflected_inflow
 

@@ -9,7 +9,6 @@
 
    classes
    constants
-   animation
 
 
 .. automodule:: boltzpy
@@ -18,6 +17,5 @@ Links
 -----
  * :ref:`classes`
  * :ref:`constants`
- * :ref:`animation`
  * :ref:`search`
  * :ref:`genindex`

@@ -33,53 +33,6 @@ class Collision(bp.BaseClass):
         self.weight = float(weight)
 
     #####################################
-    #        Sorting and Ordering       #
-    #####################################
-    @staticmethod
-    def get_key_function(mode="index",
-                         svgrid=None,
-                         **kwargs):
-        if mode == "index":
-            return bp.collisions.Collision.key_index
-        elif mode == "area":
-            assert svgrid is not None
-            return lambda x: bp.collisions.Collision.key_area(x, svgrid)
-        elif mode == "angle":
-            assert svgrid is not None
-            if "merge_similar_angles" in kwargs.keys():
-                merge_similar_angles = kwargs["merge_similar_angles"]
-                return lambda x: bp.collisions.Collision.key_angle(
-                    x,
-                    svgrid,
-                    merge_similar_angles)
-        else:
-            msg = ('Unsupported Parameter:\n\t'
-                   'mode = ' + '{}'.format(mode))
-            raise NotImplementedError(msg)
-
-    def key_index(self):
-        sorted_indices = np.sort(self.relation)
-        return tuple(sorted_indices)
-
-    def key_area(self, svgrid):
-        [v0, v1, w0, w1] = svgrid.iMG[self.relation]
-        area_1 = np.linalg.norm(np.cross(v1 - v0, w1 - v0))
-        area_2 = np.linalg.norm(np.cross(w1 - w0, w1 - v0))
-        area = 0.5 * (area_1 + area_2)
-        circumference = (np.linalg.norm(v1 - v0)
-                         + np.linalg.norm(w1 - w0)
-                         + 2 * np.linalg.norm(v0 - w1))
-        return area, circumference
-
-    def key_angle(self, svgrid, merge_similar_angles=True):
-        (v0, v1, w0, w1) = svgrid.iMG[self.relation]
-        dv = v1 - v0
-        angle = dv // np.gcd.reduce(dv)
-        if merge_similar_angles:
-            angle = sorted(np.abs(angle))
-        return tuple(angle)
-
-    #####################################
     #           Visualization           #
     #####################################
     def plot(self,
@@ -92,63 +45,8 @@ class Collision(bp.BaseClass):
         plot_object.plot(x_vals, y_vals, c="gray")
         return plot_object
 
-    @staticmethod
-    def is_collision(v_pre,
-                     v_post,
-                     w_pre,
-                     w_post,
-                     mass_v,
-                     mass_w):
-        """Check whether the Collision Candidate fulfills all necessary
-        Conditions.
 
-        Parameters
-        ----------
-
-        v_pre, v_post, w_pre, w_post : :obj:`~numpy.array` [:obj:`int`]
-            Colliding velocities in the SV-Grid
-            in multitudes of :attr:`SVGrid.delta`.
-        mass_v, mass_w : int
-            Mass of the respective particles.
-
-        Returns
-        -------
-        bool
-            True if collision fulfills all conditions, False otherwise.
-        """
-        # Ignore Collisions without changes in velocities
-        if np.all(v_pre == v_post) and np.all(w_pre == w_post):
-            return False
-        # Invariance of momentum
-        # Todo use functions from output.py instead?
-        if not np.all(mass_v * (v_post - v_pre) == mass_w * (w_pre - w_post)):
-            return False
-        # Invariance of energy
-        energy_0 = np.sum(mass_v * v_pre ** 2 + mass_w * w_pre ** 2)
-        energy_1 = np.sum(mass_v * v_post ** 2 + mass_w * w_post ** 2)
-        if energy_0 != energy_1:
-            return False
-        # Accept this Collision
-        return True
-
-    @staticmethod
-    def is_effective_collision(relation):
-        if any(idx is None for idx in relation):
-            return False
-        # Ignore collisions that were already found
-        if any([relation[3] < relation[0],
-                relation[2] < relation[0],
-                relation[1] < relation[0]]):
-            return False
-        # Ignore v=(X,b,b,X) for same species
-        # as such collisions have no effect
-        if all([relation[1] == relation[2],
-                relation[0] == relation[3]]):
-            return False
-        return True
-
-
-# Todo Remove this class, move into model
+# Todo move this class into model(velocity_grid, collisions)
 class Collisions(bp.BaseClass):
     r"""Generates and encapsulates the collision :attr:`relations`
     and :attr:`weights`.
@@ -159,7 +57,6 @@ class Collisions(bp.BaseClass):
         - **Add Stefan's Generation-Scheme**
         - can both the transport and the collisions
           be implemented as interpolations? -> GPU Speed-UP
-        - Check if its faster to switch v[0, 1] and v[1, 0]?
         - @generate: replace for loops by numpy.apply_along_axis
           (this probably needs several additional functions).
 
@@ -176,48 +73,45 @@ class Collisions(bp.BaseClass):
         Contains the numeric integration weights
         of the respective collision in :attr:`relations`.
     """
-    def __init__(self):
-        self.collisions = None
+    def __init__(self, relations=None, weights=None):
+        if relations is None:
+            self.relations = np.empty((0, 4), dtype=int)
+        else:
+            self.relations = np.array(relations, dtype=int)
+        if weights is None:
+            self.weights = np.empty((0,), dtype=float)
+        else:
+            self.weights = np.array(weights, dtype=float)
+        assert self.relations.shape[0] == self.weights.size
+        assert self.relations.shape[1] == 4
+        assert self.relations.ndim == 2
         return
 
-    @property
-    def relations(self):
-        ret = [coll.relation for coll in self.collisions]
-        return np.array(ret, dtype=int)
+    # Any single relation can be permutated without changing its effect
+    INTRASPECIES_PERMUTATION = np.array([[0, 1, 2, 3], [1, 2, 3, 0],
+                                         [2, 3, 0, 1], [3, 0, 1, 2],
+                                         [3, 2, 1, 0], [0, 3, 2, 1],
+                                         [1, 0, 3, 2], [2, 1, 0, 3]],
+                                        dtype=int)
 
-    @relations.setter
-    def relations(self, new_relations):
-        new_collisions = np.array(
-            [Collision(rel, 0.0) for rel in new_relations],
-            dtype=object)
-        if self.collisions is not None:
-            for (i, old_coll) in enumerate(self.collisions):
-                new_collisions[i].weight = old_coll.weight
-        self.collisions = new_collisions
+    INTERSPECIES_PERMUTATION = np.array([[0, 1, 2, 3],
+                                         [2, 3, 0, 1],
+                                         [3, 2, 1, 0],
+                                         [1, 0, 3, 2]],
+                                        dtype=int)
 
     @property
-    def weights(self):
-        ret = [coll.weight for coll in self.collisions]
-        return np.array(ret, dtype=float)
-
-    @weights.setter
-    def weights(self, new_weights):
-        new_collisions = np.array(
-            [Collision(np.zeros((4,), dtype=int), w) for w in new_weights],
-            dtype=object)
-        if self.collisions is not None:
-            for (i, old_coll) in enumerate(self.collisions):
-                new_collisions[i].relation = old_coll.relation
-        self.collisions = new_collisions
+    def list(self):
+        return ([*self.relations[i], self.weights[i]] for i in range(self.size))
 
     @property
     def size(self):
         """:obj:`int` : Total number of active collisions."""
-        if self.relations is not None:
-            return self.relations.shape[0]
-        else:
-            return 0
+        assert self.relations.shape[0] == self.weights.size
+        assert self.relations.shape[1] == 4
+        return self.relations.shape[0]
 
+    # Todo Remove this, should be deprecated
     @property
     def is_set_up(self):
         """:obj:`bool` :
@@ -225,17 +119,147 @@ class Collisions(bp.BaseClass):
         and ready to call :meth:`~Simulation.run_computation`.
         False Otherwise.
         """
-        is_set_up = self.relations is not None and self.weights is not None
-        return is_set_up
+        return self.size > 0
+
+    def issubset(self, other):
+        """Checks if self.relations are a subset of other.relations.
+        Weights are not checked and may differ.
+
+        Parameters
+        ----------
+        other : :class:`Collisions`
+
+        Returns
+        -------
+        :obj:`bool`
+        """
+        assert isinstance(other, Collisions)
+        # group/filter by index
+        grp_self = self.group(mode="index")
+        grp_other = other.group(mode="index")
+        # assert that each keys has only a single value
+        assert all([len(value) == 1 for value in grp_self.values()])
+        assert all([len(value) == 1 for value in grp_other.values()])
+        # use set of keys to check for subset relationship
+        set_self = set(grp_self.keys())
+        set_other = set(grp_other.keys())
+        return set_self.issubset(set_other)
+
+    #####################################
+    #        Sorting and Ordering       #
+    #####################################
+    @staticmethod
+    def key_index(collision_tuple):
+        sorted_indices = np.sort(collision_tuple[0:4])
+        return tuple(sorted_indices)
+
+    @staticmethod
+    def key_species(collision_tuple, svgrid):
+        indices = [svgrid.get_specimen(col_idx)
+                   for col_idx in collision_tuple[0:4]]
+        return tuple(sorted(indices))
+
+    @staticmethod
+    def key_area(collision_tuple, svgrid):
+        [v0, v1, w0, w1] = svgrid.iMG[collision_tuple[0:4]]
+        area_1 = np.linalg.norm(np.cross(v1 - v0, w1 - v0))
+        area_2 = np.linalg.norm(np.cross(w1 - w0, w1 - v0))
+        area = 0.5 * (area_1 + area_2)
+        circumference = (np.linalg.norm(v1 - v0)
+                         + np.linalg.norm(w1 - w0)
+                         + 2 * np.linalg.norm(v0 - w1))
+        return area, circumference
+
+    @staticmethod
+    def key_angle(collision_tuple, svgrid, merge_similar_angles=True):
+        (v0, v1, w0, w1) = svgrid.iMG[collision_tuple[0:4]]
+        dv = v1 - v0
+        angle = dv // np.gcd.reduce(dv)
+        if merge_similar_angles:
+            angle = sorted(np.abs(angle))
+        return tuple(angle)
+
+    @staticmethod
+    def key(mode, svgrid):
+        if mode == "index":
+            return Collisions.key_index
+        elif mode == "area":
+            assert svgrid is not None
+            return lambda x: Collisions.key_area(x, svgrid)
+        elif mode == "angle":
+            assert svgrid is not None
+            return lambda x: Collisions.key_angle(
+                x,
+                svgrid)
+        elif mode == "species":
+            assert svgrid is not None
+            return lambda x: Collisions.key_species(x, svgrid)
+        else:
+            msg = ('Unsupported Parameter:\n\t'
+                   'mode = ' + '{}'.format(mode))
+            raise NotImplementedError(msg)
+
+    def group(self,
+              svgrid=None,
+              mode="index"):
+        key_func = Collisions.key(mode, svgrid)
+        collisions = self.list
+        grouped_collisions = dict()
+        for coll in collisions:
+            key = key_func(coll)
+            if key in grouped_collisions.keys():
+                grouped_collisions[key].append(coll)
+            else:
+                grouped_collisions[key] = [coll]
+        return grouped_collisions
+
+    def filter(self):
+        grouped_collisions = self.group(mode="index")
+        filtered_colls = [group[0] for group in grouped_collisions.values()]
+        self.relations = np.array([coll[0:4] for coll in filtered_colls],
+                                  dtype=int)
+        self.weights = np.array([coll[4] for coll in filtered_colls],
+                                dtype=float)
+        return
+
+    def sort(self,
+             svgrid=None,
+             mode='index'):
+        key_func = Collisions.key(mode, svgrid)
+        collisions = self.list
+        sorted_colls = sorted(collisions, key=key_func)
+        self.relations = np.array([coll[0:4] for coll in sorted_colls],
+                                  dtype=int)
+        self.weights = np.array([coll[4] for coll in sorted_colls],
+                                dtype=float)
+        return
 
     #####################################
     #           Configuration           #
     #####################################
+    @staticmethod
+    def is_collision(velocities,
+                     masses):
+        (v0, v1, w0, w1) = velocities
+        # Ignore Collisions without changes in velocities
+        if np.all(v0 == v1) and np.all(w0 == w1):
+            return False
+        # Invariance of momentum
+        if not np.array_equal(masses[0] * (v1 - v0),
+                              masses[2] * (w0 - w1)):
+            return False
+        # Invariance of energy
+        energy_0 = np.sum(masses[0] * v0 ** 2 + masses[2] * w0 ** 2)
+        energy_1 = np.sum(masses[1] * v1 ** 2 + masses[3] * w1 ** 2)
+        if energy_0 != energy_1:
+            return False
+        # Accept this Collision
+        return True
+
     def setup(self,
               scheme,
               svgrid,
-              species,
-              apply_filter=True):
+              species):
         """Generates the :attr:`relations` and :attr:`weights`.
 
         Parameters
@@ -259,45 +283,93 @@ class Collisions(bp.BaseClass):
         2. v0 or w0 denotes the velocity before the collision
            v1 or w1 denotes the velocity after the collision
         """
-        # Iterate over Specimen pairs
-        for (idx_spc_v, grid_v) in enumerate(svgrid.vGrids):
-            index_offset_v = svgrid.index_range[idx_spc_v, 0]
-            mass_v = species.mass[idx_spc_v]
-            for (idx_spc_w, grid_w) in enumerate(svgrid.vGrids):
-                index_offset_w = svgrid.index_range[idx_spc_w, 0]
-                mass_w = species.mass[idx_spc_w]
-                # skip already computed combinations
-                if idx_spc_w < idx_spc_v:
-                    continue
+        # choose function for local collisions
+        if scheme.Collisions_Generation == 'UniformComplete':
+            coll_func = Collisions.complete
+        elif scheme.Collisions_Generation == 'Convergent':
+            coll_func = Collisions.convergent
+        else:
+            raise NotImplementedError(
+                'Unsupported Selection Scheme: '
+                '{}'.format(scheme.Collisions_Generation)
+            )
 
-                # generate collisions between the specimen,
-                # depending on the collision model
-                if scheme.Collisions_Generation == 'UniformComplete':
-                    [new_rels, new_weights] = complete(
-                        mass_v,
-                        grid_v,
-                        mass_w,
-                        grid_w,
-                        idx_spc_v,
-                        idx_spc_w,
-                        index_offset_v,
-                        index_offset_w,
-                        svgrid,
-                        species)
-                    relations += new_rels
-                    weights += new_weights
-                else:
-                    msg = ('Unsupported Selection Scheme:'
-                           + '{}'.format(scheme.Collisions_Generation))
-                    raise NotImplementedError(msg)
+        grids = np.empty((4,), dtype=object)
+        # use larger grids to shift within equivalence classes
+        extended_grids = np.empty((4,), dtype=object)
+        # Todo rename into species, after Model update
+        species_idx = np.zeros(4, dtype=int)
+        masses = np.zeros(4, dtype=int)
+        # Iterate over Specimen pairs
+        for (idx_v, grid_v) in enumerate(svgrid.vGrids):
+            grids[0:2] = grid_v
+            extended_shape = (2 * grids[0].shape[0] - grids[0].shape[0] % 2,
+                              2 * grids[0].shape[0] - grids[0].shape[0] % 2)
+            extended_grids[0:2] = bp.Grid(grids[0].ndim,
+                                          extended_shape,
+                                          grids[0].physical_spacing,
+                                          grids[0].spacing,
+                                          grids[0].is_centered)
+            species_idx[0:2] = idx_v
+            for (idx_w, grid_w) in enumerate(svgrid.vGrids):
+                grids[2:4] = grid_w
+                extended_shape = (2 * grids[2].shape[0] - grids[2].shape[0] % 2,
+                                  2 * grids[2].shape[0] - grids[2].shape[0] % 2)
+                extended_grids[2:4] = bp.Grid(grids[2].ndim,
+                                              extended_shape,
+                                              grids[2].physical_spacing,
+                                              grids[2].spacing,
+                                              grids[2].is_centered)
+                species_idx[2:4] = idx_w
+                masses[:] = species.mass[species_idx]
+                collision_rate = species.collision_rates[idx_v, idx_w]
+                index_offset = np.array(svgrid.index_range[species_idx, 0])
+                # Todo may be bad for differing weights
+                # skip already computed combinations
+                if idx_w < idx_v:
+                    continue
+                # group grid[0] points by distance to grid[2]
+                for equivalence_class in grids[2].group(grids[0].iG).values():
+                    # only generate colliding velocities(colvels)
+                    # for a representative v0 of its group,
+                    v0_repr = equivalence_class[0]
+                    [repr_colvels, extended_weights] = coll_func(
+                        extended_grids,
+                        masses,
+                        v0_repr,
+                        collision_rate)
+                    # Get relations for other class elements by shifting
+                    for v0 in equivalence_class:
+                        # shift extended colvels
+                        new_colvels = repr_colvels + (v0 - v0_repr)
+                        # get indices
+                        new_rels = np.zeros(new_colvels.shape[0:2], dtype=int)
+                        for i in range(4):
+                            new_rels[:, i] = grids[i].get_idx(new_colvels[:, i, :])
+                        new_rels += index_offset
+
+                        # remove out-of-bounds or useless collisions
+                        choice = np.where(
+                            # must be in the grid
+                            np.all(new_rels >= index_offset, axis=1)
+                            # must be effective
+                            & (new_rels[..., 0] != new_rels[..., 3])
+                            & (new_rels[..., 0] != new_rels[..., 1])
+                        )
+                        # Add chosen Relations/Weights to the list
+                        assert np.array_equal(
+                                new_colvels[choice],
+                                svgrid.iMG[new_rels[choice]])
+                        relations.extend(new_rels[choice])
+                        weights.extend(extended_weights[choice])
+                    # relations += new_rels
+                    # weights += new_weights
         self.relations = np.array(relations, dtype=int)
         self.weights = np.array(weights, dtype=float)
-        if apply_filter:
-            # remove redundant collisions
-            # intraspecies collisions are counted twice, since
-            # both (v0, v1, w0, w1) and ( v0, w1, w0, v1) are counted
-            # for some tests it is useful to keep these and filter later
-            self.collisions = filter_collisions(self.collisions)
+        # remove redundant collisions
+        self.filter()
+        # sort collisions for better comparability
+        self.sort()
         time_end = time()
         print('Time taken =  {t} seconds\n'
               'Total Number of Collisions = {n}\n'
@@ -305,6 +377,99 @@ class Collisions(bp.BaseClass):
                         n=self.size))
         self.check_integrity()
         return
+
+    ##############################################
+    #       Collision Generation Functions       #
+    ##############################################
+    @staticmethod
+    def complete(grids,
+                 masses,
+                 v0,
+                 collision_rate):
+        # store results in lists
+        colvels= []     # colliding velocities
+        weights = []
+        # iterate over all v1 (post collision of v0)
+        for v1 in grids[1].iG:
+            # ignore v=(a, a, * , *)
+            # calculate Velocity (index) difference
+            diff_v = v1 - v0
+            for w0 in grids[2].iG:
+                # Calculate w1, using the momentum invariance
+                assert all((diff_v * masses[0]) % masses[2] == 0)
+                diff_w = -diff_v * masses[0] // masses[2]
+                w1 = w0 + diff_w
+                if w1 not in grids[3]:
+                    continue
+                # check if its a proper Collision
+                if not Collisions.is_collision([v0, v1, w0, w1],
+                                               masses):
+                    continue
+                # Collision is accepted -> Add to List
+                colvels.append([v0, v1, w0, w1])
+                weights.append(collision_rate)
+        assert len(colvels) == len(weights)
+        colvels = np.array(colvels)
+        weights = np.array(weights)
+        return [colvels, weights]
+
+    @staticmethod
+    def convergent(grids,
+                   masses,
+                   v0,
+                   collision_rate):
+        # angles = np.array([[1, 0], [1, 1], [0, 1], [-1, 1],
+        #                    [-1, 0], [-1, -1], [0, -1], [1, -1]])
+        # Todo This is sufficient, until real weights are used
+        angles = np.array([[1, -1], [1, 0], [1, 1], [0, 1]])
+        # store results in lists
+        colvels = []    # colliding velocities
+        weights = []
+        # iterate over the given angles
+        for axis_x in angles:
+            # get y axis by rotating x axis 90°
+            axis_y = np.array([[0, -1], [1, 0]])@axis_x
+            assert np.dot(axis_x, axis_y) == 0, (
+                "axis_x and axis_y must be orthogonal"
+            )
+            # choose v1 from the grid points on the x-axis (through v0)
+            # just in positive direction because of symmetry and to avoid v1=v0
+            for v1 in grids[1].line(v0,
+                                    grids[1].spacing * axis_x,
+                                    range(1, grids[1].shape[0])):
+                diff_v = v1 - v0
+                diff_w = diff_v * masses[0] // masses[2]
+                # find starting point for w0,
+                w0_projected_on_axis_x = v0 + diff_v // 2 + diff_w // 2
+                w0_start = next(grids[2].line(w0_projected_on_axis_x,
+                                              axis_y,
+                                              range(- grids[2].spacing,
+                                                    grids[2].spacing)),
+                                None)
+                if w0_start is None:
+                    continue
+
+                # find all other collisions along axis_y
+                for w0 in grids[2].line(w0_start,
+                                        grids[2].spacing * axis_y,
+                                        range(-grids[2].shape[0],
+                                              grids[2].shape[0])):
+                    w1 = w0 - diff_w
+                    # skip, if w1 is not in the grid (can be out of bounds)
+                    if np.array(w1) not in grids[3]:
+                        continue
+                    # check if its a proper Collision
+                    if not Collisions.is_collision([v0, v1, w0, w1],
+                                                   masses):
+                        continue
+                    # Collision is accepted -> Add to List
+                    colvels.append([v0, v1, w0, w1])
+                    weights.append(collision_rate)
+        assert len(colvels) == len(weights)
+        colvels = np.array(colvels)
+        weights = np.array(weights)
+        # Todo assert colvels.size != 0
+        return [colvels, weights]
 
     def generate_collision_matrix(self, dt):
         # Size of complete velocity grid
@@ -331,13 +496,10 @@ class Collisions(bp.BaseClass):
         Determines the number of collision invariants
         by computing the rank of the resulting matrix.
         """
-        if self.relations is None:
-            return None
-        else:
-            mat = self.generate_collision_matrix(1)
-            rank = np.linalg.matrix_rank(mat.toarray())
-            size_of_velocity_space = mat.shape[0]
-            return size_of_velocity_space - rank
+        mat = self.generate_collision_matrix(1)
+        rank = np.linalg.matrix_rank(mat.toarray())
+        size_of_velocity_space = mat.shape[0]
+        return size_of_velocity_space - rank
 
     #####################################
     #           Serialization           #
@@ -418,8 +580,8 @@ class Collisions(bp.BaseClass):
             assert self.weights.ndim == 1
             assert self.relations.shape == (self.weights.size, 4)
             for col in self.relations:
-                assert col[0] < col[1]
-                assert col[0] < col[2]
+                # assert col[0] < col[1]
+                # assert col[0] < col[2]
                 if context is not None:
                     sv = context.sv
                     di_0 = (sv.iMG[col[1]] - sv.iMG[col[0]])
@@ -430,71 +592,6 @@ class Collisions(bp.BaseClass):
                     # Todo add conserves energy check
             assert all(w > 0 for w in self.weights.flatten())
         return
-
-
-##############################################
-#       Collision Generation Functions       #
-##############################################
-def complete(mass_v,
-             grid_v,
-             mass_w,
-             grid_w,
-             idx_spc_v,
-             idx_spc_w,
-             index_offset_v,
-             index_offset_w,
-             svgrid,
-             species):
-    """Generate all possible, non-useless collisions.
-
-    Iterates over all possible velocity combinations
-    and checks whether they are proper collisions.
-
-    All proper collisions are stored in the relations list."""
-    relations = []
-    weights = []
-    # Todo only works if spacing is dividable by mass_w
-    for (loc_v0, v0) in enumerate(grid_v.iG):
-        # global index in self.iMG
-        index_v0 = index_offset_v + loc_v0
-        assert np.all(v0 == svgrid.iMG[index_v0])
-        # we choose idx_v0 < idx_v1 to ignore v=(a, a, * , *)
-        # and ignore repeating collisions
-        for (loc_v1, v1) in enumerate(grid_v.iG[loc_v0 + 1:]):
-            # global index in self.iMG
-            index_v1 = index_v0 + 1 + loc_v1
-            assert np.all(v1 == svgrid.iMG[index_v1])
-            # calculate Velocity (index) difference
-            diff_v = v1 - v0
-            for (loc_w0, w0) in enumerate(grid_w.iG):
-                # global index in self.iMG
-                index_w0 = index_offset_w + loc_w0
-                assert np.all(w0 == svgrid.iMG[index_w0])
-                # Calculate w1, using the momentum invariance
-                assert all((diff_v * mass_v) % mass_w == 0)
-                diff_w = -diff_v * mass_v // mass_w
-                w1 = w0 + diff_w
-                # find the global index of w1, if its in the grid
-                index_w1 = svgrid.find_index(idx_spc_w, w1)
-                if index_w1 is None:
-                    continue
-                # check if its a proper Collision
-                new_col_idx = [index_v0,
-                               index_v1,
-                               index_w0,
-                               index_w1]
-                if not Collision.is_collision(v0, v1, w0, w1,
-                                              mass_v, mass_w):
-                    continue
-                if not Collision.is_effective_collision(new_col_idx):
-                    continue
-                # Collision is accepted -> Add to List
-                relations.append(new_col_idx)
-                new_weight = species.collision_rates[idx_spc_v,
-                                                     idx_spc_w]
-                weights.append(new_weight)
-    assert len(relations) == len(weights)
-    return [relations, weights]
 
 
 # Todo move this into model class
@@ -532,6 +629,10 @@ def plot(svgrid,
     # show each element one by one
     if iterative:
         for coll in collisions:
+            print("Relation:\n\t",
+                  str(coll.relation))
+            print("Velocities:\n\t",
+                  str(svgrid.iMG[coll.relation]).replace('\n', '\n\t'))
             plot_object.close()
             coll.plot(svgrid=svgrid,
                       plot_object=plot_object)
@@ -539,36 +640,3 @@ def plot(svgrid,
             svgrid.plot(plot_object=plot_object)
             plot_object.show()
     return plot_object
-
-
-def group_collisions(collisions,
-                     svgrid=None,
-                     mode="index",
-                     **kwargs):
-    get_key = Collision.get_key_function(mode=mode,
-                                         svgrid=svgrid,
-                                         **kwargs)
-    grouped_collisions = dict()
-    for coll in collisions:
-        key = get_key(coll)
-        if key in grouped_collisions.keys():
-            grouped_collisions[key].append(coll)
-        else:
-            grouped_collisions[key] = [coll]
-    return grouped_collisions
-
-
-def filter_collisions(collisions):
-    grouped_collisions = group_collisions(collisions,
-                                          mode="index")
-    filtered_collisions = [group[0] for group in grouped_collisions.values()]
-    return np.array(filtered_collisions, dtype=object)
-
-
-def sort_collisions(collisions,
-                    svgrid=None,
-                    mode='index'):
-    get_key = Collision.get_key_function(mode=mode,
-                                         svgrid=svgrid)
-    sorted_list = sorted(collisions, key=get_key)
-    return np.array(sorted_list, dtype=object)

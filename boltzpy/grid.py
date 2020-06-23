@@ -164,6 +164,89 @@ class Grid(bp.BaseClass):
         return self.is_configured and self.iG is not None
 
     #####################################
+    #        Sorting and Ordering       #
+    #####################################
+    def key_distance(self, velocities):
+        # NOTE: this acts as if the grid was infinite. This is desired for the partitioning
+        assert isinstance(velocities, np.ndarray)
+        # grids of even shape don't contain 0
+        # thus need to be shifted into 0 for modulo operations
+        assert len(set(self.shape)) == 1, "only works for square/cubic grids"
+        if self.shape[0] % 2 == 0:
+            velocities = velocities - self.spacing // 2
+        distance = np.mod(velocities, self.spacing)
+        distance = np.where(distance > self.spacing // 2,
+                            distance - self.spacing,
+                            distance)
+        return distance
+
+    @staticmethod
+    def key_norm(velocities):
+        norm = (velocities**2).sum(axis=-1)
+        return norm
+
+    def group(self, velocities):
+        grouped_velocities = dict()
+        keys = self.key_distance(velocities)
+        for (i, v) in enumerate(velocities):
+            key = tuple(keys[i])
+            if key in grouped_velocities.keys():
+                grouped_velocities[key].append(v)
+            else:
+                grouped_velocities[key] = [v]
+        # Each Group is sorted by norm
+        for (key, item) in grouped_velocities.items():
+            item = sorted(item, key=self.key_norm)
+            grouped_velocities[key] = np.array(item)
+        return grouped_velocities
+
+    def get_idx(self, values):
+        """Find index of given values in :attr:`iG`
+        Returns -1, if the value is not in this Grid.
+
+        Parameters
+        ----------
+        values : :obj:`~numpy.array` [:obj:`int`]
+
+        Returns
+        -------
+        index : :obj:`~numpy.array` [:obj:`int']
+        """
+        assert isinstance(values, np.ndarray), (
+            "values must be an np.array, not {}".format(type(values)))
+        assert values.dtype == int, (
+            "values must be an integer array, not {}".format(values.dtype))
+        assert len(set(self.shape)) == 1, "only works for square/cubic grids"
+        assert values.shape[-1] == self.ndim, "Only tested for 2D Velocities"
+        assert values.shape[-1] == 2, "Only tested for 2D Velocities"
+        BAD_VALUE = -2 * self.size
+        # shift Grid to start (left bottom ) at 0
+        values = values - self.iG[0]
+        # divide by spacing to get the position on the (x,y,z) axis
+        # sort out the values, that are not in the grid, by setting them to BAD_VALUE
+        values = np.where(values % self.spacing == 0, values // self.spacing, BAD_VALUE)
+        values = np.where(values >= 0, values, BAD_VALUE)
+        values = np.where(values < self.shape[0], values, BAD_VALUE)
+        # compute the (potential) index
+        # Todo(LT) Reverse Ordering of Grids?
+        factor = np.array([self.shape[0]**i for i in reversed(range(self.ndim))], dtype=int)
+        idx = values.dot(factor)
+        # remove Bad Values or points that are out of bounds
+        idx = np.where(idx >= 0, idx, -1)
+        return idx
+
+    #####################################
+    #              Utility              #
+    #####################################
+    def __contains__(self, item):
+        assert isinstance(item, np.ndarray)
+        return np.all(self.get_idx(item) != -1)
+
+    def line(self, start, direction, steps):
+        return (start + step * direction for step in steps
+                if start + step * direction in self)
+
+    #####################################
     #           Configuration           #
     #####################################
     # Todo this should be simpler -> use np.mgrid?
@@ -220,29 +303,6 @@ class Grid(bp.BaseClass):
                   "spacing = {}".format(self.spacing)
             raise AttributeError(msg)
         return
-
-    #####################################
-    #               Indexing            #
-    #####################################
-    # Todo write Gird.binary_search (iterate over dimensions
-    # Todo or: compute value by module operations
-    # Todo      write proper tests for this
-    def get_index(self, integer_value):
-        """Find index of given grid_entry in :attr:`iMG`
-        Returns None, if the value is not in the specified Grid.
-
-        Parameters
-        ----------
-        integer_value : :obj:`~numpy.array` [:obj:`int`]
-
-        Returns
-        -------
-        index : :obj:`int` of :obj:`None`
-        """
-        grid_iterator = (idx for (idx, value) in enumerate(self.iG)
-                         if np.all(value == integer_value))
-        local_index = next(grid_iterator, None)
-        return local_index
 
     #####################################
     #           Visualization           #

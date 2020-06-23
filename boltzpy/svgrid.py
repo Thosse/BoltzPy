@@ -217,8 +217,8 @@ class SVGrid(bp.BaseClass):
         global_index : :obj:`int` of :obj:`None`
 
         """
-        local_index = self.vGrids[index_of_specimen].get_index(integer_value)
-        if local_index is None:
+        local_index = self.vGrids[index_of_specimen].get_idx(integer_value)
+        if local_index < 0 :
             return None
         else:
             index_offset = self.index_range[index_of_specimen, 0]
