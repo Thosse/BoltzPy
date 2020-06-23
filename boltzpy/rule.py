@@ -630,12 +630,14 @@ class BoundaryPointRule(Rule):
             thermal_inflow = bp_o.particle_number(
                 self.reflection_rate_thermal[idx_spc] * inflow[..., beg:end],
                 data.dv[idx_spc])
+            # Todo this should be an attribute, shoult be a float, not an array
             initial_particles = bp_o.particle_number(
                 self.initial_state[np.newaxis, beg:end],
                 data.dv[idx_spc])
+            thermal_factor = (thermal_inflow / initial_particles)
             reflected_inflow[..., beg:end] += (
-                thermal_inflow / initial_particles
-                * self.initial_state[beg:end]
+                thermal_factor[:, np.newaxis]
+                * self.initial_state[np.newaxis, beg:end]
             )
         return reflected_inflow
 

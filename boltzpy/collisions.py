@@ -303,26 +303,20 @@ class Collisions(bp.BaseClass):
         # Iterate over Specimen pairs
         for (idx_v, grid_v) in enumerate(svgrid.vGrids):
             grids[0:2] = grid_v
-            assert grids[0].shape[0] % 2 == 1, (
-                "extended grids are always uneven. "
-                "Even grids need an extended even grid as well"
-            )
+            extended_shape = (2 * grids[0].shape[0] - grids[0].shape[0] % 2,
+                              2 * grids[0].shape[0] - grids[0].shape[0] % 2)
             extended_grids[0:2] = bp.Grid(grids[0].ndim,
-                                          (2 * grids[0].shape[0] - 1,
-                                           2 * grids[0].shape[1] - 1),
+                                          extended_shape,
                                           grids[0].physical_spacing,
                                           grids[0].spacing,
                                           grids[0].is_centered)
             species_idx[0:2] = idx_v
             for (idx_w, grid_w) in enumerate(svgrid.vGrids):
                 grids[2:4] = grid_w
-                assert grids[2].shape[0] % 2 == 1, (
-                    "extended grids are always uneven. "
-                    "Even grids need an extended even grid as well"
-                )
+                extended_shape = (2 * grids[2].shape[0] - grids[2].shape[0] % 2,
+                                  2 * grids[2].shape[0] - grids[2].shape[0] % 2)
                 extended_grids[2:4] = bp.Grid(grids[2].ndim,
-                                              (2 * grids[2].shape[0] - 1,
-                                               2 * grids[2].shape[1] - 1),
+                                              extended_shape,
                                               grids[2].physical_spacing,
                                               grids[2].spacing,
                                               grids[2].is_centered)
@@ -353,6 +347,7 @@ class Collisions(bp.BaseClass):
                         for i in range(4):
                             new_rels[:, i] = grids[i].get_idx(new_colvels[:, i, :])
                         new_rels += index_offset
+
                         # remove out-of-bounds or useless collisions
                         choice = np.where(
                             # must be in the grid
@@ -362,6 +357,9 @@ class Collisions(bp.BaseClass):
                             & (new_rels[..., 0] != new_rels[..., 1])
                         )
                         # Add chosen Relations/Weights to the list
+                        assert np.array_equal(
+                                new_colvels[choice],
+                                svgrid.iMG[new_rels[choice]])
                         relations.extend(new_rels[choice])
                         weights.extend(extended_weights[choice])
                     # relations += new_rels
