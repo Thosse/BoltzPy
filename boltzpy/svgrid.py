@@ -175,7 +175,7 @@ class SVGrid(bp.BaseClass):
             # Todo the physical spacing is only a dummy so far
             new_grid = bp.Grid(ndim=self.ndim,
                                shape=self.shapes[i],
-                               physical_spacing=1.0,
+                               delta=1.0,
                                spacing=self.spacings[i],
                                is_centered=True)
             self.vGrids[i] = new_grid
@@ -190,7 +190,6 @@ class SVGrid(bp.BaseClass):
         for (idx_G, G) in enumerate(self.vGrids):
             [beg, end] = self.index_range[idx_G]
             self.iMG[beg:end, :] = G.iG[...]
-            G.iG = self.iMG[beg:end]
 
         # Todo find more elegant way for this
         self.delta = self.maximum_velocity / np.max(self.iMG)
@@ -520,9 +519,6 @@ class SVGrid(bp.BaseClass):
             assert iMG.ndim == 2
             if index_range is not None:
                 assert iMG.shape[0] == index_range[-1, 1]
-            if vGrids is not None:
-                for G in vGrids:
-                    assert np.shares_memory(iMG, G.iG)
         return
 
     def __str__(self,

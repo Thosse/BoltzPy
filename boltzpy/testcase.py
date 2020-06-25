@@ -1,7 +1,6 @@
 
 import boltzpy as bp
 import numpy as np
-import h5py
 import os
 
 
@@ -31,7 +30,7 @@ class TestCase(bp.Simulation):
         if t is None:
             t = bp.Grid(ndim=1,
                         shape=(5,),
-                        physical_spacing=0.01,
+                        delta=0.01/3,
                         spacing=3)
         self.t = t
 
@@ -39,7 +38,7 @@ class TestCase(bp.Simulation):
             p = bp.Grid(ndim=1,
                         shape=(6,),
                         spacing=1,
-                        physical_spacing=0.5)
+                        delta=0.5)
         self.p = p
 
         if sv is None:
@@ -223,7 +222,8 @@ def replace_all_tests():
         for tc in CASES:
             print("TestCase = ", tc.file_address)
             assert isinstance(tc, TestCase)
-            os.remove(tc.file_address)
+            if os.path.isfile(tc.file_address):
+                os.remove(tc.file_address)
             tc.compute()
     else:
         print("Aborted replacing testcases!")

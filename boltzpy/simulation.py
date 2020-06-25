@@ -89,15 +89,16 @@ class Simulation(bp.BaseClass):
         Must be a 2D array.
     """
 
-    def __init__(self, file_address=None):
+    def __init__(self,
+                 file_address=None):
         # set file address (using a setter method)
         [self._file_directory, self._file_name] = ['', '']
         self.file_address = file_address
 
         self.s = bp.Species()
-        self.t = bp.Grid()
+        self.t = bp.Grid(1, (1,))
         self.t.ndim = 1
-        self.p = bp.Grid()
+        self.p = bp.Grid(1, (1, ))
         self.geometry = bp.Geometry()
         self.sv = bp.SVGrid()
         self.coll = bp.Collisions()
@@ -190,8 +191,6 @@ class Simulation(bp.BaseClass):
         # Todo add output_parameters
         # Todo add initial_distribution / rule_arr
         return (self.s.is_configured
-                and self.t.is_configured
-                and self.p.is_configured
                 and self.sv.is_configured
                 and self.scheme.is_configured)
 
@@ -202,9 +201,7 @@ class Simulation(bp.BaseClass):
         False Otherwise.
         """
         # Todo add initial_distribution
-        return (self.t.is_set_up
-                and self.p.is_set_up
-                and self.geometry.is_set_up
+        return (self.geometry.is_set_up
                 and self.sv.is_set_up
                 and self.coll.is_set_up)
 
@@ -301,7 +298,7 @@ class Simulation(bp.BaseClass):
         step_size = max_time / (number_time_steps - 1)
         self.t = bp.Grid(ndim=1,
                          shape=(number_time_steps,),
-                         physical_spacing=step_size,
+                         delta=step_size / calculations_per_time_step,
                          spacing=calculations_per_time_step)
         return
 
@@ -320,7 +317,8 @@ class Simulation(bp.BaseClass):
         """
         self.p = bp.Grid(ndim=grid_dimension,
                          shape=grid_shape,
-                         physical_spacing=grid_spacing)
+                         delta=grid_spacing,
+                         spacing=1)
         # Update shape of initialization_array
         self.geometry.shape = self.p.shape
         return
@@ -537,7 +535,7 @@ class Simulation(bp.BaseClass):
         self.t.ndim = 1
 
         key = "Position_Grid"
-        self.p = bp.Grid().load(file[key])
+        self.p = bp.Grid.load(file[key])
 
         key = "Geometry"
         self.geometry = bp.Geometry.load(file[key])
