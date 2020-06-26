@@ -29,12 +29,8 @@ class Grid(bp.BaseClass):
 
     Parameters
     ----------
-    ndim : :obj:`int`
-        The number of :obj:`Grid` dimensions.
-        Must be in :const:`~boltzpy.constants.SUPP_GRID_DIMENSIONS`.
     shape : :obj:`tuple` [:obj:`int`]
         Number of :obj:`Grid` points for each dimension.
-        Tuple of length :attr:`ndim`.
     delta : :obj:`float`
         Internal step size.
         This is NOT the physical distance between grid points.
@@ -49,8 +45,6 @@ class Grid(bp.BaseClass):
 
     Attributes
     ----------
-    ndim : :obj:`int`
-        The number of :obj:`Grid` dimensions.
     shape : :obj:`tuple` [:obj:`int`]
         Number of :obj:`Grid` points for each dimension.
     delta : :obj:`float`
@@ -64,12 +58,10 @@ class Grid(bp.BaseClass):
         If True, then the Grid will be centered around zero.
     """
     def __init__(self,
-                 ndim,
                  shape,
                  delta=None,
                  spacing=2,
                  is_centered=False):
-        self.ndim = ndim
         self.shape = shape
         if delta is None:
             delta = 1 / spacing
@@ -82,6 +74,13 @@ class Grid(bp.BaseClass):
     #####################################
     #           Properties              #
     #####################################
+    @property
+    def ndim(self):
+        """:obj:`int`
+        The number of :obj:`Grid` dimensions.
+        """
+        return len(self.shape)
+
     @property
     def size(self):
         """:obj:`int` :
@@ -298,13 +297,12 @@ class Grid(bp.BaseClass):
         assert hdf5_group.attrs["class"] == "Grid"
 
         # read parameters from file
-        ndim = int(hdf5_group["ndim"][()])
         shape = tuple(int(width) for width in hdf5_group["shape"][()])
         delta = float(hdf5_group["delta"][()])
         spacing = int(hdf5_group["spacing"][()])
         is_centered = bool(hdf5_group["is_centered"][()])
 
-        self = Grid(ndim, shape, delta, spacing, is_centered)
+        self = Grid(shape, delta, spacing, is_centered)
         return self
 
     def save(self, hdf5_group):
@@ -324,7 +322,6 @@ class Grid(bp.BaseClass):
         hdf5_group.attrs["class"] = self.__class__.__name__
 
         # write all set attributes to file
-        hdf5_group["ndim"] = self.ndim
         hdf5_group["shape"] = self.shape
         hdf5_group["delta"] = self.delta
         hdf5_group["spacing"] = self.spacing

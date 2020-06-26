@@ -13,15 +13,13 @@ else:
     sim.setup_time_grid(max_time=1,
                         number_time_steps=201,
                         calculations_per_time_step=5)
-    sim.setup_position_grid(grid_dimension=1,
-                            grid_shape=(31, ),
+    sim.setup_position_grid(grid_shape=(31, ),
                             grid_spacing=0.5)
     sim.set_velocity_grids(grid_dimension=2,
                            maximum_velocity=1.5,
                            shapes=[(5, 5),
                                    (7, 7)])
     sim.geometry = bp.Geometry(
-        sim.p.ndim,
         sim.p.shape,
         sim.p.delta,
         [bp.ConstantPointRule(

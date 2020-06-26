@@ -11,8 +11,6 @@ class Geometry(bp.Grid):
 
     Parameters
     ----------
-    ndim : :obj:`int`
-        The number of :obj:`Grid` dimensions.
     shape : :obj:`array_like` [:obj:`int`]
         Shape of the space grid.
     delta : :obj:`float`
@@ -20,11 +18,10 @@ class Geometry(bp.Grid):
     rules : :obj:`array_like` [:obj:`Rule`], optional
         List of Initialization :obj:`Rules<Rule>`
     """
-    def __init__(self, ndim, shape, delta, rules):
+    def __init__(self,  shape, delta, rules):
         rules = np.array(rules, dtype=bp.Rule)
         self.rules = rules
-        super().__init__(ndim,
-                         shape,
+        super().__init__(shape,
                          delta,
                          spacing=1,
                          is_centered=False)
@@ -144,7 +141,6 @@ class Geometry(bp.Grid):
         assert hdf5_group.attrs["class"] == "Geometry"
 
         # read parameters from file
-        ndim = int(hdf5_group["ndim"][()])
         shape = tuple(int(width) for width in hdf5_group["shape"][()])
         delta = float(hdf5_group["delta"][()])
         # load rules iteratively
@@ -153,7 +149,7 @@ class Geometry(bp.Grid):
         for pos_rule in range(rules.size):
             rules[pos_rule] = bp.Rule.load(hdf5_group["rules"][str(pos_rule)])
         # Initialize
-        self = Geometry(ndim, shape, delta, rules)
+        self = Geometry(shape, delta, rules)
         return self
 
     def save(self, hdf5_group):
@@ -173,7 +169,6 @@ class Geometry(bp.Grid):
         hdf5_group.attrs["class"] = self.__class__.__name__
 
         # write all parameters
-        hdf5_group["ndim"] = self.ndim
         hdf5_group["shape"] = self.shape
         hdf5_group["delta"] = self.delta
         # write rules

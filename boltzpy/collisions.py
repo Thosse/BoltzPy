@@ -305,8 +305,7 @@ class Collisions(bp.BaseClass):
             grids[0:2] = grid_v
             extended_shape = (2 * grids[0].shape[0] - grids[0].shape[0] % 2,
                               2 * grids[0].shape[0] - grids[0].shape[0] % 2)
-            extended_grids[0:2] = bp.Grid(grids[0].ndim,
-                                          extended_shape,
+            extended_grids[0:2] = bp.Grid(extended_shape,
                                           grids[0].physical_spacing,
                                           grids[0].spacing,
                                           grids[0].is_centered)
@@ -315,8 +314,7 @@ class Collisions(bp.BaseClass):
                 grids[2:4] = grid_w
                 extended_shape = (2 * grids[2].shape[0] - grids[2].shape[0] % 2,
                                   2 * grids[2].shape[0] - grids[2].shape[0] % 2)
-                extended_grids[2:4] = bp.Grid(grids[2].ndim,
-                                              extended_shape,
+                extended_grids[2:4] = bp.Grid(extended_shape,
                                               grids[2].physical_spacing,
                                               grids[2].spacing,
                                               grids[2].is_centered)

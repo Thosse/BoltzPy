@@ -28,8 +28,7 @@ class TestCase(bp.Simulation):
         self.s = s
 
         if t is None:
-            t = bp.Grid(ndim=1,
-                        shape=(5,),
+            t = bp.Grid(shape=(5,),
                         delta=0.01/3,
                         spacing=3)
         self.t = t
@@ -84,7 +83,7 @@ class TestCase(bp.Simulation):
                     surface_normal=np.array([1, 0], dtype=int),
                     species=s)
                 ]
-            geometry = bp.Geometry(ndim=1, shape=(6,), delta=0.5, rules=rules)
+            geometry = bp.Geometry(shape=(6,), delta=0.5, rules=rules)
         self.geometry = geometry
 
         if scheme is None:

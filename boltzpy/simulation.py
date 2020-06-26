@@ -94,9 +94,8 @@ class Simulation(bp.BaseClass):
         self.file_address = file_address
 
         self.s = bp.Species()
-        self.t = bp.Grid(1, (1,))
-        self.t.ndim = 1
-        self.geometry = bp.Geometry(1, (1,), 1.0, [])
+        self.t = bp.Grid((1,))
+        self.geometry = bp.Geometry((1,), 1.0, [])
         self.sv = bp.SVGrid()
         self.coll = bp.Collisions()
         self.scheme = bp.Scheme()
@@ -298,14 +297,12 @@ class Simulation(bp.BaseClass):
         calculations_per_time_step : :obj:`int`
         """
         step_size = max_time / (number_time_steps - 1)
-        self.t = bp.Grid(ndim=1,
-                         shape=(number_time_steps,),
+        self.t = bp.Grid(shape=(number_time_steps,),
                          delta=step_size / calculations_per_time_step,
                          spacing=calculations_per_time_step)
         return
 
     def setup_position_grid(self,
-                            grid_dimension,
                             grid_shape,
                             grid_spacing):
         """Set up :attr:`p` and adjust :attr:`geometry` to the new shape.
@@ -313,12 +310,10 @@ class Simulation(bp.BaseClass):
 
         Parameters
         ----------
-        grid_dimension : :obj:`int`
         grid_shape : :obj:`tuple` [:obj:`int`]
         grid_spacing : :obj:`float`
         """
         self.geometry = bp.Geometry(
-            ndim=grid_dimension,
             shape=grid_shape,
             delta=grid_spacing,
             rules=[]
@@ -533,8 +528,6 @@ class Simulation(bp.BaseClass):
 
         key = "Time_Grid"
         self.t = bp.Grid.load(file[key])
-        # Todo this should (needs to) be unnecessary
-        self.t.ndim = 1
 
         key = "Geometry"
         self.geometry = bp.Geometry.load(file[key])

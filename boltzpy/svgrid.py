@@ -173,8 +173,7 @@ class SVGrid(bp.BaseClass):
         # set up sub grids, one by one
         for i in range(number_of_grids):
             # Todo the physical spacing is only a dummy so far
-            new_grid = bp.Grid(ndim=self.ndim,
-                               shape=self.shapes[i],
+            new_grid = bp.Grid(shape=self.shapes[i],
                                delta=1.0,
                                spacing=self.spacings[i],
                                is_centered=True)
