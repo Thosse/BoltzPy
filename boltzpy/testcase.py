@@ -34,13 +34,6 @@ class TestCase(bp.Simulation):
                         spacing=3)
         self.t = t
 
-        if p is None:
-            p = bp.Grid(ndim=1,
-                        shape=(6,),
-                        spacing=1,
-                        delta=0.5)
-        self.p = p
-
         if sv is None:
             spacings = bp.SVGrid.generate_spacings(s.mass)
             shapes = [(int(2*m + 1), int(2*m + 1)) for m in s.mass]
@@ -68,21 +61,21 @@ class TestCase(bp.Simulation):
                     initial_rho=left_rho,
                     initial_drift=initial_drift,
                     initial_temp=initial_temp,
-                    affected_points=np.arange(1, p.size // 2),
+                    affected_points=np.arange(1, 3),
                     velocity_grids=sv,
                     species=s),
                 bp.InnerPointRule(
                     initial_rho=right_rho,
                     initial_drift=initial_drift,
                     initial_temp=initial_temp,
-                    affected_points=np.arange(p.size // 2, p.size - 1),
+                    affected_points=np.arange(3, 5),
                     velocity_grids=sv,
                     species=s),
                 bp.BoundaryPointRule(
                     initial_rho=right_rho,
                     initial_drift=initial_drift,
                     initial_temp=initial_temp,
-                    affected_points=[p.size - 1],
+                    affected_points=[5],
                     velocity_grids=sv,
                     reflection_rate_inverse=np.full(s.size, 0.25, dtype=float),
                     reflection_rate_elastic=np.full(s.size, 0.25, dtype=float),
@@ -91,9 +84,7 @@ class TestCase(bp.Simulation):
                     surface_normal=np.array([1, 0], dtype=int),
                     species=s)
                 ]
-            geometry = bp.Geometry(shape=p.shape,
-                                   rules=rules
-                                   )
+            geometry = bp.Geometry(ndim=1, shape=(6,), delta=0.5, rules=rules)
         self.geometry = geometry
 
         if scheme is None:

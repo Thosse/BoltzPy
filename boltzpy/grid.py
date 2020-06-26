@@ -1,10 +1,8 @@
 
 import numpy as np
 import h5py
-from math import isclose
 
 import boltzpy as bp
-import boltzpy.constants as bp_c
 
 
 # noinspection PyPep8Naming
@@ -71,9 +69,6 @@ class Grid(bp.BaseClass):
                  delta=None,
                  spacing=2,
                  is_centered=False):
-        self.check_parameters(**locals())
-        if is_centered:
-            assert (spacing % 2 == 0) or np.all(np.array(shape) % 2 == 1)
         self.ndim = ndim
         self.shape = shape
         if delta is None:
@@ -81,6 +76,7 @@ class Grid(bp.BaseClass):
         self.delta = delta
         self.spacing = spacing
         self.is_centered = is_centered
+        self.check_integrity()
         return
 
     #####################################
@@ -91,7 +87,6 @@ class Grid(bp.BaseClass):
         """:obj:`int` :
         The total number of grid points.
         """
-        # Todo remove the assertion that this must be an int
         return int(np.prod(self.shape))
 
     @property
@@ -321,12 +316,12 @@ class Grid(bp.BaseClass):
         hdf5_group : :obj:`h5py.Group <h5py:Group>`
         """
         assert isinstance(hdf5_group, h5py.Group)
-        self.check_integrity(False)
+        self.check_integrity()
 
         # Clean State of Current group
         for key in hdf5_group.keys():
             del hdf5_group[key]
-        hdf5_group.attrs["class"] = "Grid"
+        hdf5_group.attrs["class"] = self.__class__.__name__
 
         # write all set attributes to file
         hdf5_group["ndim"] = self.ndim
@@ -343,139 +338,59 @@ class Grid(bp.BaseClass):
     #####################################
     #           Verification            #
     #####################################
-    def check_integrity(self,
-                        complete_check=True,
-                        context=None):
-        """Sanity Check.
+    def check_integrity(self):
+        """Sanity Check"""
+        assert isinstance(self.ndim, int)
+        assert self.ndim >= 0
 
-        Assert all conditions in :meth:`check_parameters`.
+        assert isinstance(self.shape, tuple)
+        assert len(self.shape) == self.ndim
+        assert all(isinstance(width, int) for width in self.shape)
+        assert all(width >= 1 for width in self.shape)
 
-        Parameters
-        ----------
-        complete_check : :obj:`bool`, optional
-            If True, then all attributes must be assigned (not None).
-            If False, then unassigned attributes are ignored.
-        context : :class:`Simulation`, optional
-            The Simulation, which this instance belongs to.
-            This allows additional checks.
-        """
-        self.check_parameters(ndim=self.ndim,
-                              shape=self.shape,
-                              physical_spacing=self.physical_spacing,
-                              spacing=self.spacing,
-                              is_centered=self.is_centered,
-                              delta=self.delta,
-                              size=self.size,
-                              iG=self.iG,
-                              context=context)
-        return
+        assert isinstance(self.size, int)
+        assert self.size >= 0
+        assert np.prod(self.shape) == self.size
 
-    @staticmethod
-    def check_parameters(ndim=None,
-                         shape=None,
-                         physical_spacing=None,
-                         spacing=None,
-                         is_centered=None,
-                         delta=None,
-                         size=None,
-                         iG=None,
-                         context=None,
-                         self=None):
-        """Sanity Check.
+        assert isinstance(self.delta, float)
+        assert self.delta > 0
 
-        Checks integrity of given parameters and their interactions.
+        assert isinstance(self.spacing, int)
+        assert self.spacing > 0
 
-        Parameters
-        ----------
-        ndim : :obj:`int`, optional
-        shape : :obj:`tuple` [:obj:`int`], optional
-        physical_spacing : :obj:`float`, optional
-        spacing : :obj:`int`, optional
-        is_centered : :obj:`bool`, optional
-        delta : :obj:`float`, optional
-        size : :obj:`int`, optional
-        iG : :obj:`~numpy.array` [:obj:`int`], optional
-        context : :class:`Simulation`, optional
-            The Simulation, which this instance belongs to.
-            This allows additional checks.
-        """
-        if context is not None:
-            assert isinstance(context, bp.Simulation)
+        assert isinstance(self.physical_spacing, float)
+        assert self.physical_spacing > 0
 
-        # check all parameters, if set
-        if ndim is not None:
-            assert isinstance(ndim, int)
-            assert ndim in bp_c.SUPP_GRID_DIMENSIONS
+        assert isinstance(self.is_centered, bool)
+        if self.is_centered:
+            assert (np.all(self.spacing % 2 == 0))
+            # or np.all((np.array(self.shape) - 1) % 2 == 0)
 
-        if shape is not None:
-            assert isinstance(shape, tuple)
-            assert all(isinstance(width, int) for width in shape)
-            assert (all(width >= 2 for width in shape)
-                    or all(width == 1 for width in shape))
-
-        if physical_spacing is not None:
-            assert isinstance(physical_spacing, float)
-            assert physical_spacing > 0
-
-        if spacing is not None:
-            assert isinstance(spacing, int)
-            assert spacing > 0
-
-        if is_centered is not None:
-            assert isinstance(is_centered, bool)
-
-        if delta is not None:
-            assert isinstance(delta, float)
-            assert delta > 0
-
-        if size is not None:
-            assert isinstance(size, int)
-            assert size >= 1
-            if shape is not None:
-                assert np.prod(shape) == size
-
-        if iG is not None:
-            assert isinstance(iG, np.ndarray)
-            assert iG.dtype == int
-            assert iG.ndim == 2
-
-        # check correct attribute relations
-        if ndim is not None and shape is not None:
-            assert len(shape) == ndim
-
-        if all(attr is not None
-               for attr in [physical_spacing, spacing, delta]):
-            assert isclose(physical_spacing,
-                           spacing * delta)
-
-        if all(attr is not None for attr in [ndim, size, iG]):
-            assert iG.shape == (size, ndim)
-
+        assert isinstance(self.iG, np.ndarray)
+        assert self.iG.dtype == int
+        # iG is a flattened array of ndim-vectors
+        assert self.iG.ndim == 2
+        # Grids must have the correct shape
+        assert self.iG.shape == (self.size, self.ndim)
         # distances between grid points are multiples of index spacing
-        if all(attr is not None for attr in [spacing, iG]):
-            shifted_array = iG - iG[0]
-            assert np.all(shifted_array % spacing == 0)
-
-        if is_centered is not None and iG is not None:
-            if is_centered:
-                # Todo find something better like point symmetric...
-                assert np.array_equal(iG[0], -iG[-1])
-            else:
-                assert np.all(iG[0] == 0)
-
+        assert np.all((self.iG - self.iv(0)) % self.spacing == 0)
+        if self.is_centered:
+            assert np.array_equal(self.iG, -self.iG[::-1])
+        else:
+            assert np.all(self.iv(0) == 0)
         return
 
     def __str__(self, write_physical_grids=False):
         """:obj:`str` :
         A human readable string which describes all attributes of the instance."""
         description = ''
-        description += "Dimension = {}\n".format(self.ndim)
-        description += "Shape = {}\n".format(self.shape)
-        description += "Total Size = {}\n".format(self.size)
-        description += "Physical_Spacing = {}\n".format(self.physical_spacing)
-        description += "Spacing = {}\n".format(self.spacing)
-        description += "Internal Step Size = {}\n".format(self.delta)
-        description += 'Is_Centered = {}\n'.format(self.is_centered)
+        description += "ndim = {}\n".format(self.ndim)
+        description += "shape = {}\n".format(self.shape)
+        description += "size = {}\n".format(self.size)
+        description += "delta = {}\n".format(self.delta)
+        description += "spacing = {}\n".format(self.spacing)
+        description += "physical_spacing = {}\n".format(self.physical_spacing)
+        description += 'is_centered = {}\n'.format(self.is_centered)
         if write_physical_grids:
             description += '\n'
             description += 'Physical Grid:\n\t'

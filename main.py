@@ -21,7 +21,9 @@ else:
                            shapes=[(5, 5),
                                    (7, 7)])
     sim.geometry = bp.Geometry(
+        sim.p.ndim,
         sim.p.shape,
+        sim.p.delta,
         [bp.ConstantPointRule(
             initial_rho=[1.0, 1.0],
             initial_drift=[[0.0, 0.0], [0.0, 0.0]],
@@ -39,7 +41,7 @@ else:
          bp.BoundaryPointRule(
             initial_rho=[1.0, 1.0],
             initial_drift=[[0.0, 0.0], [0.0, 0.0]],
-            initial_temp=[.6, .6],
+            initial_temp=[.5, .5],
             affected_points=[30],
             reflection_rate_inverse=[.3, .3],
             reflection_rate_elastic=[.3, .3],
@@ -50,15 +52,27 @@ else:
             species=sim.s)
          ]
     )
-    # sim.geometry.rules[0].plot(sim.sv, sim.s, 0)
     sim.scheme.OperatorSplitting = "FirstOrder"
     sim.scheme.Transport = "FiniteDifferences_FirstOrder"
     sim.scheme.Transport_VelocityOffset = np.array([0.0, 0.0])
     sim.scheme.Collisions_Generation = "UniformComplete"
+    # sim.scheme.Collisions_Generation = "Convergent"
     sim.scheme.Collisions_Computation = "EulerScheme"
     # print(sim.__str__(write_physical_grids=True))
     sim.coll.setup(sim.scheme, sim.sv, sim.s)
     sim.save()
+    # #
+    # grp = sim.coll.group(sim.sv, mode="species")
+    # for (key, colls) in grp.items():
+    #     if key[0] == key[2]:
+    #         continue
+    #     print(key)
+    #     print(len(colls))
+    #     # import time
+    #     # time.sleep(1)
+    #     colls = np.array([c[0:4] for c in colls])
+    #     bp.collisions.plot(sim.sv, colls, iterative=True)
+    # sim.save()
     sim.compute()
 
 sim.animate()

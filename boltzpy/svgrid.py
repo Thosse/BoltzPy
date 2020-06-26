@@ -450,9 +450,9 @@ class SVGrid(bp.BaseClass):
             else:
                 number_of_grids = len(shapes)
             for shape in shapes:
-                bp.Grid.check_parameters(ndim=ndim,
-                                         shape=shape,
-                                         context=context)
+                # bp.Grid.check_parameters(ndim=ndim,
+                #                          shape=shape,
+                #                          context=context)
                 if any(entry != shape[0] for entry in shape):
                     raise NotImplementedError
 
@@ -462,10 +462,10 @@ class SVGrid(bp.BaseClass):
                 assert number_of_grids == len(spacings)
             else:
                 number_of_grids = len(spacings)
-            for spacing in spacings:
-                bp.Grid.check_parameters(ndim=ndim,
-                                         spacing=spacing,
-                                         context=context)
+            # for spacing in spacings:
+            #     bp.Grid.check_parameters(ndim=ndim,
+            #                              spacing=spacing,
+            #                              context=context)
 
         if vGrids is not None:
             assert isinstance(vGrids, np.ndarray)

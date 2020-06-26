@@ -74,8 +74,6 @@ class Simulation(bp.BaseClass):
         The simulated Specimen.
     t : :class:`Grid`
         The Time Grid.
-    p : :class:`Grid`
-        Position-Space Grid
     geometry: :class:`Geometry`
         Describes the behaviour for all position points.
         Contains the :class:`initialization rules <Rule>`
@@ -98,8 +96,7 @@ class Simulation(bp.BaseClass):
         self.s = bp.Species()
         self.t = bp.Grid(1, (1,))
         self.t.ndim = 1
-        self.p = bp.Grid(1, (1, ))
-        self.geometry = bp.Geometry()
+        self.geometry = bp.Geometry(1, (1,), 1.0, [])
         self.sv = bp.SVGrid()
         self.coll = bp.Collisions()
         self.scheme = bp.Scheme()
@@ -111,6 +108,11 @@ class Simulation(bp.BaseClass):
                                             'Energy_Flow_X']])
         self.check_integrity(complete_check=False)
         return
+
+    # Todo remove this, replace usage by geometry
+    @property
+    def p(self):
+        return self.geometry
 
     # Todo remove this, replace usage by geometry
     @property
@@ -315,12 +317,12 @@ class Simulation(bp.BaseClass):
         grid_shape : :obj:`tuple` [:obj:`int`]
         grid_spacing : :obj:`float`
         """
-        self.p = bp.Grid(ndim=grid_dimension,
-                         shape=grid_shape,
-                         delta=grid_spacing,
-                         spacing=1)
-        # Update shape of initialization_array
-        self.geometry.shape = self.p.shape
+        self.geometry = bp.Geometry(
+            ndim=grid_dimension,
+            shape=grid_shape,
+            delta=grid_spacing,
+            rules=[]
+        )
         return
 
     def set_velocity_grids(self,
@@ -534,9 +536,6 @@ class Simulation(bp.BaseClass):
         # Todo this should (needs to) be unnecessary
         self.t.ndim = 1
 
-        key = "Position_Grid"
-        self.p = bp.Grid.load(file[key])
-
         key = "Geometry"
         self.geometry = bp.Geometry.load(file[key])
 
@@ -592,11 +591,6 @@ class Simulation(bp.BaseClass):
         key = "Time_Grid"
         file.create_group(key)
         self.t.save(file[key])
-
-        # Save Position Grid
-        key = "Position_Grid"
-        file.create_group(key)
-        self.p.save(file[key])
 
         # Save Geometry
         key = "Geometry"
@@ -740,12 +734,12 @@ class Simulation(bp.BaseClass):
 
         if time_grid is not None:
             assert isinstance(time_grid, bp.Grid)
-            time_grid.check_integrity(complete_check)
+            time_grid.check_integrity()
             assert time_grid.ndim == 1
 
         if position_grid is not None:
             assert isinstance(position_grid, bp.Grid)
-            position_grid.check_integrity(complete_check)
+            position_grid.check_integrity()
             # Todo Remove this, when implementing 2D Transport
             if position_grid.ndim is not None \
                     and position_grid.ndim != 1:
@@ -759,8 +753,7 @@ class Simulation(bp.BaseClass):
 
         if geometry is not None:
             assert isinstance(geometry, bp.Geometry)
-            geometry.check_integrity(complete_check,
-                                     context)
+            geometry.check_integrity()
 
         if output_parameters is not None:
             assert isinstance(output_parameters, np.ndarray)
