@@ -30,171 +30,88 @@ class SVGrid(bp.BaseClass):
 
     Parameters
     ----------
-    ndim : :obj:`int`
-        The number of :obj:`Grid` dimensions.
-        Must be in :const:`~boltzpy.constants.SUPP_GRID_DIMENSIONS`.
-    maximum_velocity : :obj:`float`
-        Maximum physical velocity for every sub grid.
-    shapes : :obj:`list` [:obj:`tuple` [:obj:`int`]]
-        Contains the shape of each sub grid.
-    spacings : :obj:`list` [:obj:`int`]
-        Contains the index spacing of each sub grid.
+    masses : :obj:`~numpy.array` [:obj:`int`]
+        Denotes the masses of all specimen.
+    shapes : :obj:`~numpy.array` [:obj:`int`]
+        Denotes the shape of each :class:`boltzpy.Grid`.
+    delta : :obj:`float`
+        Internal step size (delta) of all :class:`Grids <boltzpy.Grid>`.
+        This is NOT the physical distance between grid points.
+    spacings : :obj:`~numpy.array` [:obj:`int`]
+        Denotes the spacing of each :class:`boltzpy.Grid`.
+
     Attributes
     ----------
     ndim : :obj:`int`
         Dimensionality of all Velocity :class:`Grids <boltzpy.Grid>`.
-        Must be in :const:`~boltzpy.constants.SUPP_GRID_DIMENSIONS`.
-    maximum_velocity : :obj:`float`
-        Maximum physical velocity for every sub grid.
-    shapes : :obj:`list` [:obj:`tuple` [:obj:`int`]]
-        Contains the :attr:`Grid.shape` of each sub grid.
-    spacings : :obj:`list` [:obj:`int`]
-        Contains the :attr:`Grid.spacing` of each sub grid.
-    delta : :obj:`float`
-        Smallest possible step size of the :obj:`Grid`.
-    index_range : :obj:`~numpy.array` [:obj:`int`]
-        Denotes the beginning and end of a specimens velocity (sub) grid
+    size : :obj:`int` :
+        The total number of velocity grid points over all grids.
+    specimen : :obj:`int` :
+        The number of different specimen or velocity grids.
+    index_offset : :obj:`~numpy.array` [:obj:`int`]
+        Denotes the beginning of the respective velocity grid
         in the multi grid :attr:`iMG`.
-        Array of shape (:attr:`size`, 2)
     vGrids : :obj:`~numpy.array` [:class:`~boltzpy.Grid`]
         Array of all Velocity :class:`Grids <boltzpy.Grid>`.
-        Each Velocity Grids attribute
-        :attr:`Grid.iG <boltzpy.Grid.iG>`
-        links to its respective slice of :attr:`iMG`.
     iMG : :obj:`~numpy.array` [:obj:`int`]
         The *integer Multi-Grid*.
         It is a concatenation of all
         Velocity integer Grids
-        (:attr:`Grid.iG <boltzpy.Grid>`);
-        One for each :class:`Specimen`.
+        (:attr:`Grid.iG <boltzpy.Grid>`).
     """
 
     def __init__(self,
-                 ndim=None,
-                 maximum_velocity=None,
-                 shapes=None,
-                 spacings=None):
-        self.check_parameters(ndim=ndim,
-                              shapes=shapes,
-                              spacings=None,
-                              maximum_velocity=maximum_velocity)
-        self.ndim = ndim
-        self.maximum_velocity = maximum_velocity
-        self.shapes = shapes
-        self.spacings = spacings
-        # the following attributes are set in setup()
-        self.delta = None
-        self.index_range = None
-        self.vGrids = None
-        self.iMG = None
+                 masses,
+                 shapes,
+                 delta,
+                 spacings):
+        self.masses = np.array(masses, dtype=int)
+        self.shapes = np.array(shapes, dtype=int)
+        self.delta = np.float(delta)
+        self.spacings = np.array(spacings, dtype=int)
 
-        if self.is_configured:
-            self.setup()
+        self.ndim = self.shapes.shape[1]
+        self.size = np.sum(np.prod(self.shapes, axis=1))
+        self.specimen = self.masses.size
+
+        # set up each Velocity Grid
+        self.vGrids = np.array([bp.Grid(self.shapes[i],
+                                        self.delta,
+                                        self.spacings[i],
+                                        is_centered=True)
+                                for i in range(self.specimen)],
+                               dtype=bp.Grid)
+        self.iMG = np.concatenate([G.iG for G in self.vGrids])
+        self.index_offset = np.zeros(self.specimen + 1, dtype=int)
+        for i in range(self.specimen):
+            self.index_offset[i + 1:] += self.vGrids[i].size
         return
+
+    # Todo properly vectorize
+    @staticmethod
+    def default_spacing(masses):
+        # compute spacings by mass ratio
+        lcm = int(np.lcm.reduce(masses))
+        spacings = [2 * lcm // int(m) for m in masses]
+        return spacings
 
     #####################################
     #           Properties              #
     #####################################
-    @property
-    def size(self):
-        """:obj:`int` :
-        The total number of velocity grid points
-        over all sub grids.
-        """
-        if self.iMG is not None:
-            return self.iMG.shape[0]
-        else:
-            return None
 
     @property
-    def number_of_grids(self):
-        """:obj:`int` :
-        The number of different
-        :class:`Velocity Grids <boltzpy.Grid>`.
-        """
-        if self.vGrids is not None:
-            return self.vGrids.size
-        else:
-            return None
+    def index_range(self):
+        # Todo remove soon
+        result = np.zeros((self.specimen, 2), dtype=int)
+        result[:, 0] = self.index_offset[0:self.specimen]
+        result[:, 1] = self.index_offset[1:]
+        return result
 
     @property
-    def is_configured(self):
-        """:obj:`bool` :
-        True, if all attributes necessary to run :meth:`setup` are set.
-        False Otherwise.
-        """
-        necessary_params = [self.ndim,
-                            self.shapes,
-                            self.spacings]
-        if any([val is None for val in necessary_params]):
-            return False
-        else:
-            return True
-
-    @property
-    def is_set_up(self):
-        """:obj:`bool` :
-        True, if the instance is completely set up and ready to call
-        :meth:`~Simulation.run_computation`.
-        False Otherwise.
-        """
-        is_set_up = (self.index_range is not None
-                     and self.iMG is not None
-                     and self.vGrids is not None)
-        self.check_integrity()
-        return is_set_up
-
-    @staticmethod
-    def generate_spacings(masses,
-                          use_identical_spacing=False):
-        if use_identical_spacing:
-            spacings = [2] * masses.size
-        else:
-            lcm = int(np.lcm.reduce(masses))
-            spacings = [2 * lcm // int(m) for m in masses]
-        return spacings
-
-    #####################################
-    #           Configuration           #
-    #####################################
-    def setup(self):
-        """Construct the attributes
-        :attr:`Grid.iMG`,
-        :attr:`Grid.index_range`,
-        :attr:`Grid.vGrids`."""
-        # Basic asserts : is everything configured and correct?
-        self.check_integrity(False)
-        assert self.is_configured
-
-        number_of_grids = len(self.shapes)
-        self.index_range = np.zeros((number_of_grids, 2),
-                                    dtype=int)
-        self.vGrids = np.empty(number_of_grids, dtype='object')
-        # set up sub grids, one by one
-        for i in range(number_of_grids):
-            # Todo the physical spacing is only a dummy so far
-            new_grid = bp.Grid(shape=self.shapes[i],
-                               delta=1.0,
-                               spacing=self.spacings[i],
-                               is_centered=True)
-            self.vGrids[i] = new_grid
-            self.index_range[i, 1] = self.index_range[i, 0] + new_grid.size
-            if i + 1 < number_of_grids:
-                self.index_range[i + 1, 0] = self.index_range[i, 1]
-
-        # Sub grids only have a view on the data
-        # The actual data are stored in the multi grid
-        self.iMG = np.zeros((self.index_range[-1, 1], self.ndim),
-                            dtype=int)
-        for (idx_G, G) in enumerate(self.vGrids):
-            [beg, end] = self.index_range[idx_G]
-            self.iMG[beg:end, :] = G.iG[...]
-
-        # Todo find more elegant way for this
-        self.delta = self.maximum_velocity / np.max(self.iMG)
-        for G in self.vGrids:
-            G.delta = self.delta
-        return
+    def maximum_velocity(self):
+        """:obj:`float`
+        Maximum physical velocity for every sub grid."""
+        return np.max(self.iMG * self.delta)
 
     #####################################
     #               Indexing            #
@@ -302,22 +219,12 @@ class SVGrid(bp.BaseClass):
         assert hdf5_group.attrs["class"] == "SVGrid"
 
         # read attributes from file
-        params = dict()
-        if "Dimensions" in hdf5_group.keys():
-            params["ndim"] = int(hdf5_group["Dimensions"][()])
-        if "Maximum_Velocity" in hdf5_group.keys():
-            params["maximum_velocity"] = float(hdf5_group["Maximum_Velocity"][()])
-        if "Shapes" in hdf5_group.keys():
-            # cast into tuple of ints
-            shapes = [tuple(int(width) for width in shape)
-                      for shape in hdf5_group["Shapes"]]
-            params["shapes"] = shapes
-        if "Spacings" in hdf5_group.keys():
-            spacings = [int(spacing)
-                        for spacing in hdf5_group["Spacings"]]
-            params["spacings"] = spacings
+        masses = hdf5_group["masses"][()]
+        shapes = hdf5_group["shapes"][()]
+        delta = hdf5_group["delta"][()]
+        spacings = hdf5_group["spacings"][()]
 
-        self = SVGrid(**params)
+        self = SVGrid(masses, shapes, delta, spacings)
         return self
 
     def save(self, hdf5_group):
@@ -329,22 +236,18 @@ class SVGrid(bp.BaseClass):
         hdf5_group : :obj:`h5py.Group <h5py:Group>`
         """
         assert isinstance(hdf5_group, h5py.Group)
-        self.check_integrity(False)
+        self.check_integrity()
 
         # Clean State of Current group
         for key in hdf5_group.keys():
             del hdf5_group[key]
-        hdf5_group.attrs["class"] = "SVGrid"
+        hdf5_group.attrs["class"] = self.__class__.__name__
 
         # write all set attributes to file
-        if self.ndim is not None:
-            hdf5_group["Dimensions"] = self.ndim
-        if self.maximum_velocity is not None:
-            hdf5_group["Maximum_Velocity"] = self.maximum_velocity
-        if self.shapes is not None:
-            hdf5_group["Shapes"] = self.shapes
-        if self.spacings is not None:
-            hdf5_group["Spacings"] = self.spacings
+        hdf5_group["masses"] = self.masses
+        hdf5_group["shapes"] = self.shapes
+        hdf5_group["delta"] = self.delta
+        hdf5_group["spacings"] = self.spacings
 
         # check that the class can be reconstructed from the save
         other = SVGrid.load(hdf5_group)
@@ -354,170 +257,60 @@ class SVGrid(bp.BaseClass):
     #####################################
     #           Verification            #
     #####################################
-    def check_integrity(self,
-                        complete_check=True,
-                        context=None):
-        """Sanity Check.
+    def check_integrity(self):
+        """Sanity Check."""
+        assert isinstance(self.ndim, int)
+        assert self.ndim in bp_c.SUPP_GRID_DIMENSIONS
+        # if context is not None and context.p.ndim is not None:
+        #     assert ndim >= context.p.ndim
 
-        Assert all conditions in :meth:`check_parameters`
+        assert isinstance(self.maximum_velocity, float)
+        assert self.maximum_velocity > 0
 
-        Parameters
-        ----------
-        complete_check : :obj:`bool`, optional
-            If True, then all attributes must be assigned (not None).
-            If False, then unassigned attributes are ignored.
-        context : :class:`Simulation`, optional
-            The Simulation, which this instance belongs to.
-            This allows additional checks.
-        """
-        self.check_parameters(ndim=self.ndim,
-                              maximum_velocity=self.maximum_velocity,
-                              delta=self.delta,
-                              shapes=self.shapes,
-                              spacings=self.spacings,
-                              index_range=self.index_range,
-                              vGrids=self.vGrids,
-                              iMG=self.iMG,
-                              number_of_grids=self.number_of_grids,
-                              size=self.size,
-                              complete_check=complete_check,
-                              context=context)
-        return
+        assert isinstance(self.delta, float)
+        assert self.delta > 0
 
-    @staticmethod
-    def check_parameters(ndim=None,
-                         maximum_velocity=None,
-                         delta=None,
-                         shapes=None,
-                         spacings=None,
-                         vGrids=None,
-                         index_range=None,
-                         iMG=None,
-                         number_of_grids=None,
-                         size=None,
-                         complete_check=False,
-                         context=None):
-        """Sanity Check.
-        Checks integrity of given parameters and their interactions.
+        assert isinstance(self.shapes, np.ndarray)
+        assert self.shapes.shape[0] == self.specimen
+        assert np.array_equal(self.shapes,
+                              np.array([G.shape for G in self.vGrids]))
+        assert len({shape.ndim for shape in self.shapes}) <= 1, (
+            "All Grids must have the same dimension.\n"
+            "Given dimensions = "
+            "{}".format([shape.shape[1] for shape in self.shapes]))
+        assert all(len(set(shape)) == 1 for shape in self.shapes), (
+            "All Velocity Grids must be squares.\n"
+            "Given shapes = "
+            "{}".format(self.shapes))
 
-        Parameters
-        ----------
-        ndim : :obj:`int`, optional
-        maximum_velocity : :obj:`float`. optional
-        delta : :obj:`float`, optional
-        shapes : :obj:`list` [:obj:`tuple` [:obj:`int`]], optional
-        spacings : :obj:`list` [:obj:`int`], optional
-        vGrids : :obj:`~numpy.array` [:class:`Grid`], optional
-        index_range : :obj:`~numpy.array` [:obj:`int`], optional
-        iMG : :obj:`~numpy.array` [:obj:`int`], optional
-        number_of_grids : :obj:`int`, optional
-        size : :obj:`int`, optional
-        complete_check : :obj:`bool`, optional
-            If True, then all parameters must be set (not None).
-            If False, then unassigned parameters are ignored.
-        context : :class:`Simulation`, optional
-            The Simulation, which this instance belongs to.
-            This allows additional checks.
-        """
-        assert isinstance(complete_check, bool)
-        # For complete check, assert that all parameters are assigned
-        if complete_check is True:
-            assert all(param_val is not None
-                       for (param_key, param_val) in locals().items()
-                       if param_key != "context")
-        if context is not None:
-            assert isinstance(context, bp.Simulation)
+        assert isinstance(self.spacings, np.ndarray)
+        assert self.spacings.shape[0] == self.specimen
+        assert np.array_equal(self.spacings,
+                              np.array([G.spacing for G in self.vGrids]))
 
-        if ndim is not None:
-            assert isinstance(ndim, int)
-            assert ndim in bp_c.SUPP_GRID_DIMENSIONS
-            if context is not None and context.p.ndim is not None:
-                assert ndim >= context.p.ndim
+        assert isinstance(self.vGrids, np.ndarray)
+        assert self.vGrids.size == self.specimen
+        assert self.vGrids.ndim == 1
+        assert self.vGrids.dtype == 'object'
+        for G in self.vGrids:
+            isinstance(G, bp.Grid)
+            G.check_integrity()
 
-        if maximum_velocity is not None:
-            assert isinstance(maximum_velocity, float)
-            assert maximum_velocity > 0
+        assert isinstance(self.index_range, np.ndarray)
+        assert self.index_range.dtype == int
+        assert self.index_range.ndim == 2
+        assert self.specimen == self.index_range.shape[0]
+        assert self.index_range.shape[1] == 2
+        assert np.all(self.index_range >= 0)
+        assert np.all(self.index_range[1:, 0] == self.index_range[0:-1, 1])
+        assert np.all(self.index_range[:, 0] < self.index_range[:, 1])
+        assert np.array_equal(self.index_offset[1:] - self.index_offset[:-1],
+                              np.array([G.size for G in self.vGrids]))
 
-        if delta is not None:
-            assert isinstance(delta, float)
-            assert delta > 0
-
-        if shapes is not None:
-            assert isinstance(shapes, list)
-            if number_of_grids is not None:
-                assert number_of_grids == len(shapes)
-            else:
-                number_of_grids = len(shapes)
-            for shape in shapes:
-                # bp.Grid.check_parameters(ndim=ndim,
-                #                          shape=shape,
-                #                          context=context)
-                if any(entry != shape[0] for entry in shape):
-                    raise NotImplementedError
-
-        if spacings is not None:
-            assert isinstance(spacings, list)
-            if number_of_grids is not None:
-                assert number_of_grids == len(spacings)
-            else:
-                number_of_grids = len(spacings)
-            # for spacing in spacings:
-            #     bp.Grid.check_parameters(ndim=ndim,
-            #                              spacing=spacing,
-            #                              context=context)
-
-        if vGrids is not None:
-            assert isinstance(vGrids, np.ndarray)
-            if number_of_grids is not None:
-                assert number_of_grids == vGrids.size
-            else:
-                number_of_grids = vGrids.size
-            assert vGrids.ndim == 1
-            assert vGrids.dtype == 'object'
-            if shapes is None:
-                shapes = list(G.shape for G in vGrids)
-            else:
-                assert shapes == [G.shape for G in vGrids]
-            if spacings is None:
-                spacings = [G.spacing for G in vGrids]
-            else:
-                assert spacings == [G.spacing for G in vGrids]
-            for (idx_G, G) in enumerate(vGrids):
-                isinstance(G, bp.Grid)
-                G.check_integrity()
-                if ndim is None:
-                    ndim = G.ndim
-                else:
-                    assert ndim == G.ndim
-                if delta is None:
-                    delta = G.delta
-                else:
-                    assert delta == G.delta
-
-        if index_range is not None:
-            assert isinstance(index_range, np.ndarray)
-            assert index_range.dtype == int
-            assert index_range.ndim == 2
-            if number_of_grids is not None:
-                assert number_of_grids == index_range.shape[0]
-            else:
-                number_of_grids = index_range.shape[0]
-            assert index_range.shape[1] == 2
-            assert all(0 <= idx for idx in index_range.flatten())
-            assert all(index_range[i, 1] == index_range[i + 1, 0]
-                       for i in range(number_of_grids - 1))
-            assert all(beg < end for [beg, end] in index_range)
-            if vGrids is not None:
-                for (idx_G, G) in enumerate(vGrids):
-                    [beg, end] = index_range[idx_G]
-                    assert G.size == end - beg
-
-        if iMG is not None:
-            assert isinstance(iMG, np.ndarray)
-            assert iMG.dtype == int
-            assert iMG.ndim == 2
-            if index_range is not None:
-                assert iMG.shape[0] == index_range[-1, 1]
+        assert isinstance(self.iMG, np.ndarray)
+        assert self.iMG.dtype == int
+        assert self.iMG.ndim == 2
+        assert self.iMG.shape[0] == self.index_range[-1, 1]
         return
 
     def __str__(self,

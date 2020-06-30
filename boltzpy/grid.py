@@ -29,12 +29,12 @@ class Grid(bp.BaseClass):
 
     Parameters
     ----------
-    shape : :obj:`tuple` [:obj:`int`]
+    shape : :obj:`~numpy.array` [:obj:`int`]
         Number of :obj:`Grid` points for each dimension.
     delta : :obj:`float`
         Internal step size.
         This is NOT the physical distance between grid points.
-    spacing : :obj:`int`, optional
+    spacing : :obj:`int`
         An integer stretching factor.
         Using even spacings allows centered grids of even shape,
         It is used for velocity grids of multiple species with differing mass.
@@ -45,49 +45,48 @@ class Grid(bp.BaseClass):
 
     Attributes
     ----------
-    shape : :obj:`tuple` [:obj:`int`]
+    shape : :obj:`~numpy.array` [:obj:`int`]
         Number of :obj:`Grid` points for each dimension.
     delta : :obj:`float`
         Smallest possible step size of the :obj:`Grid`.
-    spacing : :obj:`int`, optional
+    spacing : :obj:`int`
         This allows
         centered velocity grids (without the zero),
         write-intervalls for time grids
         and possibly adaptive positional grids.
     is_centered : :obj:`float`
         If True, then the Grid will be centered around zero.
+    ndim : :obj:`int`
+        The number of :obj:`Grid` dimensions
+    size : :obj:`int` :
+        The total number of grid points.
+    iG : :obj:`~numpy.array` [:obj:`int`] :
+        The *integer Grid* describes the position of all :class:`Grid` points
+        in multiples of :attr:`delta`, e.g. :math:`pG := iG \cdot delta`.
+
+        This allows precise computations, without rounding errors.
+
+        Array of shape (:attr:`size`, :attr:`ndim`).
     """
     def __init__(self,
                  shape,
-                 delta=None,
-                 spacing=2,
+                 delta,
+                 spacing,
                  is_centered=False):
-        self.shape = shape
-        if delta is None:
-            delta = 1 / spacing
-        self.delta = delta
-        self.spacing = spacing
+        self.shape = np.array(shape, dtype=int)
+        self.delta = np.float(delta)
+        self.spacing = np.int(spacing)
         self.is_centered = is_centered
+        self.ndim = self.shape.size
+        self.size = np.int(np.prod(self.shape))
+        self.iG = self.iv(np.arange(self.size))
+
         self.check_integrity()
         return
 
     #####################################
     #           Properties              #
     #####################################
-    @property
-    def ndim(self):
-        """:obj:`int`
-        The number of :obj:`Grid` dimensions.
-        """
-        return len(self.shape)
-
-    @property
-    def size(self):
-        """:obj:`int` :
-        The total number of grid points.
-        """
-        return int(np.prod(self.shape))
-
     @property
     def physical_spacing(self):
         r""":obj:`float` :
@@ -110,19 +109,6 @@ class Grid(bp.BaseClass):
         Array of shape (:attr:`size`, :attr:`ndim`).
          """
         return self.pv(np.arange(self.size))
-
-    @property
-    def iG(self):
-        r""":obj:`~numpy.array` [:obj:`int`] :
-        The *integer Grid*  allows precise computations, without rounding errors.
-        It describes the position of all :class:`Grid` points
-        in multiples of :attr:`delta`.
-
-        Thus :math:`pG := iG \cdot delta`
-
-        Array of shape (:attr:`size`, :attr:`ndim`).
-         """
-        return self.iv(np.arange(self.size))
 
     #####################################
     #         Indexes and Values        #
@@ -297,9 +283,9 @@ class Grid(bp.BaseClass):
         assert hdf5_group.attrs["class"] == "Grid"
 
         # read parameters from file
-        shape = tuple(int(width) for width in hdf5_group["shape"][()])
-        delta = float(hdf5_group["delta"][()])
-        spacing = int(hdf5_group["spacing"][()])
+        shape = hdf5_group["shape"][()]
+        delta = hdf5_group["delta"][()]
+        spacing = hdf5_group["spacing"][()]
         is_centered = bool(hdf5_group["is_centered"][()])
 
         self = Grid(shape, delta, spacing, is_centered)
@@ -340,22 +326,22 @@ class Grid(bp.BaseClass):
         assert isinstance(self.ndim, int)
         assert self.ndim >= 0
 
-        assert isinstance(self.shape, tuple)
-        assert len(self.shape) == self.ndim
-        assert all(isinstance(width, int) for width in self.shape)
-        assert all(width >= 1 for width in self.shape)
+        assert isinstance(self.shape, np.ndarray)
+        assert self.shape.size == self.ndim
+        assert self.shape.dtype == int
+        assert np.all(self.shape >= 1)
 
         assert isinstance(self.size, int)
         assert self.size >= 0
         assert np.prod(self.shape) == self.size
 
-        assert isinstance(self.delta, float)
+        assert isinstance(self.delta, np.float)
         assert self.delta > 0
 
         assert isinstance(self.spacing, int)
         assert self.spacing > 0
 
-        assert isinstance(self.physical_spacing, float)
+        assert isinstance(self.physical_spacing, np.float)
         assert self.physical_spacing > 0
 
         assert isinstance(self.is_centered, bool)

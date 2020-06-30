@@ -94,9 +94,9 @@ class Simulation(bp.BaseClass):
         self.file_address = file_address
 
         self.s = bp.Species()
-        self.t = bp.Grid((1,))
+        self.t = bp.Grid((1,), 1.0, 2)
         self.geometry = bp.Geometry((1,), 1.0, [])
-        self.sv = bp.SVGrid()
+        self.sv = bp.SVGrid([1], [(2, 2)], 1.0, [2])
         self.coll = bp.Collisions()
         self.scheme = bp.Scheme()
         self.output_parameters = np.array([['Mass',
@@ -318,36 +318,6 @@ class Simulation(bp.BaseClass):
             delta=grid_spacing,
             rules=[]
         )
-        return
-
-    def set_velocity_grids(self,
-                           grid_dimension,
-                           maximum_velocity,
-                           shapes,
-                           use_identical_spacing=False):
-        """Set up :attr:`sv`.
-
-        1. Generate a minimal Velocity :class:`Grid`.
-        2. Use the minimal Grid as prototype in :meth:`SVGrid.setup`
-           and setup the Velocity Grids for all :class:`Species`.
-
-        Parameters
-        ----------
-        grid_dimension : :obj:`int`
-        maximum_velocity : :obj:`float`
-        shapes : :obj:`list` [:obj:`tuple` [:obj:`int`]]
-        use_identical_spacing : :obj:`bool`, optional
-            If True, then all specimen use equal grids.
-            If False, then the spacing is adjusted to the mass ratio.
-        """
-        if not self.s.is_configured:
-            raise AttributeError
-        spacings = bp.SVGrid.generate_spacings(self.s.mass,
-                                               use_identical_spacing)
-        self.sv = bp.SVGrid(ndim=grid_dimension,
-                            maximum_velocity=maximum_velocity,
-                            shapes=shapes,
-                            spacings=spacings)
         return
 
     #####################################
@@ -741,8 +711,7 @@ class Simulation(bp.BaseClass):
 
         if species_velocity_grid is not None:
             assert isinstance(species_velocity_grid, bp.SVGrid)
-            species_velocity_grid.check_integrity(complete_check,
-                                                  context)
+            species_velocity_grid.check_integrity()
 
         if geometry is not None:
             assert isinstance(geometry, bp.Geometry)

@@ -103,7 +103,7 @@ class Rule(bp.BaseClass):
     def compute_initial_state(self, velocity_grids, species):
         assert isinstance(velocity_grids, bp.SVGrid)
         assert self.ndim == velocity_grids.ndim
-        assert self.number_of_specimen == velocity_grids.number_of_grids
+        assert self.number_of_specimen == velocity_grids.specimen
 
         initial_state = np.zeros(velocity_grids.size, dtype=float)
         for idx_spc in range(self.number_of_specimen):
@@ -385,7 +385,7 @@ class Rule(bp.BaseClass):
 
         if velocity_grids is not None:
             assert isinstance(velocity_grids, bp.SVGrid)
-            velocity_grids.check_integrity(context=context)
+            velocity_grids.check_integrity()
 
         if initial_state is not None:
             assert isinstance(initial_state, np.ndarray)

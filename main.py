@@ -13,15 +13,13 @@ else:
     sim.setup_time_grid(max_time=1,
                         number_time_steps=201,
                         calculations_per_time_step=5)
-    sim.setup_position_grid(grid_shape=(31, ),
-                            grid_spacing=0.5)
-    sim.set_velocity_grids(grid_dimension=2,
-                           maximum_velocity=1.5,
-                           shapes=[(5, 5),
-                                   (7, 7)])
+    sim.sv = bp.SVGrid([2, 3],
+                       [(5, 5), (7, 7)],
+                       0.25,
+                       [6, 4])
     sim.geometry = bp.Geometry(
-        sim.p.shape,
-        sim.p.delta,
+        (31, ),
+        0.5,
         [bp.ConstantPointRule(
             initial_rho=[1.0, 1.0],
             initial_drift=[[0.0, 0.0], [0.0, 0.0]],
@@ -53,8 +51,8 @@ else:
     sim.scheme.OperatorSplitting = "FirstOrder"
     sim.scheme.Transport = "FiniteDifferences_FirstOrder"
     sim.scheme.Transport_VelocityOffset = np.array([0.0, 0.0])
-    sim.scheme.Collisions_Generation = "UniformComplete"
-    # sim.scheme.Collisions_Generation = "Convergent"
+    # sim.scheme.Collisions_Generation = "UniformComplete"
+    sim.scheme.Collisions_Generation = "Convergent"
     sim.scheme.Collisions_Computation = "EulerScheme"
     # print(sim.__str__(write_physical_grids=True))
     sim.coll.setup(sim.scheme, sim.sv, sim.s)

@@ -9,7 +9,6 @@ class TestCase(bp.Simulation):
                  file_address,
                  s=None,
                  t=None,
-                 p=None,
                  sv=None,
                  coll=None,
                  geometry=None,
@@ -34,13 +33,14 @@ class TestCase(bp.Simulation):
         self.t = t
 
         if sv is None:
-            spacings = bp.SVGrid.generate_spacings(s.mass)
-            shapes = [(int(2*m + 1), int(2*m + 1)) for m in s.mass]
-            sv = bp.SVGrid(ndim=2,
-                           maximum_velocity=1.5,
-                           shapes=shapes,
-                           spacings=spacings,
-                           )
+            spacings = bp.SVGrid.default_spacing(s.mass)
+            shapes = np.array([(int(2*m + 1), int(2*m + 1))
+                               for m in s.mass])
+            delta = 2 * 1.5 / np.max((shapes[:, 0] - 1) * spacings)
+            sv = bp.SVGrid(s.mass,
+                           shapes,
+                           delta,
+                           spacings)
         self.sv = sv
 
         if geometry is None:
