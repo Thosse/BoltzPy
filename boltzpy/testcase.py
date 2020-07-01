@@ -12,8 +12,7 @@ class TestCase(bp.Simulation):
                  sv=None,
                  coll=None,
                  geometry=None,
-                 scheme=None,
-                 output_parameters=None):
+                 scheme=None):
         super().__init__(file_address)
 
         if s is None:
@@ -93,15 +92,6 @@ class TestCase(bp.Simulation):
                                Collisions_Generation="UniformComplete",
                                Collisions_Computation="EulerScheme")
         self.scheme = scheme
-
-        if output_parameters is None:
-            output_parameters = np.array([['Mass',
-                                           'Momentum_X'],
-                                          ['Momentum_X',
-                                           'Momentum_Flow_X'],
-                                          ['Energy',
-                                           'Energy_Flow_X']])
-        self.output_parameters = output_parameters
 
         if coll is None:
             coll = bp.Collisions()
@@ -185,10 +175,6 @@ tc2_s.add(mass=2, collision_rate=np.array([50, 50], dtype=float))
 CASES.append(TestCase("shock_2Species_equalMass",
                       s=tc2_s))
 
-# Two Species, shock, complete distribution
-# Todo Remove this, complete distribution should be default for tests
-CASES.append(TestCase("shock_2species_complete",
-                      output_parameters=np.array([["Complete_Distribution"]])))
 
 # Convergent Collision model
 convergent_scheme = bp.Scheme(OperatorSplitting="FirstOrder",

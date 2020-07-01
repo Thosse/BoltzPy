@@ -81,10 +81,6 @@ class Simulation(bp.BaseClass):
         Velocity-Space Grids of all Specimen.
     scheme : :class:`Scheme`
         Contains all computation scheme parameters.
-    output_parameters : :obj:`~numpy.array` [:obj:`str`]
-        Output/Results of the Simulation.
-        Each element must be in :const:`~boltzpy.constants.SUPP_OUTPUT`.
-        Must be a 2D array.
     """
 
     def __init__(self,
@@ -99,12 +95,6 @@ class Simulation(bp.BaseClass):
         self.sv = bp.SVGrid([1], [(2, 2)], 1.0, [2])
         self.coll = bp.Collisions()
         self.scheme = bp.Scheme()
-        self.output_parameters = np.array([['Mass',
-                                            'Momentum_X'],
-                                           ['Momentum_X',
-                                            'Momentum_Flow_X'],
-                                           ['Energy',
-                                            'Energy_Flow_X']])
         self.check_integrity(complete_check=False)
         return
 
@@ -189,10 +179,8 @@ class Simulation(bp.BaseClass):
         True, if all necessary attributes of the instance are set.
         False Otherwise.
         """
-        # Todo add output_parameters
         # Todo add initial_distribution / rule_arr
         return (self.s.is_configured
-                and self.sv.is_configured
                 and self.scheme.is_configured)
 
     @property
@@ -203,7 +191,6 @@ class Simulation(bp.BaseClass):
         """
         # Todo add initial_distribution
         return (self.geometry.is_set_up
-                and self.sv.is_set_up
                 and self.coll.is_set_up)
 
     #############################
@@ -511,10 +498,6 @@ class Simulation(bp.BaseClass):
         key = "Scheme"
         self.scheme = bp.Scheme.load(file[key])
 
-        key = "Computation/Output_Parameters"
-        shape = file[key].attrs["shape"]
-        self.output_parameters = file[key][()].reshape(shape)
-
         file.close()
         self.check_integrity(complete_check=False)
         return self
@@ -575,14 +558,6 @@ class Simulation(bp.BaseClass):
         file.create_group(key)
         self.scheme.save(file[key])
 
-        if self.output_parameters is not None:
-            #  noinspection PyUnresolvedReferences
-            h5py_string_type = h5py.special_dtype(vlen=str)
-            key = "Computation/Output_Parameters"
-            file[key] = np.array(self.output_parameters,
-                                 dtype=h5py_string_type).flatten()
-            file[key].attrs["shape"] = self.output_parameters.shape
-
         # assert that the instance can be reconstructed from the save
         other = self.load(file_address)
         # if a different file name is given then, the check MUST fail
@@ -613,7 +588,6 @@ class Simulation(bp.BaseClass):
                               position_grid=self.p,
                               species_velocity_grid=self.sv,
                               geometry=self.geometry,
-                              output_parameters=self.output_parameters,
                               scheme=self.scheme,
                               complete_check=complete_check,
                               context=self)
@@ -626,7 +600,6 @@ class Simulation(bp.BaseClass):
                          position_grid=None,
                          species_velocity_grid=None,
                          geometry=None,
-                         output_parameters=None,
                          scheme=None,
                          complete_check=False,
                          context=None):
@@ -642,7 +615,6 @@ class Simulation(bp.BaseClass):
         position_grid : :obj:`Grid`, optional
         species_velocity_grid : :obj:`SVGrid`, optional
         geometry: :class:`Geometry`, optional
-        output_parameters : :obj:`~numpy.array` [:obj:`str`], optional
         scheme : :class:`Scheme`, optional
         complete_check : :obj:`bool`, optional
             If True, then all parameters must be assigned (not None).
@@ -717,12 +689,6 @@ class Simulation(bp.BaseClass):
             assert isinstance(geometry, bp.Geometry)
             geometry.check_integrity()
 
-        if output_parameters is not None:
-            assert isinstance(output_parameters, np.ndarray)
-            assert len(output_parameters.shape) == 2
-            assert all([mom in bp_c.SUPP_OUTPUT
-                        for mom in output_parameters.flatten()])
-
         if scheme is not None:
             scheme.check_integrity(complete_check)
         return
@@ -767,8 +733,4 @@ class Simulation(bp.BaseClass):
         description += '------------------\n\t'
         description += self.scheme.__str__().replace('\n', '\n\t')
         description += '\n'
-        description += 'Animated Moments\n'
-        description += '----------------\n\t'
-        output_str = self.output_parameters.__str__().replace('\n', '\n\t')
-        description += output_str + '\n'
         return description

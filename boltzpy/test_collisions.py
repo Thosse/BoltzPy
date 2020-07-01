@@ -29,10 +29,10 @@ def test_collisions(tc):
         assert old_coll.weights[c] == new_coll.weights[c]
     return
 
-
-def test_issubset():
-    tc1 = bp_t.CASES[2]
-    tc2 = bp_t.CASES[3]
-    assert tc2.coll.issubset(tc1.coll)
-    assert not tc1.coll.issubset(tc2.coll)
-    return
+# Todo Test that complete >= convergent
+# def test_issubset():
+#     tc1 = bp_t.CASES[2]
+#     tc2 = bp_t.CASES[3]
+#     assert tc2.coll.issubset(tc1.coll)
+#     assert not tc1.coll.issubset(tc2.coll)
+#     return
