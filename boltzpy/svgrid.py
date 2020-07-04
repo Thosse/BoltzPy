@@ -64,11 +64,26 @@ class SVGrid(bp.BaseClass):
                  masses,
                  shapes,
                  delta,
-                 spacings):
+                 spacings,
+                 collision_factors):
+        assert isinstance(masses, (list, tuple, np.ndarray))
         self.masses = np.array(masses, dtype=int)
+        assert self.masses.ndim == 1
+
+        assert isinstance(shapes, (list, tuple, np.ndarray))
         self.shapes = np.array(shapes, dtype=int)
+        assert self.shapes.ndim == 2
+
         self.delta = np.float(delta)
+
+        assert isinstance(spacings, (list, tuple, np.ndarray))
         self.spacings = np.array(spacings, dtype=int)
+        assert self.spacings.ndim == 1
+
+        assert isinstance(collision_factors, (list, tuple, np.ndarray))
+        self.collision_factors = np.array(collision_factors,
+                                          dtype=float)
+        assert self.collision_factors.ndim == 2
 
         self.ndim = self.shapes.shape[1]
         self.size = np.sum(np.prod(self.shapes, axis=1))
@@ -79,12 +94,12 @@ class SVGrid(bp.BaseClass):
                                         self.delta,
                                         self.spacings[i],
                                         is_centered=True)
-                                for i in range(self.specimen)],
+                                for i in self.species],
                                dtype=bp.Grid)
         self.iMG = np.concatenate([G.iG for G in self.vGrids])
         self.index_offset = np.zeros(self.specimen + 1, dtype=int)
-        for i in range(self.specimen):
-            self.index_offset[i + 1:] += self.vGrids[i].size
+        for s in self.species:
+            self.index_offset[s + 1:] += self.vGrids[s].size
         return
 
     # Todo properly vectorize
@@ -98,6 +113,9 @@ class SVGrid(bp.BaseClass):
     #####################################
     #           Properties              #
     #####################################
+    @property
+    def species(self):
+        return range(self.specimen)
 
     @property
     def index_range(self):
@@ -223,8 +241,9 @@ class SVGrid(bp.BaseClass):
         shapes = hdf5_group["shapes"][()]
         delta = hdf5_group["delta"][()]
         spacings = hdf5_group["spacings"][()]
+        collision_factors = hdf5_group["collision_factors"][()]
 
-        self = SVGrid(masses, shapes, delta, spacings)
+        self = SVGrid(masses, shapes, delta, spacings, collision_factors)
         return self
 
     def save(self, hdf5_group):
@@ -248,6 +267,7 @@ class SVGrid(bp.BaseClass):
         hdf5_group["shapes"] = self.shapes
         hdf5_group["delta"] = self.delta
         hdf5_group["spacings"] = self.spacings
+        hdf5_group["collision_factors"] = self.collision_factors
 
         # check that the class can be reconstructed from the save
         other = SVGrid.load(hdf5_group)

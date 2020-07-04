@@ -72,10 +72,10 @@ class Data:
         # Todo Add this as property to SVGRID
         # Todo test if it faster to compute velocity (pv) on the fly
         self.dv = np.array([sim.sv.vGrids[s].physical_spacing
-                            for s in range(sim.s.size)])
+                            for s in sim.sv.species])
 
-        self.n_spc = sim.s.size
-        self.m = sim.s.mass
+        self.n_spc = sim.sv.specimen
+        self.m = sim.sv.masses
 
         self.t = 0
         self.tG = sim.t.iG  # keep it, for adaptive time grids
@@ -88,7 +88,7 @@ class Data:
         # Collision arrays
         # Todo create struct -> 4 ints and 1 float together -> possible?
         if not sim.coll.is_set_up:
-            sim.coll.setup(sim.scheme, sim.sv, sim.s)
+            sim.coll.setup(sim.scheme, sim.sv)
         self.col = sim.coll.relations
         self.weight = sim.coll.weights
 

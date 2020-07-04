@@ -8,15 +8,14 @@ if exisiting_simulation_file is not None:
     sim = bp.Simulation.load(exisiting_simulation_file)
 else:
     sim = bp.Simulation(exisiting_simulation_file)
-    sim.add_specimen(mass=2, collision_rate=[50])
-    sim.add_specimen(mass=3, collision_rate=[50, 50])
     sim.setup_time_grid(max_time=1,
                         number_time_steps=201,
                         calculations_per_time_step=5)
     sim.sv = bp.SVGrid([2, 3],
                        [(5, 5), (7, 7)],
                        0.25,
-                       [6, 4])
+                       [6, 4],
+                       np.array([[50, 50], [50, 50]]))
     sim.geometry = bp.Geometry(
         (31, ),
         0.5,
@@ -24,16 +23,14 @@ else:
             initial_rho=[1.0, 1.0],
             initial_drift=[[0.0, 0.0], [0.0, 0.0]],
             initial_temp=[.50, .50],
-            velocity_grids=sim.sv,
             affected_points=[0],
-            species=sim.s),
+            velocity_grids=sim.sv),
          bp.InnerPointRule(
             initial_rho=[1.0, 1.0],
             initial_drift=[[0.0, 0.0], [0.0, 0.0]],
             initial_temp=[.50, .50],
             affected_points=np.arange(1, 30),
-            velocity_grids=sim.sv,
-            species=sim.s),
+            velocity_grids=sim.sv),
          bp.BoundaryPointRule(
             initial_rho=[1.0, 1.0],
             initial_drift=[[0.0, 0.0], [0.0, 0.0]],
@@ -44,8 +41,7 @@ else:
             reflection_rate_thermal=[0.3, .3],
             absorption_rate=[0.1, .1],
             surface_normal=np.array([1, 0], dtype=int),
-            velocity_grids=sim.sv,
-            species=sim.s)
+            velocity_grids=sim.sv)
          ]
     )
     sim.scheme.OperatorSplitting = "FirstOrder"
@@ -55,7 +51,7 @@ else:
     sim.scheme.Collisions_Generation = "Convergent"
     sim.scheme.Collisions_Computation = "EulerScheme"
     # print(sim.__str__(write_physical_grids=True))
-    sim.coll.setup(sim.scheme, sim.sv, sim.s)
+    sim.coll.setup(sim.scheme, sim.sv)
     sim.save()
     # #
     # grp = sim.coll.group(sim.sv, mode="species")

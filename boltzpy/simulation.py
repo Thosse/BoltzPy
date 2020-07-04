@@ -70,8 +70,6 @@ class Simulation(bp.BaseClass):
 
     Attributes
     ----------
-    s : :class:`Species`
-        The simulated Specimen.
     t : :class:`Grid`
         The Time Grid.
     geometry: :class:`Geometry`
@@ -89,10 +87,9 @@ class Simulation(bp.BaseClass):
         [self._file_directory, self._file_name] = ['', '']
         self.file_address = file_address
 
-        self.s = bp.Species()
         self.t = bp.Grid((1,), 1.0, 2)
         self.geometry = bp.Geometry((1,), 1.0, [])
-        self.sv = bp.SVGrid([1], [(2, 2)], 1.0, [2])
+        self.sv = bp.SVGrid([1], [[2, 2]], 1.0, [2], [[1]])
         self.coll = bp.Collisions()
         self.scheme = bp.Scheme()
         self.check_integrity(complete_check=False)
@@ -151,11 +148,12 @@ class Simulation(bp.BaseClass):
     def file(self):
         return h5py.File(self.file_address, mode="r+")
 
+    # Todo make this an array(obj) of tuples, remove specimen folders?
     @property
     def shape_of_results(self):
-        output = dict()
-        for (s, species_name) in enumerate(self.s.names):
-            output[species_name] = {
+        output = np.empty(self.sv.specimen, dtype=dict)
+        for s in self.sv.species:
+            output[s] = {
                 'particle_number': (self.t.size, self.p.size),
                 'mean_velocity': (self.t.size, self.p.size, self.sv.ndim),
                 'momentum': (self.t.size, self.p.size, self.sv.ndim),
@@ -179,9 +177,7 @@ class Simulation(bp.BaseClass):
         True, if all necessary attributes of the instance are set.
         False Otherwise.
         """
-        # Todo add initial_distribution / rule_arr
-        return (self.s.is_configured
-                and self.scheme.is_configured)
+        return self.scheme.is_configured
 
     @property
     def is_set_up(self):
@@ -196,77 +192,6 @@ class Simulation(bp.BaseClass):
     #############################
     #       Configuration       #
     #############################
-    def add_specimen(self,
-                     name=None,
-                     mass=None,
-                     collision_rate=None,
-                     color=None):
-        """Add a :class:`Specimen` to :attr:`s`.
-        See :meth:`Species.add`
-
-        Parameters
-        ----------
-        name : :obj:`str`, optional
-        mass : :obj:`int`, optional
-        collision_rate : :obj:`~numpy.array` [:obj:`float`] or :obj:`list` [:obj:`int`], optional
-            Correlates to the collision probability between two specimen.
-        color : :obj:`str`, optional
-        """
-        # Todo alternative type of collision_rate is really a list of int?
-        # Todo  not a list of float?
-        # Todo  this is also implemented in the asserts in the beginning
-        # Todo  this also applies to edit Specimen
-        if isinstance(collision_rate, list):
-            assert all([isinstance(item, int) for item in collision_rate])
-            collision_rate = np.array(collision_rate, dtype=float)
-        self.s.add(name,
-                   mass,
-                   collision_rate,
-                   color, )
-        return
-
-    def edit_specimen(self,
-                      item,
-                      name=None,
-                      mass=None,
-                      collision_rate=None,
-                      color=None):
-        """Edit the :class:`Specimen`, denoted by *item*, in :attr:`s`.
-        See :meth:`Species.edit`
-
-        Parameters
-        ----------
-        item : :obj:`int` or :obj:`str`
-            Index or name of the :obj:`Specimen` to be edited
-        name : :obj:`str`, optional
-        mass : :obj:`int`, optional
-        collision_rate : :obj:`~numpy.array` [:obj:`float`] or :obj:`list` [:obj:`int`], optional
-            Correlates to the collision probability between two specimen.
-        color : :obj:`str`, optional
-        """
-        if isinstance(collision_rate, list):
-            assert all([isinstance(item, int) for item in collision_rate])
-            collision_rate = np.array(collision_rate, dtype=float)
-        self.s.edit(item,
-                    name,
-                    mass,
-                    collision_rate,
-                    color)
-        return
-
-    def remove_specimen(self, item):
-        """Remove the :class:`Specimen`, denoted by *item*,
-        from :attr:`s`.
-        See :meth:`Species.remove`
-
-        Parameters
-        ----------
-        item : :obj:`int` or :obj:`str`
-            Index or name of the :obj:`Specimen` to be edited
-        """
-        self.s.remove(item)
-        return
-
     # Todo Choose between step size or number of time steps
     # Todo remove calculations per time step -> adaptive RungeKutta
     def setup_time_grid(self,
@@ -329,22 +254,20 @@ class Simulation(bp.BaseClass):
         self.save(file_address)
         hdf_file = h5py.File(file_address, mode="r+")
         # Prepare storage of results
-        # Todo move this into separate method, replace results?
-        key = "results"
+        # Todo move this into save method attr t = 0
+        #  -> means no computation done?
+        key = "Results"
         hdf_file.create_group(key)
         hdf_group = hdf_file[key]
         # store index of current time step
         hdf_group.attrs["t"] = 1
         # set up separate subgroup for each species
-        for species_name in self.s.names:
-            hdf_group.create_group(species_name)
-            spc_group = hdf_group[species_name]
-            spc_results = self.shape_of_results[species_name]
+        shapes = self.shape_of_results
+        for s in self.sv.species:
+            hdf_group.create_group(str(s))
             # set up separate dataset for each moment
-            for (name, shape) in spc_results.items():
-                spc_group.create_dataset(name,
-                                         shape=shape,
-                                         dtype=float)
+            for (name, shape) in shapes[s].items():
+                hdf_group[str(s)].create_dataset(name, shape=shape, dtype=float)
 
         # Generate Computation data
         data = bp.Data(self.file_address)
@@ -367,13 +290,13 @@ class Simulation(bp.BaseClass):
         return
 
     def write_results(self, data, tw_idx, hdf_group):
-        for (s, species_name) in enumerate(self.s.names):
+        for s in self.sv.species:
             (beg, end) = self.sv.index_range[s]
             spc_state = data.state[..., beg:end]
             dv = self.sv.vGrids[s].physical_spacing
-            mass = self.s.mass[s]
+            mass = self.sv.masses[s]
             velocities = self.sv.vGrids[s].pG
-            spc_group = hdf_group[species_name]
+            spc_group = hdf_group[str(s)]
             # particle_number
             particle_number = bp_o.particle_number(spc_state, dv)
             spc_group["particle_number"][tw_idx] = particle_number
@@ -426,7 +349,7 @@ class Simulation(bp.BaseClass):
     #             Animation             #
     #####################################
     def animate(self, shape=(3, 2), moments=None):
-        hdf_group = self.file["results"]
+        hdf_group = self.file["Results"]
         tmax = int(hdf_group.attrs["t"])
         figure = bp_af.AnimatedFigure(tmax=tmax)
         if moments is None:
@@ -444,8 +367,8 @@ class Simulation(bp.BaseClass):
         for (m, moment) in enumerate(moments):
             ax = figure.add_subplot(shape + (1 + m,),
                                     title=moment)
-            for species_name in self.s.names:
-                spc_group = hdf_group[species_name]
+            for s in self.sv.species:
+                spc_group = hdf_group[str(s)]
                 if spc_group[moment].ndim == 2:
                     ydata = spc_group[moment][0:tmax, 1:-1]
                 elif spc_group[moment].ndim == 3:
@@ -479,9 +402,6 @@ class Simulation(bp.BaseClass):
         file = h5py.File(file_address, mode='r')
         assert file.attrs["class"] == "Simulation"
         self = Simulation(file_address)
-
-        key = "Species"
-        self.s = bp.Species.load(file[key])
 
         key = "Time_Grid"
         self.t = bp.Grid.load(file[key])
@@ -527,11 +447,6 @@ class Simulation(bp.BaseClass):
         # Create new HDF5 file (deletes all old data, if any)
         file = h5py.File(file_address, mode='w')
         file.attrs["class"] = "Simulation"
-
-        # Save Species
-        key = "Species"
-        file.create_group(key)
-        self.s.save(file[key])
 
         # Save Time Grid
         key = "Time_Grid"
@@ -583,7 +498,6 @@ class Simulation(bp.BaseClass):
             If False, then unassigned attributes are ignored.
         """
         self.check_parameters(file_address=self.file_address,
-                              species=self.s,
                               time_grid=self.t,
                               position_grid=self.p,
                               species_velocity_grid=self.sv,
@@ -595,7 +509,6 @@ class Simulation(bp.BaseClass):
 
     @staticmethod
     def check_parameters(file_address=None,
-                         species=None,
                          time_grid=None,
                          position_grid=None,
                          species_velocity_grid=None,
@@ -610,7 +523,6 @@ class Simulation(bp.BaseClass):
         Parameters
         ----------
         file_address : :obj:`str`, optional
-        species : :obj:`Species`, optional
         time_grid : :obj:`Grid`, optional
         position_grid : :obj:`Grid`, optional
         species_velocity_grid : :obj:`SVGrid`, optional
@@ -663,10 +575,6 @@ class Simulation(bp.BaseClass):
                 hdf5_file = h5py.File(file_directory + file_root + '.hdf5', 'r')
                 assert hdf5_file.attrs["class"] == "Simulation"
 
-        if species is not None:
-            assert isinstance(species, bp.Species)
-            species.check_integrity()
-
         if time_grid is not None:
             assert isinstance(time_grid, bp.Grid)
             time_grid.check_integrity()
@@ -700,11 +608,6 @@ class Simulation(bp.BaseClass):
         """
         description = ''
         description += 'Simulation File = ' + self.file_address + '\n'
-        description += 'Species\n'
-        description += '-------\n'
-        description += '\t' + self.s.__str__().replace('\n', '\n\t')
-        description += '\n'
-        description += '\n'
         description += 'Time Data\n'
         description += '---------\n'
         time_str = self.t.__str__(write_physical_grids)
