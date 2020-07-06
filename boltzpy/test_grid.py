@@ -20,16 +20,16 @@ GRIDS["1D_large"] = bp.Grid(shape=(10000,),
                             spacing=10)
 GRIDS["2D_centered"] = bp.Grid(shape=(25, 25),
                                delta=0.1,
-                               spacing=4,
+                               spacing=6,
                                is_centered=True)
 GRIDS["3D_centered"] = bp.Grid(shape=(5, 5, 5),
                                delta=0.1,
-                               spacing=20,
+                               spacing=2,
                                is_centered=True)
 GRIDS["2D_rectangle"] = bp.Grid(shape=(9, 33),
                                 delta=0.1,
                                 spacing=4)
-GRIDS["6D_centered"] = bp.Grid(shape=(2, 3, 4, 5, 6, 7),
+GRIDS["6D_centered"] = bp.Grid(shape=(5, 3, 4, 2, 4, 3),
                                delta=0.1,
                                spacing=2,
                                is_centered=True)
@@ -55,10 +55,10 @@ def setup_file(file_address=FILE):
 #           Tests           #
 #############################
 def test_file_exists():
-    assert os.path.exists(FILE)
+    assert os.path.exists(FILE), (
+        "The test file {} is missing.".format(FILE))
 
 
-# Todo factor this out
 def test_setup_creates_same_file():
     temp_file_address = DIRECTORY + '_tmp_.hdf5'
     setup_file(temp_file_address)
@@ -70,7 +70,8 @@ def test_setup_creates_same_file():
 @pytest.mark.parametrize("group", GRIDS.keys())
 def test_hdf5_groups_exist(group):
     file = h5py.File(FILE, mode="r")
-    assert group in file.keys()
+    assert group in file.keys(), (
+        "The group {} is missing in the test file-".format(group))
 
 
 @pytest.mark.parametrize("grid_tuple", GRIDS.items())
@@ -81,17 +82,13 @@ def test_load_from_file(grid_tuple):
     new = grid_tuple[1]
     assert isinstance(old, bp.Grid)
     assert isinstance(new, bp.Grid)
-    assert old == new
+    assert old == new, (
+        "\n{}\nis not equal to\n\n{}".format(old, new)
+    )
 
 
 @pytest.mark.parametrize("grid", GRIDS.values())
 def test_get_index_on_shuffled_grid(grid):
-    # Todo allow get_idx for all dimensions
-    if grid.ndim != 2:
-        return
-    # Todo allow get_idx for rectangles
-    if len(set(grid.shape)) != 1:
-        return
     rng = np.random.default_rng()
     shuffled_idx = rng.permutation(grid.size)
     shuffled_vals = grid.iG[shuffled_idx]
@@ -100,12 +97,6 @@ def test_get_index_on_shuffled_grid(grid):
 
 @pytest.mark.parametrize("grid", GRIDS.values())
 def test_get_index_on_shifted_grid(grid):
-    # Todo allow get_idx for all dimensions
-    if grid.ndim != 2:
-        return
-    # Todo allow get_idx for rectangles
-    if len(set(grid.shape)) != 1:
-        return
     for factor in [2, 3]:
         ext_grid = grid.extension(factor)
         for shift in range(1, grid.spacing):

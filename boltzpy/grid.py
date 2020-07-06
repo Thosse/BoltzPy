@@ -153,7 +153,6 @@ class Grid(bp.BaseClass):
         return self.iv(idx) * self.delta
 
     # Todo rename do idx
-    # Todo simplify
     def get_idx(self, values):
         """Find index of given values in :attr:`iG`
         Returns -1, if the value is not in this Grid.
@@ -170,19 +169,20 @@ class Grid(bp.BaseClass):
             "values must be an np.array, not {}".format(type(values)))
         assert values.dtype == int, (
             "values must be an integer array, not {}".format(values.dtype))
-        assert len(set(self.shape)) == 1, "only works for square/cubic grids"
-        assert values.shape[-1] == self.ndim, "Only tested for 2D Velocities"
-        assert values.shape[-1] == 2, "Only tested for 2D Velocities"
+
         BAD_VALUE = -2 * self.size
         # shift Grid to start (left bottom ) at 0
         values = values - self.iG[0]
         # divide by spacing to get the position on the (x,y,z) axis
-        # sort out the values, that are not in the grid, by setting them to BAD_VALUE
-        values = np.where(values % self.spacing == 0, values // self.spacing, BAD_VALUE)
+        values = np.where(values % self.spacing == 0,
+                          values // self.spacing,
+                          BAD_VALUE)
+        # sort out the values, that are not in the grid
         values = np.where(values >= 0, values, BAD_VALUE)
-        values = np.where(values < self.shape[0], values, BAD_VALUE)
+        values = np.where(values < self.shape, values, BAD_VALUE)
         # compute the (potential) index
-        factor = np.array([self.shape[0]**i for i in reversed(range(self.ndim))], dtype=int)
+        factor = np.array([np.prod(self.shape[i+1:]) for i in range(self.ndim)],
+                          dtype=int)
         idx = values.dot(factor)
         # remove Bad Values or points that are out of bounds
         idx = np.where(idx >= 0, idx, -1)
