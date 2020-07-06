@@ -237,6 +237,19 @@ class Grid(bp.BaseClass):
         return (start + step * direction for step in steps
                 if start + step * direction in self)
 
+    def extension(self, factor):
+        # must hold grid.shape % 2 == ext_grid.shape % 2
+        if factor % 2 == 0:
+            ext_shape = factor * self.shape - (self.shape % 2)
+        else:
+            ext_shape = factor * self.shape
+        ext_grid = bp.Grid(ext_shape,
+                           self.delta,
+                           self.spacing,
+                           self.is_centered)
+        assert np.array_equal(self.shape % 2, ext_grid.shape % 2)
+        return ext_grid
+
     #####################################
     #           Visualization           #
     #####################################
