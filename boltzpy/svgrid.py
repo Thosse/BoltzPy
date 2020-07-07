@@ -9,11 +9,6 @@ class SVGrid(bp.BaseClass):
     r"""Manages the Velocity Grids of all
     :class:`~boltzpy.Species`.
 
-    .. todo::
-        - add fast method to get physical velocities from index (cython!)
-          Apply this in pG attribute.
-        - Todo Add unit tests
-        - Todo add pMG back? If no -> remove passage from docstring
 
     Note
     ----
@@ -159,9 +154,6 @@ class SVGrid(bp.BaseClass):
             assert np.all(self.iMG[global_index] == integer_value)
             return global_index
 
-    # Todo should be faster with next()
-    # Todo change name
-    # Todo delete - is it used anywhere?
     def get_specimen(self, velocity_idx):
         """Get :class:`boltzpy.Specimen` index
         of given velocity in :attr:`iMG`.
@@ -219,7 +211,6 @@ class SVGrid(bp.BaseClass):
     #####################################
     #           Serialization           #
     #####################################
-    # Todo read and write all Velocity Grids instead?
     @staticmethod
     def load(hdf5_group):
         """Set up and return a :class:`SVGrid` instance
