@@ -67,19 +67,18 @@ def test_setup_creates_same_file():
     return
 
 
-@pytest.mark.parametrize("group", GRIDS.keys())
-def test_hdf5_groups_exist(group):
+@pytest.mark.parametrize("key", GRIDS.keys())
+def test_hdf5_groups_exist(key):
     file = h5py.File(FILE, mode="r")
-    assert group in file.keys(), (
-        "The group {} is missing in the test file-".format(group))
+    assert key in file.keys(), (
+        "The group {} is missing in the test file-".format(key))
 
 
-@pytest.mark.parametrize("grid_tuple", GRIDS.items())
-def test_load_from_file(grid_tuple):
+@pytest.mark.parametrize("key", GRIDS.keys())
+def test_load_from_file(key):
     file = h5py.File(FILE, mode="r")
-    hdf_group = file[grid_tuple[0]]
-    old = bp.Grid.load(hdf_group)
-    new = grid_tuple[1]
+    old = bp.Grid.load(file[key])
+    new = GRIDS[key]
     assert isinstance(old, bp.Grid)
     assert isinstance(new, bp.Grid)
     assert old == new, (
@@ -87,16 +86,18 @@ def test_load_from_file(grid_tuple):
     )
 
 
-@pytest.mark.parametrize("grid", GRIDS.values())
-def test_get_index_on_shuffled_grid(grid):
+@pytest.mark.parametrize("key", GRIDS.keys())
+def test_get_index_on_shuffled_grid(key):
+    grid = GRIDS[key]
     rng = np.random.default_rng()
     shuffled_idx = rng.permutation(grid.size)
     shuffled_vals = grid.iG[shuffled_idx]
     assert np.all(grid.get_idx(shuffled_vals) == shuffled_idx)
 
 
-@pytest.mark.parametrize("grid", GRIDS.values())
-def test_get_index_on_shifted_grid(grid):
+@pytest.mark.parametrize("key", GRIDS.keys())
+def test_get_index_on_shifted_grid(key):
+    grid = GRIDS[key]
     for factor in [2, 3]:
         ext_grid = grid.extension(factor)
         for shift in range(1, grid.spacing):
