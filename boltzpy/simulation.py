@@ -82,7 +82,8 @@ class Simulation(bp.BaseClass):
     """
 
     def __init__(self,
-                 file_address=None):
+                 file_address=None,
+                 log_state=False):
         # set file address (using a setter method)
         [self._file_directory, self._file_name] = ['', '']
         self.file_address = file_address
@@ -92,6 +93,7 @@ class Simulation(bp.BaseClass):
         self.sv = bp.SVGrid([1], [[2, 2]], 1.0, [2], [[1]])
         self.coll = bp.Collisions()
         self.scheme = bp.Scheme()
+        self.log_state = np.bool(log_state)
         self.check_integrity(complete_check=False)
         return
 
@@ -252,28 +254,16 @@ class Simulation(bp.BaseClass):
             file_address = self.file_address
         # Save current state to a hdf file
         self.save(file_address)
-        hdf_file = h5py.File(file_address, mode="r+")
-        # Prepare storage of results
-        # Todo move this into save method attr t = 0
-        #  -> means no computation done?
-        key = "Results"
-        hdf_file.create_group(key)
-        hdf_group = hdf_file[key]
-        # store index of current time step
-        hdf_group.attrs["t"] = 1
-        # set up separate subgroup for each species
-        shapes = self.shape_of_results
-        for s in self.sv.species:
-            hdf_group.create_group(str(s))
-            # set up separate dataset for each moment
-            for (name, shape) in shapes[s].items():
-                hdf_group[str(s)].create_dataset(name, shape=shape, dtype=float)
+        file = h5py.File(file_address, mode="r+")
+        results = file["Results"]
 
+        # Todo remove Data, move into Simulation
         # Generate Computation data
         data = bp.Data(self.file_address)
         data.check_stability_conditions()
 
         print('Start Computation:')
+        results.attrs["t"] = 1
         time_tracker = h_tt.TimeTracker()
         # Todo this might be buggy, if data.tG changes
         # Todo e.g. in adaptive time schemes
@@ -283,8 +273,8 @@ class Simulation(bp.BaseClass):
                 bp_cp.operator_splitting(data,
                                          self.geometry.transport,
                                          self.geometry.collision)
-            self.write_results(data, tw_idx, hdf_group)
-            hdf_file.flush()
+            self.write_results(data, tw_idx, results)
+            file.flush()
             # print time estimate
             time_tracker.print(tw, data.tG[-1, 0])
         return
@@ -307,7 +297,6 @@ class Simulation(bp.BaseClass):
                                                velocities,
                                                particle_number)
             spc_group["mean_velocity"][tw_idx] = mean_velocity
-
             # temperature
             temperature = bp_o.temperature(spc_state,
                                            dv,
@@ -316,7 +305,6 @@ class Simulation(bp.BaseClass):
                                            particle_number,
                                            mean_velocity)
             spc_group["temperature"][tw_idx] = temperature
-
             # momentum
             spc_group["momentum"][tw_idx] = bp_o.momentum(
                 spc_state,
@@ -341,6 +329,9 @@ class Simulation(bp.BaseClass):
                 dv,
                 velocities,
                 mass)
+            # complete distribution
+            if self.log_state:
+                spc_group["state"][tw_idx] = data.state[..., beg:end]
         # update index of current time step
         hdf_group.attrs["t"] = tw_idx + 1
         return
@@ -418,6 +409,9 @@ class Simulation(bp.BaseClass):
         key = "Scheme"
         self.scheme = bp.Scheme.load(file[key])
 
+        key = "log_state"
+        self.log_state = np.bool(file.attrs[key][()])
+
         file.close()
         self.check_integrity(complete_check=False)
         return self
@@ -448,30 +442,44 @@ class Simulation(bp.BaseClass):
         file = h5py.File(file_address, mode='w')
         file.attrs["class"] = "Simulation"
 
-        # Save Time Grid
         key = "Time_Grid"
         file.create_group(key)
         self.t.save(file[key])
 
-        # Save Geometry
         key = "Geometry"
         file.create_group(key)
         self.geometry.save(file[key])
 
-        # Save Velocity Grids
         key = "Velocity_Grids"
         file.create_group(key)
         self.sv.save(file[key])
 
-        # Save Collisions
         key = "Collisions"
         file.create_group(key)
         self.coll.save(file[key])
 
-        # Save Scheme
         key = "Scheme"
         file.create_group(key)
         self.scheme.save(file[key])
+
+        key = "log_state"
+        file.attrs[key] = self.log_state
+
+        key = "Results"
+        file.create_group(key)
+        # store index of current time step
+        file[key].attrs["t"] = 0
+        # set up separate subgroup for each species
+        shapes = self.shape_of_results
+        for s in self.sv.species:
+            file[key].create_group(str(s))
+            grp_spc = file[key][str(s)]
+            # set up separate dataset for each moment
+            for (name, shape) in shapes[s].items():
+                grp_spc.create_dataset(name, shape=shape, dtype=float)
+            if self.log_state:
+                shape = (self.t.size, self.p.size, self.sv.vGrids[s].size)
+                grp_spc.create_dataset("state", shape, dtype=float)
 
         # assert that the instance can be reconstructed from the save
         other = self.load(file_address)

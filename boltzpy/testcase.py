@@ -11,8 +11,9 @@ class TestCase(bp.Simulation):
                  sv=None,
                  coll=None,
                  geometry=None,
-                 scheme=None):
-        super().__init__(file_address)
+                 scheme=None,
+                 log_state=True):
+        super().__init__(file_address, log_state=log_state)
 
         if t is None:
             t = bp.Grid(shape=(5,),
@@ -92,27 +93,6 @@ class TestCase(bp.Simulation):
         """
         return self.default_directory + '_tmp_.hdf5'
 
-    @property
-    def shape_of_results(self):
-        shape_of_results = super().shape_of_results
-        for s in self.sv.species:
-            [beg, end] = self.sv.index_range[s]
-            velocities = end - beg
-            shape = (self.t.size, self.p.size, velocities)
-            shape_of_results[s]['state'] = shape
-        return shape_of_results
-
-    def write_results(self, data, tw_idx, hdf_group):
-        super().write_results(data, tw_idx, hdf_group)
-        for s in self.sv.species:
-            (beg, end) = self.sv.index_range[s]
-            spc_group = hdf_group[str(s)]
-            # complete distribution
-            spc_group["state"][tw_idx] = data.state[..., beg:end]
-        # update index of current time step
-        hdf_group.attrs["t"] = tw_idx + 1
-        return
-
     @staticmethod
     def load(file_address):
         """Set up and return a :class:`TestCase` instance
@@ -174,6 +154,10 @@ CASES.append(TestCase("shock_2species_convergent",
 
 FILES = [tc.file_address for tc in CASES]
 
+
+# for tc in FILES:
+#     import h5py
+#     h5py.File(tc).attrs["log_state"] = True
 
 ################################################################################
 #                                   Main                                       #
