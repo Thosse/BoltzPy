@@ -13,13 +13,10 @@ class TestCase(bp.Simulation):
                  geometry=None,
                  scheme=None,
                  log_state=True):
-        super().__init__(file_address, log_state=log_state)
-
         if t is None:
             t = bp.Grid(shape=(5,),
                         delta=0.01/3,
                         spacing=3)
-        self.t = t
 
         if sv is None:
             sv = bp.SVGrid([2, 3],
@@ -27,7 +24,6 @@ class TestCase(bp.Simulation):
                            1/8,
                            [6, 4],
                            [[50, 50], [50, 50]])
-        self.sv = sv
 
         if geometry is None:
             left_rho = 2*np.ones(sv.specimen)
@@ -66,7 +62,6 @@ class TestCase(bp.Simulation):
                     surface_normal=np.array([1, 0], dtype=int))
                 ]
             geometry = bp.Geometry(shape=(6,), delta=0.5, rules=rules)
-        self.geometry = geometry
 
         if scheme is None:
             scheme = bp.Scheme(OperatorSplitting="FirstOrder",
@@ -74,12 +69,12 @@ class TestCase(bp.Simulation):
                                Transport_VelocityOffset=np.array([-0.2, 0.0]),
                                Collisions_Generation="UniformComplete",
                                Collisions_Computation="EulerScheme")
-        self.scheme = scheme
 
         if coll is None:
             coll = bp.Collisions()
-            coll.setup(scheme=self.scheme, model=self.sv)
-        self.coll = coll
+            coll.setup(scheme=scheme, model=sv)
+
+        super().__init__(t, geometry, sv, coll, scheme, file_address, log_state)
         return
 
     @property

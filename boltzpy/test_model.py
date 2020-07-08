@@ -99,3 +99,7 @@ def test_load_from_file(key):
 #  Implement collisions only for specimen tuples
 #  -> no need for get_specimen
 #  -> no need for find_index
+
+# Todo __get__ für model -> nach species index
+#  + Grid __get__ nach index -> arbeiten mit lokalen indices möglich
+#  + für (get_)idx(specimen, indices) hinzu -Y generiert globale indices

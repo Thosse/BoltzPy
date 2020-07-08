@@ -20,8 +20,6 @@ class Simulation(bp.BaseClass):
 
 
     .. todo::
-        - write __isequal__ magic methods for configuration (and subclasses)
-        - write unittests for save/load(__init__) methods
         - Add Knudsen Number Attribute or Property?
 
             * Add method to get candidate for characteristic length
@@ -82,17 +80,22 @@ class Simulation(bp.BaseClass):
     """
 
     def __init__(self,
+                 t,
+                 geometry,
+                 sv,
+                 coll,
+                 scheme,
                  file_address=None,
                  log_state=False):
         # set file address (using a setter method)
         [self._file_directory, self._file_name] = ['', '']
         self.file_address = file_address
 
-        self.t = bp.Grid((1,), 1.0, 2)
-        self.geometry = bp.Geometry((1,), 1.0, [])
-        self.sv = bp.SVGrid([1], [[2, 2]], 1.0, [2], [[1]])
-        self.coll = bp.Collisions()
-        self.scheme = bp.Scheme()
+        self.t = t
+        self.geometry = geometry
+        self.sv = sv
+        self.coll = coll
+        self.scheme = scheme
         self.log_state = np.bool(log_state)
         self.check_integrity(complete_check=False)
         return
@@ -172,67 +175,6 @@ class Simulation(bp.BaseClass):
         Total number of :class:`initialization rules <Rule>` set up so far.
         """
         return self.geometry.rules.size
-
-    @property
-    def is_configured(self):
-        """:obj:`bool` :
-        True, if all necessary attributes of the instance are set.
-        False Otherwise.
-        """
-        return self.scheme.is_configured
-
-    @property
-    def is_set_up(self):
-        """:obj:`bool` :
-        True, if the instance is completely set up and ready to call :meth:`~Simulation.run_computation`.
-        False Otherwise.
-        """
-        # Todo add initial_distribution
-        return (self.geometry.is_set_up
-                and self.coll.is_set_up)
-
-    #############################
-    #       Configuration       #
-    #############################
-    # Todo Choose between step size or number of time steps
-    # Todo remove calculations per time step -> adaptive RungeKutta
-    def setup_time_grid(self,
-                        max_time,
-                        number_time_steps,
-                        calculations_per_time_step=1):
-        """Set up :attr:`t`.
-
-        Calculate step size and call :class:`Grid() <Grid>`.
-
-        Parameters
-        ----------
-        max_time : :obj:`float`
-        number_time_steps : :obj:`int`
-        calculations_per_time_step : :obj:`int`
-        """
-        step_size = max_time / (number_time_steps - 1)
-        self.t = bp.Grid(shape=(number_time_steps,),
-                         delta=step_size / calculations_per_time_step,
-                         spacing=calculations_per_time_step)
-        return
-
-    def setup_position_grid(self,
-                            grid_shape,
-                            grid_spacing):
-        """Set up :attr:`p` and adjust :attr:`geometry` to the new shape.
-        See :class:`Grid() <Grid>`
-
-        Parameters
-        ----------
-        grid_shape : :obj:`tuple` [:obj:`int`]
-        grid_spacing : :obj:`float`
-        """
-        self.geometry = bp.Geometry(
-            shape=grid_shape,
-            delta=grid_spacing,
-            rules=[]
-        )
-        return
 
     #####################################
     #            Computation            #
@@ -392,27 +334,15 @@ class Simulation(bp.BaseClass):
         # Open HDF5 file
         file = h5py.File(file_address, mode='r')
         assert file.attrs["class"] == "Simulation"
-        self = Simulation(file_address)
 
-        key = "Time_Grid"
-        self.t = bp.Grid.load(file[key])
+        t = bp.Grid.load(file["Time_Grid"])
+        geometry = bp.Geometry.load(file["Geometry"])
+        sv = bp.SVGrid.load(file["Velocity_Grids"])
+        coll = bp.Collisions.load(file["Collisions"])
+        scheme = bp.Scheme.load(file["Scheme"])
+        log_state = np.bool(file.attrs["log_state"][()])
 
-        key = "Geometry"
-        self.geometry = bp.Geometry.load(file[key])
-
-        key = "Velocity_Grids"
-        self.sv = bp.SVGrid.load(file[key])
-
-        key = "Collisions"
-        self.coll = bp.Collisions.load(file[key])
-
-        key = "Scheme"
-        self.scheme = bp.Scheme.load(file[key])
-
-        key = "log_state"
-        self.log_state = np.bool(file.attrs[key][()])
-
-        file.close()
+        self = Simulation(t, geometry, sv, coll, scheme, file_address, log_state)
         self.check_integrity(complete_check=False)
         return self
 
@@ -441,29 +371,23 @@ class Simulation(bp.BaseClass):
         # Create new HDF5 file (deletes all old data, if any)
         file = h5py.File(file_address, mode='w')
         file.attrs["class"] = "Simulation"
+        file.attrs["log_state"] = self.log_state
 
         key = "Time_Grid"
         file.create_group(key)
         self.t.save(file[key])
-
         key = "Geometry"
         file.create_group(key)
         self.geometry.save(file[key])
-
         key = "Velocity_Grids"
         file.create_group(key)
         self.sv.save(file[key])
-
         key = "Collisions"
         file.create_group(key)
         self.coll.save(file[key])
-
         key = "Scheme"
         file.create_group(key)
         self.scheme.save(file[key])
-
-        key = "log_state"
-        file.attrs[key] = self.log_state
 
         key = "Results"
         file.create_group(key)
@@ -484,6 +408,7 @@ class Simulation(bp.BaseClass):
         # assert that the instance can be reconstructed from the save
         other = self.load(file_address)
         # if a different file name is given then, the check MUST fail
+        # Todo implement proper __eq__ method
         if file_address == self.file_address:
             assert self == other
         else:
