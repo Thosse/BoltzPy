@@ -79,17 +79,6 @@ class Rule(bp.BaseClass):
         """
         raise NotImplementedError
 
-    @staticmethod
-    def get_subclass(behaviour_type):
-        if behaviour_type == 'InnerPointRule':
-            return InnerPointRule
-        elif behaviour_type == 'ConstantPointRule':
-            return ConstantPointRule
-        elif behaviour_type == 'BoundaryPointRule':
-            return BoundaryPointRule
-        else:
-            raise NotImplementedError
-
     @property
     def ndim(self):
         return self.initial_drift.shape[1]
@@ -206,11 +195,10 @@ class Rule(bp.BaseClass):
         self : :class:`Rule`
         """
         assert isinstance(hdf5_group, h5py.Group)
-        assert hdf5_group.attrs["class"] == "Rule"
+        assert hdf5_group.attrs["class"] in SUBCLASSES.keys()
 
         # choose derived class for new rule
-        behaviour_type = hdf5_group.attrs["behaviour_type"]
-        rule_class = bp.Rule.get_subclass(behaviour_type)
+        rule_class = SUBCLASSES[hdf5_group.attrs["class"]]
 
         # read parameters from file
         params = dict()
@@ -236,9 +224,7 @@ class Rule(bp.BaseClass):
         # Clean State of Current group
         for key in hdf5_group.keys():
             del hdf5_group[key]
-        hdf5_group.attrs["class"] = "Rule"
-        # save derived class of rule
-        hdf5_group.attrs["behaviour_type"] = self.subclass
+        hdf5_group.attrs["class"] = self.__class__.__name__
 
         # write attributes to file
         for (key, value) in self.__dict__.items():
@@ -753,3 +739,12 @@ class BoundaryPointRule(Rule):
                         "Any Reflection applied twice, must return the original."
                         "idx_array[idx_array]:\n{}".format(idx_array[idx_array])
                     )
+
+
+#: :obj:`dict` [:obj:`str`]:
+#: Links the subclass property to to the class instance.
+SUBCLASSES = {
+    'InnerPointRule': InnerPointRule,
+    'ConstantPointRule': ConstantPointRule,
+    'BoundaryPointRule': BoundaryPointRule
+}
