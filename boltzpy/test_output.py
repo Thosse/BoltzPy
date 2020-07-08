@@ -11,8 +11,7 @@ import boltzpy.output as bp_o
 def test_particle_number(tf):
     simulation = bp.Simulation.load(tf)
     # load results
-    hdf_file = h5py.File(tf, mode="r")
-    hdf_group = hdf_file["Results"]
+    hdf_group = tf["Results"]
     for s in simulation.sv.species:
         dv = simulation.sv.vGrids[s].physical_spacing
         spc_group = hdf_group[str(s)]
@@ -27,8 +26,7 @@ def test_particle_number(tf):
 def test_mean_velocity(tf):
     simulation = bp.Simulation.load(tf)
     # load results
-    hdf_file = h5py.File(tf, mode="r")
-    hdf_group = hdf_file["Results"]
+    hdf_group = tf["Results"]
     for s in simulation.sv.species:
         dv = simulation.sv.vGrids[s].physical_spacing
         velocities = simulation.sv.vGrids[s].pG
@@ -48,8 +46,7 @@ def test_mean_velocity(tf):
 def test_temperature(tf):
     simulation = bp.Simulation.load(tf)
     # load results
-    hdf_file = h5py.File(tf, mode="r")
-    hdf_group = hdf_file["Results"]
+    hdf_group = tf["Results"]
     assert simulation.sv.specimen > 0
     for s in simulation.sv.species:
         dv = simulation.sv.vGrids[s].physical_spacing
@@ -75,8 +72,7 @@ def test_temperature(tf):
 def test_momentum(tf):
     simulation = bp.Simulation.load(tf)
     # load results
-    hdf_file = h5py.File(tf, mode="r")
-    hdf_group = hdf_file["Results"]
+    hdf_group = tf["Results"]
     for s in simulation.sv.species:
         dv = simulation.sv.vGrids[s].physical_spacing
         mass = simulation.sv.masses[s]
@@ -96,8 +92,7 @@ def test_momentum(tf):
 def test_energy(tf):
     simulation = bp.Simulation.load(tf)
     # load results
-    hdf_file = h5py.File(tf, mode="r")
-    hdf_group = hdf_file["Results"]
+    hdf_group = tf["Results"]
     for s in simulation.sv.species:
         dv = simulation.sv.vGrids[s].physical_spacing
         mass = simulation.sv.masses[s]
@@ -117,8 +112,7 @@ def test_energy(tf):
 def test_momentum_flow(tf):
     simulation = bp.Simulation.load(tf)
     # load results
-    hdf_file = h5py.File(tf, mode="r")
-    hdf_group = hdf_file["Results"]
+    hdf_group = tf["Results"]
     for s in simulation.sv.species:
         dv = simulation.sv.vGrids[s].physical_spacing
         mass = simulation.sv.masses[s]
@@ -138,8 +132,7 @@ def test_momentum_flow(tf):
 def test_energy_flow(tf):
     simulation = bp.Simulation.load(tf)
     # load results
-    hdf_file = h5py.File(tf, mode="r")
-    hdf_group = hdf_file["Results"]
+    hdf_group = tf["Results"]
     for s in simulation.sv.species:
         dv = simulation.sv.vGrids[s].physical_spacing
         mass = simulation.sv.masses[s]

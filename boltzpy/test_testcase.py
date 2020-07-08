@@ -10,15 +10,15 @@ import h5py
 @pytest.mark.parametrize("tc", bp_t.CASES)
 def test_file_exists(tc):
     assert isinstance(tc, bp_t.TestCase)
-    assert os.path.exists(tc.file_address)
+    assert os.path.exists(tc.file.filename)
 
 
 @pytest.mark.parametrize("tc", bp_t.CASES)
 def test_file_initializes_the_correct_simulation(tc):
-    sim = bp.Simulation.load(tc.file_address)
-    assert sim.__eq__(tc, True)
-    assert not tc.__eq__(sim, False)
-    new_tc = bp_t.TestCase.load(tc.file_address)
+    sim = bp.Simulation.load(tc.file)
+    assert sim.__eq__(tc)
+    assert not tc.__eq__(sim)
+    new_tc = bp_t.TestCase.load(tc.file)
     assert new_tc == tc
 
 
@@ -31,10 +31,10 @@ def test_new_file_is_equal_to_current_one(tc):
         os.remove(tc.temporary_file)
 
     # create new file with results
-    tc.compute(tc.temporary_file)
+    tc.compute(h5py.File(tc.temporary_file, mode='w'))
     # load old and new data
     new_file = h5py.File(tc.temporary_file, mode='r')
-    old_file = h5py.File(tc.file_address, mode='r')
+    old_file = tc.file
     # get all keys of the files
     new_keys = get_all_keys(new_file)
     old_keys = get_all_keys(old_file)

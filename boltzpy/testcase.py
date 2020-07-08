@@ -2,11 +2,12 @@
 import boltzpy as bp
 import numpy as np
 import os
+import h5py
 
 
 class TestCase(bp.Simulation):
     def __init__(self,
-                 file_address,
+                 file,
                  t=None,
                  sv=None,
                  coll=None,
@@ -74,7 +75,9 @@ class TestCase(bp.Simulation):
             coll = bp.Collisions()
             coll.setup(scheme=scheme, model=sv)
 
-        super().__init__(t, geometry, sv, coll, scheme, file_address, log_state)
+        if isinstance(file, str):
+            file = h5py.File(self.default_directory + file + ".hdf5", mode='r+')
+        super().__init__(t, geometry, sv, coll, scheme, log_state, file)
         return
 
     @property
@@ -89,25 +92,23 @@ class TestCase(bp.Simulation):
         return self.default_directory + '_tmp_.hdf5'
 
     @staticmethod
-    def load(file_address):
+    def load(file):
         """Set up and return a :class:`TestCase` instance
         based on the parameters in the given HDF5 group.
 
         Parameters
         ----------
-        file_address : :obj:`str`, optional
-            The full path to the simulation (hdf5) file.
+        file : :obj:`h5py.Group <h5py:Group>`
 
         Returns
         -------
         self : :class:`TestCase`
         """
-        simulation = bp.Simulation.load(file_address)
+        simulation = bp.Simulation.load(file)
         # ignore private attributes
         params = {key: value
                   for (key, value) in simulation.__dict__.items()
                   if key[0] != "_"}
-        params["file_address"] = simulation.file_address
         self = TestCase(**params)
         self.check_integrity(complete_check=False)
         return self
@@ -147,7 +148,7 @@ convergent_scheme = bp.Scheme(OperatorSplitting="FirstOrder",
 CASES.append(TestCase("shock_2species_convergent",
                       scheme=convergent_scheme))
 
-FILES = [tc.file_address for tc in CASES]
+FILES = [tc.file for tc in CASES]
 
 
 # for tc in FILES:
@@ -162,10 +163,10 @@ def replace_all_tests():
                 "You are about to replace all test cases (yes/no)")
     if msg == "yes":
         for tc in CASES:
-            print("TestCase = ", tc.file_address)
+            print("TestCase = ", tc.file.filename)
             assert isinstance(tc, TestCase)
-            if os.path.isfile(tc.file_address):
-                os.remove(tc.file_address)
+            if os.path.isfile(tc.file.filename):
+                os.remove(tc.file.filename)
             tc.compute()
     else:
         print("Aborted replacing testcases!")

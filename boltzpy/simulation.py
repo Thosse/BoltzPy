@@ -58,14 +58,6 @@ class Simulation(bp.BaseClass):
         * :attr:`t.spacing` denotes the number of calculation steps
           between two writes.
 
-    Parameters
-    ----------
-    file_address : :obj:`str`, optional
-        Address of the simulation file.
-        Can be either a full path, a base file name or a file root.
-        If no full path is given, then the file is placed in the
-        :attr:`~boltzpy.constants.DEFAULT_DIRECTORY`.
-
     Attributes
     ----------
     t : :class:`Grid`
@@ -85,18 +77,24 @@ class Simulation(bp.BaseClass):
                  sv,
                  coll,
                  scheme,
-                 file_address=None,
-                 log_state=False):
-        # set file address (using a setter method)
-        [self._file_directory, self._file_name] = ['', '']
-        self.file_address = file_address
-
+                 log_state=False,
+                 file=None):
         self.t = t
         self.geometry = geometry
         self.sv = sv
         self.coll = coll
         self.scheme = scheme
         self.log_state = np.bool(log_state)
+        if file is None:
+            idx = 0
+            while True:
+                idx += 1
+                file_path = __file__[:-21] + 'Simulations/' + str(idx) + ".hdf5"
+                if not os.path.exists(file_path):
+                    break
+            file = h5py.File(file_path, mode='w')
+        self.file = file
+
         self.check_integrity(complete_check=False)
         return
 
@@ -114,44 +112,6 @@ class Simulation(bp.BaseClass):
     @property
     def rule_arr(self):
         return self.geometry.rules
-
-    @property
-    def default_directory(self):
-        return __file__[:-21] + 'Simulations/'
-
-    @property
-    def file_address(self):
-        """:obj:`str` :
-        Full path of the :class:`Simulation` file.
-        """
-        return self._file_directory + self._file_name
-
-    @file_address.setter
-    def file_address(self, address):
-        if address is None:
-            self._file_directory = self.default_directory
-            idx = 0
-            self._file_name = str(idx) + ".hdf5"
-            while os.path.exists(self.file_address):
-                idx += 1
-                self._file_name = str(idx) + ".hdf5"
-        else:
-            # separate file directory and file root
-            begin_filename = address.rfind("/") + 1
-            self._file_directory = address[0: begin_filename]
-            self._file_name = address[begin_filename:]
-            # if no directory given -> put it in the default directory
-            if self._file_directory == '':
-                self._file_directory = self.default_directory
-            # remove hdf5 ending, if any
-            if self._file_name[-5:] != '.hdf5':
-                self._file_name = self._file_name + ".hdf5"
-        self.check_parameters(file_address=self.file_address)
-        return
-
-    @property
-    def file(self):
-        return h5py.File(self.file_address, mode="r+")
 
     # Todo make this an array(obj) of tuples, remove specimen folders?
     @property
@@ -179,29 +139,21 @@ class Simulation(bp.BaseClass):
     #####################################
     #            Computation            #
     #####################################
-    # Todo write hash function in Computation folder
-    #     file = h5py.File(self.file_address + '.hdf5')
-    #     # hash = file["Computation"].attrs["Hash_Value"]
-    #     # Todo define hashing method
-    #     assert hash == self.__hash__()
-    #     print("The saved results are up to date!"
-    #           "A new computation is not necessary")
-    #     return
-    # else (KeyError, AssertionError):
     def compute(self,
-                file_address=None):
+                hdf_group=None):
         """Compute the fully configured Simulation"""
         self.check_integrity()
-        if file_address is None:
-            file_address = self.file_address
-        # Save current state to a hdf file
-        self.save(file_address)
-        file = h5py.File(file_address, mode="r+")
-        results = file["Results"]
+        if hdf_group is None:
+            hdf_group = self.file
+        assert isinstance(hdf_group, h5py.Group)
+        # Save current state to the file
+        self.save(hdf_group)
+        results = hdf_group["Results"]
+        file = hdf_group.file
 
         # Todo remove Data, move into Simulation
         # Generate Computation data
-        data = bp.Data(self.file_address)
+        data = bp.Data(hdf_group)
         data.check_stability_conditions()
 
         print('Start Computation:')
@@ -309,30 +261,26 @@ class Simulation(bp.BaseClass):
                 else:
                     raise Exception
                 ax.plot(xdata, ydata)
-        figure.save(self.file_address[:-5] + '.mp4')
+        figure.save(self.file.file.filename[:-5] + '.mp4')
         return
 
     #####################################
     #           Serialization           #
     #####################################
     @staticmethod
-    def load(file_address):
+    def load(file):
         """Set up and return a :class:`Simulation` instance
         based on the parameters in the given HDF5 group.
 
         Parameters
         ----------
-        file_address : :obj:`str`, optional
-            The full path to the simulation (hdf5) file.
+        file : :obj:`h5py.Group <h5py:Group>`
 
         Returns
         -------
         self : :class:`Simulation`
         """
-        assert isinstance(file_address, str)
-        assert os.path.exists(file_address)
-        # Open HDF5 file
-        file = h5py.File(file_address, mode='r')
+        assert isinstance(file, h5py.Group)
         assert file.attrs["class"] == "Simulation"
 
         t = bp.Grid.load(file["Time_Grid"])
@@ -342,62 +290,55 @@ class Simulation(bp.BaseClass):
         scheme = bp.Scheme.load(file["Scheme"])
         log_state = np.bool(file.attrs["log_state"][()])
 
-        self = Simulation(t, geometry, sv, coll, scheme, file_address, log_state)
+        self = Simulation(t, geometry, sv, coll, scheme, log_state, file)
         self.check_integrity(complete_check=False)
         return self
 
-    def save(self, file_address=None):
+    def save(self, hdf_group=None):
         """Write all parameters of the :class:`Simulation` instance
         to a HDF5 file.
 
         Parameters
         ----------
-        file_address : :obj:`str`, optional
-            Is either a full path, a base file name or a file root.
-            If it is a base file name or a file root,
-            then the file is placed in the
-            :attr:`~Simulation.default_directory`.
+        hdf_group : :obj:`h5py.Group <h5py:Group>`
         """
-        # Change Simulation.file_name, if file_address is given
-        if file_address is None:
-            file_address = self.file_address
-        else:
-            assert isinstance(file_address, str)
-            if file_address != self.file_address:
-                assert not os.path.exists(file_address)
-        # Sanity Check before saving
         self.check_integrity(False)
+        if hdf_group is None:
+            hdf_group = self.file
+        assert isinstance(hdf_group, h5py.Group)
+        assert hdf_group.file.mode == "r+"
+        # delete all current group content
+        for key in hdf_group.keys():
+            del hdf_group[key]
 
-        # Create new HDF5 file (deletes all old data, if any)
-        file = h5py.File(file_address, mode='w')
-        file.attrs["class"] = "Simulation"
-        file.attrs["log_state"] = self.log_state
+        hdf_group.attrs["class"] = "Simulation"
+        hdf_group.attrs["log_state"] = self.log_state
 
         key = "Time_Grid"
-        file.create_group(key)
-        self.t.save(file[key])
+        hdf_group.create_group(key)
+        self.t.save(hdf_group[key])
         key = "Geometry"
-        file.create_group(key)
-        self.geometry.save(file[key])
+        hdf_group.create_group(key)
+        self.geometry.save(hdf_group[key])
         key = "Velocity_Grids"
-        file.create_group(key)
-        self.sv.save(file[key])
+        hdf_group.create_group(key)
+        self.sv.save(hdf_group[key])
         key = "Collisions"
-        file.create_group(key)
-        self.coll.save(file[key])
+        hdf_group.create_group(key)
+        self.coll.save(hdf_group[key])
         key = "Scheme"
-        file.create_group(key)
-        self.scheme.save(file[key])
+        hdf_group.create_group(key)
+        self.scheme.save(hdf_group[key])
 
         key = "Results"
-        file.create_group(key)
+        hdf_group.create_group(key)
         # store index of current time step
-        file[key].attrs["t"] = 0
+        hdf_group[key].attrs["t"] = 0
         # set up separate subgroup for each species
         shapes = self.shape_of_results
         for s in self.sv.species:
-            file[key].create_group(str(s))
-            grp_spc = file[key][str(s)]
+            hdf_group[key].create_group(str(s))
+            grp_spc = hdf_group[key][str(s)]
             # set up separate dataset for each moment
             for (name, shape) in shapes[s].items():
                 grp_spc.create_dataset(name, shape=shape, dtype=float)
@@ -406,14 +347,10 @@ class Simulation(bp.BaseClass):
                 grp_spc.create_dataset("state", shape, dtype=float)
 
         # assert that the instance can be reconstructed from the save
-        other = self.load(file_address)
+        other = self.load(hdf_group)
         # if a different file name is given then, the check MUST fail
         # Todo implement proper __eq__ method
-        if file_address == self.file_address:
-            assert self == other
-        else:
-            assert not self == other
-        file.close()
+        assert self.__eq__(other, ignore=["file"])
         return
 
     #####################################
@@ -430,8 +367,7 @@ class Simulation(bp.BaseClass):
             If True, then all attributes must be assigned (not None).
             If False, then unassigned attributes are ignored.
         """
-        self.check_parameters(file_address=self.file_address,
-                              time_grid=self.t,
+        self.check_parameters(time_grid=self.t,
                               position_grid=self.p,
                               species_velocity_grid=self.sv,
                               geometry=self.geometry,
@@ -441,8 +377,7 @@ class Simulation(bp.BaseClass):
         return
 
     @staticmethod
-    def check_parameters(file_address=None,
-                         time_grid=None,
+    def check_parameters(time_grid=None,
                          position_grid=None,
                          species_velocity_grid=None,
                          geometry=None,
@@ -455,8 +390,7 @@ class Simulation(bp.BaseClass):
 
         Parameters
         ----------
-        file_address : :obj:`str`, optional
-        time_grid : :obj:`Grid`, optional
+       time_grid : :obj:`Grid`, optional
         position_grid : :obj:`Grid`, optional
         species_velocity_grid : :obj:`SVGrid`, optional
         geometry: :class:`Geometry`, optional
@@ -469,45 +403,13 @@ class Simulation(bp.BaseClass):
         """
         if context is not None:
             assert isinstance(context, Simulation)
-
+        # Todo Test self.file and self.log_state
         # For complete check, assert that all parameters are assigned
         assert isinstance(complete_check, bool)
         if complete_check is True:
             assert all([param is not None for param in locals().values()])
 
         # check all parameters, if set
-        if file_address is not None:
-            assert isinstance(file_address, str)
-            pos_of_file_root = file_address.rfind("/") + 1
-            file_root = file_address[pos_of_file_root:]
-            file_directory = file_address[0:pos_of_file_root]
-            # assert non empty root and directory
-            assert file_directory != ""
-            assert file_root != ""
-            # assert the file directory exists and is a directory
-            assert (os.path.exists(file_directory)
-                    and os.path.isdir(file_directory)), \
-                "No such directory: {}".format(file_directory)
-            # assert write access to directory
-            assert os.access(file_directory, os.W_OK), \
-                "No write access to directory {}".format(file_directory)
-            # Assert Validity of characters
-            for char in bp_c.INVALID_CHARACTERS:
-                assert char not in file_root, \
-                    "The provided file root is invalid:\n" \
-                    "It contains invalid characters: '{}'" \
-                    "{}".format(char, file_root)
-                if char == "/":  # ignore '/' for directory
-                    continue
-                assert char not in file_directory, \
-                    "The provided file directory is invalid:\n" \
-                    "It contains invalid characters: '{}'" \
-                    "{}".format(char, file_directory)
-            # Assert file is a simulation file
-            if os.path.exists(file_directory + file_root + '.hdf5'):
-                hdf5_file = h5py.File(file_directory + file_root + '.hdf5', 'r')
-                assert hdf5_file.attrs["class"] == "Simulation"
-
         if time_grid is not None:
             assert isinstance(time_grid, bp.Grid)
             time_grid.check_integrity()
@@ -534,13 +436,18 @@ class Simulation(bp.BaseClass):
             scheme.check_integrity(complete_check)
         return
 
+    def __eq__(self, other, ignore=None,print_message=True):
+        if ignore is None:
+            ignore = ["file"]
+        return super().__eq__(other, ignore, print_message)
+
     def __str__(self,
                 write_physical_grids=False):
         """:obj:`str` :
         A human readable string which describes all attributes of the instance.
         """
         description = ''
-        description += 'Simulation File = ' + self.file_address + '\n'
+        description += 'Simulation File = ' + self.file.file.filename + '\n'
         description += 'Time Data\n'
         description += '---------\n'
         time_str = self.t.__str__(write_physical_grids)

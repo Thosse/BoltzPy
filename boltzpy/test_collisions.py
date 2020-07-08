@@ -8,7 +8,7 @@ import boltzpy as bp
 @pytest.mark.parametrize("tc", bp_t.CASES)
 def test_collisions(tc):
     # Compute Output in temporary file
-    sim = bp.Simulation.load(file_address=tc.file_address)
+    sim = bp.Simulation.load(file=tc.file)
     old_coll = sim.coll
     # new collisions are generated in the testcases already
     new_coll = tc.coll
