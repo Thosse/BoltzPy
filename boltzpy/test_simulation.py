@@ -8,32 +8,13 @@ import boltzpy as bp
 from boltzpy.test_grid import GRIDS
 from boltzpy.test_model import MODELS
 from boltzpy.test_geometry import GEOMETRIES
+from boltzpy.test_collisions import COLLISIONS
+from boltzpy.test_collisions import SCHEMES
 
 
 ###################################
 #           Setup Cases           #
 ###################################
-# TODO remove this, when removing Scheme:
-scheme_convergent = bp.Scheme(
-    "FirstOrder",
-    "FiniteDifferences_FirstOrder",
-    np.array([0.0, 0.0]),
-    "Convergent",
-    # "UniformComplete",
-    "EulerScheme")
-scheme_complete = bp.Scheme(
-    "FirstOrder",
-    "FiniteDifferences_FirstOrder",
-    np.array([0.0, 0.0]),
-    # "Convergent",
-    "UniformComplete",
-    "EulerScheme")
-
-# TODO remove this, when moving Collisions into sv/model:
-coll_small = bp.Collisions()
-coll_small.setup(scheme_complete, MODELS["2D_small/Model"])
-coll_equal = bp.Collisions()
-coll_equal.setup(scheme_convergent, MODELS["equalMass/Model"])
 
 FILE = test_helper.DIRECTORY + 'Simulations.hdf5'
 _open_file = h5py.File(FILE, mode="r")
@@ -42,16 +23,16 @@ SIMULATIONS["2D_small/Simulation"] = bp.Simulation(
     GRIDS["2D_small/timing"],
     GEOMETRIES["2D_small/Geometry"],
     MODELS["2D_small/Model"],
-    coll_small,
-    scheme_complete,
+    COLLISIONS["2D_small/Collisions"],
+    SCHEMES["2D_small/Scheme"],
     True,
     _open_file["2D_small/Simulation"])
 SIMULATIONS["equalMass/Simulation"] = bp.Simulation(
     GRIDS["equalMass/timing"],
     GEOMETRIES["equalMass/Geometry"],
     MODELS["equalMass/Model"],
-    coll_equal,
-    scheme_convergent,
+    COLLISIONS["equalMass/Collisions"],
+    SCHEMES["equalMass/Scheme"],
     True,
     _open_file["equalMass/Simulation"])
 
