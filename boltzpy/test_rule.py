@@ -5,6 +5,7 @@ import numpy as np
 
 import boltzpy.helpers.tests as test_helper
 import boltzpy as bp
+from boltzpy.test_model import MODELS
 
 
 ###################################
@@ -12,35 +13,64 @@ import boltzpy as bp
 ###################################
 DIRECTORY = __file__[:-20] + 'test_data/'
 FILE = DIRECTORY + 'Rules.hdf5'
-MODELS = {"2D_2Spc/Model": bp.SVGrid(
-    masses=[2, 3],
-    shapes=[[5, 5], [7, 7]],
-    delta=1/8,
-    spacings=[6, 4],
-    collision_factors=[[50, 50], [50, 50]])}
 RULES = dict()
-RULES["2D_2Spc/ConstantPoint"] = bp.ConstantPointRule(
+# Test rules allow up to 4 specimen
+RULES["2D_small/LeftConstant"] = bp.ConstantPointRule(
     initial_rho=[2, 2],
     initial_drift=[[0, 0], [0, 0]],
     initial_temp=[1, 1],
     affected_points=[0],
-    velocity_grids=MODELS["2D_2Spc/Model"])
-RULES["2D_2Spc/InnerPoint"] = bp.InnerPointRule(
+    velocity_grids=MODELS["2D_small/Model"])
+RULES["2D_small/Interior"] = bp.InnerPointRule(
     initial_rho=[1, 1],
     initial_drift=[[0, 0], [0, 0]],
     initial_temp=[1, 1],
-    affected_points=np.arange(1, 19),
-    velocity_grids=MODELS["2D_2Spc/Model"])
-RULES["2D_2Spc/BoundaryPoint"] = bp.BoundaryPointRule(
+    affected_points=np.arange(1, 30),
+    velocity_grids=MODELS["2D_small/Model"])
+RULES["2D_small/RightBoundary"] = bp.BoundaryPointRule(
     initial_rho=[1, 1],
     initial_drift=[[0, 0], [0, 0]],
     initial_temp=[1, 1],
-    affected_points=[19],
-    velocity_grids=MODELS["2D_2Spc/Model"],
+    affected_points=[30],
+    velocity_grids=MODELS["2D_small/Model"],
     reflection_rate_inverse=[0.25, 0.25, 0.25, 0.25],
     reflection_rate_elastic=[0.25, 0.25, 0.25, 0.25],
     reflection_rate_thermal=[0.25, 0.25, 0.25, 0.25],
     absorption_rate=[0.25, 0.25, 0.25, 0.25],
+    surface_normal=np.array([1, 0], dtype=int))
+RULES["equalMass/LeftBoundary"] = bp.BoundaryPointRule(
+    initial_rho=[2, 2],
+    initial_drift=[[0, 0], [0, 0]],
+    initial_temp=[1, 1],
+    affected_points=[0],
+    velocity_grids=MODELS["equalMass/Model"],
+    reflection_rate_inverse=[0.45, 0.45, 0.45, 0.45],
+    reflection_rate_elastic=[0.45, 0.45, 0.45, 0.45],
+    reflection_rate_thermal=[0.1, 0.1, 0.1, 0.1],
+    absorption_rate=[0, 0, 0, 0],
+    surface_normal=np.array([-1, 0], dtype=int))
+RULES["equalMass/LeftInterior"] = bp.InnerPointRule(
+    initial_rho=[2, 2],
+    initial_drift=[[0, 0], [0, 0]],
+    initial_temp=[1, 1],
+    affected_points=np.arange(1, 15),
+    velocity_grids=MODELS["equalMass/Model"])
+RULES["equalMass/RightInterior"] = bp.InnerPointRule(
+    initial_rho=[1, 1],
+    initial_drift=[[0, 0], [0, 0]],
+    initial_temp=[1, 1],
+    affected_points=np.arange(15, 30),
+    velocity_grids=MODELS["equalMass/Model"])
+RULES["equalMass/RightBoundary"] = bp.BoundaryPointRule(
+    initial_rho=[1, 1],
+    initial_drift=[[0, 0], [0, 0]],
+    initial_temp=[1, 1],
+    affected_points=[30],
+    velocity_grids=MODELS["equalMass/Model"],
+    reflection_rate_inverse=[0.15, 0.15, 0.15, 0.15],
+    reflection_rate_elastic=[0.15, 0.15, 0.15, 0.15],
+    reflection_rate_thermal=[0.15, 0.15, 0.15, 0.15],
+    absorption_rate=[0.55, 0.55, 0.55, 0.55],
     surface_normal=np.array([1, 0], dtype=int))
 
 
