@@ -95,7 +95,7 @@ class Geometry(bp.Grid):
             (:attr:`Simulation.p.size
             <boltzpy.Grid.size>`,
             :attr:`Simulation.sv.size
-            <boltzpy.SVGrid.size>`).
+            <boltzpy.Model.size>`).
         """
         assert self.is_set_up
         shape = (self.size, self.rules[0].initial_state.size)

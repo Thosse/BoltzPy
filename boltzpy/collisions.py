@@ -64,7 +64,7 @@ class Collisions(bp.BaseClass):
     ----------
     relations : :obj:`~numpy.array` [:obj:`int`]
         Contains the active collisions.
-        Each collision is a 4-tuple of indices in :attr:`sv.iMG`
+        Each collision is a 4-tuple of indices in :attr:`model.iMG`
         and is in the form
         :math:`\left[ v_0, v_1, w_0, w_1\right]`,
         where  :math:`v_0, w_0` are the pre
@@ -256,18 +256,14 @@ class Collisions(bp.BaseClass):
         # Accept this Collision
         return True
 
-    def setup(self,
-              scheme,
-              model):
+    def setup(self, model):
         """Generates the :attr:`relations` and :attr:`weights`.
 
         Parameters
         ----------
-        scheme : :class:`Scheme`
-        model : :class:`SVGrid`
+        model : :class:`Model`
         """
-        assert isinstance(scheme, bp.Scheme)
-        assert isinstance(model, bp.SVGrid)
+        assert isinstance(model, bp.Model)
 
         print('Generating Collision Array...')
         time_beg = time()
@@ -281,14 +277,14 @@ class Collisions(bp.BaseClass):
            v1 or w1 denotes the velocity after the collision
         """
         # choose function for local collisions
-        if scheme.Collisions_Generation == 'UniformComplete':
+        if model.algorithm_relations == 'all':
             coll_func = Collisions.complete
-        elif scheme.Collisions_Generation == 'Convergent':
+        elif model.algorithm_relations == 'fast':
             coll_func = Collisions.convergent
         else:
             raise NotImplementedError(
                 'Unsupported Selection Scheme: '
-                '{}'.format(scheme.Collisions_Generation)
+                '{}'.format(model.algorithm_relations)
             )
 
         grids = np.empty((4,), dtype=object)
@@ -579,11 +575,11 @@ class Collisions(bp.BaseClass):
                 # assert col[0] < col[1]
                 # assert col[0] < col[2]
                 if context is not None:
-                    sv = context.sv
-                    di_0 = (sv.iMG[col[1]] - sv.iMG[col[0]])
-                    di_1 = (sv.iMG[col[3]] - sv.iMG[col[2]])
+                    model = context.model
+                    di_0 = (model.iMG[col[1]] - model.iMG[col[0]])
+                    di_1 = (model.iMG[col[3]] - model.iMG[col[2]])
                     assert all(np.array(di_1 + di_0) == 0)
-                    s = [sv.get_specimen(v_col) for v_col in col]
+                    s = [model.get_specimen(v_col) for v_col in col]
                     assert s[0] == s[1] and s[2] == s[3]
                     # Todo add conserves energy check
             assert all(w > 0 for w in self.weights.flatten())
@@ -598,7 +594,7 @@ def plot(model,
          collisions,
          iterative=True,
          plot_object=None):
-    assert isinstance(model, bp.SVGrid)
+    assert isinstance(model, bp.Model)
     assert model.specimen <= len(model.plot_styles)
 
     # make sure its a list of Collisions,

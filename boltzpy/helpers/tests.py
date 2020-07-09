@@ -36,12 +36,9 @@ def assert_files_are_equal(list_of_file_addresses):
     for f in range(len(files) - 1):
         assert keys[f] == keys[f + 1], (
             "The Files:\n\t{}\n\t{}"
-            "\ncontain different Groups or Data sets:"
-            "\n{}\n{}",
+            "\ncontain different Groups or Data sets"
             "".format(list_of_file_addresses[f],
-                      list_of_file_addresses[f + 1],
-                      keys[f],
-                      keys[f+1]))
+                      list_of_file_addresses[f + 1]))
 
     # All Datasets must have equal values
     for f in range(len(files) - 1):

@@ -9,7 +9,6 @@ from boltzpy.test_grid import GRIDS
 from boltzpy.test_model import MODELS
 from boltzpy.test_geometry import GEOMETRIES
 from boltzpy.test_collisions import COLLISIONS
-from boltzpy.test_collisions import SCHEMES
 
 
 ###################################
@@ -24,17 +23,15 @@ SIMULATIONS["2D_small/Simulation"] = bp.Simulation(
     GEOMETRIES["2D_small/Geometry"],
     MODELS["2D_small/Model"],
     COLLISIONS["2D_small/Collisions"],
-    SCHEMES["2D_small/Scheme"],
-    True,
-    _open_file["2D_small/Simulation"])
+    _open_file["2D_small/Simulation"],
+    True)
 SIMULATIONS["equalMass/Simulation"] = bp.Simulation(
     GRIDS["equalMass/timing"],
     GEOMETRIES["equalMass/Geometry"],
     MODELS["equalMass/Model"],
     COLLISIONS["equalMass/Collisions"],
-    SCHEMES["equalMass/Scheme"],
-    True,
-    _open_file["equalMass/Simulation"])
+    _open_file["equalMass/Simulation"],
+    True)
 
 
 def setup_file(file_address=FILE):
@@ -92,10 +89,10 @@ def test_load_from_file(key):
 def test_computed_state_is_equal(key):
     file_old = h5py.File(FILE, mode="r")
     file_new = h5py.File(test_helper.TMP_FILE, mode="r")
-    assert file_old[key]["Results"].keys() == file_new[key]["Results"].keys()
-    for s in file_old[key]["Results"].keys():
-        state_old = file_old[key]["Results"][s]["state"][()]
-        state_new = file_new[key]["Results"][s]["state"][()]
+    assert file_old[key]["results"].keys() == file_new[key]["results"].keys()
+    for s in file_old[key]["results"].keys():
+        state_old = file_old[key]["results"][s]["state"][()]
+        state_new = file_new[key]["results"][s]["state"][()]
         assert np.array_equal(state_old, state_new), (
             "\n{}\nis not equal to\n\n{}".format(state_old, state_new))
 

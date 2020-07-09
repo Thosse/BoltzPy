@@ -32,9 +32,8 @@ Workflow
 from boltzpy.BaseClass import BaseClass
 from boltzpy.grid import Grid
 from boltzpy.rule import Rule, InnerPointRule, ConstantPointRule, BoundaryPointRule
-from boltzpy.scheme import Scheme
 from boltzpy.geometry import Geometry
 from boltzpy.simulation import Simulation
-from boltzpy.svgrid import SVGrid
+from boltzpy.model import Model
 from boltzpy.collisions import Collisions
 from boltzpy.data import Data

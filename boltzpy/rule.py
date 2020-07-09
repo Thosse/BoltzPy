@@ -3,7 +3,6 @@ import numpy as np
 import h5py
 
 import boltzpy as bp
-import boltzpy.constants as bp_c
 import boltzpy.compute as bp_cp
 import boltzpy.plot as bp_p
 import boltzpy.initialization as bp_i
@@ -21,7 +20,7 @@ class Rule(bp.BaseClass):
     initial_drift : :obj:`~numpy.array` [:obj:`float`]
     initial_temp : :obj:`~numpy.array` [:obj:`float`]
     affected_points : :obj:`list`[:obj:`int`]
-    velocity_grids : :obj:`~boltzpy.SVGrid`, optional
+    model : :obj:`~boltzpy.Model`, optional
         Used to construct the initial state,
         if no initial_state parameter is given.
     initial_state : :obj:`~numpy.array` [:obj:`float`], optional
@@ -49,7 +48,7 @@ class Rule(bp.BaseClass):
                  initial_drift,
                  initial_temp,
                  affected_points,
-                 velocity_grids=None,
+                 model=None,
                  initial_state=None):
         self.check_parameters(initial_rho=initial_rho,
                               initial_drift=initial_drift,
@@ -61,12 +60,12 @@ class Rule(bp.BaseClass):
         self.affected_points = np.array(affected_points, dtype=int)
         # Either initial_state is given as parameter
         if initial_state is not None:
-            assert velocity_grids is None
+            assert model is None
             self.initial_state = initial_state
-        # or it is constructed based on the velocity_grids
+        # or it is constructed based on the model
         else:
-            assert velocity_grids is not None
-            self.initial_state = self.compute_initial_state(velocity_grids)
+            assert model is not None
+            self.initial_state = self.compute_initial_state(model)
         Rule.check_integrity(self, complete_check=False)
         return
 
@@ -87,17 +86,17 @@ class Rule(bp.BaseClass):
     def number_of_specimen(self):
         return self.initial_drift.shape[0]
 
-    def compute_initial_state(self, velocity_grids):
-        assert isinstance(velocity_grids, bp.SVGrid)
-        assert self.ndim == velocity_grids.ndim
-        assert self.number_of_specimen == velocity_grids.specimen
+    def compute_initial_state(self, model):
+        assert isinstance(model, bp.Model)
+        assert self.ndim == model.ndim
+        assert self.number_of_specimen == model.specimen
 
-        initial_state = np.zeros(velocity_grids.size, dtype=float)
-        for s in velocity_grids.species:
-            mass = velocity_grids.masses[s]
-            velocities = velocity_grids.vGrids[s].pG
-            delta_v = velocity_grids.vGrids[s].physical_spacing
-            [beg, end] = velocity_grids.index_range[s]
+        initial_state = np.zeros(model.size, dtype=float)
+        for s in model.species:
+            mass = model.masses[s]
+            velocities = model.vGrids[s].pG
+            delta_v = model.vGrids[s].physical_spacing
+            [beg, end] = model.index_range[s]
             initial_state[beg:end] = bp_i.compute_initial_distribution(
                 velocities,
                 delta_v,
@@ -128,7 +127,7 @@ class Rule(bp.BaseClass):
     #           Visualization           #
     #####################################
     def plot(self,
-             velocity_grid,
+             model,
              specimen,
              plot_object=None,
              **plot_style):
@@ -138,7 +137,7 @@ class Rule(bp.BaseClass):
         ----------
         plot_object : TODO Figure? matplotlib.pyplot?
         """
-        assert isinstance(velocity_grid, bp.SVGrid)
+        assert isinstance(model, bp.Model)
         assert isinstance(specimen, int)
         assert 0 <= specimen < self.number_of_specimen
         assert self.ndim == 2, (
@@ -155,8 +154,8 @@ class Rule(bp.BaseClass):
             plot_object = plt
 
         # plot continuous maxwellian as a surface plot
-        mass = velocity_grid.masses[specimen]
-        maximum_velocity = velocity_grid.maximum_velocity
+        mass = model.masses[specimen]
+        maximum_velocity = model.maximum_velocity
         plot_object = bp_p.plot_continuous_maxwellian(
             self.initial_rho[specimen],
             self.initial_drift[specimen],
@@ -168,11 +167,11 @@ class Rule(bp.BaseClass):
             plot_object)
 
         # plot discrete distribution as a 3D bar plot
-        beg, end = velocity_grid.index_range[specimen]
+        beg, end = model.index_range[specimen]
         plot_object = bp_p.plot_discrete_distribution(
             self.initial_state[beg:end],
-            velocity_grid.vGrids[specimen].pG,
-            velocity_grid.vGrids[specimen].physical_spacing,
+            model.vGrids[specimen].pG,
+            model.vGrids[specimen].physical_spacing,
             plot_object,
         )
         if show_plot_directly:
@@ -268,7 +267,7 @@ class Rule(bp.BaseClass):
                          initial_drift=None,
                          initial_temp=None,
                          affected_points=None,
-                         velocity_grids=None,
+                         model=None,
                          initial_state=None,
                          complete_check=False,
                          context=None):
@@ -282,7 +281,7 @@ class Rule(bp.BaseClass):
         initial_drift : :obj:`~numpy.array` [:obj:`float`], optional
         initial_temp : :obj:`~numpy.array` [:obj:`float`], optional
         affected_points : :obj:`list`[:obj:`int`]
-        velocity_grids : :obj:`~boltzpy.SVGrid`, optional
+        model : :obj:`~boltzpy.Model`, optional
         initial_state : :obj:`~numpy.array` [:obj:`float`], optional
         complete_check : :obj:`bool`, optional
             If True, then all parameters must be set (not None).
@@ -296,18 +295,18 @@ class Rule(bp.BaseClass):
         if complete_check is True:
             assert all(param_val is not None
                        for (param_key, param_val) in locals().items()
-                       if param_key not in ["context", "velocity_grids"])
+                       if param_key not in ["context", "model"])
         # Set up basic constants
         if context is not None:
             assert isinstance(context, bp.Simulation)
-            n_species = context.sv.specimen
+            n_species = context.model.specimen
         else:
             n_species = None
 
         # check all parameters, if set
         if subclass is not None:
             assert isinstance(subclass, str)
-            assert subclass in bp_c.SUPP_RULE_SUBCLASSES
+            assert subclass in SUBCLASSES.keys()
 
         if initial_rho is not None:
             if isinstance(initial_rho, list):
@@ -336,8 +335,8 @@ class Rule(bp.BaseClass):
                 "and must be in [2,3]."
                 "initial_drift.shape[1] = {}". format(initial_drift.shape[1])
             )
-            if context is not None and context.sv.ndim is not None:
-                assert initial_drift.shape[1] == context.sv.ndim
+            if context is not None and context.model.ndim is not None:
+                assert initial_drift.shape[1] == context.model.ndim
 
         if initial_temp is not None:
             if isinstance(initial_temp, list):
@@ -366,9 +365,9 @@ class Rule(bp.BaseClass):
                 "{}".format(affected_points)
             )
 
-        if velocity_grids is not None:
-            assert isinstance(velocity_grids, bp.SVGrid)
-            velocity_grids.check_integrity()
+        if model is not None:
+            assert isinstance(model, bp.Model)
+            model.check_integrity()
 
         if initial_state is not None:
             assert isinstance(initial_state, np.ndarray)
@@ -399,13 +398,13 @@ class InnerPointRule(Rule):
                  initial_drift=None,
                  initial_temp=None,
                  affected_points=None,
-                 velocity_grids=None,
+                 model=None,
                  initial_state=None):
         super().__init__(initial_rho,
                          initial_drift,
                          initial_temp,
                          affected_points,
-                         velocity_grids,
+                         model,
                          initial_state)
         return
 
@@ -444,13 +443,13 @@ class ConstantPointRule(Rule):
                  initial_drift,
                  initial_temp,
                  affected_points,
-                 velocity_grids=None,
+                 model=None,
                  initial_state=None):
         super().__init__(initial_rho,
                          initial_drift,
                          initial_temp,
                          affected_points,
-                         velocity_grids,
+                         model,
                          initial_state)
         return
 
@@ -486,7 +485,7 @@ class BoundaryPointRule(Rule):
                  incoming_velocities=None,
                  reflected_indices_inverse=None,
                  reflected_indices_elastic=None,
-                 velocity_grids=None,
+                 model=None,
                  initial_state=None):
         params = {key: value for (key, value) in locals().items()
                   if key not in ["self", "__class__"]}
@@ -512,16 +511,16 @@ class BoundaryPointRule(Rule):
             self.incoming_velocities = np.array(incoming_velocities,
                                                 dtype=int)
         # Or the incoming velocities and reflection indices
-        # must be generated based on the surface normal and the velocity_grid
+        # must be generated based on the surface normal and the model
         else:
-            self.incoming_velocities = self.compute_incoming_velocities(velocity_grids, surface_normal)
-            self.reflected_indices_inverse = self.compute_reflected_indices_inverse(velocity_grids)
-            self.reflected_indices_elastic = self.compute_reflected_indices_elastic(velocity_grids, surface_normal)
+            self.incoming_velocities = self.compute_incoming_velocities(model, surface_normal)
+            self.reflected_indices_inverse = self.compute_reflected_indices_inverse(model)
+            self.reflected_indices_elastic = self.compute_reflected_indices_elastic(model, surface_normal)
         super().__init__(initial_rho,
                          initial_drift,
                          initial_temp,
                          affected_points,
-                         velocity_grids,
+                         model,
                          initial_state)
         self.check_integrity()
         return
@@ -531,36 +530,36 @@ class BoundaryPointRule(Rule):
         return 'BoundaryPointRule'
 
     @staticmethod
-    def compute_incoming_velocities(velocity_grids, surface_normal):
+    def compute_incoming_velocities(model, surface_normal):
         # the incoming velocities are used to calculate the inflow during transport
         # we calculate the scalar product for each entry and check if its > 0
         # thus the velocity points towards the border
-        incoming_velocities = np.where(velocity_grids.iMG @ surface_normal > 0)[0]
+        incoming_velocities = np.where(model.iMG @ surface_normal > 0)[0]
         return incoming_velocities
 
     @staticmethod
-    def compute_reflected_indices_inverse(velocity_grids):
-        reflected_indices_inverse = np.zeros(velocity_grids.size, dtype=int)
-        for (idx_v, v) in enumerate(velocity_grids.iMG):
-            spc = velocity_grids.get_specimen(idx_v)
+    def compute_reflected_indices_inverse(model):
+        reflected_indices_inverse = np.zeros(model.size, dtype=int)
+        for (idx_v, v) in enumerate(model.iMG):
+            spc = model.get_specimen(idx_v)
             v_refl = -v
-            idx_v_refl = velocity_grids.find_index(spc, v_refl)
+            idx_v_refl = model.find_index(spc, v_refl)
             reflected_indices_inverse[idx_v] = idx_v_refl
         return reflected_indices_inverse
 
     @staticmethod
-    def compute_reflected_indices_elastic(velocity_grids, surface_normal):
-        reflected_indices_elastic = np.zeros(velocity_grids.size, dtype=int)
+    def compute_reflected_indices_elastic(model, surface_normal):
+        reflected_indices_elastic = np.zeros(model.size, dtype=int)
         # Todo only works in 1D
-        for (idx_v, v) in enumerate(velocity_grids.iMG):
-            spc = velocity_grids.get_specimen(idx_v)
+        for (idx_v, v) in enumerate(model.iMG):
+            spc = model.get_specimen(idx_v)
             v_refl = np.array([-1, 1]) * v
-            idx_v_refl = velocity_grids.find_index(spc, v_refl)
+            idx_v_refl = model.find_index(spc, v_refl)
             reflected_indices_elastic[idx_v] = idx_v_refl
         return reflected_indices_elastic
 
-    def compute_initial_state(self, velocity_grids):
-        full_initial_state = super().compute_initial_state(velocity_grids)
+    def compute_initial_state(self, model):
+        full_initial_state = super().compute_initial_state(model)
         # compute outgoing velocities, by relfecting incoming velocities
         outgoing_velocities = self.reflected_indices_inverse[self.incoming_velocities]
         # Set initial state to zero for all non-outgoing velocities
@@ -658,7 +657,7 @@ class BoundaryPointRule(Rule):
                          incoming_velocities=None,
                          reflected_indices_inverse=None,
                          reflected_indices_elastic=None,
-                         velocity_grids=None,
+                         model=None,
                          species=None,
                          initial_state=None,
                          complete_check=False,
@@ -669,7 +668,7 @@ class BoundaryPointRule(Rule):
             initial_drift=initial_drift,
             initial_temp=initial_temp,
             affected_points=affected_points,
-            velocity_grids=velocity_grids,
+            model=model,
             initial_state=initial_state,
             complete_check=complete_check,
             context=context)

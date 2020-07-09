@@ -7,13 +7,13 @@ from boltzpy.test_simulation import SIMULATIONS
 
 @pytest.mark.parametrize("key", SIMULATIONS.keys())
 def test_particle_number(key):
-    simulation = SIMULATIONS[key]
+    sim = SIMULATIONS[key]
     # load results
-    hdf_group = simulation.file["Results"]
-    for s in simulation.sv.species:
-        dv = simulation.sv.vGrids[s].physical_spacing
+    hdf_group = sim.file["results"]
+    for s in sim.model.species:
+        dv = sim.model.vGrids[s].physical_spacing
         spc_group = hdf_group[str(s)]
-        for t in range(simulation.t.size):
+        for t in range(sim.timing.size):
             state = spc_group["state"][t]
             old_result = spc_group["particle_number"][t]
             new_result = bp_o.particle_number(state, dv)
@@ -22,14 +22,14 @@ def test_particle_number(key):
 
 @pytest.mark.parametrize("key", SIMULATIONS.keys())
 def test_mean_velocity(key):
-    simulation = SIMULATIONS[key]
+    sim = SIMULATIONS[key]
     # load results
-    hdf_group = simulation.file["Results"]
-    for s in simulation.sv.species:
-        dv = simulation.sv.vGrids[s].physical_spacing
-        velocities = simulation.sv.vGrids[s].pG
+    hdf_group = sim.file["results"]
+    for s in sim.model.species:
+        dv = sim.model.vGrids[s].physical_spacing
+        velocities = sim.model.vGrids[s].pG
         spc_group = hdf_group[str(s)]
-        for t in range(simulation.t.size):
+        for t in range(sim.timing.size):
             state = spc_group["state"][t]
             particle_number = spc_group["particle_number"][t]
             old_result = spc_group["mean_velocity"][t]
@@ -42,16 +42,16 @@ def test_mean_velocity(key):
 
 @pytest.mark.parametrize("key", SIMULATIONS.keys())
 def test_temperature(key):
-    simulation = SIMULATIONS[key]
+    sim = SIMULATIONS[key]
     # load results
-    hdf_group = simulation.file["Results"]
-    assert simulation.sv.specimen > 0
-    for s in simulation.sv.species:
-        dv = simulation.sv.vGrids[s].physical_spacing
-        mass = simulation.sv.masses[s]
-        velocities = simulation.sv.vGrids[s].pG
+    hdf_group = sim.file["results"]
+    assert sim.model.specimen > 0
+    for s in sim.model.species:
+        dv = sim.model.vGrids[s].physical_spacing
+        mass = sim.model.masses[s]
+        velocities = sim.model.vGrids[s].pG
         spc_group = hdf_group[str(s)]
-        for t in range(simulation.t.size):
+        for t in range(sim.timing.size):
             state = spc_group["state"][t]
             particle_number = spc_group["particle_number"][t]
             mean_velocity = spc_group["mean_velocity"][t]
@@ -68,15 +68,15 @@ def test_temperature(key):
 
 @pytest.mark.parametrize("key", SIMULATIONS.keys())
 def test_momentum(key):
-    simulation = SIMULATIONS[key]
+    sim = SIMULATIONS[key]
     # load results
-    hdf_group = simulation.file["Results"]
-    for s in simulation.sv.species:
-        dv = simulation.sv.vGrids[s].physical_spacing
-        mass = simulation.sv.masses[s]
-        velocities = simulation.sv.vGrids[s].pG
+    hdf_group = sim.file["results"]
+    for s in sim.model.species:
+        dv = sim.model.vGrids[s].physical_spacing
+        mass = sim.model.masses[s]
+        velocities = sim.model.vGrids[s].pG
         spc_group = hdf_group[str(s)]
-        for t in range(simulation.t.size):
+        for t in range(sim.timing.size):
             state = spc_group["state"][t]
             old_result = spc_group["momentum"][t]
             new_result = bp_o.momentum(state,
@@ -88,15 +88,15 @@ def test_momentum(key):
 
 @pytest.mark.parametrize("key", SIMULATIONS.keys())
 def test_energy(key):
-    simulation = SIMULATIONS[key]
+    sim = SIMULATIONS[key]
     # load results
-    hdf_group = simulation.file["Results"]
-    for s in simulation.sv.species:
-        dv = simulation.sv.vGrids[s].physical_spacing
-        mass = simulation.sv.masses[s]
-        velocities = simulation.sv.vGrids[s].pG
+    hdf_group = sim.file["results"]
+    for s in sim.model.species:
+        dv = sim.model.vGrids[s].physical_spacing
+        mass = sim.model.masses[s]
+        velocities = sim.model.vGrids[s].pG
         spc_group = hdf_group[str(s)]
-        for t in range(simulation.t.size):
+        for t in range(sim.timing.size):
             state = spc_group["state"][t]
             old_result = spc_group["energy"][t]
             new_result = bp_o.energy(state,
@@ -108,15 +108,15 @@ def test_energy(key):
 
 @pytest.mark.parametrize("key", SIMULATIONS.keys())
 def test_momentum_flow(key):
-    simulation = SIMULATIONS[key]
+    sim = SIMULATIONS[key]
     # load results
-    hdf_group = simulation.file["Results"]
-    for s in simulation.sv.species:
-        dv = simulation.sv.vGrids[s].physical_spacing
-        mass = simulation.sv.masses[s]
-        velocities = simulation.sv.vGrids[s].pG
+    hdf_group = sim.file["results"]
+    for s in sim.model.species:
+        dv = sim.model.vGrids[s].physical_spacing
+        mass = sim.model.masses[s]
+        velocities = sim.model.vGrids[s].pG
         spc_group = hdf_group[str(s)]
-        for t in range(simulation.t.size):
+        for t in range(sim.timing.size):
             state = spc_group["state"][t]
             old_result = spc_group["momentum_flow"][t]
             new_result = bp_o.momentum_flow(state,
@@ -128,15 +128,15 @@ def test_momentum_flow(key):
 
 @pytest.mark.parametrize("key", SIMULATIONS.keys())
 def test_energy_flow(key):
-    simulation = SIMULATIONS[key]
+    sim = SIMULATIONS[key]
     # load results
-    hdf_group = simulation.file["Results"]
-    for s in simulation.sv.species:
-        dv = simulation.sv.vGrids[s].physical_spacing
-        mass = simulation.sv.masses[s]
-        velocities = simulation.sv.vGrids[s].pG
+    hdf_group = sim.file["results"]
+    for s in sim.model.species:
+        dv = sim.model.vGrids[s].physical_spacing
+        mass = sim.model.masses[s]
+        velocities = sim.model.vGrids[s].pG
         spc_group = hdf_group[str(s)]
-        for t in range(simulation.t.size):
+        for t in range(sim.timing.size):
             state = spc_group["state"][t]
             old_result = spc_group["energy_flow"][t]
             new_result = bp_o.energy_flow(state,

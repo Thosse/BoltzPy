@@ -11,30 +11,11 @@ FILE = test_helper.DIRECTORY + 'Collisions.hdf5'
 RULES = dict()
 COLLISIONS = dict()
 
-# TODO remove this, when removing Scheme:
-SCHEMES = dict()
-SCHEMES["2D_small/Scheme"] = bp.Scheme(
-    "FirstOrder",
-    "FiniteDifferences_FirstOrder",
-    np.array([0.0, 0.0]),
-    # "Convergent",
-    "UniformComplete",
-    "EulerScheme")
-SCHEMES["equalMass/Scheme"] = bp.Scheme(
-    "FirstOrder",
-    "FiniteDifferences_FirstOrder",
-    np.array([0.0, 0.0]),
-    "Convergent",
-    # "UniformComplete",
-    "EulerScheme")
-
 # TODO remove this, when moving Collisions into sv/model:
 COLLISIONS["2D_small/Collisions"] = bp.Collisions()
-COLLISIONS["2D_small/Collisions"].setup(SCHEMES["2D_small/Scheme"],
-                                        MODELS["2D_small/Model"])
+COLLISIONS["2D_small/Collisions"].setup(MODELS["2D_small/Model"])
 COLLISIONS["equalMass/Collisions"] = bp.Collisions()
-COLLISIONS["equalMass/Collisions"].setup(SCHEMES["equalMass/Scheme"],
-                                         MODELS["equalMass/Model"])
+COLLISIONS["equalMass/Collisions"].setup(MODELS["equalMass/Model"])
 
 
 def setup_file(file_address=FILE):

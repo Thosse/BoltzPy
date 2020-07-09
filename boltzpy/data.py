@@ -27,7 +27,7 @@ class Data:
         Denotes begin and end of each
         :class:`Specimens <boltzpy.Specimen>` velocity grid.
     vG : :obj:`~numpy.array` [:obj:`float`]
-        The physical velocity Grid (See :attr:`SVGrid.pMG`)
+        The physical velocity Grid (See :attr:`Model.pMG`)
     velocity_offset : :obj:`~numpy.array` [:obj:`float`]
         Offsets the velocities in and ONLY in the transport step
         (non-boundary points only!).
@@ -58,28 +58,26 @@ class Data:
         # create temporary Simulation instance
         sim = bp.Simulation.load(file_address)
         # data arrays, this contains all grids
-        # Todo Rework initialization (move into rules?)
-        # Todo Class for single Space points (V-Grid + 0.Moment)?
         self.state = sim.geometry.initial_state
         self.result = np.copy(self.state)
 
         # Velocity Grid parameters
-        self.v_range = sim.sv.index_range
-        # Todo rename pMG -> pG and implement efficiently
-        self.vG = sim.sv.delta * sim.sv.iMG
-        # Todo rename offset, remove from svgrid -> movingObserver?
-        self.velocity_offset = np.array(sim.scheme.Transport_VelocityOffset)
+        self.v_range = sim.model.index_range
+        self.vG = sim.model.delta * sim.model.iMG
+        # Todo reimplement offset -> geometry or simulation?
+        self.velocity_offset = np.zeros(2)
+        #np.array(sim.scheme.Transport_VelocityOffset)
         # Todo Add this as property to SVGRID
         # Todo test if it faster to compute velocity (pv) on the fly
-        self.dv = np.array([sim.sv.vGrids[s].physical_spacing
-                            for s in sim.sv.species])
+        self.dv = np.array([sim.model.vGrids[s].physical_spacing
+                            for s in sim.model.species])
 
-        self.n_spc = sim.sv.specimen
-        self.m = sim.sv.masses
+        self.n_spc = sim.model.specimen
+        self.m = sim.model.masses
 
         self.t = 0
-        self.tG = sim.t.iG  # keep it, for adaptive time grids
-        self.dt = sim.t.delta
+        self.tG = sim.timing.iG  # keep it, for adaptive time grids
+        self.dt = sim.timing.delta
 
         self.dp = sim.p.delta
         self.p_dim = sim.p.ndim
@@ -88,7 +86,7 @@ class Data:
         # Collision arrays
         # Todo create struct -> 4 ints and 1 float together -> possible?
         if not sim.coll.is_set_up:
-            sim.coll.setup(sim.scheme, sim.sv)
+            sim.coll.setup(sim.model)
         self.col = sim.coll.relations
         self.weight = sim.coll.weights
 
@@ -104,7 +102,7 @@ class Data:
 
         self._params = dict()
         # Keep as a "conditional" attribute?
-        self._params["col_mat"] = sim.coll.generate_collision_matrix(sim.t.delta)
+        self._params["col_mat"] = sim.coll.generate_collision_matrix(sim.timing.delta)
         return
 
     def __getattr__(self, item):

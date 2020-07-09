@@ -2,10 +2,9 @@ import numpy as np
 import h5py
 
 import boltzpy as bp
-import boltzpy.constants as bp_c
 
 
-class SVGrid(bp.BaseClass):
+class Model(bp.BaseClass):
     r"""Manages the Velocity Grids of all
     :class:`~boltzpy.Species`.
 
@@ -60,7 +59,9 @@ class SVGrid(bp.BaseClass):
                  shapes,
                  delta,
                  spacings,
-                 collision_factors):
+                 collision_factors,
+                 algorithm_relations="all",
+                 algorithm_weights="uniform"):
         assert isinstance(masses, (list, tuple, np.ndarray))
         self.masses = np.array(masses, dtype=int)
         assert self.masses.ndim == 1
@@ -79,6 +80,9 @@ class SVGrid(bp.BaseClass):
         self.collision_factors = np.array(collision_factors,
                                           dtype=float)
         assert self.collision_factors.ndim == 2
+
+        self.algorithm_relations = str(algorithm_relations)
+        self.algorithm_weights = str(algorithm_weights)
 
         self.ndim = self.shapes.shape[1]
         self.size = np.sum(np.prod(self.shapes, axis=1))
@@ -146,7 +150,7 @@ class SVGrid(bp.BaseClass):
 
         """
         local_index = self.vGrids[index_of_specimen].get_idx(integer_value)
-        if local_index < 0 :
+        if local_index < 0:
             return None
         else:
             index_offset = self.index_range[index_of_specimen, 0]
@@ -170,7 +174,7 @@ class SVGrid(bp.BaseClass):
         ------
         err_idx : :obj:`IndexError`
             If *velocity_idx* is out of the range of
-            :attr:`SVGrid.iMG`.
+            :attr:`Model.iMG`.
         """
         for (i, [beg, end]) in enumerate(self.index_range):
             if beg <= velocity_idx < end:
@@ -213,7 +217,7 @@ class SVGrid(bp.BaseClass):
     #####################################
     @staticmethod
     def load(hdf5_group):
-        """Set up and return a :class:`SVGrid` instance
+        """Set up and return a :class:`Model` instance
         based on the parameters in the given HDF5 group.
 
         Parameters
@@ -222,10 +226,10 @@ class SVGrid(bp.BaseClass):
 
         Returns
         -------
-        self : :class:`SVGrid`
+        self : :class:`Model`
         """
         assert isinstance(hdf5_group, h5py.Group)
-        assert hdf5_group.attrs["class"] == "SVGrid"
+        assert hdf5_group.attrs["class"] == "Model"
 
         # read attributes from file
         masses = hdf5_group["masses"][()]
@@ -233,12 +237,20 @@ class SVGrid(bp.BaseClass):
         delta = hdf5_group["delta"][()]
         spacings = hdf5_group["spacings"][()]
         collision_factors = hdf5_group["collision_factors"][()]
+        algorithm_relations = hdf5_group["algorithm_relations"][()]
+        algorithm_weights = hdf5_group["algorithm_weights"][()]
 
-        self = SVGrid(masses, shapes, delta, spacings, collision_factors)
+        self = Model(masses,
+                     shapes,
+                     delta,
+                     spacings,
+                     collision_factors,
+                     algorithm_relations,
+                     algorithm_weights)
         return self
 
     def save(self, hdf5_group):
-        """Write the main parameters of the :class:`SVGrid` instance
+        """Write the main parameters of the :class:`Model` instance
         into the HDF5 group.
 
         Parameters
@@ -259,9 +271,11 @@ class SVGrid(bp.BaseClass):
         hdf5_group["delta"] = self.delta
         hdf5_group["spacings"] = self.spacings
         hdf5_group["collision_factors"] = self.collision_factors
+        hdf5_group["algorithm_relations"] = self.algorithm_relations
+        hdf5_group["algorithm_weights"] = self.algorithm_weights
 
         # check that the class can be reconstructed from the save
-        other = SVGrid.load(hdf5_group)
+        other = Model.load(hdf5_group)
         assert self == other
         return
 
@@ -271,9 +285,7 @@ class SVGrid(bp.BaseClass):
     def check_integrity(self):
         """Sanity Check."""
         assert isinstance(self.ndim, int)
-        assert self.ndim in bp_c.SUPP_GRID_DIMENSIONS
-        # if context is not None and context.p.ndim is not None:
-        #     assert ndim >= context.p.ndim
+        assert self.ndim in {2, 3}
 
         assert isinstance(self.maximum_velocity, float)
         assert self.maximum_velocity > 0
@@ -322,6 +334,9 @@ class SVGrid(bp.BaseClass):
         assert self.iMG.dtype == int
         assert self.iMG.ndim == 2
         assert self.iMG.shape[0] == self.index_range[-1, 1]
+
+        assert self.algorithm_relations in {"all", "fast"}
+        assert self.algorithm_weights in {"uniform"}
         return
 
     def __str__(self,

@@ -14,13 +14,13 @@ from boltzpy.test_rule import RULES
 FILE = test_helper.DIRECTORY + 'Geometries.hdf5'
 GEOMETRIES = dict()
 GEOMETRIES["2D_small/Geometry"] = bp.Geometry(
-    (31,),
+    (10,),
     0.5,
     [RULES["2D_small/LeftConstant"],
      RULES["2D_small/Interior"],
      RULES["2D_small/RightBoundary"]])
 GEOMETRIES["equalMass/Geometry"] = bp.Geometry(
-    (31,),
+    (10,),
     0.5,
     [RULES["equalMass/LeftBoundary"],
      RULES["equalMass/LeftInterior"],

@@ -10,36 +10,46 @@ import boltzpy as bp
 ###################################
 FILE = test_helper.DIRECTORY + 'Models.hdf5'
 MODELS = dict()
-MODELS["2D_small/Model"] = bp.SVGrid(
+MODELS["2D_small/Model"] = bp.Model(
     masses=[2, 3],
     shapes=[[5, 5], [7, 7]],
     delta=1/8,
     spacings=[6, 4],
-    collision_factors=[[50, 50], [50, 50]])
-MODELS["equalSpacing/Model"] = bp.SVGrid(
+    collision_factors=[[50, 50], [50, 50]],
+    algorithm_relations="all",
+    algorithm_weights="uniform")
+MODELS["equalSpacing/Model"] = bp.Model(
     masses=[1, 2],
     shapes=[[7, 7], [7, 7]],
     delta=1/7,
     spacings=[2, 2],
-    collision_factors=[[50, 50], [50, 50]])
-MODELS["equalMass/Model"] = bp.SVGrid(
+    collision_factors=[[50, 50], [50, 50]],
+    algorithm_relations="fast",
+    algorithm_weights="uniform")
+MODELS["equalMass/Model"] = bp.Model(
     masses=[3, 3],
     shapes=[[5, 5], [5, 5]],
     delta=3/8,
     spacings=[2, 2],
-    collision_factors=[[50, 50], [50, 50]])
-MODELS["evenShapes/Model"] = bp.SVGrid(
+    collision_factors=[[50, 50], [50, 50]],
+    algorithm_relations="fast",
+    algorithm_weights="uniform")
+MODELS["evenShapes/Model"] = bp.Model(
     masses=[2, 3],
     shapes=[[4, 4], [6, 6]],
     delta=1/12,
     spacings=[2, 2],
-    collision_factors=[[50, 50], [50, 50]])
-MODELS["mixed_spacing/Model"] = bp.SVGrid(
+    collision_factors=[[50, 50], [50, 50]],
+    algorithm_relations="all",
+    algorithm_weights="uniform")
+MODELS["mixed_spacing/Model"] = bp.Model(
     masses=[3, 4],
     shapes=[[6, 6], [7, 7]],
     delta=1/14,
     spacings=[2, 2],
-    collision_factors=[[50, 50], [50, 50]])
+    collision_factors=[[50, 50], [50, 50]],
+    algorithm_relations="fast",
+    algorithm_weights="uniform")
 
 
 def setup_file(file_address=FILE):
@@ -52,7 +62,7 @@ def setup_file(file_address=FILE):
 
     file = h5py.File(file_address, mode="w")
     for (key, item) in MODELS.items():
-        assert isinstance(item, bp.SVGrid)
+        assert isinstance(item, bp.Model)
         file.create_group(key)
         item.save(file[key])
     return
@@ -84,10 +94,10 @@ def test_hdf5_groups_exist(key):
 def test_load_from_file(key):
     file = h5py.File(FILE, mode="r")
     hdf_group = file[key]
-    old = bp.SVGrid.load(hdf_group)
+    old = bp.Model.load(hdf_group)
     new = MODELS[key]
-    assert isinstance(old, bp.SVGrid)
-    assert isinstance(new, bp.SVGrid)
+    assert isinstance(old, bp.Model)
+    assert isinstance(new, bp.Model)
     assert old == new, (
         "\n{}\nis not equal to\n\n{}".format(old, new)
     )
