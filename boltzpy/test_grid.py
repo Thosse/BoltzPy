@@ -12,6 +12,12 @@ import boltzpy as bp
 DIRECTORY = __file__[:-20] + 'test_data/'
 FILE = DIRECTORY + 'Grids.hdf5'
 GRIDS = dict()
+GRIDS["2D_small/timing"] = bp.Grid(shape=(50,),
+                                   delta=0.002,
+                                   spacing=5)
+GRIDS["equalMass/timing"] = bp.Grid(shape=(50,),
+                                    delta=0.0015,
+                                    spacing=7)
 GRIDS["1D_small"] = bp.Grid(shape=(10,),
                             delta=0.01/4,
                             spacing=4)

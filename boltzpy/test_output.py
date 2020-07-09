@@ -1,17 +1,15 @@
 import numpy as np
 import pytest
-import h5py
 
-import boltzpy.testcase as bp_t
-import boltzpy as bp
 import boltzpy.output as bp_o
+from boltzpy.test_simulation import SIMULATIONS
 
 
-@pytest.mark.parametrize("tf", bp_t.FILES)
-def test_particle_number(tf):
-    simulation = bp.Simulation.load(tf)
+@pytest.mark.parametrize("key", SIMULATIONS.keys())
+def test_particle_number(key):
+    simulation = SIMULATIONS[key]
     # load results
-    hdf_group = tf["Results"]
+    hdf_group = simulation.file["Results"]
     for s in simulation.sv.species:
         dv = simulation.sv.vGrids[s].physical_spacing
         spc_group = hdf_group[str(s)]
@@ -22,11 +20,11 @@ def test_particle_number(tf):
             assert np.array_equal(old_result, new_result)
 
 
-@pytest.mark.parametrize("tf", bp_t.FILES)
-def test_mean_velocity(tf):
-    simulation = bp.Simulation.load(tf)
+@pytest.mark.parametrize("key", SIMULATIONS.keys())
+def test_mean_velocity(key):
+    simulation = SIMULATIONS[key]
     # load results
-    hdf_group = tf["Results"]
+    hdf_group = simulation.file["Results"]
     for s in simulation.sv.species:
         dv = simulation.sv.vGrids[s].physical_spacing
         velocities = simulation.sv.vGrids[s].pG
@@ -42,11 +40,11 @@ def test_mean_velocity(tf):
             assert np.array_equal(old_result, new_result)
 
 
-@pytest.mark.parametrize("tf", bp_t.FILES)
-def test_temperature(tf):
-    simulation = bp.Simulation.load(tf)
+@pytest.mark.parametrize("key", SIMULATIONS.keys())
+def test_temperature(key):
+    simulation = SIMULATIONS[key]
     # load results
-    hdf_group = tf["Results"]
+    hdf_group = simulation.file["Results"]
     assert simulation.sv.specimen > 0
     for s in simulation.sv.species:
         dv = simulation.sv.vGrids[s].physical_spacing
@@ -68,11 +66,11 @@ def test_temperature(tf):
             assert np.array_equal(old_result, new_result)
 
 
-@pytest.mark.parametrize("tf", bp_t.FILES)
-def test_momentum(tf):
-    simulation = bp.Simulation.load(tf)
+@pytest.mark.parametrize("key", SIMULATIONS.keys())
+def test_momentum(key):
+    simulation = SIMULATIONS[key]
     # load results
-    hdf_group = tf["Results"]
+    hdf_group = simulation.file["Results"]
     for s in simulation.sv.species:
         dv = simulation.sv.vGrids[s].physical_spacing
         mass = simulation.sv.masses[s]
@@ -88,11 +86,11 @@ def test_momentum(tf):
             assert np.array_equal(old_result, new_result)
 
 
-@pytest.mark.parametrize("tf", bp_t.FILES)
-def test_energy(tf):
-    simulation = bp.Simulation.load(tf)
+@pytest.mark.parametrize("key", SIMULATIONS.keys())
+def test_energy(key):
+    simulation = SIMULATIONS[key]
     # load results
-    hdf_group = tf["Results"]
+    hdf_group = simulation.file["Results"]
     for s in simulation.sv.species:
         dv = simulation.sv.vGrids[s].physical_spacing
         mass = simulation.sv.masses[s]
@@ -108,11 +106,11 @@ def test_energy(tf):
             assert np.array_equal(old_result, new_result)
 
 
-@pytest.mark.parametrize("tf", bp_t.FILES)
-def test_momentum_flow(tf):
-    simulation = bp.Simulation.load(tf)
+@pytest.mark.parametrize("key", SIMULATIONS.keys())
+def test_momentum_flow(key):
+    simulation = SIMULATIONS[key]
     # load results
-    hdf_group = tf["Results"]
+    hdf_group = simulation.file["Results"]
     for s in simulation.sv.species:
         dv = simulation.sv.vGrids[s].physical_spacing
         mass = simulation.sv.masses[s]
@@ -128,11 +126,11 @@ def test_momentum_flow(tf):
             assert np.array_equal(old_result, new_result)
 
 
-@pytest.mark.parametrize("tf", bp_t.FILES)
-def test_energy_flow(tf):
-    simulation = bp.Simulation.load(tf)
+@pytest.mark.parametrize("key", SIMULATIONS.keys())
+def test_energy_flow(key):
+    simulation = SIMULATIONS[key]
     # load results
-    hdf_group = tf["Results"]
+    hdf_group = simulation.file["Results"]
     for s in simulation.sv.species:
         dv = simulation.sv.vGrids[s].physical_spacing
         mass = simulation.sv.masses[s]
