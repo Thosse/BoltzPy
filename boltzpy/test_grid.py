@@ -9,8 +9,7 @@ import boltzpy as bp
 ###################################
 #           Setup Cases           #
 ###################################
-DIRECTORY = __file__[:-20] + 'test_data/'
-FILE = DIRECTORY + 'Grids.hdf5'
+FILE = test_helper.DIRECTORY + 'Grids.hdf5'
 GRIDS = dict()
 GRIDS["2D_small/timing"] = bp.Grid(shape=(50,),
                                    delta=0.002,
@@ -66,10 +65,9 @@ def test_file_exists():
 
 
 def test_setup_creates_same_file():
-    temp_file_address = DIRECTORY + '_tmp_.hdf5'
-    setup_file(temp_file_address)
-    test_helper.assert_files_are_equal([FILE, temp_file_address])
-    os.remove(temp_file_address)
+    setup_file(test_helper.TMP_FILE)
+    test_helper.assert_files_are_equal([FILE, test_helper.TMP_FILE])
+    os.remove(test_helper.TMP_FILE)
     return
 
 

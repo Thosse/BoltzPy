@@ -1,6 +1,9 @@
 import h5py
 import numpy as np
 
+DIRECTORY = __file__[:-24] + 'test_data/'
+TMP_FILE = DIRECTORY + '_tmp_.hdf5'
+
 
 # Todo make this a set of strings
 def get_all_keys(hdf_object):

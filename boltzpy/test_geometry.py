@@ -11,8 +11,7 @@ from boltzpy.test_rule import RULES
 ###################################
 #           Setup Cases           #
 ###################################
-DIRECTORY = __file__[:-24] + 'test_data/'
-FILE = DIRECTORY + 'Geometries.hdf5'
+FILE = test_helper.DIRECTORY + 'Geometries.hdf5'
 GEOMETRIES = dict()
 GEOMETRIES["2D_small/Geometry"] = bp.Geometry(
     (31,),
@@ -54,10 +53,9 @@ def test_file_exists():
 
 
 def test_setup_creates_same_file():
-    temp_file_address = DIRECTORY + '_tmp_.hdf5'
-    setup_file(temp_file_address)
-    test_helper.assert_files_are_equal([FILE, temp_file_address])
-    os.remove(temp_file_address)
+    setup_file(test_helper.TMP_FILE)
+    test_helper.assert_files_are_equal([FILE, test_helper.TMP_FILE])
+    os.remove(test_helper.TMP_FILE)
     return
 
 

@@ -35,9 +35,7 @@ coll_small.setup(scheme_complete, MODELS["2D_small/Model"])
 coll_equal = bp.Collisions()
 coll_equal.setup(scheme_convergent, MODELS["equalMass/Model"])
 
-DIRECTORY = __file__[:-26] + 'test_data/'
-FILE = DIRECTORY + 'Simulations.hdf5'
-TMP_FILE = DIRECTORY + '_tmp_.hdf5'
+FILE = test_helper.DIRECTORY + 'Simulations.hdf5'
 _open_file = h5py.File(FILE, mode="r")
 SIMULATIONS = dict()
 SIMULATIONS["2D_small/Simulation"] = bp.Simulation(
@@ -84,8 +82,8 @@ def test_file_exists():
 
 
 def test_setup_creates_same_file():
-    setup_file(TMP_FILE)
-    test_helper.assert_files_are_equal([FILE, TMP_FILE])
+    setup_file(test_helper.TMP_FILE)
+    test_helper.assert_files_are_equal([FILE, test_helper.TMP_FILE])
     return
 
 
@@ -112,10 +110,15 @@ def test_load_from_file(key):
 @pytest.mark.parametrize("key", SIMULATIONS.keys())
 def test_computed_state_is_equal(key):
     file_old = h5py.File(FILE, mode="r")
-    file_new = h5py.File(TMP_FILE, mode="r")
+    file_new = h5py.File(test_helper.TMP_FILE, mode="r")
     assert file_old[key]["Results"].keys() == file_new[key]["Results"].keys()
     for s in file_old[key]["Results"].keys():
         state_old = file_old[key]["Results"][s]["state"][()]
         state_new = file_new[key]["Results"][s]["state"][()]
         assert np.array_equal(state_old, state_new), (
             "\n{}\nis not equal to\n\n{}".format(state_old, state_new))
+
+
+# the file is used in more tests, this is a simple hack to delete it after use
+def test_teardown_tmp_file():
+    os.remove(test_helper.TMP_FILE)

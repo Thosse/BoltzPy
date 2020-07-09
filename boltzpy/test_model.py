@@ -8,8 +8,7 @@ import boltzpy as bp
 ###################################
 #           Setup Cases           #
 ###################################
-DIRECTORY = __file__[:-21] + 'test_data/'
-FILE = DIRECTORY + 'Models.hdf5'
+FILE = test_helper.DIRECTORY + 'Models.hdf5'
 MODELS = dict()
 MODELS["2D_small/Model"] = bp.SVGrid(
     masses=[2, 3],
@@ -68,10 +67,9 @@ def test_file_exists():
 
 
 def test_setup_creates_same_file():
-    temp_file_address = DIRECTORY + '_tmp_.hdf5'
-    setup_file(temp_file_address)
-    test_helper.assert_files_are_equal([FILE, temp_file_address])
-    os.remove(temp_file_address)
+    setup_file(test_helper.TMP_FILE)
+    test_helper.assert_files_are_equal([FILE, test_helper.TMP_FILE])
+    os.remove(test_helper.TMP_FILE)
     return
 
 
