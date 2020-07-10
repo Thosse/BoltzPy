@@ -304,13 +304,16 @@ class Grid(bp.BaseClass):
         self = Grid(shape, delta, spacing, is_centered)
         return self
 
-    def save(self, hdf5_group):
+    def save(self, hdf5_group, write_all=False):
         """Write the main parameters of the :obj:`Grid` instance
         into the HDF5 group.
 
         Parameters
         ----------
         hdf5_group : :obj:`h5py.Group <h5py:Group>`
+        write_all : :obj:`bool`
+            If True, write all attributes and properties to the file,
+            even the unnecessary ones. Useful for testing,
         """
         assert isinstance(hdf5_group, h5py.Group)
         self.check_integrity()
@@ -325,6 +328,12 @@ class Grid(bp.BaseClass):
         hdf5_group["delta"] = self.delta
         hdf5_group["spacing"] = self.spacing
         hdf5_group["is_centered"] = self.is_centered
+        if write_all:
+            hdf5_group["ndim"] = self.ndim
+            hdf5_group["size"] = self.size
+            hdf5_group["iG"] = self.iG
+            hdf5_group["physical_spacing"] = self.physical_spacing
+            hdf5_group["pG"] = self.pG
 
         # check that the class can be reconstructed from the save
         other = Grid.load(hdf5_group)
