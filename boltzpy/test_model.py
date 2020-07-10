@@ -1,6 +1,7 @@
 import pytest
 import os
 import h5py
+import numpy as np
 
 import boltzpy.helpers.tests as test_helper
 import boltzpy as bp
@@ -18,6 +19,7 @@ MODELS["2D_small/Model"] = bp.Model(
     collision_factors=[[50, 50], [50, 50]],
     algorithm_relations="all",
     algorithm_weights="uniform")
+# Todo This might lead to weird results! Check this!
 MODELS["equalSpacing/Model"] = bp.Model(
     masses=[1, 2],
     shapes=[[7, 7], [7, 7]],
@@ -34,19 +36,20 @@ MODELS["equalMass/Model"] = bp.Model(
     collision_factors=[[50, 50], [50, 50]],
     algorithm_relations="fast",
     algorithm_weights="uniform")
-MODELS["evenShapes/Model"] = bp.Model(
-    masses=[2, 3],
-    shapes=[[4, 4], [6, 6]],
-    delta=1/12,
-    spacings=[2, 2],
-    collision_factors=[[50, 50], [50, 50]],
-    algorithm_relations="all",
-    algorithm_weights="uniform")
+# Todo Allow equal spacing
+# MODELS["evenShapes/Model"] = bp.Model(
+#     masses=[2, 3],
+#     shapes=[[4, 4], [6, 6]],
+#     delta=1/12,
+#     spacings=[2, 2],
+#     collision_factors=[[50, 50], [50, 50]],
+#     algorithm_relations="all",
+#     algorithm_weights="uniform")
 MODELS["mixed_spacing/Model"] = bp.Model(
     masses=[3, 4],
     shapes=[[6, 6], [7, 7]],
     delta=1/14,
-    spacings=[2, 2],
+    spacings=[8, 6],
     collision_factors=[[50, 50], [50, 50]],
     algorithm_relations="fast",
     algorithm_weights="uniform")
@@ -64,7 +67,7 @@ def setup_file(file_address=FILE):
     for (key, item) in MODELS.items():
         assert isinstance(item, bp.Model)
         file.create_group(key)
-        item.save(file[key])
+        item.save(file[key], True)
     return
 
 
@@ -102,6 +105,14 @@ def test_load_from_file(key):
         "\n{}\nis not equal to\n\n{}".format(old, new)
     )
 
+
+@pytest.mark.parametrize("key", MODELS.keys())
+@pytest.mark.parametrize("attribute", bp.Model.attributes())
+def test_attributes(attribute, key):
+    file = h5py.File(FILE, mode="r")
+    old = file[key][attribute][()]
+    new = MODELS[key].__getattribute__(attribute)
+    assert np.all(old == new)
 
 # Todo proper test of find_index and get_specimen seems hard, implement differently?
 #  Implement collisions only for specimen tuples

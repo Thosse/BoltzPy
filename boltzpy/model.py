@@ -114,7 +114,7 @@ class Model(bp.BaseClass):
     #####################################
     @property
     def species(self):
-        return range(self.specimen)
+        return np.arange(self.specimen)
 
     @property
     def index_range(self):
@@ -129,6 +129,28 @@ class Model(bp.BaseClass):
         """:obj:`float`
         Maximum physical velocity for every sub grid."""
         return np.max(self.iMG * self.delta)
+
+    @staticmethod
+    def parameters():
+        return {"masses",
+                "shapes",
+                "delta",
+                "spacings",
+                "collision_factors",
+                "algorithm_relations",
+                "algorithm_weights"}
+
+    @staticmethod
+    def attributes():
+        attrs = Model.parameters()
+        attrs.update({"ndim",
+                      "size",
+                      "specimen",
+                      "index_offset",
+                      "index_range",
+                      "species",
+                      "maximum_velocity"})
+        return attrs
 
     #####################################
     #               Indexing            #
@@ -231,31 +253,23 @@ class Model(bp.BaseClass):
         assert isinstance(hdf5_group, h5py.Group)
         assert hdf5_group.attrs["class"] == "Model"
 
-        # read attributes from file
-        masses = hdf5_group["masses"][()]
-        shapes = hdf5_group["shapes"][()]
-        delta = hdf5_group["delta"][()]
-        spacings = hdf5_group["spacings"][()]
-        collision_factors = hdf5_group["collision_factors"][()]
-        algorithm_relations = hdf5_group["algorithm_relations"][()]
-        algorithm_weights = hdf5_group["algorithm_weights"][()]
+        parameters = dict()
+        for param in Model.parameters():
+            parameters[param] = hdf5_group[param][()]
 
-        self = Model(masses,
-                     shapes,
-                     delta,
-                     spacings,
-                     collision_factors,
-                     algorithm_relations,
-                     algorithm_weights)
+        self = Model(**parameters)
         return self
 
-    def save(self, hdf5_group):
+    def save(self, hdf5_group, write_all=False):
         """Write the main parameters of the :class:`Model` instance
         into the HDF5 group.
 
         Parameters
         ----------
         hdf5_group : :obj:`h5py.Group <h5py:Group>`
+        write_all : :obj:`bool`
+            If True, write all attributes and properties to the file,
+            even the unnecessary ones. Useful for testing,
         """
         assert isinstance(hdf5_group, h5py.Group)
         self.check_integrity()
@@ -264,15 +278,13 @@ class Model(bp.BaseClass):
         for key in hdf5_group.keys():
             del hdf5_group[key]
         hdf5_group.attrs["class"] = self.__class__.__name__
-
-        # write all set attributes to file
-        hdf5_group["masses"] = self.masses
-        hdf5_group["shapes"] = self.shapes
-        hdf5_group["delta"] = self.delta
-        hdf5_group["spacings"] = self.spacings
-        hdf5_group["collision_factors"] = self.collision_factors
-        hdf5_group["algorithm_relations"] = self.algorithm_relations
-        hdf5_group["algorithm_weights"] = self.algorithm_weights
+        # write attributes to file
+        if write_all:
+            for attr in Model.attributes():
+                hdf5_group[attr] = self.__getattribute__(attr)
+        else:
+            for attr in Model.parameters():
+                hdf5_group[attr] = self.__getattribute__(attr)
 
         # check that the class can be reconstructed from the save
         other = Model.load(hdf5_group)
