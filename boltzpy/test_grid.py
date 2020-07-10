@@ -10,8 +10,6 @@ import boltzpy as bp
 #           Setup Cases           #
 ###################################
 FILE = test_helper.DIRECTORY + 'Grids.hdf5'
-ATTRIBUTES = {"shape", "delta", "spacing", "is_centered",
-              "ndim", "size", "iG", "physical_spacing", "pG"}
 GRIDS = dict()
 GRIDS["2D_small/timing"] = bp.Grid(shape=(50,),
                                    delta=0.002,
@@ -93,7 +91,7 @@ def test_load_from_file(key):
 
 
 @pytest.mark.parametrize("key", GRIDS.keys())
-@pytest.mark.parametrize("attribute", ATTRIBUTES)
+@pytest.mark.parametrize("attribute", bp.Grid.attributes())
 def test_attributes(attribute, key):
     file = h5py.File(FILE, mode="r")
     old = file[key][attribute][()]

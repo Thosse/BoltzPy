@@ -76,7 +76,7 @@ class Grid(bp.BaseClass):
         self.shape = np.array(shape, dtype=int)
         self.delta = np.float(delta)
         self.spacing = np.int(spacing)
-        self.is_centered = is_centered
+        self.is_centered = bool(is_centered)
         self.ndim = self.shape.size
         self.size = np.int(np.prod(self.shape))
         self.iG = self.iv(np.arange(self.size))
@@ -109,6 +109,23 @@ class Grid(bp.BaseClass):
         Array of shape (:attr:`size`, :attr:`ndim`).
          """
         return self.pv(np.arange(self.size))
+
+    @staticmethod
+    def parameters():
+        return {"shape",
+                "delta",
+                "spacing",
+                "is_centered"}
+
+    @staticmethod
+    def attributes():
+        attrs = Grid.parameters()
+        attrs.update({"ndim",
+                      "size",
+                      "iG",
+                      "physical_spacing",
+                      "pG"})
+        return attrs
 
     #####################################
     #         Indexes and Values        #
@@ -295,13 +312,11 @@ class Grid(bp.BaseClass):
         assert isinstance(hdf5_group, h5py.Group)
         assert hdf5_group.attrs["class"] == "Grid"
 
-        # read parameters from file
-        shape = hdf5_group["shape"][()]
-        delta = hdf5_group["delta"][()]
-        spacing = hdf5_group["spacing"][()]
-        is_centered = bool(hdf5_group["is_centered"][()])
+        parameters = dict()
+        for param in Grid.parameters():
+            parameters[param] = hdf5_group[param][()]
 
-        self = Grid(shape, delta, spacing, is_centered)
+        self = Grid(**parameters)
         return self
 
     def save(self, hdf5_group, write_all=False):
@@ -322,19 +337,13 @@ class Grid(bp.BaseClass):
         for key in hdf5_group.keys():
             del hdf5_group[key]
         hdf5_group.attrs["class"] = self.__class__.__name__
-
-        # write all set attributes to file
-        hdf5_group["shape"] = self.shape
-        hdf5_group["delta"] = self.delta
-        hdf5_group["spacing"] = self.spacing
-        hdf5_group["is_centered"] = self.is_centered
+        # write attributes to file
         if write_all:
-            hdf5_group["ndim"] = self.ndim
-            hdf5_group["size"] = self.size
-            hdf5_group["iG"] = self.iG
-            hdf5_group["physical_spacing"] = self.physical_spacing
-            hdf5_group["pG"] = self.pG
-
+            for attr in Grid.attributes():
+                hdf5_group[attr] = self.__getattribute__(attr)
+        else:
+            for attr in Grid.parameters():
+                hdf5_group[attr] = self.__getattribute__(attr)
         # check that the class can be reconstructed from the save
         other = Grid.load(hdf5_group)
         assert self == other
