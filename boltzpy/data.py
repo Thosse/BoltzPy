@@ -50,9 +50,6 @@ class Data:
         Size of the position space :class:`boltzpy.Grid`.
     m : :obj:`~numpy.array` [:obj:`int`]
         Denotes the mass of every :class:`~boltzpy.Specimen`
-    category : :obj:`~numpy.array` [:obj:`int`]
-        Defines the behaviour of each point in P-Space
-        in the computation.
     """
     def __init__(self, file_address):
         # create temporary Simulation instance
@@ -79,20 +76,13 @@ class Data:
         self.tG = sim.timing.iG  # keep it, for adaptive time grids
         self.dt = sim.timing.delta
 
-        self.dp = sim.p.delta
-        self.p_dim = sim.p.ndim
-        self.p_size = sim.p.size
+        self.dp = sim.geometry.delta
+        self.p_dim = sim.geometry.ndim
+        self.p_size = sim.geometry.size
 
         # Collision arrays
-        # Todo create struct -> 4 ints and 1 float together -> possible?
-        if not sim.coll.is_set_up:
-            sim.coll.setup(sim.model)
         self.col = sim.coll.relations
         self.weight = sim.coll.weights
-
-        # Array, denotes the behaviour_type of a space point
-        # and thus its behaviour
-        self.category = sim.init_arr
 
         # Todo add rule arr (only boundary points necessary)
         #   with initialization scheme (standardized for initial_rho = 1)

@@ -68,33 +68,6 @@ class Geometry(bp.Grid):
                       "initial_state"})
         return attrs
 
-    def add_rule(self, new_rule):
-        """Add a :class:`Rule` to :attr:`rules` array.
-
-        Parameters
-        ----------
-        new_rule : :obj:`~boltzpy.Rule`
-            The Rule object to append
-        """
-        assert isinstance(new_rule, bp.Rule)
-        assert set(new_rule.affected_points).issubset(self.unaffected_points)
-        self.rules = np.append(self.rules, [new_rule])
-        self.check_integrity()
-        return
-
-    @property
-    def is_set_up(self):
-        return len(self.affected_points) == self.size
-
-    # Todo Only Temporary!
-    @property
-    def init_array(self):
-        init_arr = np.full(self.shape, -1, dtype=int)
-        for (idx_r, r) in enumerate(self.rules):
-            for idx_p in r.affected_points:
-                init_arr[idx_p] = idx_r
-        return init_arr
-
     @property
     def initial_state(self):
         """Fully initiallized initial state.
@@ -109,7 +82,6 @@ class Geometry(bp.Grid):
             :attr:`Simulation.sv.size
             <boltzpy.Model.size>`).
         """
-        assert self.is_set_up
         shape = (self.size, self.model_size)
         state = np.zeros(shape=shape, dtype=float)
         for rule in self.rules:

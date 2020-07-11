@@ -71,34 +71,30 @@ class Simulation(bp.BaseClass):
         self.check_integrity(complete_check=False)
         return
 
-    # Todo remove this, replace usage by geometry
-    @property
-    def p(self):
-        return self.geometry
-
-    # Todo remove this, replace usage by geometry
-    @property
-    def init_arr(self):
-        return self.geometry.init_array
-
-    # Todo remove this, replace usage by geometry
-    @property
-    def rule_arr(self):
-        return self.geometry.rules
-
     # Todo make this an array(obj) of tuples, remove specimen folders?
     @property
     def shape_of_results(self):
         output = np.empty(self.model.specimen, dtype=dict)
         for s in self.model.species:
             output[s] = {
-                'particle_number': (self.timing.size, self.p.size),
-                'mean_velocity': (self.timing.size, self.p.size, self.model.ndim),
-                'momentum': (self.timing.size, self.p.size, self.model.ndim),
-                'momentum_flow': (self.timing.size, self.p.size, self.model.ndim),
-                'temperature': (self.timing.size, self.p.size),
-                'energy': (self.timing.size, self.p.size),
-                'energy_flow': (self.timing.size, self.p.size, self.model.ndim)
+                'particle_number': (self.timing.size,
+                                    self.geometry.size),
+                'mean_velocity': (self.timing.size,
+                                  self.geometry.size,
+                                  self.model.ndim),
+                'momentum': (self.timing.size,
+                             self.geometry.size,
+                             self.model.ndim),
+                'momentum_flow': (self.timing.size,
+                                  self.geometry.size,
+                                  self.model.ndim),
+                'temperature': (self.timing.size,
+                                self.geometry.size),
+                'energy': (self.timing.size,
+                           self.geometry.size),
+                'energy_flow': (self.timing.size,
+                                self.geometry.size,
+                                self.model.ndim)
             }
         return output
 
@@ -218,7 +214,7 @@ class Simulation(bp.BaseClass):
             assert len(moments) <= np.prod(shape)
         # xdata (geometry) is shared over all plots
         # Todo flatten() should NOT be necessary, fix with model/geometry
-        xdata = (self.p.iG * self.p.delta).flatten()[1:-1]
+        xdata = (self.geometry.iG * self.geometry.delta).flatten()[1:-1]
         for (m, moment) in enumerate(moments):
             ax = figure.add_subplot(shape + (1 + m,),
                                     title=moment)
@@ -297,18 +293,10 @@ class Simulation(bp.BaseClass):
         hdf_group.attrs["order_transport"] = self.order_transport
         hdf_group.attrs["order_collisions"] = self.order_collisions
 
-        key = "timing"
-        hdf_group.create_group(key)
-        self.timing.save(hdf_group[key])
-        key = "geometry"
-        hdf_group.create_group(key)
-        self.geometry.save(hdf_group[key])
-        key = "model"
-        hdf_group.create_group(key)
-        self.model.save(hdf_group[key])
-        key = "Collisions"
-        hdf_group.create_group(key)
-        self.coll.save(hdf_group[key])
+        self.timing.save(hdf_group.create_group("timing"))
+        self.geometry.save(hdf_group.create_group("geometry"))
+        self.model.save(hdf_group.create_group("model"))
+        self.coll.save(hdf_group.create_group("Collisions"))
 
         key = "results"
         hdf_group.create_group(key)
@@ -323,13 +311,11 @@ class Simulation(bp.BaseClass):
             for (name, shape) in shapes[s].items():
                 grp_spc.create_dataset(name, shape=shape, dtype=float)
             if self.log_state:
-                shape = (self.timing.size, self.p.size, self.model.vGrids[s].size)
+                shape = (self.timing.size, self.geometry.size, self.model.vGrids[s].size)
                 grp_spc.create_dataset("state", shape, dtype=float)
 
         # assert that the instance can be reconstructed from the save
         other = self.load(hdf_group)
-        # if a different file name is given then, the check MUST fail
-        # Todo implement proper __eq__ method
         assert self.__eq__(other, ignore=["file"])
         return
 
@@ -348,7 +334,7 @@ class Simulation(bp.BaseClass):
             If False, then unassigned attributes are ignored.
         """
         self.check_parameters(time_grid=self.timing,
-                              position_grid=self.p,
+                              position_grid=self.geometry,
                               species_velocity_grid=self.model,
                               geometry=self.geometry,
                               complete_check=complete_check,
