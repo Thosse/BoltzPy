@@ -40,7 +40,7 @@ def setup_file(file_address=FILE):
     for (key, item) in GEOMETRIES.items():
         assert isinstance(item, bp.Geometry)
         file.create_group(key)
-        item.save(file[key])
+        item.save(file[key], True)
     return
 
 
@@ -77,3 +77,19 @@ def test_load_from_file(key):
     assert old == new, (
         "\n{}\nis not equal to\n\n{}".format(old, new)
     )
+
+
+@pytest.mark.parametrize("key", GEOMETRIES.keys())
+@pytest.mark.parametrize("attribute", bp.Geometry.attributes())
+def test_attributes(attribute, key):
+    file = h5py.File(FILE, mode="r")
+    if attribute == "rules":
+        old = np.empty(file[key]["rules"].attrs["size"],
+                       dtype=bp.Rule)
+        for r in range(old.size):
+            old[r] = bp.Rule.load(file[key]["rules"][str(r)])
+    else:
+        old = file[key][attribute][()]
+    new = GEOMETRIES[key].__getattribute__(attribute)
+    assert np.all(old == new)
+

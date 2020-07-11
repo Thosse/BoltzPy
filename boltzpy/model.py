@@ -252,13 +252,10 @@ class Model(bp.BaseClass):
         """
         assert isinstance(hdf5_group, h5py.Group)
         assert hdf5_group.attrs["class"] == "Model"
-
         parameters = dict()
         for param in Model.parameters():
             parameters[param] = hdf5_group[param][()]
-
-        self = Model(**parameters)
-        return self
+        return Model(**parameters)
 
     def save(self, hdf5_group, write_all=False):
         """Write the main parameters of the :class:`Model` instance
@@ -279,12 +276,9 @@ class Model(bp.BaseClass):
             del hdf5_group[key]
         hdf5_group.attrs["class"] = self.__class__.__name__
         # write attributes to file
-        if write_all:
-            for attr in Model.attributes():
-                hdf5_group[attr] = self.__getattribute__(attr)
-        else:
-            for attr in Model.parameters():
-                hdf5_group[attr] = self.__getattribute__(attr)
+        attributes = self.attributes() if write_all else self.parameters()
+        for attr in attributes:
+            hdf5_group[attr] = self.__getattribute__(attr)
 
         # check that the class can be reconstructed from the save
         other = Model.load(hdf5_group)

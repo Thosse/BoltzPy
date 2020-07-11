@@ -53,6 +53,21 @@ class Geometry(bp.Grid):
         assert len(set(sizes)) == 1
         return sizes[0]
 
+    @staticmethod
+    def parameters():
+        return {"shape",
+                "delta",
+                "rules"}
+
+    @staticmethod
+    def attributes():
+        attrs = Geometry.parameters()
+        attrs.update(bp.Grid.attributes())
+        attrs.update({"affected_points",
+                      "unaffected_points",
+                      "initial_state"})
+        return attrs
+
     def add_rule(self, new_rule):
         """Add a :class:`Rule` to :attr:`rules` array.
 
@@ -95,11 +110,10 @@ class Geometry(bp.Grid):
             <boltzpy.Model.size>`).
         """
         assert self.is_set_up
-        shape = (self.size, self.rules[0].initial_state.size)
+        shape = (self.size, self.model_size)
         state = np.zeros(shape=shape, dtype=float)
         for rule in self.rules:
             state[rule.affected_points, :] = rule.initial_state
-        # Todo state = state.reshape(shape + (model_size,))
         return state
 
     #####################################
@@ -136,26 +150,30 @@ class Geometry(bp.Grid):
         """
         assert isinstance(hdf5_group, h5py.Group)
         assert hdf5_group.attrs["class"] == "Geometry"
-
         # read parameters from file
-        shape = tuple(int(width) for width in hdf5_group["shape"][()])
-        delta = float(hdf5_group["delta"][()])
-        # load rules iteratively
-        rules = np.empty(shape=hdf5_group["rules"].attrs["size"],
-                         dtype=bp.Rule)
-        for pos_rule in range(rules.size):
-            rules[pos_rule] = bp.Rule.load(hdf5_group["rules"][str(pos_rule)])
-        # Initialize
-        self = Geometry(shape, delta, rules)
-        return self
+        parameters = dict()
+        for param in Geometry.parameters():
+            # load rules separately
+            if param == "rules":
+                rules = np.empty(hdf5_group["rules"].attrs["size"],
+                                 dtype=bp.Rule)
+                for r in range(rules.size):
+                    rules[r] = bp.Rule.load(hdf5_group["rules"][str(r)])
+                parameters["rules"] = rules
+            else:
+                parameters[param] = hdf5_group[param][()]
+        return Geometry(**parameters)
 
-    def save(self, hdf5_group):
+    def save(self, hdf5_group, write_all=False):
         """Write the main parameters of the :obj:`Geometry` instance
         into the HDF5 group.
 
         Parameters
         ----------
         hdf5_group : :obj:`h5py.Group <h5py:Group>`
+        write_all : :obj:`bool`
+            If True, write all attributes and properties to the file,
+            even the unnecessary ones. Useful for testing,
         """
         assert isinstance(hdf5_group, h5py.Group)
         self.check_integrity()
@@ -164,19 +182,22 @@ class Geometry(bp.Grid):
         for key in hdf5_group.keys():
             del hdf5_group[key]
         hdf5_group.attrs["class"] = self.__class__.__name__
-
-        # write all parameters
-        hdf5_group["shape"] = self.shape
-        hdf5_group["delta"] = self.delta
-        # write rules
-        hdf5_group.create_group("rules")
-        hdf5_group["rules"].attrs["class"] = "Array"
-        hdf5_group["rules"].attrs["size"] = self.rules.size
-        # save all rules iteratively
-        for (idx_rule, rule) in enumerate(self.rules):
-            key_rule = str(idx_rule)
-            hdf5_group["rules"].create_group(key_rule)
-            rule.save(hdf5_group["rules"][key_rule])
+        attributes = self.attributes() if write_all else self.parameters()
+        for attr in attributes:
+            # rules are saved separately in a subgroup
+            if attr == "rules":
+                hdf5_group.create_group("rules")
+                hdf5_group["rules"].attrs["class"] = "Array"
+                hdf5_group["rules"].attrs["size"] = self.rules.size
+                for (idx_rule, rule) in enumerate(self.rules):
+                    key_rule = str(idx_rule)
+                    hdf5_group["rules"].create_group(key_rule)
+                    rule.save(hdf5_group["rules"][key_rule])
+            else:
+                hdf5_group[attr] = self.__getattribute__(attr)
+        # check that the class can be reconstructed from the save
+        other = Geometry.load(hdf5_group)
+        assert self == other
         return
 
     #####################################

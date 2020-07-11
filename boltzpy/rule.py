@@ -190,10 +190,7 @@ class Rule(bp.BaseClass):
         parameters = dict()
         for param in rule_class.parameters():
             parameters[param] = hdf5_group[param][()]
-        # construct rule
-        self = rule_class(**parameters)
-        self.check_integrity()
-        return self
+        return rule_class(**parameters)
 
     def save(self, hdf5_group, write_all=False):
         """Write the main parameters of the :class:`Rule` instance
@@ -212,12 +209,9 @@ class Rule(bp.BaseClass):
         for key in hdf5_group.keys():
             del hdf5_group[key]
         hdf5_group.attrs["class"] = self.__class__.__name__
-        if write_all:
-            for attr in self.attributes():
-                hdf5_group[attr] = self.__getattribute__(attr)
-        else:
-            for attr in self.parameters():
-                hdf5_group[attr] = self.__getattribute__(attr)
+        attributes = self.attributes() if write_all else self.parameters()
+        for attr in attributes:
+            hdf5_group[attr] = self.__getattribute__(attr)
         return
 
     #####################################
