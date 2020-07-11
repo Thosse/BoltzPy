@@ -5,9 +5,10 @@ import numpy as np
 
 exisiting_simulation_file = None
 if exisiting_simulation_file is not None:
-    sim = bp.Simulation.load(exisiting_simulation_file)
+    import h5py
+    sim = bp.Simulation.load(h5py.File(exisiting_simulation_file, mode='r'))
 else:
-    t = bp.Grid((201,), 1/1000, 5)
+    timing = bp.Grid((201,), 1/1000, 5)
     model = bp.Model([2, 3],
                      [(5, 5), (7, 7)],
                      0.25,
@@ -17,21 +18,21 @@ else:
         (31, ),
         0.5,
         [bp.ConstantPointRule(
-            initial_rho=[1.0, 1.0],
-            initial_drift=[[0.0, 0.0], [0.0, 0.0]],
-            initial_temp=[.50, .50],
+            particle_number=[1.0, 1.0],
+            mean_velocity=[[0.0, 0.0], [0.0, 0.0]],
+            temperature=[.50, .50],
             affected_points=[0],
             model=model),
          bp.InnerPointRule(
-            initial_rho=[1.0, 1.0],
-            initial_drift=[[0.0, 0.0], [0.0, 0.0]],
-            initial_temp=[.50, .50],
+            particle_number=[1.0, 1.0],
+            mean_velocity=[[0.0, 0.0], [0.0, 0.0]],
+            temperature=[.50, .50],
             affected_points=np.arange(1, 30),
             model=model),
          bp.BoundaryPointRule(
-            initial_rho=[1.0, 1.0],
-            initial_drift=[[0.0, 0.0], [0.0, 0.0]],
-            initial_temp=[.5, .5],
+            particle_number=[1.0, 1.0],
+            mean_velocity=[[0.0, 0.0], [0.0, 0.0]],
+            temperature=[.5, .5],
             affected_points=[30],
             reflection_rate_inverse=[.3, .3],
             reflection_rate_elastic=[.3, .3],
@@ -42,8 +43,8 @@ else:
          ]
     )
     coll = bp.Collisions()
-    coll.setup(model=model)
-    sim = bp.Simulation(t, geometry, model, coll, exisiting_simulation_file)
+    coll.setup(model)
+    sim = bp.Simulation(timing, geometry, model, coll, exisiting_simulation_file)
     sim.save()
     # #
     # grp = sim.coll.group(sim.model, mode="species")

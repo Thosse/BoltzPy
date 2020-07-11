@@ -15,21 +15,21 @@ FILE = test_helper.DIRECTORY + 'Rules.hdf5'
 RULES = dict()
 # Test rules allow up to 4 specimen
 RULES["2D_small/LeftConstant"] = bp.ConstantPointRule(
-    initial_rho=[2, 2],
-    initial_drift=[[0, 0], [0, 0]],
-    initial_temp=[1, 1],
+    particle_number=[2, 2],
+    mean_velocity=[[0, 0], [0, 0]],
+    temperature=[1, 1],
     affected_points=[0],
     model=MODELS["2D_small/Model"])
 RULES["2D_small/Interior"] = bp.InnerPointRule(
-    initial_rho=[1, 1],
-    initial_drift=[[0, 0], [0, 0]],
-    initial_temp=[1, 1],
+    particle_number=[1, 1],
+    mean_velocity=[[0, 0], [0, 0]],
+    temperature=[1, 1],
     affected_points=np.arange(1, 9),
     model=MODELS["2D_small/Model"])
 RULES["2D_small/RightBoundary"] = bp.BoundaryPointRule(
-    initial_rho=[1, 1],
-    initial_drift=[[0, 0], [0, 0]],
-    initial_temp=[1, 1],
+    particle_number=[1, 1],
+    mean_velocity=[[0, 0], [0, 0]],
+    temperature=[1, 1],
     affected_points=[9],
     model=MODELS["2D_small/Model"],
     reflection_rate_inverse=[0.25, 0.25, 0.25, 0.25],
@@ -38,9 +38,9 @@ RULES["2D_small/RightBoundary"] = bp.BoundaryPointRule(
     absorption_rate=[0.25, 0.25, 0.25, 0.25],
     surface_normal=np.array([1, 0], dtype=int))
 RULES["equalMass/LeftBoundary"] = bp.BoundaryPointRule(
-    initial_rho=[2, 2],
-    initial_drift=[[0, 0], [0, 0]],
-    initial_temp=[1, 1],
+    particle_number=[2, 2],
+    mean_velocity=[[0, 0], [0, 0]],
+    temperature=[1, 1],
     affected_points=[0],
     model=MODELS["equalMass/Model"],
     reflection_rate_inverse=[0.45, 0.45, 0.45, 0.45],
@@ -49,21 +49,21 @@ RULES["equalMass/LeftBoundary"] = bp.BoundaryPointRule(
     absorption_rate=[0, 0, 0, 0],
     surface_normal=np.array([-1, 0], dtype=int))
 RULES["equalMass/LeftInterior"] = bp.InnerPointRule(
-    initial_rho=[2, 2],
-    initial_drift=[[0, 0], [0, 0]],
-    initial_temp=[1, 1],
+    particle_number=[2, 2],
+    mean_velocity=[[0, 0], [0, 0]],
+    temperature=[1, 1],
     affected_points=np.arange(1, 5),
     model=MODELS["equalMass/Model"])
 RULES["equalMass/RightInterior"] = bp.InnerPointRule(
-    initial_rho=[1, 1],
-    initial_drift=[[0, 0], [0, 0]],
-    initial_temp=[1, 1],
+    particle_number=[1, 1],
+    mean_velocity=[[0, 0], [0, 0]],
+    temperature=[1, 1],
     affected_points=np.arange(5, 9),
     model=MODELS["equalMass/Model"])
 RULES["equalMass/RightBoundary"] = bp.BoundaryPointRule(
-    initial_rho=[1, 1],
-    initial_drift=[[0, 0], [0, 0]],
-    initial_temp=[1, 1],
+    particle_number=[1, 1],
+    mean_velocity=[[0, 0], [0, 0]],
+    temperature=[1, 1],
     affected_points=[9],
     model=MODELS["equalMass/Model"],
     reflection_rate_inverse=[0.15, 0.15, 0.15, 0.15],
@@ -71,6 +71,11 @@ RULES["equalMass/RightBoundary"] = bp.BoundaryPointRule(
     reflection_rate_thermal=[0.15, 0.15, 0.15, 0.15],
     absorption_rate=[0.55, 0.55, 0.55, 0.55],
     surface_normal=np.array([1, 0], dtype=int))
+
+# Sub dictionaries for specific attribute tests
+CLASSES = {name: {key: item for (key, item) in RULES.items()
+                  if isinstance(item, subclass)}
+           for (name, subclass) in bp.Rule.classes().items()}
 
 
 def setup_file(file_address=FILE):
@@ -85,7 +90,7 @@ def setup_file(file_address=FILE):
     for (key, item) in RULES.items():
         assert isinstance(item, bp.Rule)
         file.create_group(key)
-        item.save(file[key])
+        item.save(file[key], True)
 
     # save models
     for group in file.keys():
@@ -130,6 +135,33 @@ def test_load_from_file(key):
     )
 
 
+@pytest.mark.parametrize("key", CLASSES["InnerPointRule"].keys())
+@pytest.mark.parametrize("attribute", bp.InnerPointRule.attributes())
+def test_attributes_of_inner_points(attribute, key):
+    file = h5py.File(FILE, mode="r")
+    old = file[key][attribute][()]
+    new = RULES[key].__getattribute__(attribute)
+    assert np.all(old == new)
+
+
+@pytest.mark.parametrize("key", CLASSES["ConstantPointRule"].keys())
+@pytest.mark.parametrize("attribute", bp.ConstantPointRule.attributes())
+def test_attributes_of_constant_points(attribute, key):
+    file = h5py.File(FILE, mode="r")
+    old = file[key][attribute][()]
+    new = RULES[key].__getattribute__(attribute)
+    assert np.all(old == new)
+
+
+@pytest.mark.parametrize("key", CLASSES["BoundaryPointRule"].keys())
+@pytest.mark.parametrize("attribute", bp.BoundaryPointRule.attributes())
+def test_attributes_of_boundary_points(attribute, key):
+    file = h5py.File(FILE, mode="r")
+    old = file[key][attribute][()]
+    new = RULES[key].__getattribute__(attribute)
+    assert np.all(old == new)
+
+
 @pytest.mark.parametrize("key", RULES.keys())
 def test_reflected_indices_inverse(key):
     rule = RULES[key]
@@ -154,9 +186,9 @@ def test_reflected_indices_inverse(key):
 #     spacings=[6, 4],
 #     collision_factors=[[50, 50], [50, 50]])
 # rule = bp.ConstantPointRule(
-#     initial_rho=[2, 2],
-#     initial_drift=[[0, 0], [0, 0]],
-#     initial_temp=[1, 1],
+#     particle_number=[2, 2],
+#     mean_velocity=[[0, 0], [0, 0]],
+#     temperature=[1, 1],
 #     affected_points=[0],
 #     model=model)
 

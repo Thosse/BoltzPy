@@ -37,22 +37,19 @@ class Geometry(bp.Grid):
 
     @property
     def affected_points(self):
-        result = list()
-        for rule in self.rules:
-            result += list(rule.affected_points)
-        assert len(result) == len(set(result))
+        result = np.concatenate([r.affected_points for r in self.rules])
         return result
 
     @property
     def unaffected_points(self):
-        possible_points = set(range(int(self.size)))
+        possible_points = set(np.arange(self.size))
         affected_points = set(self.affected_points)
-        return possible_points - affected_points
+        return np.array(list(possible_points - affected_points))
 
+    # Todo remove?
     @property
-    def size_of_model(self):
+    def model_size(self):
         sizes = [rule.initial_state.size for rule in self.rules]
-        # todo assert all rule.initial_state.size must be equal in check_params
         assert len(set(sizes)) == 1
         return sizes[0]
 
@@ -197,18 +194,17 @@ class Geometry(bp.Grid):
         for rule in self.rules:
             assert isinstance(rule, bp.Rule)
             rule.check_integrity()
-        # all points must be affected at most once
-        affected_points = list()
-        for rule in self.rules:
-            affected_points += list(rule.affected_points)
-            assert len(affected_points) == len(set(affected_points)), (
+        # all points are affected at most once
+        assert self.affected_points.size == len(set(self.affected_points)), (
                 "Some points are affected by more than one rule:"
-                "{}".format(affected_points)
-            )
-        # All rules must work on the same model
-        assert len({(rule.initial_state.size for rule in self.rules)}) < 2, (
-            "Some rules have different model size!"
-        )
+                "{}".format(self.affected_points))
+        # all points are affected at least once
+        assert self.unaffected_points.size == 0
+        # rules affect only points in the geometry
+        assert np.max(self.affected_points) < self.size
+        # All rules must work on the same model(size)
+        assert len({rule.initial_state.size for rule in self.rules}) < 2, (
+            "Some rules have different model size!")
         return
 
     def __str__(self, write_physical_grids=False):
