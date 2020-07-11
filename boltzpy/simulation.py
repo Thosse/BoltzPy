@@ -71,32 +71,43 @@ class Simulation(bp.BaseClass):
         self.check_integrity(complete_check=False)
         return
 
-    # Todo make this an array(obj) of tuples, remove specimen folders?
     @property
-    def shape_of_results(self):
-        output = np.empty(self.model.specimen, dtype=dict)
+    def results_shape(self):
+        shapes = np.empty(self.model.specimen, dtype=dict)
         for s in self.model.species:
-            output[s] = {
-                'particle_number': (self.timing.size,
-                                    self.geometry.size),
-                'mean_velocity': (self.timing.size,
-                                  self.geometry.size,
-                                  self.model.ndim),
-                'momentum': (self.timing.size,
-                             self.geometry.size,
-                             self.model.ndim),
-                'momentum_flow': (self.timing.size,
-                                  self.geometry.size,
-                                  self.model.ndim),
-                'temperature': (self.timing.size,
-                                self.geometry.size),
-                'energy': (self.timing.size,
-                           self.geometry.size),
-                'energy_flow': (self.timing.size,
-                                self.geometry.size,
-                                self.model.ndim)
-            }
-        return output
+            shapes[s] = {
+                'particle_number': (
+                    self.timing.size,
+                    self.geometry.size),
+                'mean_velocity': (
+                    self.timing.size,
+                    self.geometry.size,
+                    self.model.ndim),
+                'momentum': (
+                    self.timing.size,
+                    self.geometry.size,
+                    self.model.ndim),
+                'momentum_flow': (
+                    self.timing.size,
+                    self.geometry.size,
+                    self.model.ndim),
+                'temperature': (
+                    self.timing.size,
+                    self.geometry.size),
+                'energy': (
+                    self.timing.size,
+                    self.geometry.size),
+                'energy_flow': (
+                    self.timing.size,
+                    self.geometry.size,
+                    self.model.ndim),
+                "state": (
+                    self.timing.size,
+                    self.geometry.size,
+                    self.model.vGrids[s].size)}
+            if not self.log_state:
+                del shapes[s]["state"]
+        return shapes
 
     @property
     def n_rules(self):
@@ -303,16 +314,13 @@ class Simulation(bp.BaseClass):
         # store index of current time step
         hdf_group[key].attrs["t"] = 0
         # set up separate subgroup for each species
-        shapes = self.shape_of_results
+        shapes = self.results_shape
         for s in self.model.species:
             hdf_group[key].create_group(str(s))
             grp_spc = hdf_group[key][str(s)]
             # set up separate dataset for each moment
             for (name, shape) in shapes[s].items():
-                grp_spc.create_dataset(name, shape=shape, dtype=float)
-            if self.log_state:
-                shape = (self.timing.size, self.geometry.size, self.model.vGrids[s].size)
-                grp_spc.create_dataset("state", shape, dtype=float)
+                grp_spc.create_dataset(name, shape, dtype=float)
 
         # assert that the instance can be reconstructed from the save
         other = self.load(hdf_group)
