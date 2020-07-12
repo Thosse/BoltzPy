@@ -60,6 +60,8 @@ class Model(bp.BaseClass):
                  delta,
                  spacings,
                  collision_factors,
+                 collision_relations=None,
+                 collision_weights=None,
                  algorithm_relations="all",
                  algorithm_weights="uniform"):
         assert isinstance(masses, (list, tuple, np.ndarray))
@@ -99,6 +101,15 @@ class Model(bp.BaseClass):
         self.index_offset = np.zeros(self.specimen + 1, dtype=int)
         for s in self.species:
             self.index_offset[s + 1:] += self.vGrids[s].size
+        # setup collisions
+        if collision_relations is None:
+            coll = bp.Collisions()
+            coll.setup(self)
+            self.collision_relations = coll.relations
+            self.collision_weights = coll.weights
+        else:
+            self.collision_relations = np.array(collision_relations)
+            self.collision_weights = np.array(collision_weights)
         return
 
     # Todo properly vectorize
@@ -137,6 +148,8 @@ class Model(bp.BaseClass):
                 "delta",
                 "spacings",
                 "collision_factors",
+                "collision_relations",
+                "collision_weights",
                 "algorithm_relations",
                 "algorithm_weights"}
 

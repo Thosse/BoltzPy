@@ -81,8 +81,8 @@ class Data:
         self.p_size = sim.geometry.size
 
         # Collision arrays
-        self.col = sim.coll.relations
-        self.weight = sim.coll.weights
+        self.col = sim.model.collision_relations
+        self.weight = sim.model.collision_weights
 
         # Todo add rule arr (only boundary points necessary)
         #   with initialization scheme (standardized for initial_rho = 1)
@@ -92,7 +92,8 @@ class Data:
 
         self._params = dict()
         # Keep as a "conditional" attribute?
-        self._params["col_mat"] = sim.coll.generate_collision_matrix(sim.timing.delta)
+        coll = bp.Collisions(self.col, self.weight)
+        self._params["col_mat"] = coll.generate_collision_matrix(sim.timing.delta)
         return
 
     def __getattr__(self, item):

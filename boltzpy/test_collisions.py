@@ -12,10 +12,12 @@ RULES = dict()
 COLLISIONS = dict()
 
 # TODO remove this, when moving Collisions into sv/model:
-COLLISIONS["2D_small/Collisions"] = bp.Collisions()
-COLLISIONS["2D_small/Collisions"].setup(MODELS["2D_small/Model"])
-COLLISIONS["equalMass/Collisions"] = bp.Collisions()
-COLLISIONS["equalMass/Collisions"].setup(MODELS["equalMass/Model"])
+COLLISIONS["2D_small/Collisions"] = bp.Collisions(
+    MODELS["2D_small/Model"].collision_relations,
+    MODELS["2D_small/Model"].collision_weights)
+COLLISIONS["equalMass/Collisions"] = bp.Collisions(
+    MODELS["equalMass/Model"].collision_relations,
+    MODELS["equalMass/Model"].collision_weights)
 
 
 def setup_file(file_address=FILE):

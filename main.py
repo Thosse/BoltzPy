@@ -42,9 +42,7 @@ else:
             model=model)
          ]
     )
-    coll = bp.Collisions()
-    coll.setup(model)
-    sim = bp.Simulation(timing, geometry, model, coll, exisiting_simulation_file)
+    sim = bp.Simulation(timing, geometry, model, exisiting_simulation_file)
     sim.save()
     # #
     # grp = sim.coll.group(sim.model, mode="species")

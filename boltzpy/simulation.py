@@ -44,7 +44,6 @@ class Simulation(bp.BaseClass):
                  timing,
                  geometry,
                  model,
-                 coll,
                  file=None,
                  log_state=False,
                  order_operator_splitting=1,
@@ -53,7 +52,6 @@ class Simulation(bp.BaseClass):
         self.timing = timing
         self.geometry = geometry
         self.model = model
-        self.coll = coll
         self.log_state = np.bool(log_state)
         if file is None:
             idx = 0
@@ -263,7 +261,6 @@ class Simulation(bp.BaseClass):
         timing = bp.Grid.load(file["timing"])
         geometry = bp.Geometry.load(file["geometry"])
         model = bp.Model.load(file["model"])
-        coll = bp.Collisions.load(file["Collisions"])
         log_state = np.bool(file.attrs["log_state"][()])
         order_operator_splitting = file.attrs["order_operator_splitting"][()]
         order_transport = file.attrs["order_transport"][()]
@@ -272,7 +269,6 @@ class Simulation(bp.BaseClass):
         self = Simulation(timing,
                           geometry,
                           model,
-                          coll,
                           file,
                           log_state,
                           order_operator_splitting,
@@ -307,7 +303,6 @@ class Simulation(bp.BaseClass):
         self.timing.save(hdf_group.create_group("timing"))
         self.geometry.save(hdf_group.create_group("geometry"))
         self.model.save(hdf_group.create_group("model"))
-        self.coll.save(hdf_group.create_group("Collisions"))
 
         key = "results"
         hdf_group.create_group(key)

@@ -8,7 +8,6 @@ import boltzpy as bp
 from boltzpy.test_grid import GRIDS
 from boltzpy.test_model import MODELS
 from boltzpy.test_geometry import GEOMETRIES
-from boltzpy.test_collisions import COLLISIONS
 
 
 ###################################
@@ -22,14 +21,12 @@ SIMULATIONS["2D_small/Simulation"] = bp.Simulation(
     GRIDS["2D_small/timing"],
     GEOMETRIES["2D_small/Geometry"],
     MODELS["2D_small/Model"],
-    COLLISIONS["2D_small/Collisions"],
     _open_file["2D_small/Simulation"],
     True)
 SIMULATIONS["equalMass/Simulation"] = bp.Simulation(
     GRIDS["equalMass/timing"],
     GEOMETRIES["equalMass/Geometry"],
     MODELS["equalMass/Model"],
-    COLLISIONS["equalMass/Collisions"],
     _open_file["equalMass/Simulation"],
     True)
 
