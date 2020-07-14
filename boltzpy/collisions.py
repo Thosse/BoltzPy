@@ -36,10 +36,10 @@ class Collision(bp.BaseClass):
     #           Visualization           #
     #####################################
     def plot(self,
-             svgrid,
+             model,
              plot_object=None):
         indices = list(self.relation) + [self.relation[0]]
-        quadrangle = svgrid.iMG[indices] * svgrid.delta
+        quadrangle = model.iMG[indices] * model.delta
         x_vals = quadrangle[..., 0]
         y_vals = quadrangle[..., 1]
         plot_object.plot(x_vals, y_vals, c="gray")
@@ -64,7 +64,7 @@ class Collisions(bp.BaseClass):
     ----------
     relations : :obj:`~numpy.array` [:obj:`int`]
         Contains the active collisions.
-        Each collision is a 4-tuple of indices in :attr:`sv.iMG`
+        Each collision is a 4-tuple of indices in :attr:`model.iMG`
         and is in the form
         :math:`\left[ v_0, v_1, w_0, w_1\right]`,
         where  :math:`v_0, w_0` are the pre
@@ -154,14 +154,14 @@ class Collisions(bp.BaseClass):
         return tuple(sorted_indices)
 
     @staticmethod
-    def key_species(collision_tuple, svgrid):
-        indices = [svgrid.get_specimen(col_idx)
+    def key_species(collision_tuple, model):
+        indices = [model.get_specimen(col_idx)
                    for col_idx in collision_tuple[0:4]]
         return tuple(sorted(indices))
 
     @staticmethod
-    def key_area(collision_tuple, svgrid):
-        [v0, v1, w0, w1] = svgrid.iMG[collision_tuple[0:4]]
+    def key_area(collision_tuple, model):
+        [v0, v1, w0, w1] = model.iMG[collision_tuple[0:4]]
         area_1 = np.linalg.norm(np.cross(v1 - v0, w1 - v0))
         area_2 = np.linalg.norm(np.cross(w1 - w0, w1 - v0))
         area = 0.5 * (area_1 + area_2)
@@ -171,8 +171,8 @@ class Collisions(bp.BaseClass):
         return area, circumference
 
     @staticmethod
-    def key_angle(collision_tuple, svgrid, merge_similar_angles=True):
-        (v0, v1, w0, w1) = svgrid.iMG[collision_tuple[0:4]]
+    def key_angle(collision_tuple, model, merge_similar_angles=True):
+        (v0, v1, w0, w1) = model.iMG[collision_tuple[0:4]]
         dv = v1 - v0
         angle = dv // np.gcd.reduce(dv)
         if merge_similar_angles:
@@ -180,29 +180,29 @@ class Collisions(bp.BaseClass):
         return tuple(angle)
 
     @staticmethod
-    def key(mode, svgrid):
+    def key(mode, model):
         if mode == "index":
             return Collisions.key_index
         elif mode == "area":
-            assert svgrid is not None
-            return lambda x: Collisions.key_area(x, svgrid)
+            assert model is not None
+            return lambda x: Collisions.key_area(x, model)
         elif mode == "angle":
-            assert svgrid is not None
+            assert model is not None
             return lambda x: Collisions.key_angle(
                 x,
-                svgrid)
+                model)
         elif mode == "species":
-            assert svgrid is not None
-            return lambda x: Collisions.key_species(x, svgrid)
+            assert model is not None
+            return lambda x: Collisions.key_species(x, model)
         else:
             msg = ('Unsupported Parameter:\n\t'
                    'mode = ' + '{}'.format(mode))
             raise NotImplementedError(msg)
 
     def group(self,
-              svgrid=None,
+              model=None,
               mode="index"):
-        key_func = Collisions.key(mode, svgrid)
+        key_func = Collisions.key(mode, model)
         collisions = self.list
         grouped_collisions = dict()
         for coll in collisions:
@@ -223,9 +223,9 @@ class Collisions(bp.BaseClass):
         return
 
     def sort(self,
-             svgrid=None,
+             model=None,
              mode='index'):
-        key_func = Collisions.key(mode, svgrid)
+        key_func = Collisions.key(mode, model)
         collisions = self.list
         sorted_colls = sorted(collisions, key=key_func)
         self.relations = np.array([coll[0:4] for coll in sorted_colls],
@@ -256,21 +256,14 @@ class Collisions(bp.BaseClass):
         # Accept this Collision
         return True
 
-    def setup(self,
-              scheme,
-              svgrid,
-              species):
+    def setup(self, model):
         """Generates the :attr:`relations` and :attr:`weights`.
 
         Parameters
         ----------
-        scheme : :class:`Scheme`
-        svgrid : :class:`SVGrid`
-        species : :class:`Species`
+        model : :class:`Model`
         """
-        assert isinstance(scheme, bp.Scheme)
-        assert isinstance(svgrid, bp.SVGrid)
-        assert isinstance(species, bp.Species)
+        assert isinstance(model, bp.Model)
 
         print('Generating Collision Array...')
         time_beg = time()
@@ -284,46 +277,45 @@ class Collisions(bp.BaseClass):
            v1 or w1 denotes the velocity after the collision
         """
         # choose function for local collisions
-        if scheme.Collisions_Generation == 'UniformComplete':
+        if model.algorithm_relations == 'all':
             coll_func = Collisions.complete
-        elif scheme.Collisions_Generation == 'Convergent':
+        elif model.algorithm_relations == 'fast':
             coll_func = Collisions.convergent
         else:
             raise NotImplementedError(
                 'Unsupported Selection Scheme: '
-                '{}'.format(scheme.Collisions_Generation)
+                '{}'.format(model.algorithm_relations)
             )
 
         grids = np.empty((4,), dtype=object)
         # use larger grids to shift within equivalence classes
         extended_grids = np.empty((4,), dtype=object)
-        # Todo rename into species, after Model update
-        species_idx = np.zeros(4, dtype=int)
+        species = np.zeros(4, dtype=int)
         masses = np.zeros(4, dtype=int)
         # Iterate over Specimen pairs
-        for (idx_v, grid_v) in enumerate(svgrid.vGrids):
+        for (idx_v, grid_v) in enumerate(model.vGrids):
             grids[0:2] = grid_v
+            # Todo make extended grid a property?
             extended_shape = (2 * grids[0].shape[0] - grids[0].shape[0] % 2,
                               2 * grids[0].shape[0] - grids[0].shape[0] % 2)
-            extended_grids[0:2] = bp.Grid(grids[0].ndim,
-                                          extended_shape,
+            extended_grids[0:2] = bp.Grid(extended_shape,
                                           grids[0].physical_spacing,
                                           grids[0].spacing,
                                           grids[0].is_centered)
-            species_idx[0:2] = idx_v
-            for (idx_w, grid_w) in enumerate(svgrid.vGrids):
+            species[0:2] = idx_v
+            for (idx_w, grid_w) in enumerate(model.vGrids):
                 grids[2:4] = grid_w
                 extended_shape = (2 * grids[2].shape[0] - grids[2].shape[0] % 2,
                                   2 * grids[2].shape[0] - grids[2].shape[0] % 2)
-                extended_grids[2:4] = bp.Grid(grids[2].ndim,
-                                              extended_shape,
+                extended_grids[2:4] = bp.Grid(extended_shape,
                                               grids[2].physical_spacing,
                                               grids[2].spacing,
                                               grids[2].is_centered)
-                species_idx[2:4] = idx_w
-                masses[:] = species.mass[species_idx]
-                collision_rate = species.collision_rates[idx_v, idx_w]
-                index_offset = np.array(svgrid.index_range[species_idx, 0])
+                species[2:4] = idx_w
+                masses[:] = model.masses[species]
+                # Todo rename into collision_factor
+                collision_rate = model.collision_factors[idx_v, idx_w]
+                index_offset = np.array(model.index_range[species, 0])
                 # Todo may be bad for differing weights
                 # skip already computed combinations
                 if idx_w < idx_v:
@@ -359,7 +351,7 @@ class Collisions(bp.BaseClass):
                         # Add chosen Relations/Weights to the list
                         assert np.array_equal(
                                 new_colvels[choice],
-                                svgrid.iMG[new_rels[choice]])
+                                model.iMG[new_rels[choice]])
                         relations.extend(new_rels[choice])
                         weights.extend(extended_weights[choice])
                     # relations += new_rels
@@ -387,7 +379,7 @@ class Collisions(bp.BaseClass):
                  v0,
                  collision_rate):
         # store results in lists
-        colvels= []     # colliding velocities
+        colvels = []     # colliding velocities
         weights = []
         # iterate over all v1 (post collision of v0)
         for v1 in grids[1].iG:
@@ -583,11 +575,11 @@ class Collisions(bp.BaseClass):
                 # assert col[0] < col[1]
                 # assert col[0] < col[2]
                 if context is not None:
-                    sv = context.sv
-                    di_0 = (sv.iMG[col[1]] - sv.iMG[col[0]])
-                    di_1 = (sv.iMG[col[3]] - sv.iMG[col[2]])
+                    model = context.model
+                    di_0 = (model.iMG[col[1]] - model.iMG[col[0]])
+                    di_1 = (model.iMG[col[3]] - model.iMG[col[2]])
                     assert all(np.array(di_1 + di_0) == 0)
-                    s = [sv.get_specimen(v_col) for v_col in col]
+                    s = [model.get_specimen(v_col) for v_col in col]
                     assert s[0] == s[1] and s[2] == s[3]
                     # Todo add conserves energy check
             assert all(w > 0 for w in self.weights.flatten())
@@ -598,12 +590,12 @@ class Collisions(bp.BaseClass):
 #####################################
 #           Visualization           #
 #####################################
-def plot(svgrid,
+def plot(model,
          collisions,
          iterative=True,
          plot_object=None):
-    assert isinstance(svgrid, bp.SVGrid)
-    assert svgrid.number_of_grids <= len(svgrid.plot_styles)
+    assert isinstance(model, bp.Model)
+    assert model.specimen <= len(model.plot_styles)
 
     # make sure its a list of Collisions,
     # this allows to plot lists of relations
@@ -620,9 +612,9 @@ def plot(svgrid,
 
     # show all Collisions together
     for coll in collisions:
-        coll.plot(svgrid=svgrid,
+        coll.plot(model=model,
                   plot_object=plot_object)
-    svgrid.plot(plot_object)
+    model.plot(plot_object)
     if show_plot_directly:
         plot_object.show()
 
@@ -632,11 +624,11 @@ def plot(svgrid,
             print("Relation:\n\t",
                   str(coll.relation))
             print("Velocities:\n\t",
-                  str(svgrid.iMG[coll.relation]).replace('\n', '\n\t'))
+                  str(model.iMG[coll.relation]).replace('\n', '\n\t'))
             plot_object.close()
-            coll.plot(svgrid=svgrid,
+            coll.plot(model=model,
                       plot_object=plot_object)
             # plot Grid on top of collision
-            svgrid.plot(plot_object=plot_object)
+            model.plot(plot_object=plot_object)
             plot_object.show()
     return plot_object

@@ -3,7 +3,6 @@ import numpy as np
 import h5py
 
 import boltzpy as bp
-import boltzpy.constants as bp_c
 import boltzpy.compute as bp_cp
 import boltzpy.plot as bp_p
 import boltzpy.initialization as bp_i
@@ -17,114 +16,95 @@ class Rule(bp.BaseClass):
 
     Parameters
     ----------
-    initial_rho : :obj:`~numpy.array` [:obj:`float`]
-    initial_drift : :obj:`~numpy.array` [:obj:`float`]
-    initial_temp : :obj:`~numpy.array` [:obj:`float`]
+    particle_number : :obj:`~numpy.array` [:obj:`float`]
+    mean_velocity : :obj:`~numpy.array` [:obj:`float`]
+    temperature : :obj:`~numpy.array` [:obj:`float`]
     affected_points : :obj:`list`[:obj:`int`]
-    velocity_grids : :obj:`~boltzpy.SVGrid`, optional
+    model : :obj:`~boltzpy.Model`, optional
         Used to construct the initial state,
         if no initial_state parameter is given.
     initial_state : :obj:`~numpy.array` [:obj:`float`], optional
-
-    Attributes
-    ----------
-    initial_rho : :obj:`~numpy.array` [:obj:`float`]
-        Correlates to the initial amount of particles in
-        :class:`P-Grid <boltzpy.Grid>` point.
-    initial_drift : :obj:`~numpy.array` [:obj:`float`]
-        Describes the mean velocity,
-        i.e. the first moment (expectancy value) of the
-        velocity distribution.
-    initial_temp : :obj:`~numpy.array` [:obj:`float`]
-        Correlates to the Energy,
-        i.e. the second moment (variance) of the
-        velocity distribution.
-    affected_points : :obj:`~numpy.array`[:obj:`int`]
-        Contains all indices of the space points, where this rule applies
-    initial_state : :obj:`~numpy.array` [:obj:`float`]
-        Initial state of the simulation model.
     """
     def __init__(self,
-                 initial_rho,
-                 initial_drift,
-                 initial_temp,
+                 particle_number,
+                 mean_velocity,
+                 temperature,
                  affected_points,
-                 velocity_grids=None,
-                 species=None,
+                 model=None,
                  initial_state=None):
-        self.check_parameters(initial_rho=initial_rho,
-                              initial_drift=initial_drift,
-                              initial_temp=initial_temp,
-                              affected_points=affected_points)
-        self.initial_rho = np.array(initial_rho, dtype=float)
-        self.initial_drift = np.array(initial_drift, dtype=float)
-        self.initial_temp = np.array(initial_temp, dtype=float)
+        self.particle_number = np.array(particle_number, dtype=float)
+        self.mean_velocity = np.array(mean_velocity, dtype=float)
+        self.temperature = np.array(temperature, dtype=float)
         self.affected_points = np.array(affected_points, dtype=int)
         # Either initial_state is given as parameter
         if initial_state is not None:
-            assert velocity_grids is None
+            assert model is None
             self.initial_state = initial_state
-        # or it is constructed based on the velocity_grids
+        # or it is constructed based on the model
         else:
-            assert velocity_grids is not None
-            self.initial_state = self.compute_initial_state(velocity_grids,
-                                                            species)
-        Rule.check_integrity(self, complete_check=False)
+            assert model is not None
+            self.initial_state = self.compute_initial_state(model)
+        Rule.check_integrity(self)
         return
 
-    @property
-    def subclass(self):
-        """
-        :obj:`str`
-            Used fore load() and save() to initialize as the correct subclass.
-            Must be in :const:`~boltzpy.constants.SUPP_RULE_SUBCLASSES`.
-        """
-        raise NotImplementedError
+    @staticmethod
+    def classes():
+        return {'InnerPointRule': InnerPointRule,
+                'ConstantPointRule': ConstantPointRule,
+                'BoundaryPointRule': BoundaryPointRule}
 
     @staticmethod
-    def get_subclass(behaviour_type):
-        if behaviour_type == 'InnerPointRule':
-            return InnerPointRule
-        elif behaviour_type == 'ConstantPointRule':
-            return ConstantPointRule
-        elif behaviour_type == 'BoundaryPointRule':
-            return BoundaryPointRule
-        else:
-            raise NotImplementedError
+    def parameters():
+        return {"particle_number",
+                "mean_velocity",
+                "temperature",
+                "affected_points",
+                "initial_state"}
+
+    @staticmethod
+    def attributes():
+        attrs = Rule.parameters()
+        attrs.update({"ndim",
+                      "specimen"})
+        return attrs
 
     @property
     def ndim(self):
-        return self.initial_drift.shape[1]
+        return self.mean_velocity.shape[1]
 
     @property
-    def number_of_specimen(self):
-        return self.initial_drift.shape[0]
+    def specimen(self):
+        return self.mean_velocity.shape[0]
 
-    def compute_initial_state(self, velocity_grids, species):
-        assert isinstance(velocity_grids, bp.SVGrid)
-        assert self.ndim == velocity_grids.ndim
-        assert self.number_of_specimen == velocity_grids.number_of_grids
+    def compute_initial_state(self, model):
+        assert isinstance(model, bp.Model)
+        assert self.ndim == model.ndim
+        assert self.specimen == model.specimen
 
-        initial_state = np.zeros(velocity_grids.size, dtype=float)
-        for idx_spc in range(self.number_of_specimen):
-            mass = species[idx_spc].mass
-            velocities = velocity_grids.vGrids[idx_spc].pG
-            delta_v = velocity_grids.vGrids[idx_spc].physical_spacing
-            [beg, end] = velocity_grids.index_range[idx_spc]
+        initial_state = np.zeros(model.size, dtype=float)
+        for s in model.species:
+            mass = model.masses[s]
+            velocities = model.vGrids[s].pG
+            delta_v = model.vGrids[s].physical_spacing
+            (beg, end) = model.index_offset[s:s+2]
             initial_state[beg:end] = bp_i.compute_initial_distribution(
                 velocities,
                 delta_v,
                 mass,
-                self.initial_rho[idx_spc],
-                self.initial_drift[idx_spc],
-                self.initial_temp[idx_spc])
+                self.particle_number[s],
+                self.mean_velocity[s],
+                self.temperature[s])
 
+        # Todo test initial state, moments should be matching (up to 10^-x)
         return initial_state
 
     #####################################
     #            Computation            #
     #####################################
     def collision(self, data):
+        """Executes single collision step for the :attr:`affected_points`.
+           Reads data.state
+           and writes the results in data.results"""
         raise NotImplementedError
 
     def transport(self, data):
@@ -133,7 +113,7 @@ class Rule(bp.BaseClass):
            This is a finite differences scheme.
            It computes the inflow and outflow and, if necessary,
            applies reflection or absorption.
-           The Computation reads data.state
+           Reads data.state
            and writes the results in data.results"""
         raise NotImplementedError
 
@@ -141,20 +121,14 @@ class Rule(bp.BaseClass):
     #           Visualization           #
     #####################################
     def plot(self,
-             velocity_grid,
-             species,
-             index_of_specimen,
+             model,
+             specimen,
              plot_object=None,
              **plot_style):
-        """Plot the initial state of a single specimen using matplotlib 3D.
-
-        Parameters
-        ----------
-        plot_object : TODO Figure? matplotlib.pyplot?
-        """
-        assert isinstance(velocity_grid, bp.SVGrid)
-        assert isinstance(index_of_specimen, int)
-        assert 0 <= index_of_specimen < self.number_of_specimen
+        """Plot the initial state of a single specimen using matplotlib 3D."""
+        assert isinstance(model, bp.Model)
+        assert isinstance(specimen, int)
+        assert 0 <= specimen < self.specimen
         assert self.ndim == 2, (
             "3D Plots are only implemented for 2D velocity spaces")
         # show plot directly, if no object to store in is specified
@@ -169,12 +143,12 @@ class Rule(bp.BaseClass):
             plot_object = plt
 
         # plot continuous maxwellian as a surface plot
-        mass = species[index_of_specimen].mass
-        maximum_velocity = velocity_grid.maximum_velocity
+        mass = model.masses[specimen]
+        maximum_velocity = model.maximum_velocity
         plot_object = bp_p.plot_continuous_maxwellian(
-            self.initial_rho[index_of_specimen],
-            self.initial_drift[index_of_specimen],
-            self.initial_temp[index_of_specimen],
+            self.particle_number[specimen],
+            self.mean_velocity[specimen],
+            self.temperature[specimen],
             mass,
             -maximum_velocity,
             maximum_velocity,
@@ -182,16 +156,17 @@ class Rule(bp.BaseClass):
             plot_object)
 
         # plot discrete distribution as a 3D bar plot
-        beg, end = velocity_grid.index_range[index_of_specimen]
+        beg, end = model.index_range[specimen]
         plot_object = bp_p.plot_discrete_distribution(
             self.initial_state[beg:end],
-            velocity_grid.vGrids[index_of_specimen].pG,
-            velocity_grid.vGrids[index_of_specimen].physical_spacing,
+            model.vGrids[specimen].pG,
+            model.vGrids[specimen].physical_spacing,
             plot_object,
         )
         if show_plot_directly:
             plot_object.show()
         return plot_object
+
     #####################################
     #           Serialization           #
     #####################################
@@ -209,195 +184,83 @@ class Rule(bp.BaseClass):
         self : :class:`Rule`
         """
         assert isinstance(hdf5_group, h5py.Group)
-        assert hdf5_group.attrs["class"] == "Rule"
-
+        assert hdf5_group.attrs["class"] in Rule.classes().keys()
         # choose derived class for new rule
-        behaviour_type = hdf5_group.attrs["behaviour_type"]
-        rule_class = bp.Rule.get_subclass(behaviour_type)
+        rule_class = Rule.classes()[hdf5_group.attrs["class"]]
+        parameters = dict()
+        for param in rule_class.parameters():
+            parameters[param] = hdf5_group[param][()]
+        return rule_class(**parameters)
 
-        # read parameters from file
-        params = dict()
-        for (key, value) in hdf5_group.items():
-            params[key] = value[()]
-
-        # construct rule
-        self = rule_class(**params)
-        self.check_integrity(False)
-        return self
-
-    def save(self, hdf5_group):
+    def save(self, hdf5_group, write_all=False):
         """Write the main parameters of the :class:`Rule` instance
         into the HDF5 group.
 
         Parameters
         ----------
         hdf5_group : :obj:`h5py.Group <h5py:Group>`
+        write_all : :obj:`bool`
+            If True, write all attributes and properties to the file,
+            even the unnecessary ones. Useful for testing,
         """
         assert isinstance(hdf5_group, h5py.Group)
-        self.check_integrity(False)
-
+        self.check_integrity()
         # Clean State of Current group
         for key in hdf5_group.keys():
             del hdf5_group[key]
-        hdf5_group.attrs["class"] = "Rule"
-        # save derived class of rule
-        hdf5_group.attrs["behaviour_type"] = self.subclass
-
-        # write attributes to file
-        for (key, value) in self.__dict__.items():
-            hdf5_group[key] = value
+        hdf5_group.attrs["class"] = self.__class__.__name__
+        attributes = self.attributes() if write_all else self.parameters()
+        for attr in attributes:
+            hdf5_group[attr] = self.__getattribute__(attr)
         return
 
     #####################################
     #            Verification           #
     #####################################
-    def check_integrity(self, complete_check=True, context=None):
-        """Sanity Check.
-        Assert all conditions in :meth:`check_parameters`
-        and the correct type of all attributes of the instance.
+    def check_integrity(self):
+        """Sanity Check."""
+        assert isinstance(self.particle_number, np.ndarray)
+        assert self.particle_number.dtype == float
+        assert self.particle_number.ndim == 1
+        assert np.min(self.particle_number) > 0
 
-        Parameters
-        ----------
-        complete_check : :obj:`bool`, optional
-            If True, then all attributes must be assigned (not None).
-            If False, then unassigned attributes are ignored.
-        context : :class:`Simulation`, optional
-            The Simulation, which this instance belongs to.
-            This allows additional checks.
-        """
-        assert isinstance(self.initial_rho, np.ndarray)
-        assert isinstance(self.initial_drift, np.ndarray)
-        assert isinstance(self.initial_temp, np.ndarray)
+        assert isinstance(self.mean_velocity, np.ndarray)
+        assert self.mean_velocity.dtype == float
+        assert self.mean_velocity.ndim == 2
+        assert self.mean_velocity.shape[0] == self.particle_number.size
+        assert self.mean_velocity.shape[1] in {2, 3}, (
+            "Any drift has the same dimension as the velocity grid "
+            "and must be in [2,3]."
+            "mean_velocity.shape[1] = "
+            "{}". format(self.mean_velocity.shape[1]))
+
+        assert isinstance(self.temperature, np.ndarray)
+        assert self.temperature.dtype == float
+        assert self.temperature.ndim == 1
+        assert np.min(self.temperature) > 0
+        assert self.particle_number.size == self.temperature.size
+
         assert isinstance(self.affected_points, np.ndarray)
-        self.check_parameters(subclass=self.subclass,
-                              initial_rho=self.initial_rho,
-                              initial_drift=self.initial_drift,
-                              initial_temp=self.initial_temp,
-                              affected_points=self.affected_points,
-                              initial_state=self.initial_state,
-                              complete_check=complete_check,
-                              context=context)
-        return
+        assert self.affected_points.ndim == 1
+        assert self.affected_points.dtype == int
+        assert self.affected_points.size > 0
+        assert np.min(self.affected_points) >= 0
+        # if context is not None and context.geometry.shape is not None:
+        #     assert np.max(affected_points) < context.geometry.size
+        assert self.affected_points.size == len(set(self.affected_points)), (
+            "Some points are affected twice be the same Rule:"
+            "{}".format(self.affected_points))
 
-    @staticmethod
-    def check_parameters(subclass=None,
-                         initial_rho=None,
-                         initial_drift=None,
-                         initial_temp=None,
-                         affected_points=None,
-                         velocity_grids=None,
-                         initial_state=None,
-                         complete_check=False,
-                         context=None):
-        """Sanity Check.
-        Checks integrity of given parameters and their interactions.
-
-        Parameters
-        ----------
-        subclass : :obj:`str`, optional
-        initial_rho : :obj:`~numpy.array` [:obj:`float`], optional
-        initial_drift : :obj:`~numpy.array` [:obj:`float`], optional
-        initial_temp : :obj:`~numpy.array` [:obj:`float`], optional
-        affected_points : :obj:`list`[:obj:`int`]
-        velocity_grids : :obj:`~boltzpy.SVGrid`, optional
-        initial_state : :obj:`~numpy.array` [:obj:`float`], optional
-        complete_check : :obj:`bool`, optional
-            If True, then all parameters must be set (not None).
-            If False, then unassigned parameters are ignored.
-        context : :class:`Simulation`, optional
-            The Simulation, which this instance belongs to.
-            This allows additional checks.
-        """
-        # For complete check, assert that all parameters are assigned
-        assert isinstance(complete_check, bool)
-        if complete_check is True:
-            assert all(param_val is not None
-                       for (param_key, param_val) in locals().items()
-                       if param_key not in ["context", "velocity_grids"])
-        # Set up basic constants
-        if context is not None:
-            assert isinstance(context, bp.Simulation)
-            n_species = context.s.size
-        else:
-            n_species = None
-
-        # check all parameters, if set
-        if subclass is not None:
-            assert isinstance(subclass, str)
-            assert subclass in bp_c.SUPP_RULE_SUBCLASSES
-
-        if initial_rho is not None:
-            if isinstance(initial_rho, list):
-                initial_rho = np.array(initial_rho, dtype=float)
-            assert isinstance(initial_rho, np.ndarray)
-            assert initial_rho.dtype == float
-            assert initial_rho.ndim == 1
-            assert np.min(initial_rho) > 0
-            if n_species is not None:
-                assert n_species == initial_rho.size
-            else:
-                n_species = initial_rho.size
-
-        if initial_drift is not None:
-            if isinstance(initial_drift, list):
-                initial_drift = np.array(initial_drift, dtype=float)
-            assert isinstance(initial_drift, np.ndarray)
-            assert initial_drift.dtype == float
-            assert initial_drift.ndim == 2
-            if n_species is not None:
-                assert initial_drift.shape[0] == n_species
-            else:
-                n_species = initial_drift.shape[0]
-            assert initial_drift.shape[1] in [2, 3], (
-                "Any drift has the same dimension as the velocity grid "
-                "and must be in [2,3]."
-                "initial_drift.shape[1] = {}". format(initial_drift.shape[1])
-            )
-            if context is not None and context.sv.ndim is not None:
-                assert initial_drift.shape[1] == context.sv.ndim
-
-        if initial_temp is not None:
-            if isinstance(initial_temp, list):
-                initial_temp = np.array(initial_temp, dtype=float)
-            assert isinstance(initial_temp, np.ndarray)
-            assert initial_temp.dtype == float
-            assert initial_temp.ndim == 1
-            assert np.min(initial_temp) > 0
-            if n_species is not None:
-                assert n_species == initial_temp.size
-            else:
-                n_species = initial_temp.size
-
-        if affected_points is not None:
-            if isinstance(affected_points, list):
-                affected_points = np.array(affected_points, dtype=int)
-            assert isinstance(affected_points, np.ndarray)
-            assert affected_points.ndim == 1
-            assert affected_points.dtype == int
-            assert affected_points.size > 0
-            assert np.min(affected_points) >= 0
-            if context is not None and context.geometry.shape is not None:
-                assert np.max(affected_points) < context.geometry.size
-            assert affected_points.size == len(set(affected_points)), (
-                "Some points are affected twice be the same Rule:"
-                "{}".format(affected_points)
-            )
-
-        if velocity_grids is not None:
-            assert isinstance(velocity_grids, bp.SVGrid)
-            velocity_grids.check_integrity(context=context)
-
-        if initial_state is not None:
-            assert isinstance(initial_state, np.ndarray)
-            assert initial_state.dtype == float
-            assert not np.any(np.isnan(initial_state)), (
-                "Initial state contains NAN values!"
-            )
-            assert np.all(initial_state >= 0), (
-                "Minimal value = {}\n"
-                "Initial values:\n{}".format(np.min(initial_state), initial_state)
-            )
-            # Todo test initial state, moments should be matching (up to 10^-x)
+        assert isinstance(self.initial_state, np.ndarray)
+        assert self.initial_state.dtype == float
+        assert not np.any(np.isnan(self.initial_state)), (
+            "Initial state contains NAN values!"
+        )
+        assert np.all(self.initial_state >= 0), (
+            "Minimal value = {}\n"
+            "Initial values:\n"
+            "{}".format(np.min(self.initial_state), self.initial_state)
+        )
         return
 
     def __str__(self):
@@ -412,25 +275,19 @@ class Rule(bp.BaseClass):
 
 class InnerPointRule(Rule):
     def __init__(self,
-                 initial_rho=None,
-                 initial_drift=None,
-                 initial_temp=None,
-                 affected_points=None,
-                 velocity_grids=None,
-                 species=None,
+                 particle_number,
+                 mean_velocity,
+                 temperature,
+                 affected_points,
+                 model=None,
                  initial_state=None):
-        super().__init__(initial_rho,
-                         initial_drift,
-                         initial_temp,
+        super().__init__(particle_number,
+                         mean_velocity,
+                         temperature,
                          affected_points,
-                         velocity_grids,
-                         species,
+                         model,
                          initial_state)
         return
-
-    @property
-    def subclass(self):
-        return 'InnerPointRule'
 
     #####################################
     #            Computation            #
@@ -444,12 +301,12 @@ class InnerPointRule(Rule):
             message = 'Transport is currently only implemented ' \
                       'for 1D Problems'
             raise NotImplementedError(message)
-        # Simulate Outflowing
+        # simulate outflow
         data.result[self.affected_points, :] = bp_cp.transport_outflow_remains(
             data,
             self.affected_points
         )
-        # Simulate Inflow
+        # simulate inflow
         data.result[self.affected_points, :] += bp_cp.transport_inflow_innerPoint(
             data,
             self.affected_points
@@ -459,25 +316,19 @@ class InnerPointRule(Rule):
 
 class ConstantPointRule(Rule):
     def __init__(self,
-                 initial_rho,
-                 initial_drift,
-                 initial_temp,
+                 particle_number,
+                 mean_velocity,
+                 temperature,
                  affected_points,
-                 velocity_grids=None,
-                 species=None,
+                 model=None,
                  initial_state=None):
-        super().__init__(initial_rho,
-                         initial_drift,
-                         initial_temp,
+        super().__init__(particle_number,
+                         mean_velocity,
+                         temperature,
                          affected_points,
-                         velocity_grids,
-                         species,
+                         model,
                          initial_state)
         return
-
-    @property
-    def subclass(self):
-        return 'ConstantPointRule'
 
     #####################################
     #            Computation            #
@@ -485,19 +336,19 @@ class ConstantPointRule(Rule):
     def collision(self, data):
         bp_cp.euler_scheme(data, self.affected_points)
         # Todo replace by bp_cp.no_collisions(data, self.affected_points)
-        # before that, implement proper initialization
+        #  before that, implement proper initialization
+        #  constant points should not change under collisions
         return
 
     def transport(self, data):
         pass
 
 
-# Todo This is not tested!
 class BoundaryPointRule(Rule):
     def __init__(self,
-                 initial_rho,
-                 initial_drift,
-                 initial_temp,
+                 particle_number,
+                 mean_velocity,
+                 temperature,
                  reflection_rate_inverse,
                  reflection_rate_elastic,
                  reflection_rate_thermal,
@@ -507,83 +358,105 @@ class BoundaryPointRule(Rule):
                  incoming_velocities=None,
                  reflected_indices_inverse=None,
                  reflected_indices_elastic=None,
-                 velocity_grids=None,
-                 species=None,
+                 effective_particle_number=None,
+                 model=None,
                  initial_state=None):
-        params = {key: value for (key, value) in locals().items()
-                  if key not in ["self", "__class__"]}
-        self.check_parameters(**params)
-        self.reflection_rate_inverse = np.array(reflection_rate_inverse,
-                                                dtype=float)
-        self.reflection_rate_elastic = np.array(reflection_rate_elastic,
-                                                dtype=float)
-        self.reflection_rate_thermal = np.array(reflection_rate_thermal,
-                                                dtype=float)
-        self.absorption_rate = np.array(absorption_rate,
-                                        dtype=float)
-        # Either the incoming velocities and reflection indices
-        # are given as parameters
+        self.reflection_rate_inverse = np.array(reflection_rate_inverse, dtype=float)
+        self.reflection_rate_elastic = np.array(reflection_rate_elastic, dtype=float)
+        self.reflection_rate_thermal = np.array(reflection_rate_thermal, dtype=float)
+        self.absorption_rate = np.array(absorption_rate, dtype=float)
+
+        # Either the incoming velocities and reflections are given as parameters
         if surface_normal is None:
             assert reflected_indices_inverse is not None
             assert reflected_indices_elastic is not None
             assert incoming_velocities is not None
-            self.reflected_indices_inverse = np.array(reflected_indices_inverse,
-                                                      dtype=int)
-            self.reflected_indices_elastic = np.array(reflected_indices_elastic,
-                                                      dtype=int)
-            self.incoming_velocities = np.array(incoming_velocities,
-                                                dtype=int)
-        # Or the incoming velocities and reflection indices
-        # must be generated based on the surface normal and the velocity_grid
+            self.reflected_indices_inverse = np.array(reflected_indices_inverse,  dtype=int)
+            self.reflected_indices_elastic = np.array(reflected_indices_elastic, dtype=int)
+            self.incoming_velocities = np.array(incoming_velocities, dtype=int)
+            self.effective_particle_number = np.array(effective_particle_number, dtype=float)
+        # Or they must be generated based on the surface normal and the model
         else:
-            self.incoming_velocities = self.compute_incoming_velocities(velocity_grids, surface_normal)
-            self.reflected_indices_inverse = self.compute_reflected_indices_inverse(velocity_grids)
-            self.reflected_indices_elastic = self.compute_reflected_indices_elastic(velocity_grids, surface_normal)
-        super().__init__(initial_rho,
-                         initial_drift,
-                         initial_temp,
+            assert model is not None
+            assert isinstance(surface_normal, np.ndarray)
+            assert surface_normal.dtype == int
+            assert np.all(np.abs(surface_normal) <= 1), (
+                "A surface normal must have entries from [-1, 0, 1]."
+                "surface_normal = {}".format(surface_normal)
+            )
+            self.incoming_velocities = self.compute_incoming_velocities(model, surface_normal)
+            self.reflected_indices_inverse = self.compute_reflected_indices_inverse(model)
+            self.reflected_indices_elastic = self.compute_reflected_indices_elastic(model, surface_normal)
+        super().__init__(particle_number,
+                         mean_velocity,
+                         temperature,
                          affected_points,
-                         velocity_grids,
-                         species,
+                         model,
                          initial_state)
+        if effective_particle_number is None:
+            self.effective_particle_number = np.array([
+                bp_o.particle_number(
+                    self.initial_state[np.newaxis,
+                                       model.index_offset[s]: model.index_offset[s+1]],
+                    model.vGrids[s].physical_spacing)
+                for s in model.species])
         self.check_integrity()
         return
 
-    @property
-    def subclass(self):
-        return 'BoundaryPointRule'
+    @staticmethod
+    def parameters():
+        params = Rule.parameters()
+        params.update({"reflection_rate_inverse",
+                       "reflection_rate_elastic",
+                       "reflection_rate_thermal",
+                       "absorption_rate",
+                       "incoming_velocities",
+                       "reflected_indices_inverse",
+                       "reflected_indices_elastic",
+                       "effective_particle_number"})
+        return params
 
     @staticmethod
-    def compute_incoming_velocities(velocity_grids, surface_normal):
+    def attributes():
+        attrs = BoundaryPointRule.parameters()
+        attrs.update({"ndim",
+                      "specimen"})
+        return attrs
+
+    @staticmethod
+    def compute_incoming_velocities(model, surface_normal):
         # the incoming velocities are used to calculate the inflow during transport
         # we calculate the scalar product for each entry and check if its > 0
         # thus the velocity points towards the border
-        incoming_velocities = np.where(velocity_grids.iMG @ surface_normal > 0)[0]
+        incoming_velocities = np.where(model.iMG @ surface_normal > 0)[0]
         return incoming_velocities
 
     @staticmethod
-    def compute_reflected_indices_inverse(velocity_grids):
-        reflected_indices_inverse = np.zeros(velocity_grids.size, dtype=int)
-        for (idx_v, v) in enumerate(velocity_grids.iMG):
-            spc = velocity_grids.get_specimen(idx_v)
+    def compute_reflected_indices_inverse(model):
+        reflected_indices_inverse = np.zeros(model.size, dtype=int)
+        for (idx_v, v) in enumerate(model.iMG):
+            spc = model.get_specimen(idx_v)
             v_refl = -v
-            idx_v_refl = velocity_grids.find_index(spc, v_refl)
+            idx_v_refl = model.find_index(spc, v_refl)
             reflected_indices_inverse[idx_v] = idx_v_refl
         return reflected_indices_inverse
 
     @staticmethod
-    def compute_reflected_indices_elastic(velocity_grids, surface_normal):
-        reflected_indices_elastic = np.zeros(velocity_grids.size, dtype=int)
-        # Todo only works in 1D
-        for (idx_v, v) in enumerate(velocity_grids.iMG):
-            spc = velocity_grids.get_specimen(idx_v)
+    def compute_reflected_indices_elastic(model, surface_normal):
+        reflected_indices_elastic = np.zeros(model.size, dtype=int)
+        # Todo only works in 1D Geometries
+        assert np.sum(np.abs(surface_normal)) == 1, (
+            "only works in 1D Geometries, "
+            "doesn't even use surface normal currently")
+        for (idx_v, v) in enumerate(model.iMG):
+            spc = model.get_specimen(idx_v)
             v_refl = np.array([-1, 1]) * v
-            idx_v_refl = velocity_grids.find_index(spc, v_refl)
+            idx_v_refl = model.find_index(spc, v_refl)
             reflected_indices_elastic[idx_v] = idx_v_refl
         return reflected_indices_elastic
 
-    def compute_initial_state(self, velocity_grids, species):
-        full_initial_state = super().compute_initial_state(velocity_grids, species)
+    def compute_initial_state(self, model):
+        full_initial_state = super().compute_initial_state(model)
         # compute outgoing velocities, by relfecting incoming velocities
         outgoing_velocities = self.reflected_indices_inverse[self.incoming_velocities]
         # Set initial state to zero for all non-outgoing velocities
@@ -619,22 +492,18 @@ class BoundaryPointRule(Rule):
     def reflection(self, inflow, data):
         reflected_inflow = np.zeros(inflow.shape, dtype=float)
         # compute each reflection separately for every species
-        for idx_spc in range(data.n_spc):
-            beg, end = data.v_range[idx_spc]
-            inverse_inflow = self.reflection_rate_inverse[idx_spc] * inflow
+        for s in range(data.n_spc):
+            beg, end = data.v_range[s]
+            inverse_inflow = self.reflection_rate_inverse[s] * inflow
             reflected_inflow[:, self.reflected_indices_inverse] += inverse_inflow
 
-            elastic_inflow = self.reflection_rate_elastic[idx_spc] * inflow
+            elastic_inflow = self.reflection_rate_elastic[s] * inflow
             reflected_inflow[:, self.reflected_indices_elastic] += elastic_inflow
 
             thermal_inflow = bp_o.particle_number(
-                self.reflection_rate_thermal[idx_spc] * inflow[..., beg:end],
-                data.dv[idx_spc])
-            # Todo this should be an attribute, shoult be a float, not an array
-            initial_particles = bp_o.particle_number(
-                self.initial_state[np.newaxis, beg:end],
-                data.dv[idx_spc])
-            thermal_factor = (thermal_inflow / initial_particles)
+                self.reflection_rate_thermal[s] * inflow[..., beg:end],
+                data.dv[s])
+            thermal_factor = (thermal_inflow / self.effective_particle_number[s])
             reflected_inflow[..., beg:end] += (
                 thermal_factor[:, np.newaxis]
                 * self.initial_state[np.newaxis, beg:end]
@@ -645,120 +514,54 @@ class BoundaryPointRule(Rule):
     #            Verification           #
     #####################################
     def check_integrity(self, complete_check=True, context=None):
-        assert isinstance(self.initial_rho, np.ndarray)
-        assert isinstance(self.initial_drift, np.ndarray)
-        assert isinstance(self.initial_temp, np.ndarray)
-        assert isinstance(self.affected_points, np.ndarray)
-        self.check_parameters(
-            subclass=self.subclass,
-            initial_rho=self.initial_rho,
-            initial_drift=self.initial_drift,
-            initial_temp=self.initial_temp,
-            reflection_rate_inverse=self.reflection_rate_inverse,
-            reflection_rate_elastic=self.reflection_rate_elastic,
-            reflection_rate_thermal=self.reflection_rate_thermal,
-            absorption_rate=self.absorption_rate,
-            affected_points=self.affected_points,
-            incoming_velocities=self.incoming_velocities,
-            reflected_indices_inverse=self.reflected_indices_inverse,
-            reflected_indices_elastic=self.reflected_indices_elastic,
-            initial_state=self.initial_state,
-            complete_check=complete_check,
-            context=context)
-        return
+        super().check_integrity()
+        assert np.all(self.mean_velocity == 0), (
+            "BoundaryPointRules must have no drift! Drift ="
+            "{}".format(self.mean_velocity)
+        )
 
-    @staticmethod
-    def check_parameters(subclass=None,
-                         initial_rho=None,
-                         initial_drift=None,
-                         initial_temp=None,
-                         reflection_rate_inverse=None,
-                         reflection_rate_elastic=None,
-                         reflection_rate_thermal=None,
-                         absorption_rate=None,
-                         affected_points=None,
-                         surface_normal=None,
-                         incoming_velocities=None,
-                         reflected_indices_inverse=None,
-                         reflected_indices_elastic=None,
-                         velocity_grids=None,
-                         species=None,
-                         initial_state=None,
-                         complete_check=False,
-                         context=None):
-        Rule.check_parameters(
-            subclass=subclass,
-            initial_rho=initial_rho,
-            initial_drift=initial_drift,
-            initial_temp=initial_temp,
-            affected_points=affected_points,
-            velocity_grids=velocity_grids,
-            initial_state=initial_state,
-            complete_check=complete_check,
-            context=context)
-        if initial_drift is not None:
-            if isinstance(initial_drift, list):
-                initial_drift = np.array(initial_drift, dtype=float)
-            assert np.all(initial_drift == 0), (
-                "BoundaryPointRules must have no drift! Drift ="
-                "{}".format(initial_drift)
-            )
-
-        rates = [reflection_rate_inverse,
-                 reflection_rate_elastic,
-                 reflection_rate_thermal,
-                 absorption_rate]
+        rates = [self.reflection_rate_inverse,
+                 self.reflection_rate_elastic,
+                 self.reflection_rate_thermal,
+                 self.absorption_rate]
         for rate in rates:
-            if rate is not None:
-                if isinstance(rate, list):
-                    rate = np.array(rate, dtype=float)
-                assert isinstance(rate, np.ndarray)
-                assert rate.dtype == float, (
-                    "Any reflection/absorption rate must be of type float. "
-                    "type(rate) = {}".format(type(rate))
-                )
-                assert rate.ndim == 1, (
-                    "All rates must be 1 dimensional arrays."
-                    "A single float for each species."
-                )
-                assert np.all(0 <= rate) and np.all(rate <= 1), (
-                    "Reflection/Absorption rates must be between 0 and 1. "
-                    "Rates = {}".format(rates)
-                )
-        if all(rate is not None for rate in rates):
-            assert len({len(rate) for rate in rates}) == 1, (
-                "All rates must have the same length (number of species)."
+            assert isinstance(rate, np.ndarray)
+            assert rate.dtype == float, (
+                "Any reflection/absorption rate must be of type float. "
+                "type(rate) = {}".format(type(rate))
+            )
+            assert rate.ndim == 1, (
+                "All rates must be 1 dimensional arrays."
+                "A single float for each species."
+            )
+            assert np.all(0 <= rate) and np.all(rate <= 1), (
+                "Reflection/Absorption rates must be between 0 and 1. "
                 "Rates = {}".format(rates)
             )
-            assert np.allclose(np.sum(rates, axis=0), 1.0, atol=1e-12), (
-                "Reflection/Absorption rates must sum up to 1 for each species.\n"
-                "Rates = {}\n"
-                "Sums = {}".format(rates, np.sum(rates, axis=0))
+        assert len({len(rate) for rate in rates}) == 1, (
+            "All rates must have the same length (number of species)."
+            "Rates = {}".format(rates)
+        )
+        assert np.allclose(np.sum(rates, axis=0), 1.0, atol=1e-12), (
+            "Reflection/Absorption rates must sum up to 1 for each species.\n"
+            "Rates = {}\n"
+            "Sums = {}".format(rates, np.sum(rates, axis=0))
+        )
+
+        for indices in [self.incoming_velocities,
+                        self.reflected_indices_inverse,
+                        self.reflected_indices_elastic]:
+            assert isinstance(indices, np.ndarray)
+            assert indices.dtype == int
+            assert len(set(indices)) == indices.size, (
+                "Index arrays must be unique indices!"
+                "idx_array:\n{}".format(indices)
             )
 
-        if surface_normal is not None:
-            assert isinstance(surface_normal, np.ndarray)
-            assert surface_normal.dtype == int
-            assert np.all(np.abs(surface_normal) <= 1), (
-                "A surface normal must have entries from [-1, 0, 1]."
-                "surface_normal = {}".format(surface_normal)
-            )
-
-        for idx_array in [incoming_velocities,
-                          reflected_indices_inverse,
-                          reflected_indices_elastic]:
-            if idx_array is not None:
-                assert isinstance(idx_array, np.ndarray)
-                assert idx_array.dtype == int
-                assert len(set(idx_array)) == idx_array.size, (
-                    "Index arrays must be unique indices!"
-                    "idx_array:\n{}".format(idx_array)
-                )
-
-        for idx_array in [reflected_indices_inverse,
-                          reflected_indices_elastic]:
-            if idx_array is not None:
-                assert np.all(idx_array[idx_array] == np.arange(idx_array.size)), (
-                        "Any Reflection applied twice, must return the original."
-                        "idx_array[idx_array]:\n{}".format(idx_array[idx_array])
-                    )
+        for reflection_indices in [self.reflected_indices_inverse,
+                                   self.reflected_indices_elastic]:
+            no_reflecion = np.arange(reflection_indices.size)
+            reflect_twice = reflection_indices[reflection_indices]
+            assert np.all(no_reflecion == reflect_twice), (
+                    "Any Reflection applied twice, must return the original."
+                    "idx_array[idx_array]:\n{}".format(reflect_twice))

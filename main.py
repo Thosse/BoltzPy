@@ -5,60 +5,57 @@ import numpy as np
 
 exisiting_simulation_file = None
 if exisiting_simulation_file is not None:
-    sim = bp.Simulation.load(exisiting_simulation_file)
+    import h5py
+    sim = bp.Simulation.load(h5py.File(exisiting_simulation_file, mode='r'))
 else:
-    sim = bp.Simulation(exisiting_simulation_file)
-    sim.add_specimen(mass=2, collision_rate=[50])
-    sim.add_specimen(mass=3, collision_rate=[50, 50])
-    sim.setup_time_grid(max_time=1,
-                        number_time_steps=201,
-                        calculations_per_time_step=5)
-    sim.setup_position_grid(grid_dimension=1,
-                            grid_shape=(31, ),
-                            grid_spacing=0.5)
-    sim.set_velocity_grids(grid_dimension=2,
-                           maximum_velocity=1.5,
-                           shapes=[(5, 5),
-                                   (7, 7)])
-    sim.geometry = bp.Geometry(
-        sim.p.shape,
+    timing = bp.Grid((201,), 1/1000, 5)
+    model = bp.Model([2, 3],
+                     [(5, 5), (7, 7)],
+                     0.25,
+                     [6, 4],
+                     np.array([[50, 50], [50, 50]]))
+    geometry = bp.Geometry(
+        (31, ),
+        0.5,
         [bp.ConstantPointRule(
-            initial_rho=[1.0, 1.0],
-            initial_drift=[[0.0, 0.0], [0.0, 0.0]],
-            initial_temp=[.50, .50],
-            velocity_grids=sim.sv,
+            particle_number=[1.0, 1.0],
+            mean_velocity=[[0.0, 0.0], [0.0, 0.0]],
+            temperature=[.50, .50],
             affected_points=[0],
-            species=sim.s),
+            model=model),
          bp.InnerPointRule(
-            initial_rho=[1.0, 1.0],
-            initial_drift=[[0.0, 0.0], [0.0, 0.0]],
-            initial_temp=[.50, .50],
+            particle_number=[1.0, 1.0],
+            mean_velocity=[[0.0, 0.0], [0.0, 0.0]],
+            temperature=[.50, .50],
             affected_points=np.arange(1, 30),
-            velocity_grids=sim.sv,
-            species=sim.s),
+            model=model),
          bp.BoundaryPointRule(
-            initial_rho=[1.0, 1.0],
-            initial_drift=[[0.0, 0.0], [0.0, 0.0]],
-            initial_temp=[.6, .6],
+            particle_number=[1.0, 1.0],
+            mean_velocity=[[0.0, 0.0], [0.0, 0.0]],
+            temperature=[.5, .5],
             affected_points=[30],
             reflection_rate_inverse=[.3, .3],
             reflection_rate_elastic=[.3, .3],
             reflection_rate_thermal=[0.3, .3],
             absorption_rate=[0.1, .1],
             surface_normal=np.array([1, 0], dtype=int),
-            velocity_grids=sim.sv,
-            species=sim.s)
+            model=model)
          ]
     )
-    # sim.geometry.rules[0].plot(sim.sv, sim.s, 0)
-    sim.scheme.OperatorSplitting = "FirstOrder"
-    sim.scheme.Transport = "FiniteDifferences_FirstOrder"
-    sim.scheme.Transport_VelocityOffset = np.array([0.0, 0.0])
-    sim.scheme.Collisions_Generation = "UniformComplete"
-    sim.scheme.Collisions_Computation = "EulerScheme"
-    # print(sim.__str__(write_physical_grids=True))
-    sim.coll.setup(sim.scheme, sim.sv, sim.s)
+    sim = bp.Simulation(timing, geometry, model, exisiting_simulation_file)
     sim.save()
+    # #
+    # grp = sim.coll.group(sim.model, mode="species")
+    # for (key, colls) in grp.items():
+    #     if key[0] == key[2]:
+    #         continue
+    #     print(key)
+    #     print(len(colls))
+    #     # import time
+    #     # time.sleep(1)
+    #     colls = np.array([c[0:4] for c in colls])
+    #     bp.collisions.plot(sim.model, colls, iterative=True)
+    # sim.save()
     sim.compute()
 
 sim.animate()

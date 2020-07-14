@@ -1,10 +1,8 @@
 
 import numpy as np
 import h5py
-from math import isclose
 
 import boltzpy as bp
-import boltzpy.constants as bp_c
 
 
 # noinspection PyPep8Naming
@@ -31,84 +29,64 @@ class Grid(bp.BaseClass):
 
     Parameters
     ----------
-    ndim : :obj:`int`
-        The number of :obj:`Grid` dimensions.
-        Must be in :const:`~boltzpy.constants.SUPP_GRID_DIMENSIONS`.
-    shape : :obj:`tuple` [:obj:`int`]
+    shape : :obj:`~numpy.array` [:obj:`int`]
         Number of :obj:`Grid` points for each dimension.
-        Tuple of length :attr:`ndim`.
-    physical_spacing : :obj:`float`
-        Step size for the physical grid points.
-    spacing : :obj:`int`, optional
-        This allows
-        centered velocity grids (without the zero),
-        write-intervalls for time grids
-        and possibly adaptive positional grids.
+    delta : :obj:`float`
+        Internal step size.
+        This is NOT the physical distance between grid points.
+    spacing : :obj:`int`
+        An integer stretching factor.
+        Using even spacings allows centered grids of even shape,
+        It is used for velocity grids of multiple species with differing mass.
+        It determines write-intervalls for time grids.
     is_centered : :obj:`bool`, optional
         True if the Grid should be centered around zero.
 
 
     Attributes
     ----------
-    ndim : :obj:`int`
-        The number of :obj:`Grid` dimensions.
-    shape : :obj:`tuple` [:obj:`int`]
+    shape : :obj:`~numpy.array` [:obj:`int`]
         Number of :obj:`Grid` points for each dimension.
     delta : :obj:`float`
         Smallest possible step size of the :obj:`Grid`.
-    spacing : :obj:`int`, optional
+    spacing : :obj:`int`
         This allows
         centered velocity grids (without the zero),
         write-intervalls for time grids
         and possibly adaptive positional grids.
     is_centered : :obj:`float`
-        True if the Grid should be centered around zero.
-    iG : :obj:`~numpy.array` [:obj:`int`]
-        The *integer Grid*  describes the
-        physical values (:attr:`pG`)
-        of all :class:`Grid` points
-        in multiples of :attr:`delta`.
-        Using integers allows precise computations,
-        compared to floats.
+        If True, then the Grid will be centered around zero.
+    ndim : :obj:`int`
+        The number of :obj:`Grid` dimensions
+    size : :obj:`int` :
+        The total number of grid points.
+    iG : :obj:`~numpy.array` [:obj:`int`] :
+        The *integer Grid* describes the position of all :class:`Grid` points
+        in multiples of :attr:`delta`, e.g. :math:`pG := iG \cdot delta`.
+
+        This allows precise computations, without rounding errors.
+
+        Array of shape (:attr:`size`, :attr:`ndim`).
     """
     def __init__(self,
-                 ndim=None,
-                 shape=None,
-                 physical_spacing=None,
-                 spacing=2,
+                 shape,
+                 delta,
+                 spacing,
                  is_centered=False):
-        self.check_parameters(ndim=ndim,
-                              shape=shape,
-                              physical_spacing=physical_spacing,
-                              spacing=spacing,
-                              is_centered=is_centered)
-        self.ndim = ndim
-        self.shape = shape
-        if physical_spacing is not None:
-            self.delta = physical_spacing / spacing
-        else:
-            self.delta = None
-        self.spacing = spacing
-        self.is_centered = is_centered
-        self.iG = None
-        # set up self.iG, if all necessary parameters are given
-        if self.is_configured:
-            self.setup()
+        self.shape = np.array(shape, dtype=int)
+        self.delta = np.float(delta)
+        self.spacing = np.int(spacing)
+        self.is_centered = bool(is_centered)
+        self.ndim = self.shape.size
+        self.size = np.int(np.prod(self.shape))
+        self.iG = self.iv(np.arange(self.size))
+
+        self.check_integrity()
         return
 
     #####################################
     #           Properties              #
     #####################################
-    @property
-    def size(self):
-        """:obj:`int` :
-        The total number of grid points.
-        """
-        if self.iG is None:
-            return None
-        else:
-            return self.iG[:, 0].size
-
     @property
     def physical_spacing(self):
         r""":obj:`float` :
@@ -116,10 +94,7 @@ class Grid(bp.BaseClass):
 
         It holds :math:`physical \_ spacing = delta \cdot index \_ spacing`.
         """
-        if self.delta is None or self.spacing is None:
-            return None
-        else:
-            return self.delta * self.spacing
+        return self.delta * self.spacing
 
     @property
     def pG(self):
@@ -133,35 +108,102 @@ class Grid(bp.BaseClass):
 
         Array of shape (:attr:`size`, :attr:`ndim`).
          """
-        if self.iG is None or self.delta is None:
-            return None
-        else:
-            return self.iG * self.delta
+        return self.pv(np.arange(self.size))
 
-    @property
-    def is_configured(self):
-        """:obj:`bool` :
-        True, if all necessary attributes of the instance are set.
-        False Otherwise.
-        """
-        necessary_params = [self.ndim,
-                            self.shape,
-                            self.delta,
-                            self.spacing,
-                            self.is_centered]
-        if any([val is None for val in necessary_params]):
-            return False
-        else:
-            return True
+    @staticmethod
+    def parameters():
+        return {"shape",
+                "delta",
+                "spacing",
+                "is_centered"}
 
-    @property
-    def is_set_up(self):
-        """:obj:`bool` :
-        True, if the instance is completely set up and ready to call
-        :meth:`~Simulation.run_computation`.
-        False Otherwise.
+    @staticmethod
+    def attributes():
+        attrs = Grid.parameters()
+        attrs.update({"ndim",
+                      "size",
+                      "iG",
+                      "physical_spacing",
+                      "pG"})
+        return attrs
+
+    #####################################
+    #         Indexes and Values        #
+    #####################################
+    def iv(self, idx):
+        """Return the integer values of the indexed grid points`
+        Parameters
+        ----------
+        idx : :obj:`ìnt` or :obj:`~numpy.array` [:obj:`int`]
+
+        Returns
+        -------
+        values : :obj:`~numpy.array` [:obj:`int']
         """
-        return self.is_configured and self.iG is not None
+        assert np.all(idx >= 0)
+        assert np.all(idx < self.size)
+        values = np.empty(np.shape(idx) + (self.ndim,), dtype=int)
+        # calculate the values, by iterating over the dimension
+        for i in range(self.ndim):
+            multi = np.prod(self.shape[i + 1:self.ndim], dtype=int)
+            values[..., i] = idx // multi
+            idx -= multi * values[..., i]
+            values[..., i] = self.spacing * values[..., i]
+        # centralize Grid around zero, if necessary
+        # Note that True/False == 1/0
+        offset = -self.is_centered * (self.spacing
+                                      * (np.array(self.shape, dtype=int) - 1)
+                                      // 2)
+        values += offset
+        return values
+
+    def pv(self, idx):
+        """Return the physical values of the indexed grid points`
+        Parameters
+        ----------
+        idx : :obj:`ìnt` or :obj:`~numpy.array` [:obj:`int`]
+
+        Returns
+        -------
+        values : :obj:`~numpy.array` [:obj:`float']
+        """
+        return self.iv(idx) * self.delta
+
+    # Todo rename do idx
+    def get_idx(self, values):
+        """Find index of given values in :attr:`iG`
+        Returns -1, if the value is not in this Grid.
+
+        Parameters
+        ----------
+        values : :obj:`~numpy.array` [:obj:`int`]
+
+        Returns
+        -------
+        index : :obj:`~numpy.array` [:obj:`int']
+        """
+        assert isinstance(values, np.ndarray), (
+            "values must be an np.array, not {}".format(type(values)))
+        assert values.dtype == int, (
+            "values must be an integer array, not {}".format(values.dtype))
+
+        BAD_VALUE = -2 * self.size
+        # shift Grid to start (left bottom ) at 0
+        values = values - self.iG[0]
+        # divide by spacing to get the position on the (x,y,z) axis
+        values = np.where(values % self.spacing == 0,
+                          values // self.spacing,
+                          BAD_VALUE)
+        # sort out the values, that are not in the grid
+        values = np.where(values >= 0, values, BAD_VALUE)
+        values = np.where(values < self.shape, values, BAD_VALUE)
+        # compute the (potential) index
+        factor = np.array([np.prod(self.shape[i+1:]) for i in range(self.ndim)],
+                          dtype=int)
+        idx = values.dot(factor)
+        # remove Bad Values or points that are out of bounds
+        idx = np.where(idx >= 0, idx, -1)
+        return idx
 
     #####################################
     #        Sorting and Ordering       #
@@ -200,109 +242,30 @@ class Grid(bp.BaseClass):
             grouped_velocities[key] = np.array(item)
         return grouped_velocities
 
-    def get_idx(self, values):
-        """Find index of given values in :attr:`iG`
-        Returns -1, if the value is not in this Grid.
-
-        Parameters
-        ----------
-        values : :obj:`~numpy.array` [:obj:`int`]
-
-        Returns
-        -------
-        index : :obj:`~numpy.array` [:obj:`int']
-        """
-        assert isinstance(values, np.ndarray), (
-            "values must be an np.array, not {}".format(type(values)))
-        assert values.dtype == int, (
-            "values must be an integer array, not {}".format(values.dtype))
-        assert len(set(self.shape)) == 1, "only works for square/cubic grids"
-        assert values.shape[-1] == self.ndim, "Only tested for 2D Velocities"
-        assert values.shape[-1] == 2, "Only tested for 2D Velocities"
-        BAD_VALUE = -2 * self.size
-        # shift Grid to start (left bottom ) at 0
-        values = values - self.iG[0]
-        # divide by spacing to get the position on the (x,y,z) axis
-        # sort out the values, that are not in the grid, by setting them to BAD_VALUE
-        values = np.where(values % self.spacing == 0, values // self.spacing, BAD_VALUE)
-        values = np.where(values >= 0, values, BAD_VALUE)
-        values = np.where(values < self.shape[0], values, BAD_VALUE)
-        # compute the (potential) index
-        # Todo(LT) Reverse Ordering of Grids?
-        factor = np.array([self.shape[0]**i for i in reversed(range(self.ndim))], dtype=int)
-        idx = values.dot(factor)
-        # remove Bad Values or points that are out of bounds
-        idx = np.where(idx >= 0, idx, -1)
-        return idx
-
     #####################################
     #              Utility              #
     #####################################
     def __contains__(self, item):
         assert isinstance(item, np.ndarray)
+        assert item.shape[-1] == self.ndim
         return np.all(self.get_idx(item) != -1)
 
     def line(self, start, direction, steps):
         return (start + step * direction for step in steps
                 if start + step * direction in self)
 
-    #####################################
-    #           Configuration           #
-    #####################################
-    # Todo this should be simpler -> use np.mgrid?
-    def setup(self):
-        """Construct the index grid (:attr:`Grid.iG`)."""
-        self.check_integrity(False)
-        assert self.is_configured
-
-        # Todo This process is too confusing
-        # Create rectangular Grid first
-        # Create list of axes (1D arrays)
-        axes = [np.arange(0,
-                          points_on_axis * self.spacing,
-                          self.spacing)
-                for points_on_axis in self.shape]
-        # Create mesh grid from axes
-        # Note that *[a,b,c] == a,b,c
-        # it unpacks a list
-        meshgrid = np.meshgrid(*axes)
-        grid = np.array(meshgrid, dtype=int)
-        # bring meshgrid into desired order/structure
-        if self.ndim == 1:
-            grid = np.array(grid.transpose((1, 0)))
-        elif self.ndim == 2:
-            grid = np.array(grid.transpose((2, 1, 0)))
-        elif self.ndim == 3:
-            grid = np.array(grid.transpose((2, 1, 3, 0)))
+    def extension(self, factor):
+        # must hold grid.shape % 2 == ext_grid.shape % 2
+        if factor % 2 == 0:
+            ext_shape = factor * self.shape - (self.shape % 2)
         else:
-            msg = "Error - Unsupported Grid dimension: " \
-                  "{}".format(self.ndim)
-            raise AttributeError(msg)
-        assert grid.shape == tuple(self.shape) + (self.ndim,)
-        self.iG = grid.reshape((np.prod(self.shape),
-                                self.ndim))
-
-        # center the Grid if necessary
-        if self.is_centered:
-            self.centralize()
-        self.check_integrity()
-        return
-
-    def centralize(self):
-        """Shift the integer Grid (:attr:`iG`) to be centered around zero.
-        """
-        assert isinstance(self.iG, np.ndarray)
-        assert self.spacing is not None
-        double_shift = np.max(self.iG, axis=0) + np.min(self.iG, axis=0)
-        if np.all(double_shift % 2 == 0):
-            shift = double_shift // 2
-            self.iG -= shift
-        else:
-            msg = "Even Grids can only be centralized, " \
-                  "if the spacing is even. " \
-                  "spacing = {}".format(self.spacing)
-            raise AttributeError(msg)
-        return
+            ext_shape = factor * self.shape
+        ext_grid = bp.Grid(ext_shape,
+                           self.delta,
+                           self.spacing,
+                           self.is_centered)
+        assert np.array_equal(self.shape % 2, ext_grid.shape % 2)
+        return ext_grid
 
     #####################################
     #           Visualization           #
@@ -348,58 +311,33 @@ class Grid(bp.BaseClass):
         """
         assert isinstance(hdf5_group, h5py.Group)
         assert hdf5_group.attrs["class"] == "Grid"
+        parameters = dict()
+        for param in Grid.parameters():
+            parameters[param] = hdf5_group[param][()]
+        return Grid(**parameters)
 
-        # read parameters from file
-        params = dict()
-        if "Dimensions" in hdf5_group.keys():
-            params["ndim"] = int(hdf5_group["Dimensions"][()])
-        if "Shape" in hdf5_group.keys():
-            # cast into tuple of ints
-            shape = hdf5_group["Shape"][()]
-            params["shape"] = tuple(int(width) for width in shape)
-        # Todo remove physical spacing as attribute(parameter
-        if "Physical_Spacing" in hdf5_group.keys():
-            params["physical_spacing"] = float(hdf5_group["Physical_Spacing"][()])
-        if "Spacing" in hdf5_group.keys():
-            params["spacing"] = int(hdf5_group["Spacing"][()])
-        else:
-            params["spacing"] = None
-        if "Is_Centered" in hdf5_group.keys():
-            params["is_centered"] = bool(hdf5_group["Is_Centered"][()])
-        else:
-            params["is_centered"] = None
-
-        self = Grid(**params)
-        return self
-
-    def save(self, hdf5_group):
+    def save(self, hdf5_group, write_all=False):
         """Write the main parameters of the :obj:`Grid` instance
         into the HDF5 group.
 
         Parameters
         ----------
         hdf5_group : :obj:`h5py.Group <h5py:Group>`
+        write_all : :obj:`bool`
+            If True, write all attributes and properties to the file,
+            even the unnecessary ones. Useful for testing,
         """
         assert isinstance(hdf5_group, h5py.Group)
-        self.check_integrity(False)
+        self.check_integrity()
 
         # Clean State of Current group
         for key in hdf5_group.keys():
             del hdf5_group[key]
-        hdf5_group.attrs["class"] = "Grid"
-
-        # write all set attributes to file
-        if self.ndim is not None:
-            hdf5_group["Dimensions"] = self.ndim
-        if self.shape is not None:
-            hdf5_group["Shape"] = self.shape
-        if self.physical_spacing is not None:
-            hdf5_group["Physical_Spacing"] = self.physical_spacing
-        if self.spacing is not None:
-            hdf5_group["Spacing"] = self.spacing
-        if self.is_centered is not None:
-            hdf5_group["Is_Centered"] = self.is_centered
-
+        hdf5_group.attrs["class"] = self.__class__.__name__
+        # write attributes to file
+        attributes = self.attributes() if write_all else self.parameters()
+        for attr in attributes:
+            hdf5_group[attr] = self.__getattribute__(attr)
         # check that the class can be reconstructed from the save
         other = Grid.load(hdf5_group)
         assert self == other
@@ -408,149 +346,59 @@ class Grid(bp.BaseClass):
     #####################################
     #           Verification            #
     #####################################
-    def check_integrity(self,
-                        complete_check=True,
-                        context=None):
-        """Sanity Check.
+    def check_integrity(self):
+        """Sanity Check"""
+        assert isinstance(self.ndim, int)
+        assert self.ndim >= 0
 
-        Assert all conditions in :meth:`check_parameters`.
+        assert isinstance(self.shape, np.ndarray)
+        assert self.shape.size == self.ndim
+        assert self.shape.dtype == int
+        assert np.all(self.shape >= 1)
 
-        Parameters
-        ----------
-        complete_check : :obj:`bool`, optional
-            If True, then all attributes must be assigned (not None).
-            If False, then unassigned attributes are ignored.
-        context : :class:`Simulation`, optional
-            The Simulation, which this instance belongs to.
-            This allows additional checks.
-        """
-        self.check_parameters(ndim=self.ndim,
-                              shape=self.shape,
-                              physical_spacing=self.physical_spacing,
-                              spacing=self.spacing,
-                              is_centered=self.is_centered,
-                              delta=self.delta,
-                              size=self.size,
-                              iG=self.iG,
-                              complete_check=complete_check,
-                              context=context)
-        return
+        assert isinstance(self.size, int)
+        assert self.size >= 0
+        assert np.prod(self.shape) == self.size
 
-    @staticmethod
-    def check_parameters(ndim=None,
-                         shape=None,
-                         physical_spacing=None,
-                         spacing=None,
-                         is_centered=None,
-                         delta=None,
-                         size=None,
-                         iG=None,
-                         complete_check=False,
-                         context=None):
-        """Sanity Check.
+        assert isinstance(self.delta, np.float)
+        assert self.delta > 0
 
-        Checks integrity of given parameters and their interactions.
+        assert isinstance(self.spacing, int)
+        assert self.spacing > 0
 
-        Parameters
-        ----------
-        ndim : :obj:`int`, optional
-        shape : :obj:`tuple` [:obj:`int`], optional
-        physical_spacing : :obj:`float`, optional
-        spacing : :obj:`int`, optional
-        is_centered : :obj:`bool`, optional
-        delta : :obj:`float`, optional
-        size : :obj:`int`, optional
-        iG : :obj:`~numpy.array` [:obj:`int`], optional
-        complete_check : :obj:`bool`, optional
-            If True, then all parameters must be set (not None).
-            If False, then unassigned parameters are ignored.
-        context : :class:`Simulation`, optional
-            The Simulation, which this instance belongs to.
-            This allows additional checks.
-        """
-        assert isinstance(complete_check, bool)
-        # For complete check, assert that all parameters are assigned
-        if complete_check is True:
-            assert all(param_val is not None
-                       for (param_key, param_val) in locals().items()
-                       if param_key != "context")
-        if context is not None:
-            assert isinstance(context, bp.Simulation)
+        assert isinstance(self.physical_spacing, np.float)
+        assert self.physical_spacing > 0
 
-        # check all parameters, if set
-        if ndim is not None:
-            assert isinstance(ndim, int)
-            assert ndim in bp_c.SUPP_GRID_DIMENSIONS
+        assert isinstance(self.is_centered, bool)
+        if self.is_centered:
+            assert (np.all(self.spacing % 2 == 0))
+            # or np.all((np.array(self.shape) - 1) % 2 == 0)
 
-        if shape is not None:
-            assert isinstance(shape, tuple)
-            assert all(isinstance(width, int) for width in shape)
-            assert (all(width >= 2 for width in shape)
-                    or all(width == 1 for width in shape))
-
-        if physical_spacing is not None:
-            assert isinstance(physical_spacing, float)
-            assert physical_spacing > 0
-
-        if spacing is not None:
-            assert isinstance(spacing, int)
-            assert spacing > 0
-
-        if is_centered is not None:
-            assert isinstance(is_centered, bool)
-
-        if delta is not None:
-            assert isinstance(delta, float)
-            assert delta > 0
-
-        if size is not None:
-            assert isinstance(size, int)
-            assert size >= 1
-            if shape is not None:
-                assert np.prod(shape) == size
-
-        if iG is not None:
-            assert isinstance(iG, np.ndarray)
-            assert iG.dtype == int
-            assert iG.ndim == 2
-
-        # check correct attribute relations
-        if ndim is not None and shape is not None:
-            assert len(shape) == ndim
-
-        if all(attr is not None
-               for attr in [physical_spacing, spacing, delta]):
-            assert isclose(physical_spacing,
-                           spacing * delta)
-
-        if all(attr is not None for attr in [ndim, size, iG]):
-            assert iG.shape == (size, ndim)
-
+        assert isinstance(self.iG, np.ndarray)
+        assert self.iG.dtype == int
+        # iG is a flattened array of ndim-vectors
+        assert self.iG.ndim == 2
+        # Grids must have the correct shape
+        assert self.iG.shape == (self.size, self.ndim)
         # distances between grid points are multiples of index spacing
-        if all(attr is not None for attr in [spacing, iG]):
-            shifted_array = iG - iG[0]
-            assert np.all(shifted_array % spacing == 0)
-
-        if is_centered is not None and iG is not None:
-            if is_centered:
-                # Todo find something better like point symmetric...
-                assert np.array_equal(iG[0], -iG[-1])
-            else:
-                assert np.all(iG[0] == 0)
-
+        assert np.all((self.iG - self.iv(0)) % self.spacing == 0)
+        if self.is_centered:
+            assert np.array_equal(self.iG, -self.iG[::-1])
+        else:
+            assert np.all(self.iv(0) == 0)
         return
 
     def __str__(self, write_physical_grids=False):
         """:obj:`str` :
         A human readable string which describes all attributes of the instance."""
         description = ''
-        description += "Dimension = {}\n".format(self.ndim)
-        description += "Shape = {}\n".format(self.shape)
-        description += "Total Size = {}\n".format(self.size)
-        description += "Physical_Spacing = {}\n".format(self.physical_spacing)
-        description += "Spacing = {}\n".format(self.spacing)
-        description += "Internal Step Size = {}\n".format(self.delta)
-        description += 'Is_Centered = {}\n'.format(self.is_centered)
+        description += "ndim = {}\n".format(self.ndim)
+        description += "shape = {}\n".format(self.shape)
+        description += "size = {}\n".format(self.size)
+        description += "delta = {}\n".format(self.delta)
+        description += "spacing = {}\n".format(self.spacing)
+        description += "physical_spacing = {}\n".format(self.physical_spacing)
+        description += 'is_centered = {}\n'.format(self.is_centered)
         if write_physical_grids:
             description += '\n'
             description += 'Physical Grid:\n\t'

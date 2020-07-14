@@ -2,7 +2,9 @@ import numpy as np
 
 
 class BaseClass:
-    def __eq__(self, other, print_message=True):
+    def __eq__(self, other, ignore=None,print_message=True):
+        if ignore is None:
+            ignore = []
         # This explicitly allows other to be an child class of self
         if not isinstance(other, type(self)):
             if print_message:
@@ -17,6 +19,8 @@ class BaseClass:
                       "\n\tother.keys = ", set(other.__dict__.keys()))
             return False
         for (key, value) in self.__dict__.items():
+            if key in ignore:
+                continue
             other_value = other.__dict__[key]
             if type(value) != type(other_value):
                 if print_message:
