@@ -21,8 +21,6 @@ class Simulation(bp.BaseClass):
     .. todo::
         - Add Knudsen Number Attribute or Property?
             * Add method to get candidate for characteristic length
-            * show this char length in GUI
-            * automatically calculate Knudsen number with this information
 
     Attributes
     ----------
@@ -53,6 +51,9 @@ class Simulation(bp.BaseClass):
         self.geometry = geometry
         self.model = model
         self.log_state = np.bool(log_state)
+        self.order_operator_splitting = int(order_operator_splitting)
+        self.order_transport = int(order_transport)
+        self.order_collisions = int(order_collisions)
         if file is None:
             idx = 0
             while True:
@@ -61,12 +62,9 @@ class Simulation(bp.BaseClass):
                 if not os.path.exists(file_path):
                     break
             file = h5py.File(file_path, mode='w')
-        self.order_operator_splitting = int(order_operator_splitting)
-        self.order_transport = int(order_transport)
-        self.order_collisions = int(order_collisions)
         self.file = file
 
-        self.check_integrity(complete_check=False)
+        self.check_integrity()
         return
 
     @property
@@ -106,13 +104,6 @@ class Simulation(bp.BaseClass):
             if not self.log_state:
                 del shapes[s]["state"]
         return shapes
-
-    @property
-    def n_rules(self):
-        """:obj:`int` :
-        Total number of :class:`initialization rules <Rule>` set up so far.
-        """
-        return self.geometry.rules.size
 
     #####################################
     #            Computation            #
@@ -208,6 +199,7 @@ class Simulation(bp.BaseClass):
     #####################################
     #             Animation             #
     #####################################
+    # Todo give moments as tuple(arrays, ) (self.file...)
     def animate(self, shape=(3, 2), moments=None):
         hdf_group = self.file["results"]
         tmax = int(hdf_group.attrs["t"])
@@ -274,7 +266,6 @@ class Simulation(bp.BaseClass):
                           order_operator_splitting,
                           order_transport,
                           order_collisions)
-        self.check_integrity(complete_check=False)
         return self
 
     def save(self, hdf_group=None):
@@ -285,7 +276,7 @@ class Simulation(bp.BaseClass):
         ----------
         hdf_group : :obj:`h5py.Group <h5py:Group>`
         """
-        self.check_integrity(False)
+        self.check_integrity()
         if hdf_group is None:
             hdf_group = self.file
         assert isinstance(hdf_group, h5py.Group)
@@ -325,79 +316,27 @@ class Simulation(bp.BaseClass):
     #####################################
     #            Verification           #
     #####################################
-    def check_integrity(self, complete_check=True):
-        """Sanity Check.
-
-        Assert all conditions in :meth:`check_parameters`.
-
-        Parameters
-        ----------
-        complete_check : :obj:`bool`, optional
-            If True, then all attributes must be assigned (not None).
-            If False, then unassigned attributes are ignored.
-        """
-        self.check_parameters(time_grid=self.timing,
-                              position_grid=self.geometry,
-                              species_velocity_grid=self.model,
-                              geometry=self.geometry,
-                              complete_check=complete_check,
-                              context=self)
+    def check_integrity(self):
+        """Sanity Check."""
+        assert isinstance(self.timing, bp.Grid)
+        self.timing.check_integrity()
+        assert self.timing.ndim == 1
+        assert isinstance(self.geometry, bp.Geometry)
+        self.geometry.check_integrity()
+        assert isinstance(self.model, bp.Model)
+        self.model.check_integrity()
+        assert self.model.ndim >= self.geometry.ndim
+        assert self.geometry.model_size == self.model.size
+        assert self.geometry.rules.size >= self.model.specimen
+        assert isinstance(self.file, h5py.Group)
+        assert isinstance(self.log_state, np.bool)
+        assert isinstance(self.order_operator_splitting, int)
+        assert self.order_operator_splitting == 1
+        assert isinstance(self.order_collisions, int)
+        assert self.order_collisions == 1
+        assert isinstance(self.order_transport, int)
+        assert self.order_transport == 1
         return
-
-    @staticmethod
-    def check_parameters(time_grid=None,
-                         position_grid=None,
-                         species_velocity_grid=None,
-                         geometry=None,
-                         complete_check=False,
-                         context=None):
-        r"""Sanity Check.
-
-        Check integrity of given parameters and their interaction.
-
-        Parameters
-        ----------
-       time_grid : :obj:`Grid`, optional
-        position_grid : :obj:`Grid`, optional
-        species_velocity_grid : :obj:`Model`, optional
-        geometry: :class:`Geometry`, optional
-        scheme : :class:`Scheme`, optional
-        complete_check : :obj:`bool`, optional
-            If True, then all parameters must be assigned (not None).
-            If False, then unassigned parameters are ignored.
-        context : :class:`Simulation`, optional
-            The Simulation instance, allows checking related attributes.
-        """
-        if context is not None:
-            assert isinstance(context, Simulation)
-        # Todo Test self.file and self.log_state
-        # For complete check, assert that all parameters are assigned
-        assert isinstance(complete_check, bool)
-        if complete_check is True:
-            assert all([param is not None for param in locals().values()])
-
-        # check all parameters, if set
-        if time_grid is not None:
-            assert isinstance(time_grid, bp.Grid)
-            time_grid.check_integrity()
-            assert time_grid.ndim == 1
-
-        if position_grid is not None:
-            assert isinstance(position_grid, bp.Grid)
-            position_grid.check_integrity()
-            # Todo Remove this, when implementing 2D Transport
-            if position_grid.ndim is not None \
-                    and position_grid.ndim != 1:
-                msg = "Currently only 1D Simulations are supported!"
-                raise NotImplementedError(msg)
-
-        if species_velocity_grid is not None:
-            assert isinstance(species_velocity_grid, bp.Model)
-            species_velocity_grid.check_integrity()
-
-        if geometry is not None:
-            assert isinstance(geometry, bp.Geometry)
-            geometry.check_integrity()
 
     def __eq__(self, other, ignore=None, print_message=True):
         if ignore is None:
