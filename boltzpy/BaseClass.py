@@ -1,8 +1,9 @@
 import numpy as np
+import scipy.sparse
 
 
 class BaseClass:
-    def __eq__(self, other, ignore=None,print_message=True):
+    def __eq__(self, other, ignore=None, print_message=True):
         if ignore is None:
             ignore = []
         # This explicitly allows other to be an child class of self
@@ -29,6 +30,9 @@ class BaseClass:
                           "\n\ttype(self) = ", type(value),
                           "\n\ttype(other) = ", type(other_value))
                 return False
+            if isinstance(value, scipy.sparse.csr_matrix):
+                value = value.toarray()
+                other_value = other_value.toarray()
             if isinstance(value, np.ndarray):
                 if value.shape != other_value.shape:
                     if print_message:

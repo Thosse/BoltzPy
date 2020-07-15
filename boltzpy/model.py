@@ -1,5 +1,6 @@
 import numpy as np
 import h5py
+from scipy.sparse import csr_matrix
 
 import boltzpy as bp
 
@@ -101,6 +102,7 @@ class Model(bp.BaseClass):
         self.index_offset = np.zeros(self.specimen + 1, dtype=int)
         for s in self.species:
             self.index_offset[s + 1:] += self.vGrids[s].size
+
         # setup collisions
         if collision_relations is None:
             coll = bp.Collisions()
@@ -110,6 +112,13 @@ class Model(bp.BaseClass):
         else:
             self.collision_relations = np.array(collision_relations)
             self.collision_weights = np.array(collision_weights)
+
+        # create collision_matrix
+        col_mat = np.zeros((self.size, self.collision_weights.size), dtype=float)
+        for [r, rel] in enumerate(self.collision_relations):
+            weight = self.collision_weights[r]
+            col_mat[rel, r] = weight * np.array([-1, 1, -1, 1])
+        self.collision_matrix = csr_matrix(col_mat)
         return
 
     # Todo properly vectorize
@@ -141,6 +150,12 @@ class Model(bp.BaseClass):
         Maximum physical velocity for every sub grid."""
         return np.max(self.iMG * self.delta)
 
+    @property
+    def collision_invariants(self):
+        rank = np.linalg.matrix_rank(self.collision_matrix.toarray())
+        maximum_rank = np.min([self.size, self.collision_weights.size])
+        return maximum_rank - rank
+
     @staticmethod
     def parameters():
         return {"masses",
@@ -158,11 +173,13 @@ class Model(bp.BaseClass):
         attrs = Model.parameters()
         attrs.update({"ndim",
                       "size",
+                      "collision_matrix",
                       "specimen",
                       "index_offset",
                       "index_range",
                       "species",
-                      "maximum_velocity"})
+                      "maximum_velocity",
+                      "collision_invariants"})
         return attrs
 
     #####################################
@@ -291,7 +308,10 @@ class Model(bp.BaseClass):
         # write attributes to file
         attributes = self.attributes() if write_all else self.parameters()
         for attr in attributes:
-            hdf5_group[attr] = self.__getattribute__(attr)
+            value = self.__getattribute__(attr)
+            if isinstance(value, csr_matrix):
+                value = value.toarray()
+            hdf5_group[attr] = value
 
         # check that the class can be reconstructed from the save
         other = Model.load(hdf5_group)

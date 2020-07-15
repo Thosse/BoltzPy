@@ -93,7 +93,7 @@ class Data:
         self._params = dict()
         # Keep as a "conditional" attribute?
         coll = bp.Collisions(self.col, self.weight)
-        self._params["col_mat"] = coll.generate_collision_matrix(sim.timing.delta)
+        self._params["col_mat"] = sim.model.collision_matrix * sim.timing.delta
         return
 
     def __getattr__(self, item):
