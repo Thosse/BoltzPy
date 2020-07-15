@@ -48,11 +48,11 @@ def setup_file(file_address=FILE):
             print("ABORTED")
             return
 
-    file = h5py.File(file_address, mode="w")
-    for (key, item) in GRIDS.items():
-        assert isinstance(item, bp.Grid)
-        file.create_group(key)
-        item.save(file[key], True)
+    with h5py.File(file_address, mode="w") as file:
+        for (key, item) in GRIDS.items():
+            assert isinstance(item, bp.Grid)
+            file.create_group(key)
+            item.save(file[key], True)
     return
 
 
@@ -73,30 +73,30 @@ def test_setup_creates_same_file():
 
 @pytest.mark.parametrize("key", GRIDS.keys())
 def test_hdf5_groups_exist(key):
-    file = h5py.File(FILE, mode="r")
-    assert key in file.keys(), (
-        "The group {} is missing in the test file-".format(key))
+    with h5py.File(FILE, mode="r") as file:
+        assert key in file.keys(), (
+            "The group {} is missing in the test file-".format(key))
 
 
 @pytest.mark.parametrize("key", GRIDS.keys())
 def test_load_from_file(key):
-    file = h5py.File(FILE, mode="r")
-    old = bp.Grid.load(file[key])
-    new = GRIDS[key]
-    assert isinstance(old, bp.Grid)
-    assert isinstance(new, bp.Grid)
-    assert old == new, (
-        "\n{}\nis not equal to\n\n{}".format(old, new)
+    with h5py.File(FILE, mode="r") as file:
+        old = bp.Grid.load(file[key])
+        new = GRIDS[key]
+        assert isinstance(old, bp.Grid)
+        assert isinstance(new, bp.Grid)
+        assert old == new, (
+            "\n{}\nis not equal to\n\n{}".format(old, new)
     )
 
 
 @pytest.mark.parametrize("key", GRIDS.keys())
 @pytest.mark.parametrize("attribute", bp.Grid.attributes())
 def test_attributes(attribute, key):
-    file = h5py.File(FILE, mode="r")
-    old = file[key][attribute][()]
-    new = GRIDS[key].__getattribute__(attribute)
-    assert np.all(old == new)
+    with h5py.File(FILE, mode="r") as file:
+        old = file[key][attribute][()]
+        new = GRIDS[key].__getattribute__(attribute)
+        assert np.all(old == new)
 
 
 @pytest.mark.parametrize("key", GRIDS.keys())

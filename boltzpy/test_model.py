@@ -63,11 +63,11 @@ def setup_file(file_address=FILE):
             print("ABORTED")
             return
 
-    file = h5py.File(file_address, mode="w")
-    for (key, item) in MODELS.items():
-        assert isinstance(item, bp.Model)
-        file.create_group(key)
-        item.save(file[key], True)
+    with h5py.File(file_address, mode="w") as file:
+        for (key, item) in MODELS.items():
+            assert isinstance(item, bp.Model)
+            file.create_group(key)
+            item.save(file[key], True)
     return
 
 
@@ -88,31 +88,30 @@ def test_setup_creates_same_file():
 
 @pytest.mark.parametrize("key", MODELS.keys())
 def test_hdf5_groups_exist(key):
-    file = h5py.File(FILE, mode="r")
-    assert key in file.keys(), (
-        "The group {} is missing in the test file-".format(key))
+    with h5py.File(FILE, mode="r") as file:
+        assert key in file.keys(), (
+            "The group {} is missing in the test file-".format(key))
 
 
 @pytest.mark.parametrize("key", MODELS.keys())
 def test_load_from_file(key):
-    file = h5py.File(FILE, mode="r")
-    hdf_group = file[key]
-    old = bp.Model.load(hdf_group)
-    new = MODELS[key]
-    assert isinstance(old, bp.Model)
-    assert isinstance(new, bp.Model)
-    assert old == new, (
-        "\n{}\nis not equal to\n\n{}".format(old, new)
-    )
+    with h5py.File(FILE, mode="r") as file:
+        hdf_group = file[key]
+        old = bp.Model.load(hdf_group)
+        new = MODELS[key]
+        assert isinstance(old, bp.Model)
+        assert isinstance(new, bp.Model)
+        assert old == new, (
+            "\n{}\nis not equal to\n\n{}".format(old, new))
 
 
 @pytest.mark.parametrize("key", MODELS.keys())
 @pytest.mark.parametrize("attribute", bp.Model.attributes())
 def test_attributes(attribute, key):
-    file = h5py.File(FILE, mode="r")
-    old = file[key][attribute][()]
-    new = MODELS[key].__getattribute__(attribute)
-    assert np.all(old == new)
+    with h5py.File(FILE, mode="r") as file:
+        old = file[key][attribute][()]
+        new = MODELS[key].__getattribute__(attribute)
+        assert np.all(old == new)
 
 # Todo proper test of find_index and get_specimen seems hard, implement differently?
 #  Implement collisions only for specimen tuples

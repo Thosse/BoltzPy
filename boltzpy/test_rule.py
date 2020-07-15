@@ -86,17 +86,17 @@ def setup_file(file_address=FILE):
             print("ABORTED")
             return
 
-    file = h5py.File(file_address, mode="w")
-    for (key, item) in RULES.items():
-        assert isinstance(item, bp.Rule)
-        file.create_group(key)
-        item.save(file[key], True)
+    with h5py.File(file_address, mode="w") as file:
+        for (key, item) in RULES.items():
+            assert isinstance(item, bp.Rule)
+            file.create_group(key)
+            item.save(file[key], True)
 
-    # save models
-    for group in file.keys():
-        key_model = group + "/Model"
-        for rule in file[group].keys():
-            file[group][rule].attrs["Model"] = key_model
+        # save models
+        for group in file.keys():
+            key_model = group + "/Model"
+            for rule in file[group].keys():
+                file[group][rule].attrs["Model"] = key_model
     return
 
 
@@ -117,49 +117,49 @@ def test_setup_creates_same_file():
 
 @pytest.mark.parametrize("key", RULES.keys())
 def test_hdf5_groups_exist(key):
-    file = h5py.File(FILE, mode="r")
-    assert key in file.keys(), (
-        "The group {} is missing in the test file-".format(key))
+    with h5py.File(FILE, mode="r") as file:
+        assert key in file.keys(), (
+            "The group {} is missing in the test file-".format(key))
 
 
 @pytest.mark.parametrize("key", RULES.keys())
 def test_load_from_file(key):
-    file = h5py.File(FILE, mode="r")
-    hdf_group = file[key]
-    old = bp.Rule.load(hdf_group)
-    new = RULES[key]
-    assert isinstance(old, bp.Rule)
-    assert isinstance(new, bp.Rule)
-    assert old == new, (
-        "\n{}\nis not equal to\n\n{}".format(old, new)
-    )
+    with h5py.File(FILE, mode="r") as file:
+        hdf_group = file[key]
+        old = bp.Rule.load(hdf_group)
+        new = RULES[key]
+        assert isinstance(old, bp.Rule)
+        assert isinstance(new, bp.Rule)
+        assert old == new, (
+            "\n{}\nis not equal to\n\n{}".format(old, new)
+        )
 
 
 @pytest.mark.parametrize("key", CLASSES["InnerPointRule"].keys())
 @pytest.mark.parametrize("attribute", bp.InnerPointRule.attributes())
 def test_attributes_of_inner_points(attribute, key):
-    file = h5py.File(FILE, mode="r")
-    old = file[key][attribute][()]
-    new = RULES[key].__getattribute__(attribute)
-    assert np.all(old == new)
+    with h5py.File(FILE, mode="r") as file:
+        old = file[key][attribute][()]
+        new = RULES[key].__getattribute__(attribute)
+        assert np.all(old == new)
 
 
 @pytest.mark.parametrize("key", CLASSES["ConstantPointRule"].keys())
 @pytest.mark.parametrize("attribute", bp.ConstantPointRule.attributes())
 def test_attributes_of_constant_points(attribute, key):
-    file = h5py.File(FILE, mode="r")
-    old = file[key][attribute][()]
-    new = RULES[key].__getattribute__(attribute)
-    assert np.all(old == new)
+    with h5py.File(FILE, mode="r") as file:
+        old = file[key][attribute][()]
+        new = RULES[key].__getattribute__(attribute)
+        assert np.all(old == new)
 
 
 @pytest.mark.parametrize("key", CLASSES["BoundaryPointRule"].keys())
 @pytest.mark.parametrize("attribute", bp.BoundaryPointRule.attributes())
 def test_attributes_of_boundary_points(attribute, key):
-    file = h5py.File(FILE, mode="r")
-    old = file[key][attribute][()]
-    new = RULES[key].__getattribute__(attribute)
-    assert np.all(old == new)
+    with h5py.File(FILE, mode="r") as file:
+        old = file[key][attribute][()]
+        new = RULES[key].__getattribute__(attribute)
+        assert np.all(old == new)
 
 
 @pytest.mark.parametrize("key", RULES.keys())

@@ -28,11 +28,11 @@ def setup_file(file_address=FILE):
             print("ABORTED")
             return
 
-    file = h5py.File(file_address, mode="w")
-    for (key, item) in COLLISIONS.items():
-        assert isinstance(item, bp.Collisions)
-        file.create_group(key)
-        item.save(file[key])
+    with h5py.File(file_address, mode="w") as file:
+        for (key, item) in COLLISIONS.items():
+            assert isinstance(item, bp.Collisions)
+            file.create_group(key)
+            item.save(file[key])
     return
 
 
@@ -53,22 +53,21 @@ def test_setup_creates_same_file():
 
 @pytest.mark.parametrize("key", COLLISIONS.keys())
 def test_hdf5_groups_exist(key):
-    file = h5py.File(FILE, mode="r")
-    assert key in file.keys(), (
-        "The group {} is missing in the test file-".format(key))
+    with h5py.File(FILE, mode="r") as file:
+        assert key in file.keys(), (
+            "The group {} is missing in the test file-".format(key))
 
 
 @pytest.mark.parametrize("key", COLLISIONS.keys())
 def test_load_from_file(key):
-    file = h5py.File(FILE, mode="r")
-    hdf_group = file[key]
-    old = bp.Collisions.load(hdf_group)
-    new = COLLISIONS[key]
-    assert isinstance(old, bp.Collisions)
-    assert isinstance(new, bp.Collisions)
-    assert old == new, (
-        "\n{}\nis not equal to\n\n{}".format(old, new)
-    )
+    with h5py.File(FILE, mode="r") as file:
+        hdf_group = file[key]
+        old = bp.Collisions.load(hdf_group)
+        new = COLLISIONS[key]
+        assert isinstance(old, bp.Collisions)
+        assert isinstance(new, bp.Collisions)
+        assert old == new, (
+            "\n{}\nis not equal to\n\n{}".format(old, new))
 
 #
 # @pytest.mark.parametrize("tc", bp_t.CASES)
