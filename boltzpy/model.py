@@ -106,7 +106,7 @@ class Model(bp.BaseClass):
         # setup collisions
         if collision_relations is None:
             coll = bp.Collisions()
-            coll.setup(self)
+            coll.compute_relations(self)
             self.collision_relations = coll.relations
             self.collision_weights = coll.weights
         else:
@@ -339,6 +339,22 @@ class Model(bp.BaseClass):
             return None
         else:
             return relations[positions]
+
+    ##################################
+    #           Collisions           #
+    ##################################
+    def compute_weights(self, relations=None):
+        if relations is None:
+            relations = self.collision_relations
+        species = self.key_species(relations)[:, 1:3]
+        coll_factors = self.collision_factors[species[..., 0], species[..., 1]]
+        if self.algorithm_weights == "uniform":
+            weights = np.ones(coll_factors.size)
+        elif self.algorithm_weights == "area":
+            weights = self.key_area(relations)[..., 0]
+        else:
+            raise NotImplementedError
+        return weights * coll_factors
 
     #####################################
     #           Visualization           #

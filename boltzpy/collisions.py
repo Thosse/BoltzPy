@@ -156,7 +156,7 @@ class Collisions(bp.BaseClass):
         # Accept this Collision
         return True
 
-    def setup(self, model):
+    def compute_relations(self, model):
         """Generates the :attr:`relations` and :attr:`weights`.
 
         Parameters
@@ -169,7 +169,6 @@ class Collisions(bp.BaseClass):
         time_beg = time()
         # collect collisions in the following lists
         relations = []
-        weights = []
 
         """The velocities are named in the following way:
         1. v* and w* are velocities of the first/second specimen, respectively
@@ -225,11 +224,10 @@ class Collisions(bp.BaseClass):
                     # only generate colliding velocities(colvels)
                     # for a representative v0 of its group,
                     v0_repr = equivalence_class[0]
-                    [repr_colvels, extended_weights] = coll_func(
+                    repr_colvels = coll_func(
                         extended_grids,
                         masses,
-                        v0_repr,
-                        collision_rate)
+                        v0_repr)
                     # Get relations for other class elements by shifting
                     for v0 in equivalence_class:
                         # shift extended colvels
@@ -253,14 +251,12 @@ class Collisions(bp.BaseClass):
                                 new_colvels[choice],
                                 model.iMG[new_rels[choice]])
                         relations.extend(new_rels[choice])
-                        weights.extend(extended_weights[choice])
                     # relations += new_rels
                     # weights += new_weights
         self.relations = np.array(relations, dtype=int)
-        self.weights = np.array(weights, dtype=float)
         # remove redundant collisions
         model.collision_relations = self.relations
-        model.collision_weights = self.weights
+        model.collision_weights = model.compute_weights()
         model.filter()
         # sort collisions for better comparability
         model.sort()
@@ -280,11 +276,9 @@ class Collisions(bp.BaseClass):
     @staticmethod
     def complete(grids,
                  masses,
-                 v0,
-                 collision_rate):
+                 v0):
         # store results in lists
         colvels = []     # colliding velocities
-        weights = []
         # iterate over all v1 (post collision of v0)
         for v1 in grids[1].iG:
             # ignore v=(a, a, * , *)
@@ -303,28 +297,23 @@ class Collisions(bp.BaseClass):
                     continue
                 # Collision is accepted -> Add to List
                 colvels.append([v0, v1, w0, w1])
-                weights.append(collision_rate)
-        assert len(colvels) == len(weights)
         colvels = np.array(colvels)
-        weights = np.array(weights)
-        return [colvels, weights]
+        return colvels
 
     @staticmethod
     def convergent(grids,
                    masses,
-                   v0,
-                   collision_rate):
+                   v0):
         # angles = np.array([[1, 0], [1, 1], [0, 1], [-1, 1],
         #                    [-1, 0], [-1, -1], [0, -1], [1, -1]])
         # Todo This is sufficient, until real weights are used
         angles = np.array([[1, -1], [1, 0], [1, 1], [0, 1]])
         # store results in lists
         colvels = []    # colliding velocities
-        weights = []
         # iterate over the given angles
         for axis_x in angles:
             # get y axis by rotating x axis 90°
-            axis_y = np.array([[0, -1], [1, 0]])@axis_x
+            axis_y = np.array([[0, -1], [1, 0]]) @ axis_x
             assert np.dot(axis_x, axis_y) == 0, (
                 "axis_x and axis_y must be orthogonal"
             )
@@ -360,12 +349,9 @@ class Collisions(bp.BaseClass):
                         continue
                     # Collision is accepted -> Add to List
                     colvels.append([v0, v1, w0, w1])
-                    weights.append(collision_rate)
-        assert len(colvels) == len(weights)
         colvels = np.array(colvels)
-        weights = np.array(weights)
         # Todo assert colvels.size != 0
-        return [colvels, weights]
+        return colvels
 
     #####################################
     #           Serialization           #
