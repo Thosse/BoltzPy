@@ -290,6 +290,7 @@ class Model(bp.BaseClass):
         angles = np.sort(np.abs(angles), axis=-1)
         return angles
 
+    # Todo switch oder of key_function an relations, give group a default key=species
     def group(self, key_function, relations=None):
         if relations is None:
             relations = self.collision_relations
@@ -383,48 +384,36 @@ class Model(bp.BaseClass):
                 '{}'.format(self.algorithm_relations)
             )
 
-        grids = np.empty((4,), dtype=object)
-        # use larger grids to shift within equivalence classes
-        extended_grids = np.empty((4,), dtype=object)
-        species = np.zeros(4, dtype=int)
-        masses = np.zeros(4, dtype=int)
         # Iterate over Specimen pairs
-        for (idx_v, grid_v) in enumerate(self.vGrids):
-            grids[0:2] = grid_v
-            extended_grids[0:2] = grids[0].extension(2)
-            species[0:2] = idx_v
-            for (idx_w, grid_w) in enumerate(self.vGrids):
-                grids[2:4] = grid_w
-                extended_grids[2:4] = grids[2].extension(2)
-                species[2:4] = idx_w
-                masses[:] = self.masses[species]
-                index_offset = np.array(self.index_range[species, 0])
-                # skip already computed combinations
-                if idx_w < idx_v:
-                    continue
+        for s0 in self.species:
+            for s1 in np.arange(s0, self.specimen):
+                # Todo first generate and store all base_relations
+                # Todo then transfer them for all velocities
                 # group grid[0] points by distance to grid[2]
-                for equivalence_class in grids[2].group(grids[0].iG).values():
+                group = self.vGrids[s1].group(self.vGrids[s0].iG)
+                for key in group.keys():
                     # only generate colliding velocities(colvels)
                     # for a representative v0 of its group,
-                    v0_repr = equivalence_class[0]
+                    representant = group[key][0]
                     repr_colvels = coll_func(
-                        extended_grids,
-                        masses,
-                        v0_repr)
+                        [self.vGrids[i].extension(2) for i in [s0, s0, s1, s1]],
+                        self.masses[[s0, s0, s1, s1]],
+                        representant)
                     # Get relations for other class elements by shifting
-                    for v0 in equivalence_class:
+                    for v0 in group[key]:
                         # shift extended colvels
-                        new_colvels = repr_colvels + (v0 - v0_repr)
+                        new_colvels = repr_colvels + (v0 - representant)
                         # get indices
                         new_rels = np.zeros(new_colvels.shape[0:2], dtype=int)
                         for i in range(4):
-                            new_rels[:, i] = grids[i].get_idx(new_colvels[:, i, :])
-                        new_rels += index_offset
+                            s = [s0, s0, s1, s1][i]
+                            new_rels[:, i] = self.vGrids[s].get_idx(new_colvels[:, i, :])
+                            new_rels[:, i] += self.index_offset[s]
 
                         # remove out-of-bounds or useless collisions
                         choice = np.where(
                             # must be in the grid
-                            np.all(new_rels >= index_offset, axis=1)
+                            np.all(new_rels >= self.index_offset[[s0, s0, s1, s1]], axis=1)
                             # must be effective
                             & (new_rels[..., 0] != new_rels[..., 3])
                             & (new_rels[..., 0] != new_rels[..., 1])
