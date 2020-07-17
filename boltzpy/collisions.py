@@ -1,6 +1,5 @@
 
 import numpy as np
-from scipy.sparse import csr_matrix
 from time import time
 import h5py
 
@@ -111,128 +110,29 @@ class Collisions(bp.BaseClass):
         assert self.relations.shape[1] == 4
         return self.relations.shape[0]
 
-    # Todo Remove this, should be deprecated
-    @property
-    def is_set_up(self):
-        """:obj:`bool` :
-        True, if the instance is completely set up
-        and ready to call :meth:`~Simulation.run_computation`.
-        False Otherwise.
-        """
-        return self.size > 0
-
-    def issubset(self, other):
-        """Checks if self.relations are a subset of other.relations.
-        Weights are not checked and may differ.
-
-        Parameters
-        ----------
-        other : :class:`Collisions`
-
-        Returns
-        -------
-        :obj:`bool`
-        """
-        assert isinstance(other, Collisions)
-        # group/filter by index
-        grp_self = self.group(mode="index")
-        grp_other = other.group(mode="index")
-        # assert that each keys has only a single value
-        assert all([len(value) == 1 for value in grp_self.values()])
-        assert all([len(value) == 1 for value in grp_other.values()])
-        # use set of keys to check for subset relationship
-        set_self = set(grp_self.keys())
-        set_other = set(grp_other.keys())
-        return set_self.issubset(set_other)
-
-    #####################################
-    #        Sorting and Ordering       #
-    #####################################
-    @staticmethod
-    def key_index(collision_tuple):
-        sorted_indices = np.sort(collision_tuple[0:4])
-        return tuple(sorted_indices)
-
-    @staticmethod
-    def key_species(collision_tuple, model):
-        indices = [model.get_specimen(col_idx)
-                   for col_idx in collision_tuple[0:4]]
-        return tuple(sorted(indices))
-
-    @staticmethod
-    def key_area(collision_tuple, model):
-        [v0, v1, w0, w1] = model.iMG[collision_tuple[0:4]]
-        area_1 = np.linalg.norm(np.cross(v1 - v0, w1 - v0))
-        area_2 = np.linalg.norm(np.cross(w1 - w0, w1 - v0))
-        area = 0.5 * (area_1 + area_2)
-        circumference = (np.linalg.norm(v1 - v0)
-                         + np.linalg.norm(w1 - w0)
-                         + 2 * np.linalg.norm(v0 - w1))
-        return area, circumference
-
-    @staticmethod
-    def key_angle(collision_tuple, model, merge_similar_angles=True):
-        (v0, v1, w0, w1) = model.iMG[collision_tuple[0:4]]
-        dv = v1 - v0
-        angle = dv // np.gcd.reduce(dv)
-        if merge_similar_angles:
-            angle = sorted(np.abs(angle))
-        return tuple(angle)
-
-    @staticmethod
-    def key(mode, model):
-        if mode == "index":
-            return Collisions.key_index
-        elif mode == "area":
-            assert model is not None
-            return lambda x: Collisions.key_area(x, model)
-        elif mode == "angle":
-            assert model is not None
-            return lambda x: Collisions.key_angle(
-                x,
-                model)
-        elif mode == "species":
-            assert model is not None
-            return lambda x: Collisions.key_species(x, model)
-        else:
-            msg = ('Unsupported Parameter:\n\t'
-                   'mode = ' + '{}'.format(mode))
-            raise NotImplementedError(msg)
-
-    def group(self,
-              model=None,
-              mode="index"):
-        key_func = Collisions.key(mode, model)
-        collisions = self.list
-        grouped_collisions = dict()
-        for coll in collisions:
-            key = key_func(coll)
-            if key in grouped_collisions.keys():
-                grouped_collisions[key].append(coll)
-            else:
-                grouped_collisions[key] = [coll]
-        return grouped_collisions
-
-    def filter(self):
-        grouped_collisions = self.group(mode="index")
-        filtered_colls = [group[0] for group in grouped_collisions.values()]
-        self.relations = np.array([coll[0:4] for coll in filtered_colls],
-                                  dtype=int)
-        self.weights = np.array([coll[4] for coll in filtered_colls],
-                                dtype=float)
-        return
-
-    def sort(self,
-             model=None,
-             mode='index'):
-        key_func = Collisions.key(mode, model)
-        collisions = self.list
-        sorted_colls = sorted(collisions, key=key_func)
-        self.relations = np.array([coll[0:4] for coll in sorted_colls],
-                                  dtype=int)
-        self.weights = np.array([coll[4] for coll in sorted_colls],
-                                dtype=float)
-        return
+    # def issubset(self, other):
+    #     """Checks if self.relations are a subset of other.relations.
+    #     Weights are not checked and may differ.
+    #
+    #     Parameters
+    #     ----------
+    #     other : :class:`Collisions`
+    #
+    #     Returns
+    #     -------
+    #     :obj:`bool`
+    #     """
+    #     assert isinstance(other, Collisions)
+    #     # group/filter by index
+    #     grp_self = self.group(mode="index")
+    #     grp_other = other.group(mode="index")
+    #     # assert that each keys has only a single value
+    #     assert all([len(value) == 1 for value in grp_self.values()])
+    #     assert all([len(value) == 1 for value in grp_other.values()])
+    #     # use set of keys to check for subset relationship
+    #     set_self = set(grp_self.keys())
+    #     set_other = set(grp_other.keys())
+    #     return set_self.issubset(set_other)
 
     #####################################
     #           Configuration           #
@@ -359,9 +259,13 @@ class Collisions(bp.BaseClass):
         self.relations = np.array(relations, dtype=int)
         self.weights = np.array(weights, dtype=float)
         # remove redundant collisions
-        self.filter()
+        model.collision_relations = self.relations
+        model.collision_weights = self.weights
+        model.filter()
         # sort collisions for better comparability
-        self.sort()
+        model.sort()
+        self.relations = model.collision_relations
+        self.weights = model.collision_weights
         time_end = time()
         print('Time taken =  {t} seconds\n'
               'Total Number of Collisions = {n}\n'
@@ -463,36 +367,6 @@ class Collisions(bp.BaseClass):
         # Todo assert colvels.size != 0
         return [colvels, weights]
 
-    def generate_collision_matrix(self, dt):
-        # Size of complete velocity grid
-        rows = np.max(self.relations.flatten()) + 1
-        # Number of different collisions
-        columns = self.size
-        col_matrix = np.zeros(shape=(rows, columns),
-                              dtype=float)
-        for [i_col, col] in enumerate(self.relations):
-            """Negative sign for pre-collision velocities
-            => necessary for stability
-               v[i]*v[j] - v[k]*v[l] is used as collision term
-               => v'[*] = ... - X*u[*]"""
-            # Todo multiplication with dt -> move out of matrix
-            col_weight = dt * self.weights[i_col]
-            col_matrix[col, i_col] = [-1, 1, -1, 1]
-            col_matrix[col, i_col] *= col_weight
-        col_mat = csr_matrix(col_matrix)
-        return col_mat
-
-    @property
-    def number_of_collision_invariants(self):
-        """:obj:`int` :
-        Determines the number of collision invariants
-        by computing the rank of the resulting matrix.
-        """
-        mat = self.generate_collision_matrix(1)
-        rank = np.linalg.matrix_rank(mat.toarray())
-        size_of_velocity_space = mat.shape[0]
-        return size_of_velocity_space - rank
-
     #####################################
     #           Serialization           #
     #####################################
@@ -579,7 +453,7 @@ class Collisions(bp.BaseClass):
                     di_0 = (model.iMG[col[1]] - model.iMG[col[0]])
                     di_1 = (model.iMG[col[3]] - model.iMG[col[2]])
                     assert all(np.array(di_1 + di_0) == 0)
-                    s = [model.get_specimen(v_col) for v_col in col]
+                    s = model.get_spc(col)
                     assert s[0] == s[1] and s[2] == s[3]
                     # Todo add conserves energy check
             assert all(w > 0 for w in self.weights.flatten())

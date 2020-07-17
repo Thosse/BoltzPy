@@ -151,6 +151,10 @@ class Model(bp.BaseClass):
         return np.max(self.iMG * self.delta)
 
     @property
+    def collisions(self):
+        return self.collision_weights.size
+
+    @property
     def collision_invariants(self):
         rank = np.linalg.matrix_rank(self.collision_matrix.toarray())
         maximum_rank = np.min([self.size, self.collision_weights.size])
@@ -210,17 +214,16 @@ class Model(bp.BaseClass):
             assert np.all(self.iMG[global_index] == integer_value)
             return global_index
 
-    def get_specimen(self, velocity_idx):
-        """Get :class:`boltzpy.Specimen` index
-        of given velocity in :attr:`iMG`.
+    def get_spc(self, indices):
+        """Get the specimen of given indices of :attr:`iMG`.
 
         Parameters
         ----------
-        velocity_idx : :obj:`int`
+        indices : :obj:`~numpy.array` [ :obj:`int` ]
 
         Returns
         -------
-        index : :obj:`int`
+        species : :obj:`~numpy.array` [ :obj:`int` ]
 
         Raises
         ------
@@ -228,12 +231,114 @@ class Model(bp.BaseClass):
             If *velocity_idx* is out of the range of
             :attr:`Model.iMG`.
         """
-        for (i, [beg, end]) in enumerate(self.index_range):
-            if beg <= velocity_idx < end:
-                return i
-        msg = 'The given index ({}) points out of the boundaries of ' \
-              'iMG, the concatenated Velocity Grid.'.format(velocity_idx)
-        raise IndexError(msg)
+        if not isinstance(indices, np.ndarray):
+            indices = np.array(indices)
+        species = np.full(indices.shape, -1, dtype=int)
+        for s in self.species:
+            offset = self.index_offset[s]
+            species = np.where(indices >= offset, s, species)
+        species = np.where(indices >= self.index_offset[-1], -1, species)
+        assert np.all(species >= 0)
+        return species
+
+    ################################################
+    #        Sorting and Ordering Collisions       #
+    ################################################
+    @staticmethod
+    def key_index(relations):
+        """"Sorts a set of relations,
+        such that each relations indices are in ascending"""
+        return np.sort(relations, axis=-1)
+
+    def key_species(self, relations):
+        species = self.get_spc(relations)
+        return np.sort(species, axis=-1)
+
+    def key_area(self, relations):
+        (v0, v1, w0, w1) = self.iMG[relations.transpose()]
+        # in 2D cross returns only the z component -> use absolute
+        result = np.zeros(relations.shape[:-1] + (2,), dtype=float)
+        if self.ndim == 2:
+            area_1 = np.abs(np.cross(v1 - v0, w1 - v0))
+            area_2 = np.abs(np.cross(w1 - w0, w1 - v0))
+        # in 3D cross returns the vector -> use norm
+        elif self.ndim == 3:
+            area_1 = np.linalg.norm(np.cross(v1 - v0, w1 - v0), axis=-1)
+            area_2 = np.linalg.norm(np.cross(w1 - w0, w1 - v0), axis=-1)
+        else:
+            raise NotImplementedError
+        result[..., 0] = 0.5 * (area_1 + area_2)
+
+        result[..., 1] = (np.linalg.norm(v1 - v0, axis=-1)
+                          + np.linalg.norm(w1 - w0, axis=-1)
+                          + 2 * np.linalg.norm(v0 - w1, axis=-1))
+        return result
+
+    def key_angle(self, relations):
+        (v0, v1, w0, w1) = self.iMG[relations.transpose()]
+        dv = v1 - v0
+        gcd = np.gcd.reduce(dv.transpose())
+        if self.ndim == 2:
+            gcd = gcd[..., np.newaxis]
+        elif self.ndim == 2:
+            gcd = gcd[..., np.newaxis, np.newaxis]
+        else:
+            raise NotImplementedError
+        angles = dv // gcd
+        #
+        angles = np.sort(np.abs(angles), axis=-1)
+        return angles
+
+    def group(self, key_function, relations=None):
+        if relations is None:
+            relations = self.collision_relations
+        assert relations.ndim > 1
+
+        grouped = dict()
+        keys = key_function(relations)
+        # unique values _ are not needed
+        unique_keys = np.unique(keys, axis=0)
+        for key in unique_keys:
+            pos = np.where(np.all(keys == key, axis=-1))
+            grouped[tuple(key)] = relations[pos]
+        return grouped
+
+    def filter(self, key_function=None, relations=None):
+        if key_function is None:
+            key_function = self.key_index
+        if relations is None:
+            rels = self.collision_relations
+        else:
+            rels = relations
+
+        keys = key_function(rels)
+        # unique values _ are not needed
+        _, positions = np.unique(keys, return_index=True, axis=0)
+        if relations is None:
+            self.collision_relations = self.collision_relations[positions]
+            self.collision_weights = self.collision_weights[positions]
+            return
+        else:
+            return relations[positions]
+
+    def sort(self, key_function=None, relations=None):
+        if key_function is None:
+            key_function = self.key_index
+        if relations is None:
+            rels = self.collision_relations
+        else:
+            rels = relations
+
+        keys = key_function(rels)
+        # lexsort sorts columns, thus we transpose first
+        # flip keys, as the last key (row) has highest priority
+        positions = np.lexsort(np.flip(keys.transpose(), axis=0), axis=0)
+        if relations is None:
+            self.collision_relations = self.collision_relations[positions]
+            self.collision_weights = self.collision_weights[positions]
+            return None
+        else:
+            return relations[positions]
 
     #####################################
     #           Visualization           #
