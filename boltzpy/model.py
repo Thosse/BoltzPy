@@ -290,28 +290,26 @@ class Model(bp.BaseClass):
         angles = np.sort(np.abs(angles), axis=-1)
         return angles
 
-    # Todo switch oder of key_function an relations, give group a default key=species
-    def group(self, key_function, relations=None):
-        if relations is None:
-            relations = self.collision_relations
-        assert relations.ndim > 1
+    def group(self, relations=None, key_function=None):
+        rels = self.collision_relations if relations is None else relations
+        assert rels.ndim > 1
+        if key_function is None:
+            key_function = self.key_species
 
         grouped = dict()
-        keys = key_function(relations)
+        keys = key_function(rels)
         # unique values _ are not needed
         unique_keys = np.unique(keys, axis=0)
         for key in unique_keys:
             pos = np.where(np.all(keys == key, axis=-1))
-            grouped[tuple(key)] = relations[pos]
+            grouped[tuple(key)] = rels[pos]
         return grouped
 
-    def filter(self, key_function=None, relations=None):
+    def filter(self, relations=None, key_function=None):
+        rels = self.collision_relations if relations is None else relations
+        assert rels.ndim > 1
         if key_function is None:
             key_function = self.key_index
-        if relations is None:
-            rels = self.collision_relations
-        else:
-            rels = relations
 
         keys = key_function(rels)
         # unique values _ are not needed
@@ -323,13 +321,11 @@ class Model(bp.BaseClass):
         else:
             return relations[positions]
 
-    def sort(self, key_function=None, relations=None):
+    def sort(self, relations=None, key_function=None):
+        rels = self.collision_relations if relations is None else relations
+        assert rels.ndim > 1
         if key_function is None:
             key_function = self.key_index
-        if relations is None:
-            rels = self.collision_relations
-        else:
-            rels = relations
 
         keys = key_function(rels)
         # lexsort sorts columns, thus we transpose first
@@ -427,11 +423,9 @@ class Model(bp.BaseClass):
                     # weights += new_weights
         relations = np.array(relations, dtype=int)
         # remove redundant collisions
-        relations = self.filter(self.key_index,
-                                relations)
+        relations = self.filter(relations, self.key_index)
         # sort collisions for better comparability
-        relations = self.sort(self.key_index,
-                              relations)
+        relations = self.sort(relations, self.key_index)
         toc = process_time()
         print('Time taken =  {t} seconds\n'
               'Total Number of Collisions = {n}\n'
