@@ -1,6 +1,7 @@
 import numpy as np
 import h5py
 from scipy.sparse import csr_matrix
+from time import process_time
 
 import boltzpy as bp
 
@@ -105,12 +106,12 @@ class Model(bp.BaseClass):
 
         # setup collisions
         if collision_relations is None:
-            coll = bp.Collisions()
-            coll.compute_relations(self)
-            self.collision_relations = coll.relations
-            self.collision_weights = coll.weights
+            self.collision_relations = self.compute_relations()
         else:
             self.collision_relations = np.array(collision_relations)
+        if collision_weights is None:
+            self.collision_weights = self.compute_weights()
+        else:
             self.collision_weights = np.array(collision_weights)
 
         # create collision_matrix
@@ -344,6 +345,9 @@ class Model(bp.BaseClass):
     #           Collisions           #
     ##################################
     def compute_weights(self, relations=None):
+        """Generates and returns the :attr:`collision_weights`,
+        based on the given relations and :attr:`algorithm_weights`
+        """
         if relations is None:
             relations = self.collision_relations
         species = self.key_species(relations)[:, 1:3]
@@ -355,6 +359,96 @@ class Model(bp.BaseClass):
         else:
             raise NotImplementedError
         return weights * coll_factors
+
+    def compute_relations(self):
+        """Generates and returns the :attr:`collision_relations`."""
+        print('Generating Collision Array...')
+        tic = process_time()
+        # collect collisions in the following lists
+        relations = []
+
+        """The velocities are named in the following way:
+        1. v* and w* are velocities of the first/second specimen, respectively
+        2. v0 or w0 denotes the velocity before the collision
+           v1 or w1 denotes the velocity after the collision
+        """
+        # choose function for local collisions
+        if self.algorithm_relations == 'all':
+            coll_func = bp.Collisions.complete
+        elif self.algorithm_relations == 'fast':
+            coll_func = bp.Collisions.convergent
+        else:
+            raise NotImplementedError(
+                'Unsupported Selection Scheme: '
+                '{}'.format(self.algorithm_relations)
+            )
+
+        grids = np.empty((4,), dtype=object)
+        # use larger grids to shift within equivalence classes
+        extended_grids = np.empty((4,), dtype=object)
+        species = np.zeros(4, dtype=int)
+        masses = np.zeros(4, dtype=int)
+        # Iterate over Specimen pairs
+        for (idx_v, grid_v) in enumerate(self.vGrids):
+            grids[0:2] = grid_v
+            extended_grids[0:2] = grids[0].extension(2)
+            species[0:2] = idx_v
+            for (idx_w, grid_w) in enumerate(self.vGrids):
+                grids[2:4] = grid_w
+                extended_grids[2:4] = grids[2].extension(2)
+                species[2:4] = idx_w
+                masses[:] = self.masses[species]
+                index_offset = np.array(self.index_range[species, 0])
+                # skip already computed combinations
+                if idx_w < idx_v:
+                    continue
+                # group grid[0] points by distance to grid[2]
+                for equivalence_class in grids[2].group(grids[0].iG).values():
+                    # only generate colliding velocities(colvels)
+                    # for a representative v0 of its group,
+                    v0_repr = equivalence_class[0]
+                    repr_colvels = coll_func(
+                        extended_grids,
+                        masses,
+                        v0_repr)
+                    # Get relations for other class elements by shifting
+                    for v0 in equivalence_class:
+                        # shift extended colvels
+                        new_colvels = repr_colvels + (v0 - v0_repr)
+                        # get indices
+                        new_rels = np.zeros(new_colvels.shape[0:2], dtype=int)
+                        for i in range(4):
+                            new_rels[:, i] = grids[i].get_idx(new_colvels[:, i, :])
+                        new_rels += index_offset
+
+                        # remove out-of-bounds or useless collisions
+                        choice = np.where(
+                            # must be in the grid
+                            np.all(new_rels >= index_offset, axis=1)
+                            # must be effective
+                            & (new_rels[..., 0] != new_rels[..., 3])
+                            & (new_rels[..., 0] != new_rels[..., 1])
+                        )
+                        # Add chosen Relations/Weights to the list
+                        assert np.array_equal(
+                                new_colvels[choice],
+                                self.iMG[new_rels[choice]])
+                        relations.extend(new_rels[choice])
+                    # relations += new_rels
+                    # weights += new_weights
+        relations = np.array(relations, dtype=int)
+        # remove redundant collisions
+        relations = self.filter(self.key_index,
+                                relations)
+        # sort collisions for better comparability
+        relations = self.sort(self.key_index,
+                              relations)
+        toc = process_time()
+        print('Time taken =  {t} seconds\n'
+              'Total Number of Collisions = {n}\n'
+              ''.format(t=round(toc - tic, 3),
+                        n=self.size))
+        return relations
 
     #####################################
     #           Visualization           #
