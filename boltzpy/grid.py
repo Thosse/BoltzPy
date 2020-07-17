@@ -208,6 +208,7 @@ class Grid(bp.BaseClass):
     #####################################
     #        Sorting and Ordering       #
     #####################################
+    # Todo vectorize this, use same naming as in model
     def key_distance(self, velocities):
         # NOTE: this acts as if the grid was infinite. This is desired for the partitioning
         assert isinstance(velocities, np.ndarray)
@@ -227,20 +228,19 @@ class Grid(bp.BaseClass):
         norm = (velocities**2).sum(axis=-1)
         return norm
 
-    def group(self, velocities):
-        grouped_velocities = dict()
-        keys = self.key_distance(velocities)
-        for (i, v) in enumerate(velocities):
-            key = tuple(keys[i])
-            if key in grouped_velocities.keys():
-                grouped_velocities[key].append(v)
-            else:
-                grouped_velocities[key] = [v]
-        # Each Group is sorted by norm
-        for (key, item) in grouped_velocities.items():
-            item = sorted(item, key=self.key_norm)
-            grouped_velocities[key] = np.array(item)
-        return grouped_velocities
+    @staticmethod
+    def group(velocities, key_function):
+        assert velocities.ndim == 2
+        grouped = dict()
+        keys = key_function(velocities)
+        unique_keys = np.unique(keys, axis=0)
+        for key in unique_keys:
+            pos = np.where(np.all(keys == key, axis=-1))
+            values = velocities[pos]
+            # sort values, first element must have smallest norm for collisions
+            order = np.argsort(Grid.key_norm(values), kind="stable")
+            grouped[tuple(key)] = values[order]
+        return grouped
 
     #####################################
     #              Utility              #

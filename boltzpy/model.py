@@ -292,13 +292,12 @@ class Model(bp.BaseClass):
 
     def group(self, relations=None, key_function=None):
         rels = self.collision_relations if relations is None else relations
-        assert rels.ndim > 1
+        assert rels.ndim == 2
         if key_function is None:
             key_function = self.key_species
 
         grouped = dict()
         keys = key_function(rels)
-        # unique values _ are not needed
         unique_keys = np.unique(keys, axis=0)
         for key in unique_keys:
             pos = np.where(np.all(keys == key, axis=-1))
@@ -307,7 +306,7 @@ class Model(bp.BaseClass):
 
     def filter(self, relations=None, key_function=None):
         rels = self.collision_relations if relations is None else relations
-        assert rels.ndim > 1
+        assert rels.ndim == 2
         if key_function is None:
             key_function = self.key_index
 
@@ -323,7 +322,7 @@ class Model(bp.BaseClass):
 
     def sort(self, relations=None, key_function=None):
         rels = self.collision_relations if relations is None else relations
-        assert rels.ndim > 1
+        assert rels.ndim == 2
         if key_function is None:
             key_function = self.key_index
 
@@ -386,7 +385,8 @@ class Model(bp.BaseClass):
                 # Todo first generate and store all base_relations
                 # Todo then transfer them for all velocities
                 # group grid[0] points by distance to grid[2]
-                group = self.vGrids[s1].group(self.vGrids[s0].iG)
+                group = bp.Grid.group(self.vGrids[s0].iG,
+                                      self.vGrids[s1].key_distance)
                 for key in group.keys():
                     # only generate colliding velocities(colvels)
                     # for a representative v0 of its group,
