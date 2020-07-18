@@ -190,9 +190,7 @@ class Model(bp.BaseClass):
     #####################################
     #               Indexing            #
     #####################################
-    def find_index(self,
-                   index_of_specimen,
-                   integer_value):
+    def find_index(self, index_of_specimen, integer_value):
         """Find index of given grid_entry in :attr:`iMG`
         Returns None, if the value is not in the specified Grid.
 
@@ -214,6 +212,41 @@ class Model(bp.BaseClass):
             global_index = index_offset + local_index
             assert np.all(self.iMG[global_index] == integer_value)
             return global_index
+
+    # TODO this gives a warning in pytest, when used on 0d arrays
+    def get_idx(self,
+                species,
+                velocities):
+        """Find index of given grid_entry in :attr:`iMG`
+        Returns None, if the value is not in the specified Grid.
+
+        Parameters
+        ----------
+        species : :obj:`~numpy.array` [:obj:`int`]
+        velocities : :obj:`~numpy.array` [:obj:`int`]
+
+        Returns
+        -------
+        global_index : :obj:`int` of :obj:`None`
+
+        """
+        species = np.array(species, ndmin=1)
+        if velocities.ndim == 1:
+            assert species.size == 1
+            velocities = velocities[np.newaxis, ...]
+        assert velocities.shape[-2] == species.size
+
+        indices = np.zeros(velocities.shape[0:-1], dtype=int)
+        for col, s in enumerate(species):
+            local_indices = self.vGrids[s].get_idx(velocities[..., col, :])
+            indices[..., col] = np.where(local_indices >= 0,
+                                         local_indices + self.index_offset[s],
+                                         -1)
+
+        # Todo move this into a unittest
+        pos = np.where(np.all(indices >= 0, axis=-1))
+        assert np.all(self.iMG[indices[pos]] == velocities[pos])
+        return indices
 
     def get_spc(self, indices):
         """Get the specimen of given indices of :attr:`iMG`.
@@ -382,34 +415,33 @@ class Model(bp.BaseClass):
         # Iterate over Specimen pairs
         for s0 in self.species:
             for s1 in np.arange(s0, self.specimen):
-                # Todo first generate and store all base_relations
-                # Todo then transfer them for all velocities
+
                 # group grid[0] points by distance to grid[2]
                 group = bp.Grid.group(self.vGrids[s0].iG,
                                       self.vGrids[s1].key_distance)
+                # generate relations for a representative of each group
+                repr = {key: group[key][0] for key in group.keys()}
+                repr_rels = dict()
                 for key in group.keys():
-                    # only generate colliding velocities(colvels)
-                    # for a representative v0 of its group,
-                    representant = group[key][0]
-                    repr_colvels = coll_func(
+                    # generate collisions in extended grids
+                    # allows transfering the results without losing collisions
+                    repr_rels[key] = coll_func(
                         [self.vGrids[i].extension(2) for i in [s0, s0, s1, s1]],
                         self.masses[[s0, s0, s1, s1]],
-                        representant)
+                        repr[key])
+                for key, velocities in group.items():
                     # Get relations for other class elements by shifting
-                    for v0 in group[key]:
+                    for v0 in velocities:
                         # shift extended colvels
-                        new_colvels = repr_colvels + (v0 - representant)
+                        new_colvels = repr_rels[key] + (v0 - repr[key])
                         # get indices
-                        new_rels = np.zeros(new_colvels.shape[0:2], dtype=int)
-                        for i in range(4):
-                            s = [s0, s0, s1, s1][i]
-                            new_rels[:, i] = self.vGrids[s].get_idx(new_colvels[:, i, :])
-                            new_rels[:, i] += self.index_offset[s]
+                        new_rels = self.get_idx([s0, s0, s1, s1],
+                                                 new_colvels)
 
                         # remove out-of-bounds or useless collisions
                         choice = np.where(
                             # must be in the grid
-                            np.all(new_rels >= self.index_offset[[s0, s0, s1, s1]], axis=1)
+                            np.all(new_rels >= 0, axis=1)
                             # must be effective
                             & (new_rels[..., 0] != new_rels[..., 3])
                             & (new_rels[..., 0] != new_rels[..., 1])
@@ -430,7 +462,7 @@ class Model(bp.BaseClass):
         print('Time taken =  {t} seconds\n'
               'Total Number of Collisions = {n}\n'
               ''.format(t=round(toc - tic, 3),
-                        n=self.size))
+                        n=relations.shape[0]))
         return relations
 
     #####################################
