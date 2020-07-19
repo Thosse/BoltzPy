@@ -450,7 +450,8 @@ class BoundaryPointRule(Rule):
             "doesn't even use surface normal currently")
         for (idx_v, v) in enumerate(model.iMG):
             spc = model.get_spc(idx_v)
-            v_refl = np.array([-1, 1]) * v
+            v_refl= np.copy(v)
+            v_refl[0] = - v[0]
             idx_v_refl = model.find_index(spc, v_refl)
             reflected_indices_elastic[idx_v] = idx_v_refl
         return reflected_indices_elastic
