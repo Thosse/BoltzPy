@@ -190,6 +190,7 @@ class Model(bp.BaseClass):
     #####################################
     #               Indexing            #
     #####################################
+    # Todo fix warning in get_idx, then replace feind_index by get_idx
     def find_index(self, index_of_specimen, integer_value):
         """Find index of given grid_entry in :attr:`iMG`
         Returns None, if the value is not in the specified Grid.
@@ -214,6 +215,12 @@ class Model(bp.BaseClass):
             return global_index
 
     # TODO this gives a warning in pytest, when used on 0d arrays
+    """ <__array_function__ internals>:5: DeprecationWarning: 
+      Calling nonzero on 0d arrays is deprecated, as it behaves surprisingly. 
+      Use `atleast_1d(cond).nonzero()` if the old behavior was intended. 
+      If the context of this warning is of the form `arr[nonzero(cond)]`, 
+      just use `arr[cond]`.
+    """
     def get_idx(self,
                 species,
                 velocities):
