@@ -142,6 +142,7 @@ class Grid(bp.BaseClass):
         """
         assert np.all(idx >= 0)
         assert np.all(idx < self.size)
+        idx = np.copy(idx)
         values = np.empty(np.shape(idx) + (self.ndim,), dtype=int)
         # calculate the values, by iterating over the dimension
         for i in range(self.ndim):
@@ -169,7 +170,6 @@ class Grid(bp.BaseClass):
         """
         return self.iv(idx) * self.delta
 
-    # Todo rename do idx
     def get_idx(self, values):
         """Find index of given values in :attr:`iG`
         Returns -1, if the value is not in this Grid.
@@ -186,23 +186,24 @@ class Grid(bp.BaseClass):
             "values must be an np.array, not {}".format(type(values)))
         assert values.dtype == int, (
             "values must be an integer array, not {}".format(values.dtype))
-
-        BAD_VALUE = -2 * self.size
+        BAD_VALUE = -2 * self.size ** self.ndim
         # shift Grid to start (left bottom ) at 0
-        values = values - self.iG[0]
+        # rename variable, to compare afterwards
+        vals = values - self.iG[0]
         # divide by spacing to get the position on the (x,y,z) axis
-        values = np.where(values % self.spacing == 0,
-                          values // self.spacing,
+        vals = np.where(vals % self.spacing == 0,
+                          vals // self.spacing,
                           BAD_VALUE)
-        # sort out the values, that are not in the grid
-        values = np.where(values >= 0, values, BAD_VALUE)
-        values = np.where(values < self.shape, values, BAD_VALUE)
+        # sort out the vals, that are not in the grid
+        vals = np.where(vals >= 0, vals, BAD_VALUE)
+        vals = np.where(vals < self.shape, vals, BAD_VALUE)
         # compute the (potential) index
         factor = np.array([np.prod(self.shape[i+1:]) for i in range(self.ndim)],
                           dtype=int)
-        idx = values.dot(factor)
+        idx = vals.dot(factor)
         # remove Bad Values or points that are out of bounds
         idx = np.where(idx >= 0, idx, -1)
+        assert np.all(values == self.iv(idx))
         return idx
 
     #####################################
