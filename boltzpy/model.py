@@ -477,29 +477,33 @@ class Model(bp.BaseClass):
     #####################################
     #: :obj:`list` [:obj:`dict`]:
     #: Default plot_styles for :meth::`plot`
-    plot_styles = [{"marker": 'o', "color": "r", "facecolors": 'none'},
-                   {"marker": 's', "color": "b", "facecolors": 'none'},
-                   {"marker": 'x', "color": "black"},
-                   {"marker": 'D', "color": "green", "facecolors": "none"}]
+    plot_styles = [{"marker": 'o', "alpha": 0.5, "s": 9},
+                   {"marker": 'x', "s": 16},
+                   {"marker": 's', "alpha": 0.5, "s": 9},
+                   {"marker": 'D', "alpha": 0.5, "s": 9}]
 
-    def plot(self, plot_object=None):
-        """Plot the Grid using matplotlib.
-
-        Parameters
-        ----------
-        plot_object : TODO Figure? matplotlib.pyplot?
-        """
-        show_plot_directly = plot_object is None
-        if plot_object is None:
-            # Choose standard pyplot
-            import matplotlib.pyplot as plt
-            plot_object = plt
+    def plot(self, 
+             relations=None,
+             species=None):
+        """Plot the Grid using matplotlib."""
+        relations = [] if relations is None else np.array(relations, ndmin=2)
+        species = self.species if species is None else np.array(species, ndmin=1)
+        # setup ax for plot
+        import matplotlib.pyplot as plt
+        projection = "3d" if self.ndim == 3 else None
+        ax = plt.figure().add_subplot(projection=projection)
         # Plot Grids as scatter plot
-        for (idx_G, G) in enumerate(self.vGrids):
-            G.plot(plot_object, **(self.plot_styles[idx_G]))
-        if show_plot_directly:
-            plot_object.show()
-        return plot_object
+        for s in species:
+            self.vGrids[s].plot(ax, **(self.plot_styles[s]))
+        # plot collisions
+        for r in relations:
+            # repeat the collision to "close" the rectangle / trapezoid
+            rels = np.tile(r, 2)
+            # transpose the velocities, for easy unpacking
+            vels = (self.iMG[rels] * self.delta).transpose()
+            ax.plot(*vels, color="gray", linewidth=1)
+        plt.show()
+        return
 
     #####################################
     #           Serialization           #
