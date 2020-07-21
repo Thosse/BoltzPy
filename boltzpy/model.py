@@ -410,9 +410,11 @@ class Model(bp.BaseClass):
         """
         # choose function for local collisions
         if self.algorithm_relations == 'all':
-            coll_func = bp.Collisions.complete
-        elif self.algorithm_relations == 'fast':
-            coll_func = bp.Collisions.convergent
+            coll_func = Model.get_colvels
+        elif self.algorithm_relations == 'naive':
+            coll_func = Model.get_colvels_naive
+        elif self.algorithm_relations == 'convergent':
+            coll_func = Model.get_colvels_convergent
         else:
             raise NotImplementedError(
                 'Unsupported Selection Scheme: '
@@ -471,6 +473,129 @@ class Model(bp.BaseClass):
               ''.format(t=round(toc - tic, 3),
                         n=relations.shape[0]))
         return relations
+
+    @staticmethod
+    def get_colvels_naive(grids, masses, v0):
+        # store results in list ov colliding velocities (colvels)
+        colvels = []
+        # iterate over all v1 (post collision of v0)
+        for v1 in grids[1].iG:
+            # ignore v=(a, a, * , *)
+            # calculate Velocity (index) difference
+            diff_v = v1 - v0
+            for w0 in grids[2].iG:
+                # Calculate w1, using the momentum invariance
+                assert all((diff_v * masses[0]) % masses[2] == 0)
+                diff_w = -diff_v * masses[0] // masses[2]
+                w1 = w0 + diff_w
+                if w1 not in grids[3]:
+                    continue
+                colvel = np.array([v0, v1, w0, w1], ndmin=3)
+                # check if its a proper Collision
+                if not Model.is_collision(colvel, masses):
+                    continue
+                # Collision is accepted -> Add to List
+                colvels.append(colvel)
+        return np.concatenate(colvels, axis=0)
+
+    @staticmethod
+    def get_colvels(grids,
+                    masses,
+                    v0):
+        # store results in list ov colliding velocities (colvels)
+        colvels = []
+        for v1 in grids[1].iG:
+            dv = v1 - v0
+            if np.any((dv * masses[0]) % masses[2] != 0):
+                continue
+            dw = -(dv * masses[0]) // masses[2]
+            # find starting point for w0, projected on axis( v0 -> v1 )
+            w0_proj = v0 + dv // 2 - dw // 2
+            w0 = grids[2].hyperplane(w0_proj, dv)
+            # Calculate w1, using the momentum invariance
+            w1 = w0 + dw
+            # remove w0/w1 if w1 is out of the grid
+            pos = np.where(grids[3].get_idx(w1) >= 0)
+            w0 = w0[pos]
+            w1 = w1[pos]
+            # construct colliding velocities array (colvels)
+            local_colvels = np.empty((w0.shape[0], 4, w0.shape[1]), dtype=int)
+            local_colvels[:, 0] = v0
+            local_colvels[:, 1] = v1
+            local_colvels[:, 2] = w0
+            local_colvels[:, 3] = w1
+            # remove collisions that don't fulfill all conditions
+            choice = np.where(Model.is_collision(local_colvels, masses))
+            colvels.append(local_colvels[choice])
+        return np.concatenate(colvels, axis=0)
+
+    @staticmethod
+    def get_colvels_convergent(grids, masses, v0):
+        # angles = np.array([[1, 0], [1, 1], [0, 1], [-1, 1],
+        #                    [-1, 0], [-1, -1], [0, -1], [1, -1]])
+        # Todo This is sufficient, until real weights are used
+        angles = np.array([[1, -1], [1, 0], [1, 1], [0, 1]])
+        # store results in lists
+        colvels = []    # colliding velocities
+        # iterate over the given angles
+        for axis_x in angles:
+            # get y axis by rotating x axis 90°
+            axis_y = np.array([[0, -1], [1, 0]]) @ axis_x
+            assert np.dot(axis_x, axis_y) == 0, (
+                "axis_x and axis_y must be orthogonal"
+            )
+            # choose v1 from the grid points on the x-axis (through v0)
+            # just in positive direction because of symmetry and to avoid v1=v0
+            for v1 in grids[1].line(v0,
+                                    grids[1].spacing * axis_x,
+                                    range(1, grids[1].shape[0])):
+                diff_v = v1 - v0
+                diff_w = diff_v * masses[0] // masses[2]
+                # find starting point for w0,
+                w0_projected_on_axis_x = v0 + diff_v // 2 + diff_w // 2
+                w0_start = next(grids[2].line(w0_projected_on_axis_x,
+                                              axis_y,
+                                              range(- grids[2].spacing,
+                                                    grids[2].spacing)),
+                                None)
+                if w0_start is None:
+                    continue
+
+                # find all other collisions along axis_y
+                for w0 in grids[2].line(w0_start,
+                                        grids[2].spacing * axis_y,
+                                        range(-grids[2].shape[0],
+                                              grids[2].shape[0])):
+                    w1 = w0 - diff_w
+                    # skip, if w1 is not in the grid (can be out of bounds)
+                    if np.array(w1) not in grids[3]:
+                        continue
+                    colvel = np.array([v0, v1, w0, w1], ndmin=3)
+                    # check if its a proper Collision
+                    if not Model.is_collision(colvel, masses):
+                        continue
+                    # Collision is accepted -> Add to List
+                    colvels.append([v0, v1, w0, w1])
+        colvels = np.array(colvels)
+        # Todo assert colvels.size != 0
+        return colvels
+
+    @staticmethod
+    def is_collision(colvels,
+                     masses):
+        v0 = colvels[:, 0]
+        v1 = colvels[:, 1]
+        w0 = colvels[:, 2]
+        w1 = colvels[:, 3]
+        cond = np.empty((3, colvels.shape[0]))
+        # Ignore Collisions without changes in velocities
+        cond[0] = np.any(np.logical_or(v0 != v1, w0 != w1), axis=-1)
+        # Invariance of momentum
+        cond[1] = np.all(masses[0] * (v1 - v0) == masses[2] * (w0 - w1), axis=-1)
+        # Invariance of energy
+        cond[2] = np.all(np.sum(masses[0] * (v0 ** 2 - v1 ** 2), axis=-1)
+                         == np.sum(masses[2] * (w1 ** 2 - w0 ** 2), axis=-1))
+        return np.all(cond, axis=0)
 
     #####################################
     #           Visualization           #
@@ -615,7 +740,7 @@ class Model(bp.BaseClass):
         assert self.iMG.ndim == 2
         assert self.iMG.shape[0] == self.index_range[-1, 1]
 
-        assert self.algorithm_relations in {"all", "fast"}
+        assert self.algorithm_relations in {"all", "convergent", "naive"}
         assert self.algorithm_weights in {"uniform"}
         return
 

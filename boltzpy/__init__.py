@@ -35,5 +35,4 @@ from boltzpy.rule import Rule, InnerPointRule, ConstantPointRule, BoundaryPointR
 from boltzpy.geometry import Geometry
 from boltzpy.simulation import Simulation
 from boltzpy.model import Model
-from boltzpy.collisions import Collisions
 from boltzpy.data import Data

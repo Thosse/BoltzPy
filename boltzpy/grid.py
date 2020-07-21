@@ -253,6 +253,11 @@ class Grid(bp.BaseClass):
         return (start + step * direction for step in steps
                 if start + step * direction in self)
 
+    def hyperplane(self, start, normal):
+        shifted_vels = self.iG - start
+        pos = np.where(shifted_vels @ normal == 0)
+        return self.iG[pos]
+
     def extension(self, factor):
         # must hold grid.shape % 2 == ext_grid.shape % 2
         if factor % 2 == 0:
@@ -369,8 +374,7 @@ class Grid(bp.BaseClass):
 
         assert isinstance(self.is_centered, bool)
         if self.is_centered:
-            assert (np.all(self.spacing % 2 == 0))
-            # or np.all((np.array(self.shape) - 1) % 2 == 0)
+            assert (np.all(self.spacing % 2 == 0 or (np.array(self.shape) - 1) % 2 == 0))
 
         assert isinstance(self.iG, np.ndarray)
         assert self.iG.dtype == int
