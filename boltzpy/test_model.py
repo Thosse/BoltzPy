@@ -129,7 +129,30 @@ def test_attributes(attribute, key):
         new = MODELS[key].__getattribute__(attribute)
         assert np.all(old == new)
 
-# Todo proper test of find_index and get_specimen seems hard, implement differently?
+
+@pytest.mark.parametrize("key", MODELS.keys())
+def test_get_spc_on_shuffled_grid(key):
+    model = MODELS[key]
+    # setup the species each gridpoint/velocity belongs to, for comparison
+    species = np.zeros(model.size)
+    for s in model.species:
+        beg, end = model.index_offset[s:s+2]
+        species[beg:end] = s
+    # shuffle velocities/species
+    rng = np.random.default_rng()
+    shuffled_idx = rng.permutation(model.size)
+    # test for 0d arrays/elements
+    for idx in shuffled_idx:
+        assert model.get_spc(idx).ndim == 0
+        assert model.get_spc(idx) == species[idx]
+    # test for different ndims >= 1
+    for ndmin in range(1, 6):
+        shuffled_idx = np.array(shuffled_idx, ndmin=ndmin)
+        shuffles_spc = species[shuffled_idx]
+        assert np.all(model.get_spc(shuffled_idx) == shuffles_spc)
+
+
+# Todo proper test of find_index implement differently?
 #  Implement collisions only for specimen tuples
 #  -> no need for get_specimen
 #  -> no need for find_index
