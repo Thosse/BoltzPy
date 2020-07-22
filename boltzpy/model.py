@@ -190,37 +190,6 @@ class Model(bp.BaseClass):
     #####################################
     #               Indexing            #
     #####################################
-    # Todo fix warning in get_idx, then replace feind_index by get_idx
-    def find_index(self, index_of_specimen, integer_value):
-        """Find index of given grid_entry in :attr:`iMG`
-        Returns None, if the value is not in the specified Grid.
-
-        Parameters
-        ----------
-        index_of_specimen : :obj:`int`
-        integer_value : :obj:`~numpy.array` [:obj:`int`]
-
-        Returns
-        -------
-        global_index : :obj:`int` of :obj:`None`
-
-        """
-        local_index = self.vGrids[index_of_specimen].get_idx(integer_value)
-        if local_index < 0:
-            return None
-        else:
-            index_offset = self.index_range[index_of_specimen, 0]
-            global_index = index_offset + local_index
-            assert np.all(self.iMG[global_index] == integer_value)
-            return global_index
-
-    # TODO this gives a warning in pytest, when used on 0d arrays
-    """ <__array_function__ internals>:5: DeprecationWarning: 
-      Calling nonzero on 0d arrays is deprecated, as it behaves surprisingly. 
-      Use `atleast_1d(cond).nonzero()` if the old behavior was intended. 
-      If the context of this warning is of the form `arr[nonzero(cond)]`, 
-      just use `arr[cond]`.
-    """
     def get_idx(self,
                 species,
                 velocities):
@@ -237,23 +206,32 @@ class Model(bp.BaseClass):
         global_index : :obj:`int` of :obj:`None`
 
         """
+        # reshape arrays for vectorization
+        species = np.array(species)
+        assert species.ndim in [0, 1], "species must be 0d or 1d array"
+        # species must be 1d array
         species = np.array(species, ndmin=1)
-        if velocities.ndim == 1:
-            assert species.size == 1
-            velocities = velocities[np.newaxis, ...]
-        assert velocities.shape[-2] == species.size
+        assert velocities.ndim in [1, 2, 3], "velocities must be 1d, 2d, or 3d array"
+        # reshape the result/indices at the end
+        shape_indices = velocities.shape[:-1]
+        # reshape velocities into 3d
+        n_vels = velocities.size // (species.size * self.ndim)
+        shape_velocities = (n_vels, species.size, self.ndim)
+        velocities = velocities.reshape(shape_velocities)
 
-        indices = np.zeros(velocities.shape[0:-1], dtype=int)
+        assert species.ndim == 1 and velocities.ndim == 3
+        indices = np.zeros(velocities.shape[0:2], dtype=int)
         for col, s in enumerate(species):
-            local_indices = self.vGrids[s].get_idx(velocities[..., col, :])
+            local_indices = self.vGrids[s].get_idx(velocities[:, col, :])
             indices[..., col] = np.where(local_indices >= 0,
                                          local_indices + self.index_offset[s],
                                          -1)
 
-        # Todo move this into a unittest
-        pos = np.where(np.all(indices >= 0, axis=-1))
-        assert np.all(self.iMG[indices[pos]] == velocities[pos])
-        return indices
+        # noinspection PyUnreachableCode
+        if __debug__:
+            pos = np.where(np.all(indices >= 0, axis=-1))
+            assert np.all(self.iMG[indices[pos]] == velocities[pos])
+        return indices.reshape(shape_indices)
 
     def get_spc(self, indices):
         """Get the specimen of given indices of :attr:`iMG`.

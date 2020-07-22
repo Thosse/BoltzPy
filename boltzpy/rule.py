@@ -437,7 +437,7 @@ class BoundaryPointRule(Rule):
         for (idx_v, v) in enumerate(model.iMG):
             spc = model.get_spc(idx_v)
             v_refl = -v
-            idx_v_refl = model.find_index(spc, v_refl)
+            idx_v_refl = model.get_idx(spc, v_refl)
             reflected_indices_inverse[idx_v] = idx_v_refl
         return reflected_indices_inverse
 
@@ -452,7 +452,7 @@ class BoundaryPointRule(Rule):
             spc = model.get_spc(idx_v)
             v_refl= np.copy(v)
             v_refl[0] = - v[0]
-            idx_v_refl = model.find_index(spc, v_refl)
+            idx_v_refl = model.get_idx(spc, v_refl)
             reflected_indices_elastic[idx_v] = idx_v_refl
         return reflected_indices_elastic
 

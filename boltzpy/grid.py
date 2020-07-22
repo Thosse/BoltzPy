@@ -202,6 +202,11 @@ class Grid(bp.BaseClass):
         idx = values.dot(factor)
         # remove Bad Values or points that are out of bounds
         idx = np.where(idx >= 0, idx, -1)
+
+        # Todo assert that result is correct
+        # noinspection PyUnreachableCode
+        # if __debug__:
+        #     pass
         return idx
 
     #####################################
@@ -293,6 +298,7 @@ class Grid(bp.BaseClass):
         # Plot Grid as scatter plot
         ax.scatter(*grid_points,  **plot_style)
         if plot_object is None:
+            # noinspection PyUnboundLocalVariable
             plt.show()
         return plot_object
 

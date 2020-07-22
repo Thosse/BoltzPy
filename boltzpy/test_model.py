@@ -152,10 +152,36 @@ def test_get_spc_on_shuffled_grid(key):
         assert np.all(model.get_spc(shuffled_idx) == shuffles_spc)
 
 
-# Todo proper test of find_index implement differently?
-#  Implement collisions only for specimen tuples
-#  -> no need for get_specimen
-#  -> no need for find_index
+@pytest.mark.parametrize("key", MODELS.keys())
+def test_get_idx_on_shuffled_grid_with(key):
+    model = MODELS[key]
+    rng = np.random.default_rng()
+    # test 0d species arrays
+    for s in model.species:
+        beg, end = model.index_offset[s:s+2]
+        indices = np.arange(beg, end)
+        shuffle = rng.permutation(indices.size)
+        shuffled_idx = indices[shuffle]
+        # test 1d velocity arrays
+        for idx in shuffled_idx:
+            assert np.all(model.get_idx(s, model.iMG[idx]) == idx)
+        # test 2d velocity arrays (n_Vels x dim)
+        shuffled_vels = model.iMG[shuffled_idx]
+        assert shuffled_vels.ndim == 2
+        assert np.all(model.get_idx(s, shuffled_vels) == shuffled_idx)
+        # test 3d velocity arrays (n_vels x 1 x dim)
+        shuffled_idx = indices[shuffle][:, np.newaxis]
+        shuffled_vels = model.iMG[shuffled_idx]
+        assert shuffled_idx.ndim == 2
+        assert shuffled_vels.ndim == 3
+        assert np.all(model.get_idx(s, shuffled_vels) == shuffled_idx)
+    # Todo add tests for 1d species array
+    # test 1d species arrays
+    if model.specimen <= 2:
+        return
+
+# Todo/Idea: Implement collisions only for specimen tuples
+#  -> no need for get_idx  with its warnings
 
 # Todo __get__ für model -> nach species index
 #  + Grid __get__ nach index -> arbeiten mit lokalen indices möglich
