@@ -79,6 +79,11 @@ class Grid(bp.BaseClass):
         self.is_centered = bool(is_centered)
         self.ndim = self.shape.size
         self.size = np.int(np.prod(self.shape))
+        # if the grid is centered, all values are shifted by +offset
+        # Note that True/False == 1/0
+        self.offset = -(self.spacing
+                        * (np.array(self.shape, dtype=int) - 1)
+                        // 2) * self.is_centered
         self.iG = self.iv(np.arange(self.size))
 
         self.check_integrity()
@@ -150,12 +155,8 @@ class Grid(bp.BaseClass):
             values[..., i] = idx // multi
             idx -= multi * values[..., i]
             values[..., i] = self.spacing * values[..., i]
-        # centralize Grid around zero, if necessary
-        # Note that True/False == 1/0
-        offset = -self.is_centered * (self.spacing
-                                      * (np.array(self.shape, dtype=int) - 1)
-                                      // 2)
-        values += offset
+        # centralize Grid around zero, by adding the offset
+        values += self.offset
         return values
 
     def pv(self, idx):
@@ -212,38 +213,38 @@ class Grid(bp.BaseClass):
     #####################################
     #        Sorting and Ordering       #
     #####################################
-    # Todo vectorize this, use same naming as in model
-    def key_distance(self, velocities):
-        # NOTE: this acts as if the grid was infinite. This is desired for the partitioning
-        assert isinstance(velocities, np.ndarray)
-        # grids of even shape don't contain 0
-        # thus need to be shifted into 0 for modulo operations
-        assert len(set(self.shape)) == 1, "only works for square/cubic grids"
-        if self.shape[0] % 2 == 0:
-            velocities = velocities - self.spacing // 2
-        distance = np.mod(velocities, self.spacing)
+    def key_distance(self, values):
+        # NOTE: this acts as if the grid was infinite.
+        # This is desired for the partitioning
+        assert isinstance(values, np.ndarray)
+        # Even or centered grids  mav have an offset % spacing != 0
+        # thus the grid points are not multiples of the spacing
+        # values must be shifted to reverse that offset
+        values = values - self.offset
+        distance = np.mod(values, self.spacing)
         distance = np.where(distance > self.spacing // 2,
                             distance - self.spacing,
                             distance)
+        # Now values - distance is in the (infinite) Grid
         return distance
 
     @staticmethod
-    def key_norm(velocities):
-        norm = (velocities**2).sum(axis=-1)
+    def key_norm(values):
+        norm = (values**2).sum(axis=-1)
         return norm
 
     @staticmethod
-    def group(velocities, key_function):
-        assert velocities.ndim == 2
+    def group(values, key_function):
+        assert values.ndim == 2
         grouped = dict()
-        keys = key_function(velocities)
+        keys = key_function(values)
         unique_keys = np.unique(keys, axis=0)
         for key in unique_keys:
             pos = np.where(np.all(keys == key, axis=-1))
-            values = velocities[pos]
-            # sort values, first element must have smallest norm for collisions
-            order = np.argsort(Grid.key_norm(values), kind="stable")
-            grouped[tuple(key)] = values[order]
+            vals = values[pos]
+            # sort vals, first element must have smallest norm for collisions
+            order = np.argsort(Grid.key_norm(vals), kind="stable")
+            grouped[tuple(key)] = vals[order]
         return grouped
 
     #####################################

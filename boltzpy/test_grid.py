@@ -116,3 +116,14 @@ def test_get_index_on_shifted_grid(key):
         for shift in range(1, grid.spacing):
             shifted_vals = ext_grid.iG + shift
             assert np.all(grid.get_idx(shifted_vals) == - 1)
+
+
+@pytest.mark.parametrize("key", GRIDS.keys())
+def test_key_distance(key):
+    grid = GRIDS[key]
+    vals = np.random.randint(5000, size=(100, grid.ndim))
+    distances = grid.key_distance(vals)
+    shifted_vals = vals - distances - grid.offset
+    assert np.all(shifted_vals % grid.spacing == 0)
+
+
