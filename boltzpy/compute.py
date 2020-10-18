@@ -184,34 +184,32 @@ def no_transport(data, affected_points):
 ##################################
 def collision_operator(state,
                        collisions_relations,
-                       collision_matrix,
-                       affected_points):
+                       collision_matrix):
     """Computes dt * J[f,f],
-    with J[f,f] being the collision operator at the affected points.
+    with J[f,f] being the collision operator at all given points.
+    These points are the ones specified in state.
 
     Note that this is the collision of all species.
     Collisions of species i with species j are not implemented.
 
     It is faster to include the dt in the collision matrix, thus the result is
     actually the collision operator times dt."""
-    result = np.empty((affected_points.size, state.shape[1]),
-                      dtype=float)
-    for (i_p, p) in enumerate(affected_points):
+    result = np.empty(state.shape, dtype=float)
+    for p in range(state.shape[0]):
         u_c0 = state[p, collisions_relations[:, 0]]
         u_c1 = state[p, collisions_relations[:, 1]]
         u_c2 = state[p, collisions_relations[:, 2]]
         u_c3 = state[p, collisions_relations[:, 3]]
         col_factor = (np.multiply(u_c0, u_c2) - np.multiply(u_c1, u_c3))
-        result[i_p] = collision_matrix.dot(col_factor)
+        result[p] = collision_matrix.dot(col_factor)
     return result
 
 
 def euler_scheme(data, affected_points):
-    """Executes a single collision step on complete P-Grid"""
-    data.state[affected_points] += collision_operator(data.state,
+    """Executes a collision step, by using the 1st order Euler scheme"""
+    data.state[affected_points] += collision_operator(data.state[affected_points],
                                                       data.col,
-                                                      data.col_mat,
-                                                      affected_points)
+                                                      data.col_mat)
     return
 
 
