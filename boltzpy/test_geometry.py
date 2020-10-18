@@ -36,11 +36,11 @@ def setup_file(file_address=FILE):
             print("ABORTED")
             return
 
-    file = h5py.File(file_address, mode="w")
-    for (key, item) in GEOMETRIES.items():
-        assert isinstance(item, bp.Geometry)
-        file.create_group(key)
-        item.save(file[key], True)
+    with h5py.File(file_address, mode="w") as file:
+        for (key, item) in GEOMETRIES.items():
+            assert isinstance(item, bp.Geometry)
+            file.create_group(key)
+            item.save(file[key], True)
     return
 
 
@@ -61,35 +61,33 @@ def test_setup_creates_same_file():
 
 @pytest.mark.parametrize("key", GEOMETRIES.keys())
 def test_hdf5_groups_exist(key):
-    file = h5py.File(FILE, mode="r")
-    assert key in file.keys(), (
-        "The group {} is missing in the test file-".format(key))
+    with h5py.File(FILE, mode="r") as file:
+        assert key in file.keys(), (
+            "The group {} is missing in the test file-".format(key))
 
 
 @pytest.mark.parametrize("key", GEOMETRIES.keys())
 def test_load_from_file(key):
-    file = h5py.File(FILE, mode="r")
-    hdf_group = file[key]
-    old = bp.Geometry.load(hdf_group)
-    new = GEOMETRIES[key]
-    assert isinstance(old, bp.Geometry)
-    assert isinstance(new, bp.Geometry)
-    assert old == new, (
-        "\n{}\nis not equal to\n\n{}".format(old, new)
-    )
+    with h5py.File(FILE, mode="r") as file:
+        hdf_group = file[key]
+        old = bp.Geometry.load(hdf_group)
+        new = GEOMETRIES[key]
+        assert isinstance(old, bp.Geometry)
+        assert isinstance(new, bp.Geometry)
+        assert old == new, (
+            "\n{}\nis not equal to\n\n{}".format(old, new))
 
 
 @pytest.mark.parametrize("key", GEOMETRIES.keys())
 @pytest.mark.parametrize("attribute", bp.Geometry.attributes())
 def test_attributes(attribute, key):
-    file = h5py.File(FILE, mode="r")
-    if attribute == "rules":
-        old = np.empty(file[key]["rules"].attrs["size"],
-                       dtype=bp.Rule)
-        for r in range(old.size):
-            old[r] = bp.Rule.load(file[key]["rules"][str(r)])
-    else:
-        old = file[key][attribute][()]
-    new = GEOMETRIES[key].__getattribute__(attribute)
-    assert np.all(old == new)
-
+    with h5py.File(FILE, mode="r") as file:
+        if attribute == "rules":
+            old = np.empty(file[key]["rules"].attrs["size"],
+                           dtype=bp.Rule)
+            for r in range(old.size):
+                old[r] = bp.Rule.load(file[key]["rules"][str(r)])
+        else:
+            old = file[key][attribute][()]
+        new = GEOMETRIES[key].__getattribute__(attribute)
+        assert np.all(old == new)

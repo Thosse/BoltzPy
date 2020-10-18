@@ -38,13 +38,15 @@ def setup_file(file_address=FILE):
         if reply != "yes":
             print("ABORTED")
             return
-    _open_file.close()
-    file = h5py.File(file_address, mode="w")
-    for (key, item) in SIMULATIONS.items():
-        assert isinstance(item, bp.Simulation)
-        file.create_group(key)
-        item.compute(file[key])
-        item.file = file[key]
+        else:
+            _open_file.close()
+
+    with h5py.File(file_address, mode="w") as file:
+        for (key, item) in SIMULATIONS.items():
+            assert isinstance(item, bp.Simulation)
+            file.create_group(key)
+            item.compute(file[key])
+            item.file = file[key]
     return
 
 
@@ -64,34 +66,36 @@ def test_setup_creates_same_file():
 
 @pytest.mark.parametrize("key", SIMULATIONS.keys())
 def test_hdf5_groups_exist(key):
-    file = h5py.File(FILE, mode="r")
-    assert key in file.keys(), (
-        "The group {} is missing in the test file-".format(key))
+    with h5py.File(FILE, mode="r") as file:
+        assert key in file.keys(), (
+            "The group {} is missing in the test file-".format(key))
 
 
 @pytest.mark.parametrize("key", SIMULATIONS.keys())
 def test_load_from_file(key):
-    file = h5py.File(FILE, mode="r")
-    hdf_group = file[key]
-    old = bp.Simulation.load(hdf_group)
-    new = SIMULATIONS[key]
-    assert isinstance(old, bp.Simulation)
-    assert isinstance(new, bp.Simulation)
-    assert old == new, (
-        "\n{}\nis not equal to\n\n{}".format(old, new)
-    )
+    with h5py.File(FILE, mode="r") as file:
+        hdf_group = file[key]
+        old = bp.Simulation.load(hdf_group)
+        new = SIMULATIONS[key]
+        assert isinstance(old, bp.Simulation)
+        assert isinstance(new, bp.Simulation)
+        assert old == new, (
+            "\n{}\nis not equal to\n\n{}".format(old, new)
+        )
 
 
 @pytest.mark.parametrize("key", SIMULATIONS.keys())
 def test_computed_state_is_equal(key):
-    file_old = h5py.File(FILE, mode="r")
-    file_new = h5py.File(test_helper.TMP_FILE, mode="r")
-    assert file_old[key]["results"].keys() == file_new[key]["results"].keys()
-    for s in file_old[key]["results"].keys():
-        state_old = file_old[key]["results"][s]["state"][()]
-        state_new = file_new[key]["results"][s]["state"][()]
-        assert np.array_equal(state_old, state_new), (
-            "\n{}\nis not equal to\n\n{}".format(state_old, state_new))
+    with h5py.File(FILE, mode="r") as file_old:
+        with h5py.File(test_helper.TMP_FILE, mode="r") as file_new:
+            keys_old = file_old[key]["results"].keys()
+            keys_new = file_new[key]["results"].keys()
+            assert keys_old == keys_new
+            for s in file_old[key]["results"].keys():
+                state_old = file_old[key]["results"][s]["state"][()]
+                state_new = file_new[key]["results"][s]["state"][()]
+                assert np.array_equal(state_old, state_new), (
+                    "\n{}\nis not equal to\n\n{}".format(state_old, state_new))
 
 
 # the file is used in more tests, this is a simple hack to delete it after use

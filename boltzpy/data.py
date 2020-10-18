@@ -62,7 +62,7 @@ class Data:
         self.v_range = sim.model.index_range
         self.vG = sim.model.delta * sim.model.iMG
         # Todo reimplement offset -> geometry or simulation?
-        self.velocity_offset = np.zeros(2)
+        self.velocity_offset = np.zeros(sim.model.ndim)
         #np.array(sim.scheme.Transport_VelocityOffset)
         # Todo Add this as property to SVGRID
         # Todo test if it faster to compute velocity (pv) on the fly
@@ -92,8 +92,7 @@ class Data:
 
         self._params = dict()
         # Keep as a "conditional" attribute?
-        coll = bp.Collisions(self.col, self.weight)
-        self._params["col_mat"] = coll.generate_collision_matrix(sim.timing.delta)
+        self._params["col_mat"] = sim.model.collision_matrix * sim.timing.delta
         return
 
     def __getattr__(self, item):

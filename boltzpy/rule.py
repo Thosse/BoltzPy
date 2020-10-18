@@ -435,9 +435,9 @@ class BoundaryPointRule(Rule):
     def compute_reflected_indices_inverse(model):
         reflected_indices_inverse = np.zeros(model.size, dtype=int)
         for (idx_v, v) in enumerate(model.iMG):
-            spc = model.get_specimen(idx_v)
+            spc = model.get_spc(idx_v)
             v_refl = -v
-            idx_v_refl = model.find_index(spc, v_refl)
+            idx_v_refl = model.get_idx(spc, v_refl)
             reflected_indices_inverse[idx_v] = idx_v_refl
         return reflected_indices_inverse
 
@@ -449,9 +449,10 @@ class BoundaryPointRule(Rule):
             "only works in 1D Geometries, "
             "doesn't even use surface normal currently")
         for (idx_v, v) in enumerate(model.iMG):
-            spc = model.get_specimen(idx_v)
-            v_refl = np.array([-1, 1]) * v
-            idx_v_refl = model.find_index(spc, v_refl)
+            spc = model.get_spc(idx_v)
+            v_refl= np.copy(v)
+            v_refl[0] = - v[0]
+            idx_v_refl = model.get_idx(spc, v_refl)
             reflected_indices_elastic[idx_v] = idx_v_refl
         return reflected_indices_elastic
 

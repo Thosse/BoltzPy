@@ -37,8 +37,7 @@ def compute_initial_distribution(velocities,
                                        mass,
                                        particle_number,
                                        mean_velocity,
-                                       temperature)
-                                 )
+                                       temperature))
     assert isinstance(discrete_momenta, np.ndarray)
     return maxwellian(velocities, mass, discrete_momenta)
 
@@ -74,9 +73,19 @@ def _maxwellian_iteration(input_momenta,
     #                            cmp_temperature][0],
     #                           dtype=float)
 
+    # Todo remove the ugly if case!
     # return difference from desired momenta
-    result = np.array([cmp_particle_number[0] - desired_particle_number,
-                       cmp_mean_velocity[0, 0] - desired_mean_velocity[0],
-                       cmp_mean_velocity[0, 1] - desired_mean_velocity[1],
-                       cmp_temperature[0] - desired_temperature])
-    return result # desired_momenta - output_momenta
+    if desired_mean_velocity.size == 2:
+        result = np.array([cmp_particle_number[0] - desired_particle_number,
+                           cmp_mean_velocity[0, 0] - desired_mean_velocity[0],
+                           cmp_mean_velocity[0, 1] - desired_mean_velocity[1],
+                           cmp_temperature[0] - desired_temperature])
+    elif desired_mean_velocity.size == 3:
+        result = np.array([cmp_particle_number[0] - desired_particle_number,
+                           cmp_mean_velocity[0, 0] - desired_mean_velocity[0],
+                           cmp_mean_velocity[0, 1] - desired_mean_velocity[1],
+                           cmp_mean_velocity[0, 2] - desired_mean_velocity[2],
+                           cmp_temperature[0] - desired_temperature])
+    else:
+        raise NotImplementedError
+    return result   # desired_momenta - output_momenta

@@ -79,6 +79,11 @@ class Grid(bp.BaseClass):
         self.is_centered = bool(is_centered)
         self.ndim = self.shape.size
         self.size = np.int(np.prod(self.shape))
+        # if the grid is centered, all values are shifted by +offset
+        # Note that True/False == 1/0
+        self.offset = -(self.spacing
+                        * (np.array(self.shape, dtype=int) - 1)
+                        // 2) * self.is_centered
         self.iG = self.iv(np.arange(self.size))
 
         self.check_integrity()
@@ -142,6 +147,7 @@ class Grid(bp.BaseClass):
         """
         assert np.all(idx >= 0)
         assert np.all(idx < self.size)
+        idx = np.copy(idx)
         values = np.empty(np.shape(idx) + (self.ndim,), dtype=int)
         # calculate the values, by iterating over the dimension
         for i in range(self.ndim):
@@ -149,12 +155,8 @@ class Grid(bp.BaseClass):
             values[..., i] = idx // multi
             idx -= multi * values[..., i]
             values[..., i] = self.spacing * values[..., i]
-        # centralize Grid around zero, if necessary
-        # Note that True/False == 1/0
-        offset = -self.is_centered * (self.spacing
-                                      * (np.array(self.shape, dtype=int) - 1)
-                                      // 2)
-        values += offset
+        # centralize Grid around zero, by adding the offset
+        values += self.offset
         return values
 
     def pv(self, idx):
@@ -169,7 +171,6 @@ class Grid(bp.BaseClass):
         """
         return self.iv(idx) * self.delta
 
-    # Todo rename do idx
     def get_idx(self, values):
         """Find index of given values in :attr:`iG`
         Returns -1, if the value is not in this Grid.
@@ -186,8 +187,7 @@ class Grid(bp.BaseClass):
             "values must be an np.array, not {}".format(type(values)))
         assert values.dtype == int, (
             "values must be an integer array, not {}".format(values.dtype))
-
-        BAD_VALUE = -2 * self.size
+        BAD_VALUE = -2 * self.size ** self.ndim
         # shift Grid to start (left bottom ) at 0
         values = values - self.iG[0]
         # divide by spacing to get the position on the (x,y,z) axis
@@ -203,44 +203,49 @@ class Grid(bp.BaseClass):
         idx = values.dot(factor)
         # remove Bad Values or points that are out of bounds
         idx = np.where(idx >= 0, idx, -1)
+
+        # Todo assert that result is correct
+        # noinspection PyUnreachableCode
+        # if __debug__:
+        #     pass
         return idx
 
     #####################################
     #        Sorting and Ordering       #
     #####################################
-    def key_distance(self, velocities):
-        # NOTE: this acts as if the grid was infinite. This is desired for the partitioning
-        assert isinstance(velocities, np.ndarray)
-        # grids of even shape don't contain 0
-        # thus need to be shifted into 0 for modulo operations
-        assert len(set(self.shape)) == 1, "only works for square/cubic grids"
-        if self.shape[0] % 2 == 0:
-            velocities = velocities - self.spacing // 2
-        distance = np.mod(velocities, self.spacing)
+    def key_distance(self, values):
+        # NOTE: this acts as if the grid was infinite.
+        # This is desired for the partitioning
+        assert isinstance(values, np.ndarray)
+        # Even or centered grids  mav have an offset % spacing != 0
+        # thus the grid points are not multiples of the spacing
+        # values must be shifted to reverse that offset
+        values = values - self.offset
+        distance = np.mod(values, self.spacing)
         distance = np.where(distance > self.spacing // 2,
                             distance - self.spacing,
                             distance)
+        # Now values - distance is in the (infinite) Grid
         return distance
 
     @staticmethod
-    def key_norm(velocities):
-        norm = (velocities**2).sum(axis=-1)
+    def key_norm(values):
+        norm = (values**2).sum(axis=-1)
         return norm
 
-    def group(self, velocities):
-        grouped_velocities = dict()
-        keys = self.key_distance(velocities)
-        for (i, v) in enumerate(velocities):
-            key = tuple(keys[i])
-            if key in grouped_velocities.keys():
-                grouped_velocities[key].append(v)
-            else:
-                grouped_velocities[key] = [v]
-        # Each Group is sorted by norm
-        for (key, item) in grouped_velocities.items():
-            item = sorted(item, key=self.key_norm)
-            grouped_velocities[key] = np.array(item)
-        return grouped_velocities
+    @staticmethod
+    def group(values, key_function):
+        assert values.ndim == 2
+        grouped = dict()
+        keys = key_function(values)
+        unique_keys = np.unique(keys, axis=0)
+        for key in unique_keys:
+            pos = np.where(np.all(keys == key, axis=-1))
+            vals = values[pos]
+            # sort vals, first element must have smallest norm for collisions
+            order = np.argsort(Grid.key_norm(vals), kind="stable")
+            grouped[tuple(key)] = vals[order]
+        return grouped
 
     #####################################
     #              Utility              #
@@ -253,6 +258,11 @@ class Grid(bp.BaseClass):
     def line(self, start, direction, steps):
         return (start + step * direction for step in steps
                 if start + step * direction in self)
+
+    def hyperplane(self, start, normal):
+        shifted_vels = self.iG - start
+        pos = np.where(shifted_vels @ normal == 0)
+        return self.iG[pos]
 
     def extension(self, factor):
         # must hold grid.shape % 2 == ext_grid.shape % 2
@@ -277,20 +287,20 @@ class Grid(bp.BaseClass):
         ----------
         plot_object : TODO Figure? matplotlib.pyplot?
         """
-        show_plot_directly = plot_object is None
-        pG = self.iG * self.delta
         if plot_object is None:
-            # Choose standard pyplot
             import matplotlib.pyplot as plt
-            plot_object = plt
-        # Plot Grid as scatter plot
-        if self.ndim == 2:
-            plot_object.scatter(pG[:, 0], pG[:, 1],
-                                **plot_style)
+            projection = "3d" if self.ndim == 3 else None
+            ax = plt.figure().add_subplot(projection=projection)
         else:
-            raise NotImplementedError
-        if show_plot_directly:
-            plot_object.show()
+            ax = plot_object
+        # transpose grid points to unpack each coordinate separately
+        assert self.pG.ndim == 2
+        grid_points = self.pG.transpose()
+        # Plot Grid as scatter plot
+        ax.scatter(*grid_points,  **plot_style)
+        if plot_object is None:
+            # noinspection PyUnboundLocalVariable
+            plt.show()
         return plot_object
 
     #####################################
@@ -371,8 +381,7 @@ class Grid(bp.BaseClass):
 
         assert isinstance(self.is_centered, bool)
         if self.is_centered:
-            assert (np.all(self.spacing % 2 == 0))
-            # or np.all((np.array(self.shape) - 1) % 2 == 0)
+            assert (np.all(self.spacing % 2 == 0 or (np.array(self.shape) - 1) % 2 == 0))
 
         assert isinstance(self.iG, np.ndarray)
         assert self.iG.dtype == int
