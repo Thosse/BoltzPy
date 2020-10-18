@@ -104,6 +104,7 @@ def transport_inflow_innerPoint(data, affected_points):
                            )
     return result
 
+
 # Todo test that this is equivalent to innerPoint, with all velocities allowed
 def transport_inflow_boundaryPoint(data,
                                    affected_points,
@@ -181,16 +182,36 @@ def no_transport(data, affected_points):
 ##################################
 #           Collisions           #
 ##################################
-# Todo this needs the col_mat, make sure this is the case
+def collision_operator(state,
+                       collisions_relations,
+                       collision_matrix,
+                       affected_points):
+    """Computes dt * J[f,f],
+    with J[f,f] being the collision operator at the affected points.
+
+    Note that this is the collision of all species.
+    Collisions of species i with species j are not implemented.
+
+    It is faster to include the dt in the collision matrix, thus the result is
+    actually the collision operator times dt."""
+    result = np.empty((affected_points.size, state.shape[1]),
+                      dtype=float)
+    for (i_p, p) in enumerate(affected_points):
+        u_c0 = state[p, collisions_relations[:, 0]]
+        u_c1 = state[p, collisions_relations[:, 1]]
+        u_c2 = state[p, collisions_relations[:, 2]]
+        u_c3 = state[p, collisions_relations[:, 3]]
+        col_factor = (np.multiply(u_c0, u_c2) - np.multiply(u_c1, u_c3))
+        result[i_p] = collision_matrix.dot(col_factor)
+    return result
+
+
 def euler_scheme(data, affected_points):
     """Executes a single collision step on complete P-Grid"""
-    for p in affected_points:
-        u_c0 = data.state[p, data.col[:, 0]]
-        u_c1 = data.state[p, data.col[:, 1]]
-        u_c2 = data.state[p, data.col[:, 2]]
-        u_c3 = data.state[p, data.col[:, 3]]
-        col_factor = (np.multiply(u_c0, u_c2) - np.multiply(u_c1, u_c3))
-        data.state[p] += data.col_mat.dot(col_factor)
+    data.state[affected_points] += collision_operator(data.state,
+                                                      data.col,
+                                                      data.col_mat,
+                                                      affected_points)
     return
 
 
