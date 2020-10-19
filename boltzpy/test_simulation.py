@@ -79,9 +79,7 @@ def test_load_from_file(key):
         new = SIMULATIONS[key]
         assert isinstance(old, bp.Simulation)
         assert isinstance(new, bp.Simulation)
-        assert old == new, (
-            "\n{}\nis not equal to\n\n{}".format(old, new)
-        )
+        assert old == new
 
 
 @pytest.mark.parametrize("key", SIMULATIONS.keys())
@@ -94,7 +92,7 @@ def test_computed_state_is_equal(key):
             for s in file_old[key]["results"].keys():
                 state_old = file_old[key]["results"][s]["state"][()]
                 state_new = file_new[key]["results"][s]["state"][()]
-                assert np.array_equal(state_old, state_new), (
+                assert np.allclose(state_old, state_new), (
                     "\n{}\nis not equal to\n\n{}".format(state_old, state_new))
 
 

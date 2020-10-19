@@ -117,9 +117,7 @@ def test_load_from_file(key):
         new = MODELS[key]
         assert isinstance(old, bp.Model)
         assert isinstance(new, bp.Model)
-        assert old == new, (
-            "\n{}\nis not equal to\n\n{}".format(old, new))
-
+        assert old == new
 
 @pytest.mark.parametrize("key", MODELS.keys())
 @pytest.mark.parametrize("attribute", bp.Model.attributes())
@@ -127,7 +125,10 @@ def test_attributes(attribute, key):
     with h5py.File(FILE, mode="r") as file:
         old = file[key][attribute][()]
         new = MODELS[key].__getattribute__(attribute)
-        assert np.all(old == new)
+        if isinstance(new, np.ndarray) and (new.dtype == float):
+            assert np.allclose(old, new)
+        else:
+            assert np.all(old == new)
 
 
 @pytest.mark.parametrize("key", MODELS.keys())

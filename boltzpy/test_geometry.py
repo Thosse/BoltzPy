@@ -74,8 +74,7 @@ def test_load_from_file(key):
         new = GEOMETRIES[key]
         assert isinstance(old, bp.Geometry)
         assert isinstance(new, bp.Geometry)
-        assert old == new, (
-            "\n{}\nis not equal to\n\n{}".format(old, new))
+        assert old == new
 
 
 @pytest.mark.parametrize("key", GEOMETRIES.keys())
@@ -90,4 +89,7 @@ def test_attributes(attribute, key):
         else:
             old = file[key][attribute][()]
         new = GEOMETRIES[key].__getattribute__(attribute)
-        assert np.all(old == new)
+        if isinstance(new, np.ndarray) and (new.dtype == float):
+            assert np.allclose(old, new)
+        else:
+            assert np.all(old == new)

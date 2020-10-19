@@ -85,9 +85,7 @@ def test_load_from_file(key):
         new = GRIDS[key]
         assert isinstance(old, bp.Grid)
         assert isinstance(new, bp.Grid)
-        assert old == new, (
-            "\n{}\nis not equal to\n\n{}".format(old, new)
-    )
+        assert old == new
 
 
 @pytest.mark.parametrize("key", GRIDS.keys())
@@ -96,7 +94,10 @@ def test_attributes(attribute, key):
     with h5py.File(FILE, mode="r") as file:
         old = file[key][attribute][()]
         new = GRIDS[key].__getattribute__(attribute)
-        assert np.all(old == new)
+        if isinstance(new, np.ndarray) and (new.dtype == float):
+            assert np.allclose(old, new)
+        else:
+            assert np.all(old == new)
 
 
 @pytest.mark.parametrize("key", GRIDS.keys())
