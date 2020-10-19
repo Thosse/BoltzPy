@@ -51,7 +51,8 @@ class Rule(bp.BaseClass):
     def classes():
         return {'InnerPointRule': InnerPointRule,
                 'ConstantPointRule': ConstantPointRule,
-                'BoundaryPointRule': BoundaryPointRule}
+                'BoundaryPointRule': BoundaryPointRule,
+                'HomogeneousPointRule': HomogeneousPointRule}
 
     @staticmethod
     def parameters():
@@ -98,9 +99,6 @@ class Rule(bp.BaseClass):
         # Todo test initial state, moments should be matching (up to 10^-x)
         return initial_state
 
-    #####################################
-    #            Computation            #
-    #####################################
     def collision(self, data):
         """Executes single collision step for the :attr:`affected_points`.
            Reads data.state
@@ -117,9 +115,6 @@ class Rule(bp.BaseClass):
            and writes the results in data.results"""
         raise NotImplementedError
 
-    #####################################
-    #           Visualization           #
-    #####################################
     def plot(self,
              model,
              specimen,
@@ -167,9 +162,6 @@ class Rule(bp.BaseClass):
             plot_object.show()
         return plot_object
 
-    #####################################
-    #           Serialization           #
-    #####################################
     @staticmethod
     def load(hdf5_group):
         """Set up and return a :class:`Rule` instance
@@ -214,9 +206,6 @@ class Rule(bp.BaseClass):
             hdf5_group[attr] = self.__getattribute__(attr)
         return
 
-    #####################################
-    #            Verification           #
-    #####################################
     def check_integrity(self):
         """Sanity Check."""
         assert isinstance(self.particle_number, np.ndarray)
@@ -289,9 +278,6 @@ class InnerPointRule(Rule):
                          initial_state)
         return
 
-    #####################################
-    #            Computation            #
-    #####################################
     def collision(self, data):
         bp_cp.euler_scheme(data, self.affected_points)
         return
@@ -330,9 +316,6 @@ class ConstantPointRule(Rule):
                          initial_state)
         return
 
-    #####################################
-    #            Computation            #
-    #####################################
     def collision(self, data):
         bp_cp.euler_scheme(data, self.affected_points)
         # Todo replace by bp_cp.no_collisions(data, self.affected_points)
@@ -465,9 +448,6 @@ class BoundaryPointRule(Rule):
         initial_state[outgoing_velocities] = full_initial_state[outgoing_velocities]
         return initial_state
 
-    #####################################
-    #            Computation            #
-    #####################################
     def collision(self, data):
         pass
 
@@ -511,9 +491,6 @@ class BoundaryPointRule(Rule):
             )
         return reflected_inflow
 
-    #####################################
-    #            Verification           #
-    #####################################
     def check_integrity(self, complete_check=True, context=None):
         super().check_integrity()
         assert np.all(self.mean_velocity == 0), (
@@ -566,3 +543,56 @@ class BoundaryPointRule(Rule):
             assert np.all(no_reflecion == reflect_twice), (
                     "Any Reflection applied twice, must return the original."
                     "idx_array[idx_array]:\n{}".format(reflect_twice))
+
+
+class HomogeneousPointRule(Rule):
+    """Implementation of a homogeneous Simulation.
+    This means that no Transport happens in space.
+    However, it is possible to provide a source term s,
+    such that
+
+    .. math::` \partial_t f + s = J[f,f]`
+
+    Parameters
+    ----------
+    source_term : :obj:'~numpy.array'[:obj:'float']
+    """
+    def __init__(self,
+                 particle_number,
+                 mean_velocity,
+                 temperature,
+                 affected_points,
+                 source_term=0.,
+                 model=None,
+                 initial_state=None):
+        super().__init__(particle_number,
+                         mean_velocity,
+                         temperature,
+                         affected_points,
+                         model,
+                         initial_state)
+        self.source_term = np.array(source_term, dtype=float)
+        return
+
+    @staticmethod
+    def parameters():
+        params = Rule.parameters()
+        params.update({"source_term"})
+        return params
+
+    def collision(self, data):
+        bp_cp.collision_rkv4(data, self.affected_points)
+        return
+
+    def transport(self, data):
+        """Implements the transport as a 4th order Runge-Kutta scheme.
+        This is possible since there are no complex boundary conditions.
+        """
+        state = data.state[self.affected_points]
+        data.result[self.affected_points] = state - self.source_term * data.dt
+        return
+
+    def check_integrity(self, complete_check=True, context=None):
+        super().check_integrity()
+        if self.source_term.size != 1:
+            assert self.source_term.shape == self.initial_state.shape

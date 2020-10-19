@@ -213,6 +213,25 @@ def euler_scheme(data, affected_points):
     return
 
 
+def collision_rkv4(data, affected_points):
+    """Executes a collision step, by using the 4th order Runge Kutta scheme"""
+    # Todo remove data, use sim.sv.size instead of state.shape[1]
+    state = data.state[affected_points]
+    result = np.zeros(state.shape, float)
+    rkv_component = np.zeros(state.shape, float)
+    rkv_offset = np.array([0, 0.5, 0.5, 1])
+    rkv_weight = np.array([1/6, 2/6, 2/6, 1/6])
+    for i in np.arange(4):
+        offset = rkv_offset[i]
+        weight = rkv_weight[i]
+        rkv_component = collision_operator(state + offset * rkv_component,
+                                           data.col,
+                                           data.col_mat)
+        result += weight * rkv_component
+    data.state[affected_points] += result
+    return
+
+
 def no_collisions(data, affected_points):
     """No Collisions are done here"""
     return

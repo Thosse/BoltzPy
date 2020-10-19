@@ -31,7 +31,7 @@ Workflow
 """
 from boltzpy.BaseClass import BaseClass
 from boltzpy.grid import Grid
-from boltzpy.rule import Rule, InnerPointRule, ConstantPointRule, BoundaryPointRule
+from boltzpy.rule import Rule, InnerPointRule, ConstantPointRule, BoundaryPointRule, HomogeneousPointRule
 from boltzpy.geometry import Geometry
 from boltzpy.simulation import Simulation
 from boltzpy.model import Model

@@ -139,7 +139,7 @@ class Model(bp.BaseClass):
 
     @property
     def index_range(self):
-        # Todo remove soon
+        # Todo replace by a slice
         result = np.zeros((self.specimen, 2), dtype=int)
         result[:, 0] = self.index_offset[0:self.specimen]
         result[:, 1] = self.index_offset[1:]
