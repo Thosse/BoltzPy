@@ -327,7 +327,8 @@ class Simulation(bp.BaseClass):
         self.model.check_integrity()
         assert self.model.ndim >= self.geometry.ndim
         assert self.geometry.model_size == self.model.size
-        assert self.geometry.rules.size >= self.model.specimen
+        for r in self.geometry.rules:
+            assert r.specimen >= self.model.specimen
         assert isinstance(self.file, h5py.Group)
         assert isinstance(self.log_state, np.bool)
         assert isinstance(self.order_operator_splitting, int)
