@@ -8,7 +8,6 @@
    :hidden:
 
    classes
-   constants
 
 
 .. automodule:: boltzpy
@@ -16,6 +15,5 @@
 Links
 -----
  * :ref:`classes`
- * :ref:`constants`
  * :ref:`search`
  * :ref:`genindex`
