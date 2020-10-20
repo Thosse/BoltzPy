@@ -139,6 +139,7 @@ class Simulation(bp.BaseClass):
             time_tracker.print(tw, data.tG[-1, 0])
         return
 
+    # Todo this needs an overhaul
     def write_results(self, data, tw_idx, hdf_group):
         for s in self.model.species:
             (beg, end) = self.model.index_range[s]
@@ -147,30 +148,27 @@ class Simulation(bp.BaseClass):
             mass = self.model.masses[s]
             velocities = self.model.vGrids[s].pG
             spc_group = hdf_group[str(s)]
-            # particle_number
-            particle_number = bp_o.particle_number(spc_state, dv)
-            spc_group["particle_number"][tw_idx] = particle_number
+            # number_density
+            number_density = bp_o.number_density(spc_state, dv)
+            spc_group["particle_number"][tw_idx] = number_density
+
+            # momentum
+            momentum = bp_o.momentum(spc_state, dv, velocities, mass)
+            spc_group["momentum"][tw_idx] = momentum
 
             # mean velocity
-            mean_velocity = bp_o.mean_velocity(spc_state,
-                                               dv,
-                                               velocities,
-                                               particle_number)
+            mean_velocity = bp_o.mean_velocity(momentum, mass * number_density)
             spc_group["mean_velocity"][tw_idx] = mean_velocity
+
             # temperature
-            temperature = bp_o.temperature(spc_state,
-                                           dv,
-                                           velocities,
-                                           mass,
-                                           particle_number,
-                                           mean_velocity)
+            pressure = bp_o.pressure(spc_state,
+                                     dv,
+                                     velocities,
+                                     mass,
+                                     mean_velocity)
+            temperature = bp_o.temperature(pressure, number_density)
             spc_group["temperature"][tw_idx] = temperature
-            # momentum
-            spc_group["momentum"][tw_idx] = bp_o.momentum(
-                spc_state,
-                dv,
-                velocities,
-                mass)
+
             # momentum flow
             spc_group["momentum_flow"][tw_idx] = bp_o.momentum_flow(
                 spc_state,
@@ -178,7 +176,7 @@ class Simulation(bp.BaseClass):
                 velocities,
                 mass)
             # energy
-            spc_group["energy"][tw_idx] = bp_o.energy(
+            spc_group["energy"][tw_idx] = bp_o.energy_density(
                 spc_state,
                 dv,
                 velocities,

@@ -378,7 +378,7 @@ class BoundaryPointRule(Rule):
                          initial_state)
         if effective_particle_number is None:
             self.effective_particle_number = np.array([
-                bp_o.particle_number(
+                bp_o.number_density(
                     self.initial_state[np.newaxis,
                                        model.index_offset[s]: model.index_offset[s+1]],
                     model.vGrids[s].physical_spacing)
@@ -481,7 +481,7 @@ class BoundaryPointRule(Rule):
             elastic_inflow = self.reflection_rate_elastic[s] * inflow
             reflected_inflow[:, self.reflected_indices_elastic] += elastic_inflow
 
-            thermal_inflow = bp_o.particle_number(
+            thermal_inflow = bp_o.number_density(
                 self.reflection_rate_thermal[s] * inflow[..., beg:end],
                 data.dv[s])
             thermal_factor = (thermal_inflow / self.effective_particle_number[s])
@@ -550,8 +550,6 @@ class HomogeneousPointRule(Rule):
     This means that no Transport happens in space.
     However, it is possible to provide a source term s,
     such that
-
-    .. math::` \partial_t f + s = J[f,f]`
 
     Parameters
     ----------
