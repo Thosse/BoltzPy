@@ -142,8 +142,8 @@ class Simulation(bp.BaseClass):
     # Todo this needs an overhaul
     def write_results(self, data, tw_idx, hdf_group):
         for s in self.model.species:
-            (beg, end) = self.model.index_range[s]
-            spc_state = data.state[..., beg:end]
+            idx_range = self.model.idx_range(s)
+            spc_state = data.state[..., idx_range]
             dv = self.model.vGrids[s].physical_spacing
             mass = self.model.masses[s]
             velocities = self.model.vGrids[s].pG
@@ -189,7 +189,7 @@ class Simulation(bp.BaseClass):
                 mass)
             # complete distribution
             if self.log_state:
-                spc_group["state"][tw_idx] = data.state[..., beg:end]
+                spc_group["state"][tw_idx] = spc_state
         # update index of current time step
         hdf_group.attrs["t"] = tw_idx + 1
         return

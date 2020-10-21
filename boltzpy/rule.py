@@ -87,8 +87,8 @@ class Rule(bp.BaseClass):
             mass = model.masses[s]
             velocities = model.vGrids[s].pG
             delta_v = model.vGrids[s].physical_spacing
-            (beg, end) = model.index_offset[s:s+2]
-            initial_state[beg:end] = bp_i.compute_initial_distribution(
+            idx_range = model.idx_range(s)
+            initial_state[idx_range] = bp_i.compute_initial_distribution(
                 velocities,
                 delta_v,
                 mass,
@@ -151,9 +151,10 @@ class Rule(bp.BaseClass):
             plot_object)
 
         # plot discrete distribution as a 3D bar plot
-        beg, end = model.index_range[specimen]
+        idx_range = model.idx_range(specimen)
+        # Todo replace by animated figure (in plot and here)
         plot_object = bp_p.plot_discrete_distribution(
-            self.initial_state[beg:end],
+            self.initial_state[idx_range],
             model.vGrids[specimen].pG,
             model.vGrids[specimen].physical_spacing,
             plot_object,

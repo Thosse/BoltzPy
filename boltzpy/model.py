@@ -138,14 +138,6 @@ class Model(bp.BaseClass):
         return np.arange(self.specimen)
 
     @property
-    def index_range(self):
-        # Todo replace by a slice
-        result = np.zeros((self.specimen, 2), dtype=int)
-        result[:, 0] = self.index_offset[0:self.specimen]
-        result[:, 1] = self.index_offset[1:]
-        return result
-
-    @property
     def maximum_velocity(self):
         """:obj:`float`
         Maximum physical velocity for every sub grid."""
@@ -181,7 +173,6 @@ class Model(bp.BaseClass):
                       "collision_matrix",
                       "specimen",
                       "index_offset",
-                      "index_range",
                       "species",
                       "maximum_velocity",
                       "collision_invariants"})
@@ -190,6 +181,9 @@ class Model(bp.BaseClass):
     #####################################
     #               Indexing            #
     #####################################
+    def idx_range(self, s):
+        return np.s_[self.index_offset[s]: self.index_offset[s+1]]
+
     def get_idx(self,
                 species,
                 velocities):
@@ -422,8 +416,7 @@ class Model(bp.BaseClass):
                         # shift extended colvels
                         new_colvels = repr_rels[key] + (v0 - repr[key])
                         # get indices
-                        new_rels = self.get_idx([s0, s0, s1, s1],
-                                                 new_colvels)
+                        new_rels = self.get_idx([s0, s0, s1, s1], new_colvels)
 
                         # remove out-of-bounds or useless collisions
                         choice = np.where(
@@ -702,21 +695,18 @@ class Model(bp.BaseClass):
             isinstance(G, bp.Grid)
             G.check_integrity()
 
-        assert isinstance(self.index_range, np.ndarray)
-        assert self.index_range.dtype == int
-        assert self.index_range.ndim == 2
-        assert self.specimen == self.index_range.shape[0]
-        assert self.index_range.shape[1] == 2
-        assert np.all(self.index_range >= 0)
-        assert np.all(self.index_range[1:, 0] == self.index_range[0:-1, 1])
-        assert np.all(self.index_range[:, 0] < self.index_range[:, 1])
+        assert isinstance(self.index_offset, np.ndarray)
+        assert self.index_offset.dtype == int
+        assert self.index_offset.shape == (self.specimen + 1,)
+        assert np.all(self.index_offset >= 0)
+        assert np.all(self.index_offset[1:] > self.index_offset[:-1])
         assert np.array_equal(self.index_offset[1:] - self.index_offset[:-1],
                               np.array([G.size for G in self.vGrids]))
 
         assert isinstance(self.iMG, np.ndarray)
         assert self.iMG.dtype == int
         assert self.iMG.ndim == 2
-        assert self.iMG.shape[0] == self.index_range[-1, 1]
+        assert self.iMG.shape[0] == self.index_offset[-1]
 
         assert self.algorithm_relations in {"all", "convergent", "naive"}
         assert self.algorithm_weights in {"uniform"}
