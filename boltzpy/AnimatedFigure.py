@@ -42,16 +42,18 @@ class AnimatedFigure:
         self.animated_axes.append(animated_axes)
         return animated_axes
 
-    def update(self, i):
+    def update(self, i, track_time=True):
         for ax in self.animated_axes:
             ax.update(i)
-        # print time estimate
-        self._time_tracker.print(i + 1, self.tmax)
+        # print time estimate to console
+        if track_time:
+            self._time_tracker.print(i + 1, self.tmax)
         return
 
-    def create_plot(self):
+    def create_plot(self, track_time=True):
         self.mpl_fig.tight_layout()
-        self._time_tracker = h_tt.TimeTracker()
+        if track_time:
+            self._time_tracker = h_tt.TimeTracker()
         if self.tmax == 1:
             print("Plotting...")
             self.update(0)
@@ -63,6 +65,7 @@ class AnimatedFigure:
                 self.update,
                 frames=self.tmax,
                 interval=1,
+                fargs=(track_time,),
                 blit=False
             )
             return animation
@@ -70,7 +73,7 @@ class AnimatedFigure:
             raise ValueError
 
     def save(self, file_address):
-        plot = self.create_plot()
+        plot = self.create_plot(track_time=True)
         if self.tmax == 1:
             plot.savefig(file_address)
         elif self.tmax > 1:
@@ -83,7 +86,7 @@ class AnimatedFigure:
 
     def show(self):
         # must store plt, otherwise animations is not shown (figure instead)
-        plt = self.create_plot()
+        plt = self.create_plot(track_time=False)
         self._plt.show()
 
 
