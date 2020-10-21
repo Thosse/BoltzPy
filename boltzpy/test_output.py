@@ -5,6 +5,40 @@ import boltzpy.output as bp_o
 from boltzpy.test_simulation import SIMULATIONS
 
 
+def test_proj():
+    for _ in range(10):
+        dim = 2 + int(2 * np.random.rand(1))
+        assert dim in [2, 3]
+        # set up random vectors
+        ndim = int(6 * np.random.random(1))
+        shape = np.array(1 + 10 * np.random.random(ndim), dtype=int)
+        shape = tuple(shape) + (dim,)
+        size = np.prod(shape)
+        vectors = np.random.random(size).reshape(shape)
+        # Test that proj of ith unit vector is the ith components
+        for i in range(dim):
+            direction = np.zeros(dim)
+            direction[i] = 1
+            result = bp_o.proj(vectors, direction)
+            goal = np.zeros(result.shape)
+            goal[..., i] = vectors[..., i]
+            assert np.allclose(result, goal)
+        # for random directions
+        # test that the sum of proj of all orthogonal directions is the original
+        direction = np.zeros((dim, dim))
+        direction[0] = np.random.random(dim)
+        direction[1, 0:2] = [-direction[0, 1], direction[0, 0]]
+        if dim == 3:
+            direction[2] = [-np.prod(direction[0, [0, 2]]),
+                            -np.prod(direction[0, [1, 2]]),
+                            np.sum(direction[0, 0:2]**2)]
+        result = np.zeros(vectors.shape)
+        for i in range(dim):
+            result[:] += bp_o.proj(vectors, direction[i])
+        assert np.allclose(result, vectors)
+    return
+
+
 @pytest.mark.parametrize("key", SIMULATIONS.keys())
 def test_particle_number(key):
     sim = SIMULATIONS[key]

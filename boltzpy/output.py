@@ -2,6 +2,17 @@
 import numpy as np
 
 
+def proj(vectors, direction):
+    assert direction.shape == (vectors.shape[-1],)
+    shape = vectors.shape[:-1]
+    size = np.prod(shape, dtype=int)
+    dim = vectors.shape[-1]
+    vector = vectors.reshape((size, dim))
+    result = (np.dot(vector, direction) / np.sum(direction**2))
+    result = result[:, np.newaxis] * direction[np.newaxis,:]
+    return result.reshape(shape + (dim,))
+
+
 def number_density(state, delta_v):
     r"""
 
