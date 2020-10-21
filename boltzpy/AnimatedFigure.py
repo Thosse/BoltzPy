@@ -123,11 +123,18 @@ class AnimatedAxes:
         # update y limits, stretch range a bit, for nice look
         stretch = 1.25
         factors = np.array([(1 + stretch)/2, (1 - stretch)/2])
+        self.mpl_axes.set_xlim(self.xmin, self.xmax)
         if self.dim == 2:
             ymin = np.sum(factors * [self.ymin, self.ymax])
             ymax = np.sum(factors * [self.ymax, self.ymin])
-            self.mpl_axes.set_xlim(self.xmin, self.xmax)
             self.mpl_axes.set_ylim(float(ymin), float(ymax))
+        elif self.dim == 3:
+            self.mpl_axes.set_ylim(self.ymin, self.ymax)
+            zmin = np.sum(factors * [self.zmin, self.zmax])
+            zmax = np.sum(factors * [self.zmax, self.zmin])
+            self.mpl_axes.set_zlim(float(zmin), float(zmax))
+        else:
+            raise ValueError
         return
 
     def update(self, i):
