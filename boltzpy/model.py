@@ -178,6 +178,22 @@ class Model(bp.BaseClass):
                       "collision_invariants"})
         return attrs
 
+    @property
+    def dv(self):
+        return self.delta * self.spacings
+
+    @property
+    def velocities(self):
+        return self.delta * self.iMG
+
+    def centered_velocities(self, mean_velocities):
+        assert isinstance(mean_velocities, np.ndarray)
+        assert mean_velocities.shape == (self.specimen, self.ndim)
+        result = self.velocities
+        for s in self.species:
+            result[self.idx_range(s)] -= mean_velocities[s]
+        return result
+
     #####################################
     #               Indexing            #
     #####################################
@@ -405,7 +421,7 @@ class Model(bp.BaseClass):
                 repr_rels = dict()
                 for key in group.keys():
                     # generate collisions in extended grids
-                    # allows transfering the results without losing collisions
+                    # allows transferring the results without losing collisions
                     repr_rels[key] = coll_func(
                         [self.vGrids[i].extension(2) for i in [s0, s0, s1, s1]],
                         self.masses[[s0, s0, s1, s1]],
