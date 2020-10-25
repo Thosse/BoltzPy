@@ -194,6 +194,13 @@ class Model(bp.BaseClass):
             result[self.idx_range(s)] -= mean_velocities[s]
         return result
 
+    @property
+    def mass_array(self):
+        result = np.empty(self.size)
+        for s in self.species:
+            result[self.idx_range(s)] = self.masses[s]
+        return result
+
     #####################################
     #               Indexing            #
     #####################################
@@ -583,6 +590,22 @@ class Model(bp.BaseClass):
         cond[2] = np.all(np.sum(masses[0] * (v0 ** 2 - v1 ** 2), axis=-1)
                          == np.sum(masses[2] * (w1 ** 2 - w0 ** 2), axis=-1))
         return np.all(cond, axis=0)
+
+    #####################################
+    #           Coefficients            #
+    #####################################
+    def viscosity(self,
+                  number_densities,
+                  mean_velocity,
+                  temperature,
+                  direction_1=None,
+                  direction_2=None,
+                  plot=False):
+        # initialize homogeneous rule
+        # set up source term -> update rule
+        # run simulation for L^1f
+        # compute viscosity as scalar product
+        pass
 
     #####################################
     #           Visualization           #

@@ -2,15 +2,64 @@
 import numpy as np
 
 
-def proj(vectors, direction):
+def project_velocities(vectors, direction):
     assert direction.shape == (vectors.shape[-1],)
+    assert np.linalg.norm(direction) > 1e-8
     shape = vectors.shape[:-1]
     size = np.prod(shape, dtype=int)
     dim = vectors.shape[-1]
     vector = vectors.reshape((size, dim))
-    result = (np.dot(vector, direction) / np.sum(direction**2))
-    result = result[:, np.newaxis] * direction[np.newaxis,:]
-    return result.reshape(shape + (dim,))
+    angle = direction / np.linalg.norm(direction)
+    result = np.dot(vector, angle)
+    return result.reshape(shape)
+
+
+def mf_stress(mass_array,
+              centered_velocities,
+              direction_1,
+              direction_2):
+    assert mass_array.shape == (centered_velocities.shape[0],)
+    assert centered_velocities.shape == mass_array.shape + direction_1.shape
+    assert direction_1.shape == direction_2.shape
+    assert direction_2.shape == (centered_velocities.shape[-1],)
+    dirs_are_equal = np.all(direction_1 - direction_2 < 1e-16)
+    dirs_are_orthogonal = np.all(np.dot(direction_1, direction_2) < 1e-16)
+    assert dirs_are_equal or dirs_are_orthogonal
+    proj_vels_1 = project_velocities(centered_velocities, direction_1)
+    proj_vels_2 = project_velocities(centered_velocities, direction_2)
+    return mass_array * proj_vels_1 * proj_vels_2
+
+
+# todo Add test for models (with default params) that its orthogonal to the moments
+def mf_orthogonal_stress(mass_array,
+                         centered_velocities,
+                         direction_1,
+                         direction_2):
+    dirs_are_equal = np.all(direction_1 - direction_2 < 1e-16)
+    dirs_are_orthogonal = np.all(np.dot(direction_1, direction_2) < 1e-16)
+    result = mf_stress(mass_array, centered_velocities, direction_1, direction_2)
+    if dirs_are_orthogonal:
+        return result
+    elif dirs_are_equal:
+        dim = centered_velocities.shape[-1]
+        mf_pressure = 1/dim * mass_array * np.sum(centered_velocities**2, axis=-1)
+        return result - mf_pressure
+    else:
+        raise ValueError
+
+
+def mf_heat_flow(mass_array, centered_velocities, direction):
+    assert mass_array.shape == (centered_velocities.shape[0],)
+    assert centered_velocities.shape == mass_array.shape + direction.shape
+    assert direction.shape == (centered_velocities.shape[-1],)
+    proj_vels = project_velocities(centered_velocities, direction)
+    squared_sum = np.sum(centered_velocities**2, axis=-1)
+    return mass_array * proj_vels * squared_sum
+
+
+# todo Add test for models (with default params) that its orthogonal to the moments
+def mf_orthogonal_heat_flow(mass_array, centered_velocities, direction):
+    raise NotImplementedError
 
 
 def number_density(state, delta_v):
@@ -212,7 +261,13 @@ def energy_flow(state,
         The particle mass of the species.
     """
     assert state.ndim == 2
+    # Reshape arrays to use np.dot
+    shape = state.shape[:-1]
+    size = np.prod(shape, dtype=int)
+    flat_shape = (size, state.shape[-1])
     dim = velocities.shape[1]
+    new_shape = shape + (dim,)
+    state = state.reshape(flat_shape)
     energies = 0.5 * mass * np.sum(velocities**2, axis=1)[:, np.newaxis]
-    weighted_state = state * delta_v**dim
-    return np.dot(weighted_state, energies * velocities)
+    result = delta_v**dim * np.dot(state, energies * velocities)
+    return result.reshape(new_shape)

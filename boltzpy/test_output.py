@@ -18,15 +18,23 @@ def test_proj():
         # Test that proj of ith unit vector is the ith components
         for i in range(dim):
             direction = np.zeros(dim)
-            direction[i] = 1
-            result = bp_o.proj(vectors, direction)
+            length = 10 * np.random.random(1)
+            direction[i] = length
+            result = bp_o.project_velocities(vectors, direction)
+            angle = direction / np.linalg.norm(direction)
+            shape = result.shape
+            size = result.size
+            result = result.reshape((size, 1))
+            result = result * angle[np.newaxis, :]
+            result = result.reshape(shape + (dim,))
             goal = np.zeros(result.shape)
             goal[..., i] = vectors[..., i]
             assert np.allclose(result, goal)
         # for random directions
         # test that the sum of proj of all orthogonal directions is the original
         direction = np.zeros((dim, dim))
-        direction[0] = np.random.random(dim)
+        length = 10 * np.random.random(1)
+        direction[0] = length * np.random.random(dim)
         direction[1, 0:2] = [-direction[0, 1], direction[0, 0]]
         if dim == 3:
             direction[2] = [-np.prod(direction[0, [0, 2]]),
@@ -34,7 +42,14 @@ def test_proj():
                             np.sum(direction[0, 0:2]**2)]
         result = np.zeros(vectors.shape)
         for i in range(dim):
-            result[:] += bp_o.proj(vectors, direction[i])
+            res = bp_o.project_velocities(vectors, direction[i])
+            angle = direction[i] / np.linalg.norm(direction[i])
+            angle = angle.reshape((1, dim))
+            shape = res.shape
+            size = res.size
+            res = res.reshape((size, 1))
+            res = res * angle
+            result[:] += res.reshape(shape + (dim,))
         assert np.allclose(result, vectors)
     return
 
@@ -158,4 +173,4 @@ def test_energy_flow(key):
                                           dv,
                                           velocities,
                                           mass)
-            assert np.array_equal(old_result, new_result)
+            assert np.allclose(old_result, new_result)
