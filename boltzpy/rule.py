@@ -88,7 +88,7 @@ class Rule(bp.BaseClass):
             velocities = model.vGrids[s].pG
             delta_v = model.vGrids[s].physical_spacing
             idx_range = model.idx_range(s)
-            initial_state[idx_range] = bp_i.compute_initial_distribution(
+            initial_state[idx_range] = model._compute_initial_state(
                 velocities,
                 delta_v,
                 mass,

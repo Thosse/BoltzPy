@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from matplotlib import cm
 import numpy as np
-import boltzpy.initialization as bp_i
+import boltzpy as bp
 
 
 def plot_discrete_distribution(discrete_distribution,
@@ -83,8 +83,11 @@ def plot_continuous_maxwellian(particle_number,
     X, Y = np.meshgrid(steps, steps)
     # Compute continuous maxwellian as Z axis
     velocities = np.vstack((X.flatten(), Y.flatten())).T
-    momenta = np.array([particle_number, *mean_velocity, temperature])
-    Z = bp_i.maxwellian(velocities, mass, momenta).reshape((num, num))
+    Z = bp.Model.maxwellian(velocities,
+                            mass,
+                            particle_number,
+                            mean_velocity,
+                            temperature).reshape((num, num))
 
     # Create Surface plot
     ax.plot_surface(X, Y, Z, **plot_style)

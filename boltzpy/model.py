@@ -1,6 +1,7 @@
 import numpy as np
 import h5py
 from scipy.sparse import csr_matrix
+from scipy.optimize import newton as sp_newton
 from time import process_time
 
 import boltzpy as bp
@@ -407,7 +408,6 @@ class Model(bp.BaseClass):
                                     current_moments[1: dim + 1],
                                     current_moments[dim + 1],
                                     delta_v)
-        state = state
         # compute momenta
         number_density = bp_o.number_density(state, delta_v)
         momentum = bp_o.momentum(state, delta_v, velocities, mass)
@@ -422,6 +422,8 @@ class Model(bp.BaseClass):
         result[dim + 1] = temperature
         return result
 
+    # Todo This could work with multi species, however is currently not intended
+    #  however the moments cant be computed (missing idx_range)
     @staticmethod
     def _maxwellian_moments_error(moment_parameters,
                                   wanted_moments,
@@ -439,6 +441,39 @@ class Model(bp.BaseClass):
                                             delta_v)
         result = moments - wanted_moments
         return result
+
+    @staticmethod
+    def _compute_initial_state(velocities,
+                               delta_v,
+                               mass,
+                               number_density,
+                               mean_velocity,
+                               temperature):
+        dim = velocities.shape[-1]
+        # store parameters in array: wanted_moments
+        wanted_moments = np.zeros(dim+2, dtype=float)
+        wanted_moments[0] = number_density
+        wanted_moments[1: dim + 1] = mean_velocity
+        wanted_moments[dim + 1] = temperature
+        # log interim results in list: log
+        log = []
+        # Compute discrete Momenta with newton scheme
+        moment_parameters = sp_newton(bp.Model._maxwellian_moments_error,
+                                      wanted_moments,
+                                      args=(wanted_moments,
+                                            velocities,
+                                            mass,
+                                            delta_v,
+                                            log))
+        assert isinstance(moment_parameters, np.ndarray)
+        assert moment_parameters.shape == wanted_moments.shape
+        state = bp.Model.maxwellian(velocities,
+                                    mass,
+                                    moment_parameters[0],
+                                    moment_parameters[1: dim + 1],
+                                    moment_parameters[dim + 1],
+                                    delta_v)
+        return state
 
     ##################################
     #           Collisions           #
