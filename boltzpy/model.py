@@ -397,6 +397,49 @@ class Model(bp.BaseClass):
         result = (number_density / divisor) * exponential
         return result
 
+    @staticmethod
+    def _maxwellian_moments(current_moments, velocities, mass, delta_v):
+        dim = velocities.shape[-1]
+        # add axis to maxwellian, since moment functions need a 2D array
+        state = bp.Model.maxwellian(velocities,
+                                    mass,
+                                    current_moments[0],
+                                    current_moments[1: dim + 1],
+                                    current_moments[dim + 1],
+                                    delta_v)
+        state = state
+        # compute momenta
+        number_density = bp_o.number_density(state, delta_v)
+        momentum = bp_o.momentum(state, delta_v, velocities, mass)
+        mass_density = bp_o.mass_density(number_density, mass)
+        mean_velocity = bp_o.mean_velocity(momentum, mass_density)
+        pressure = bp_o.pressure(state, delta_v, velocities, mass, mean_velocity)
+        temperature = bp_o.temperature(pressure, number_density)
+        # return difference from wanted_moments
+        result = np.zeros(current_moments.shape, dtype=float)
+        result[0] = number_density
+        result[1: dim + 1] = mean_velocity
+        result[dim + 1] = temperature
+        return result
+
+    @staticmethod
+    def _maxwellian_moments_error(moment_parameters,
+                                  wanted_moments,
+                                  velocities,
+                                  mass,
+                                  delta_v,
+                                  interim_results=None):
+        # log interim results in a list
+        if interim_results is not None:
+            assert isinstance(interim_results, list)
+            interim_results.append(moment_parameters)
+        moments = Model._maxwellian_moments(moment_parameters,
+                                            velocities,
+                                            mass,
+                                            delta_v)
+        result = moments - wanted_moments
+        return result
+
     ##################################
     #           Collisions           #
     ##################################
