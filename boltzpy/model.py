@@ -4,6 +4,7 @@ from scipy.sparse import csr_matrix
 from time import process_time
 
 import boltzpy as bp
+import boltzpy.output as bp_o
 
 
 class Model(bp.BaseClass):
@@ -371,6 +372,30 @@ class Model(bp.BaseClass):
             return None
         else:
             return relations[positions]
+
+    ##################################
+    #      Initial Distribution      #
+    ##################################
+    @staticmethod
+    def maxwellian(velocities,
+                   mass,
+                   number_density,
+                   mean_velocity,
+                   temperature,
+                   delta_v=None):
+        dim = velocities.shape[-1]
+        # compute exponential with matching mean velocity and temperature
+        exponential = np.exp(
+            -0.5 * mass / temperature
+            * np.sum((velocities - mean_velocity)**2, axis=-1))
+        # normalize exponential to number_density = 1
+        if delta_v is None:     # continuous velocity space
+            divisor = np.sqrt(2*np.pi * temperature / mass) ** (dim / 2)
+        else:       # discrete velocity grid
+            divisor = bp_o.number_density(exponential, delta_v)
+        # multiply to get desired number density
+        result = (number_density / divisor) * exponential
+        return result
 
     ##################################
     #           Collisions           #

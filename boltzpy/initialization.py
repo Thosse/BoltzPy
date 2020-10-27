@@ -1,23 +1,7 @@
 import numpy as np
 import boltzpy.output as bp_o
+import boltzpy as bp
 from scipy.optimize import newton as sp_newton
-
-
-# Maxwellian (continous function)
-def maxwellian(velocities,
-               mass,
-               input_momenta):
-    # unpack momenta
-    dimension = input_momenta.size - 2
-    particle_number = input_momenta[0]
-    mean_velocity = input_momenta[1: dimension + 1]
-    temperature = input_momenta[dimension + 1]
-
-    # compute discrete maxwellian, with continuous definition
-    factor = particle_number / np.sqrt(2*np.pi * temperature / mass) ** (dimension/2)
-    exponential = np.exp(- np.sum((velocities - mean_velocity) ** 2, axis=1)
-                         / (2 * temperature / mass))
-    return factor * exponential
 
 
 def compute_initial_distribution(velocities,
@@ -26,6 +10,7 @@ def compute_initial_distribution(velocities,
                                  particle_number,
                                  mean_velocity,
                                  temperature):
+    dim = velocities.shape[-1]
     # write parameters into array
     desired_momenta = np.array([particle_number, *mean_velocity, temperature],
                                dtype=float)
@@ -39,7 +24,13 @@ def compute_initial_distribution(velocities,
                                        mean_velocity,
                                        temperature))
     assert isinstance(discrete_momenta, np.ndarray)
-    return maxwellian(velocities, mass, discrete_momenta)
+    state = bp.Model.maxwellian(velocities,
+                                mass,
+                                discrete_momenta[0],
+                                discrete_momenta[1: dim + 1],
+                                discrete_momenta[dim + 1],
+                                delta_v)
+    return state
 
 
 def _maxwellian_iteration(input_momenta,
@@ -49,9 +40,15 @@ def _maxwellian_iteration(input_momenta,
                           desired_particle_number,
                           desired_mean_velocity,
                           desired_temperature):
-    # create maxwellian, based on continous function
+    dim = velocities.shape[-1]
     # add axis to maxwellian, since moment functions need a 2D array
-    state = maxwellian(velocities, mass, input_momenta)[np.newaxis, :]
+    state = bp.Model.maxwellian(velocities,
+                                mass,
+                                input_momenta[0],
+                                input_momenta[1: dim + 1],
+                                input_momenta[dim + 1],
+                                delta_v)
+    state = state[np.newaxis, :]
     # compute momenta
     c_number_density = bp_o.number_density(state, delta_v)
     c_momentum = bp_o.momentum(state, delta_v, velocities, mass)
