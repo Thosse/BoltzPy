@@ -5,7 +5,6 @@ import h5py
 import boltzpy as bp
 import boltzpy.compute as bp_cp
 import boltzpy.plot as bp_p
-import boltzpy.initialization as bp_i
 import boltzpy.output as bp_o
 
 
@@ -82,21 +81,9 @@ class Rule(bp.BaseClass):
         assert self.ndim == model.ndim
         assert self.specimen == model.specimen
 
-        initial_state = np.zeros(model.size, dtype=float)
-        for s in model.species:
-            mass = model.masses[s]
-            velocities = model.vGrids[s].pG
-            delta_v = model.vGrids[s].physical_spacing
-            idx_range = model.idx_range(s)
-            initial_state[idx_range] = model._compute_initial_state(
-                velocities,
-                delta_v,
-                mass,
-                self.particle_number[s],
-                self.mean_velocity[s],
-                self.temperature[s])
-
-        # Todo test initial state, moments should be matching (up to 10^-x)
+        initial_state = model.compute_initial_state(self.particle_number,
+                                                    self.mean_velocity,
+                                                    self.temperature)
         return initial_state
 
     def collision(self, data):

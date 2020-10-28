@@ -475,6 +475,38 @@ class Model(bp.BaseClass):
                                     delta_v)
         return state
 
+    def compute_initial_state(self,
+                              number_densities,
+                              mean_velocities,
+                              temperatures):
+        # basic assertions
+        number_densities = np.array(number_densities, dtype=float)
+        mean_velocities = np.array(mean_velocities, dtype=float)
+        temperatures = np.array(temperatures, dtype=float)
+        assert number_densities.shape == (self.specimen,)
+        assert mean_velocities.shape == (self.specimen, self.ndim)
+        assert temperatures.shape == (self.specimen,)
+        # store moments in array
+        initial_state = np.zeros(self.size, dtype=float)
+        # # Check if all specimen have equal mean_velocities and temperatures
+        # equal_mean_velocities = np.allclose(mean_velocities, mean_velocities[0])
+        # equal_temperatures = np.allclose(temperatures, temperatures[0])
+        # if False and equal_temperatures and equal_temperatures:
+        #     raise NotImplementedError
+        #     # create an equlibrium, eg the initial state is invariant under collisions
+        #     # this means all speciman must have equal parameters for temperature and mean velocity
+        # else:
+        for s in self.species:
+            idx_range = self.idx_range(s)
+            initial_state[idx_range] = self._compute_initial_state(
+                velocities=self.vGrids[s].pG,
+                delta_v=self.vGrids[s].physical_spacing,
+                mass=self.masses[s],
+                number_density=number_densities[s],
+                mean_velocity=mean_velocities[s],
+                temperature=temperatures[s])
+        return initial_state
+
     ##################################
     #           Collisions           #
     ##################################
