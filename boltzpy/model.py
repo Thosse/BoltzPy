@@ -203,6 +203,14 @@ class Model(bp.BaseClass):
             result[self.idx_range(s)] = self.masses[s]
         return result
 
+    @property
+    def dv_array(self):
+        result = np.empty(self.size)
+        dv = self.dv
+        for s in self.species:
+            result[self.idx_range(s)] = dv[s]
+        return result
+
     #####################################
     #               Indexing            #
     #####################################
@@ -379,35 +387,35 @@ class Model(bp.BaseClass):
     ##################################
     @staticmethod
     def maxwellian(velocities,
-                   mass,
-                   number_density,
-                   mean_velocity,
                    temperature,
-                   delta_v=None):
+                   mass=1,
+                   number_density=1,
+                   mean_velocity=0):
         dim = velocities.shape[-1]
         # compute exponential with matching mean velocity and temperature
         exponential = np.exp(
             -0.5 * mass / temperature
             * np.sum((velocities - mean_velocity)**2, axis=-1))
-        # normalize exponential to number_density = 1
-        if delta_v is None:     # continuous velocity space
-            divisor = np.sqrt(2*np.pi * temperature / mass) ** (dim / 2)
-        else:       # discrete velocity grid
-            divisor = bp_o.number_density(exponential, delta_v)
+        divisor = np.sqrt(2*np.pi * temperature / mass) ** (dim / 2)
         # multiply to get desired number density
         result = (number_density / divisor) * exponential
         return result
 
+    # Todo unstatic this method, give parameter specimen=None (=mixture)
     @staticmethod
-    def _maxwellian_moments(current_moments, velocities, mass, delta_v):
+    def _init_error(moment_parameters,
+                    wanted_moments,
+                    velocities,
+                    mass,
+                    delta_v):
         dim = velocities.shape[-1]
-        # add axis to maxwellian, since moment functions need a 2D array
+        # compute values of maxwellian on given velocities
         state = bp.Model.maxwellian(velocities,
-                                    mass,
-                                    current_moments[0],
-                                    current_moments[1: dim + 1],
-                                    current_moments[dim + 1],
-                                    delta_v)
+                                    temperature=moment_parameters[dim],
+                                    mass=mass,
+                                    mean_velocity=moment_parameters[0: dim])
+        # Todo edit these functions, to take optional parameters
+        #  Also move them into model
         # compute momenta
         number_density = bp_o.number_density(state, delta_v)
         momentum = bp_o.momentum(state, delta_v, velocities, mass)
@@ -416,95 +424,67 @@ class Model(bp.BaseClass):
         pressure = bp_o.pressure(state, delta_v, velocities, mass, mean_velocity)
         temperature = bp_o.temperature(pressure, number_density)
         # return difference from wanted_moments
-        result = np.zeros(current_moments.shape, dtype=float)
-        result[0] = number_density
-        result[1: dim + 1] = mean_velocity
-        result[dim + 1] = temperature
-        return result
-
-    # Todo This could work with multi species, however is currently not intended
-    #  however the moments cant be computed (missing idx_range)
-    @staticmethod
-    def _maxwellian_moments_error(moment_parameters,
-                                  wanted_moments,
-                                  velocities,
-                                  mass,
-                                  delta_v,
-                                  interim_results=None):
-        # log interim results in a list
-        if interim_results is not None:
-            assert isinstance(interim_results, list)
-            interim_results.append(moment_parameters)
-        moments = Model._maxwellian_moments(moment_parameters,
-                                            velocities,
-                                            mass,
-                                            delta_v)
-        result = moments - wanted_moments
-        return result
-
-    @staticmethod
-    def _compute_initial_state(velocities,
-                               delta_v,
-                               mass,
-                               number_density,
-                               mean_velocity,
-                               temperature):
-        dim = velocities.shape[-1]
-        # store parameters in array: wanted_moments
-        wanted_moments = np.zeros(dim+2, dtype=float)
-        wanted_moments[0] = number_density
-        wanted_moments[1: dim + 1] = mean_velocity
-        wanted_moments[dim + 1] = temperature
-        # log interim results in list: log
-        log = []
-        # Compute discrete Momenta with newton scheme
-        moment_parameters = sp_newton(bp.Model._maxwellian_moments_error,
-                                      wanted_moments,
-                                      args=(wanted_moments,
-                                            velocities,
-                                            mass,
-                                            delta_v,
-                                            log))
-        assert isinstance(moment_parameters, np.ndarray)
-        assert moment_parameters.shape == wanted_moments.shape
-        state = bp.Model.maxwellian(velocities,
-                                    mass,
-                                    moment_parameters[0],
-                                    moment_parameters[1: dim + 1],
-                                    moment_parameters[dim + 1],
-                                    delta_v)
-        return state
+        moments = np.zeros(moment_parameters.shape, dtype=float)
+        moments[0: dim] = mean_velocity
+        moments[dim] = temperature
+        return moments - wanted_moments
 
     def compute_initial_state(self,
                               number_densities,
                               mean_velocities,
                               temperatures):
-        # basic assertions
-        number_densities = np.array(number_densities, dtype=float)
-        mean_velocities = np.array(mean_velocities, dtype=float)
-        temperatures = np.array(temperatures, dtype=float)
+        # number densities can be multiplied on the distribution at the end
+        number_densities = np.array(number_densities)
         assert number_densities.shape == (self.specimen,)
-        assert mean_velocities.shape == (self.specimen, self.ndim)
-        assert temperatures.shape == (self.specimen,)
+
+        # mean velocites and temperatures are the targets for the newton scheme
+        wanted_moments = np.zeros((self.specimen, self.ndim + 1), dtype=float)
+        wanted_moments[:, : self.ndim] = mean_velocities
+        wanted_moments[:, self.ndim] = temperatures
+
+        # initialization parameters for the maxwellians
+        init_params = np.zeros((self.specimen, self.ndim + 1), dtype=float)
+
+        # if all specimen have equal mean_velocities and temperatures
+        # then create a maxwellian in equilibrium (invariant under collisions)
+        is_in_equilibrium = False   # np.allclose(wanted_moments, wanted_moments[0])
+        if is_in_equilibrium:
+            # To create an equilibrium, all specimen must have equal init_params
+            # We cannot achieve each specimen to fit the wanted_values
+            # Thus we fit total moments to the wanted_values
+            raise NotImplementedError
+            # init_params = sp_newton(bp.Model._init_error,
+            #                         wanted_moments,
+            #                         args=(wanted_moments,
+            #                               self.velocities,
+            #                               self.mass_array,
+            #                               self.dv_array))
+        else:
+            # Here we don't need an equilibrium,
+            # all specimen may have different init_params
+            # Thus we can fit each specimen to its wanted_values
+            for s in self.species:
+                velocities = self.velocities[self.idx_range(s)]
+                init_params[s] = sp_newton(bp.Model._init_error,
+                                           wanted_moments[s],
+                                           args=(wanted_moments[s],
+                                                 velocities,
+                                                 self.masses[s],
+                                                 self.dv[s]))
         # store moments in array
         initial_state = np.zeros(self.size, dtype=float)
-        # # Check if all specimen have equal mean_velocities and temperatures
-        # equal_mean_velocities = np.allclose(mean_velocities, mean_velocities[0])
-        # equal_temperatures = np.allclose(temperatures, temperatures[0])
-        # if False and equal_temperatures and equal_temperatures:
-        #     raise NotImplementedError
-        #     # create an equlibrium, eg the initial state is invariant under collisions
-        #     # this means all speciman must have equal parameters for temperature and mean velocity
-        # else:
         for s in self.species:
             idx_range = self.idx_range(s)
-            initial_state[idx_range] = self._compute_initial_state(
-                velocities=self.vGrids[s].pG,
-                delta_v=self.vGrids[s].physical_spacing,
-                mass=self.masses[s],
-                number_density=number_densities[s],
-                mean_velocity=mean_velocities[s],
-                temperature=temperatures[s])
+            velocities = self.velocities[idx_range]
+            state = bp.Model.maxwellian(velocities,
+                                        mass=self.masses[s],
+                                        temperature=init_params[s, self.ndim],
+                                        mean_velocity=init_params[s, 0:self.ndim])
+            # normalize meaxwellian to number density == 1
+            state /= bp_o.number_density(state, self.dv[s])
+            # multiply to get the wanted number density
+            state *= number_densities[s]
+            initial_state[idx_range] = state
         return initial_state
 
     ##################################
