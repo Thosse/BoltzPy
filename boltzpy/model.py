@@ -188,14 +188,17 @@ class Model(bp.BaseClass):
     def velocities(self):
         return self.delta * self.iMG
 
-    # Todo change into s=None, mean velocities is constant over all specimen!, but may have higher ndim
-    def centered_velocities(self, mean_velocities):
-        assert isinstance(mean_velocities, np.ndarray)
-        assert mean_velocities.shape == (self.specimen, self.ndim)
-        result = self.velocities
-        for s in self.species:
-            result[self.idx_range(s)] -= mean_velocities[s]
-        return result
+    def centered_velocities(self, mean_velocity, s=None):
+        dim = self.ndim
+        velocities = self.velocities[self.idx_range(s), :]
+        # mean_velocity may have ndim > 1, thus reshape into 3D
+        shape = mean_velocity.shape[:-1]
+        size = np.prod(shape, dtype=int)
+        new_shape = shape + (velocities.shape[0], dim)
+        mean_velocity = mean_velocity.reshape((size, 1, dim))
+        velocities = velocities[np.newaxis, ...]
+        centered_velocities = velocities - mean_velocity
+        return centered_velocities.reshape(new_shape)
 
     @property
     def mass_array(self):
@@ -532,8 +535,7 @@ class Model(bp.BaseClass):
         size = np.prod(shape, dtype=int)
         new_shape = shape + (velocities.shape[0],)
         mean_velocity = mean_velocity.reshape((size, 1, dim))
-        velocities = velocities[np.newaxis, ...]
-        c_vels = velocities - mean_velocity
+        c_vels = self.centered_velocities(mean_velocity, s)
         mf_pressure = mass / dim * np.sum(c_vels**2, axis=-1)
         return mf_pressure.reshape(new_shape)
 
