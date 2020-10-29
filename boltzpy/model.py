@@ -5,7 +5,6 @@ from scipy.optimize import newton as sp_newton
 from time import process_time
 
 import boltzpy as bp
-import boltzpy.output as bp_o
 
 
 class Model(bp.BaseClass):
@@ -420,15 +419,13 @@ class Model(bp.BaseClass):
                                  temperature=moment_parameters[dim],
                                  mass=mass,
                                  mean_velocity=moment_parameters[0: dim])
-        # Todo edit these functions, to take optional parameters
-        #  Also move them into model
         # compute momenta
         number_density = self.number_density(state, s)
         momentum = self.momentum(state, s)
         mass_density = self.mass_density(state, s)
         mean_velocity = self.mean_velocity(momentum, mass_density)
         pressure = self.pressure(state, s, mean_velocity)
-        temperature = bp_o.temperature(pressure, number_density)
+        temperature = self.temperature(pressure, number_density)
         # return difference from wanted_moments
         moments = np.zeros(moment_parameters.shape, dtype=float)
         moments[0: dim] = mean_velocity
@@ -645,6 +642,50 @@ class Model(bp.BaseClass):
         mf_pressure = self.mf_pressure(mean_velocity, s).reshape(flat_shape)
         result = np.sum(dv**dim * mf_pressure * state, axis=-1)
         return result.reshape(new_shape)
+
+    @staticmethod
+    def temperature(pressure, number_density):
+        assert pressure.shape == number_density.shape
+        return pressure / number_density
+
+    def momentum_flow(self, state, s):
+        r"""
+        Parameters
+        ----------
+        state : :obj:`~numpy.ndarray` [:obj:`float`]
+        """
+        state = self._get_state_of_species(state, s)
+        # Reshape arrays to use np.dot
+        shape = state.shape[:-1]
+        size = np.prod(shape, dtype=int)
+        flat_shape = (size, state.shape[-1])
+        state = state.reshape(flat_shape)
+        dim = self.ndim
+        mass = self.mass_array[np.newaxis, :] if s is None else self.masses[s]
+        dv = self.dv_array[np.newaxis, :] if s is None else self.dv[s]
+        velocities = self.velocities[self.idx_range(s)]
+        result = np.dot(dv**dim * mass * state, velocities ** 2)
+        return result.reshape(shape + (dim,))
+
+    def energy_flow(self, state, s):
+        r"""
+        Parameters
+        ----------
+        state : :obj:`~numpy.ndarray` [:obj:`float`]
+        """
+        assert state.ndim == 2
+        # Reshape arrays to use np.dot
+        shape = state.shape[:-1]
+        size = np.prod(shape, dtype=int)
+        flat_shape = (size, state.shape[-1])
+        state = state.reshape(flat_shape)
+        dim = self.ndim
+        mass = self.mass_array[np.newaxis, :] if s is None else self.masses[s]
+        dv = self.dv_array[np.newaxis, :] if s is None else self.dv[s]
+        velocities = self.velocities[self.idx_range(s)]
+        energies = 0.5 * mass * np.sum(velocities ** 2, axis=1)[:, np.newaxis]
+        result = np.dot(dv**dim * state, energies * velocities)
+        return result.reshape(shape + (dim,))
 
     ##################################
     #           Collisions           #

@@ -107,7 +107,7 @@ def test_particle_number(key):
         hdf_group = file[key]
         sim = bp.Simulation.load(hdf_group)
         model = sim.model
-        for s in sim.model.species:
+        for s in model.species:
             spc_group = hdf_group["results"][str(s)]
             state = spc_group["state"][()]
             old_result = spc_group["particle_number"][()]
@@ -121,7 +121,7 @@ def test_momentum(key):
         hdf_group = file[key]
         sim = bp.Simulation.load(hdf_group)
         model = sim.model
-        for s in sim.model.species:
+        for s in model.species:
             spc_group = hdf_group["results"][str(s)]
             state = spc_group["state"][()]
             old_result = spc_group["momentum"][()]
@@ -135,7 +135,7 @@ def test_mean_velocity(key):
         hdf_group = file[key]
         sim = bp.Simulation.load(hdf_group)
         model = sim.model
-        for s in sim.model.species:
+        for s in model.species:
             spc_group = hdf_group["results"][str(s)]
             state = spc_group["state"][()]
             old_result = spc_group["mean_velocity"][()]
@@ -151,9 +151,56 @@ def test_energy_density(key):
         hdf_group = file[key]
         sim = bp.Simulation.load(hdf_group)
         model = sim.model
-        for s in sim.model.species:
+        for s in model.species:
             spc_group = hdf_group["results"][str(s)]
             state = spc_group["state"][()]
             old_result = spc_group["energy"][()]
             new_result = model.energy_density(state, s)
             assert np.allclose(old_result, new_result)
+
+
+@pytest.mark.parametrize("key", SIMULATIONS.keys())
+def test_temperature(key):
+    with h5py.File(FILE, mode="r") as file:
+        hdf_group = file[key]
+        sim = bp.Simulation.load(hdf_group)
+        model = sim.model
+        for s in model.species:
+            spc_group = hdf_group["results"][str(s)]
+            state = spc_group["state"][()]
+            number_density = spc_group["particle_number"][()]
+            mean_velocity = spc_group["mean_velocity"][()]
+            pressure = model.pressure(state, s, mean_velocity)
+            old_result = spc_group["temperature"][()]
+            new_result = model.temperature(pressure, number_density)
+            assert old_result.shape == new_result.shape
+            assert np.allclose(old_result, new_result)
+
+
+@pytest.mark.parametrize("key", SIMULATIONS.keys())
+def test_momentum_flow(key):
+    with h5py.File(FILE, mode="r") as file:
+        hdf_group = file[key]
+        sim = bp.Simulation.load(hdf_group)
+        model = sim.model
+        for s in model.species:
+            spc_group = hdf_group["results"][str(s)]
+            state = spc_group["state"][()]
+            old_result = spc_group["momentum_flow"][()]
+            new_result = model.momentum_flow(state, s)
+            assert np.allclose(old_result, new_result)
+
+
+@pytest.mark.parametrize("key", SIMULATIONS.keys())
+def test_energy_flow(key):
+    with h5py.File(FILE, mode="r") as file:
+        hdf_group = file[key]
+        sim = bp.Simulation.load(hdf_group)
+        model = sim.model
+        for s in model.species:
+            spc_group = hdf_group["results"][str(s)]
+            for t in range(sim.timing.size):
+                state = spc_group["state"][t]
+                old_result = spc_group["energy_flow"][t]
+                new_result = model.energy_flow(state, s)
+                assert np.allclose(old_result, new_result)

@@ -5,7 +5,6 @@ import h5py
 import boltzpy as bp
 import boltzpy.compute as bp_cp
 import boltzpy.plot as bp_p
-import boltzpy.output as bp_o
 
 
 class Rule(bp.BaseClass):

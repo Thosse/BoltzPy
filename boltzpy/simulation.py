@@ -5,7 +5,6 @@ import numpy as np
 import boltzpy.helpers.TimeTracker as h_tt
 import boltzpy.AnimatedFigure as bp_af
 import boltzpy.compute as bp_cp
-import boltzpy.output as bp_o
 import boltzpy as bp
 
 
@@ -163,23 +162,15 @@ class Simulation(bp.BaseClass):
 
             # temperature
             pressure = self.model.pressure(spc_state, s, mean_velocity)
-            temperature = bp_o.temperature(pressure, number_density)
+            temperature = self.model.temperature(pressure, number_density)
             spc_group["temperature"][tw_idx] = temperature
 
             # momentum flow
-            spc_group["momentum_flow"][tw_idx] = bp_o.momentum_flow(
-                spc_state,
-                dv,
-                velocities,
-                mass)
+            spc_group["momentum_flow"][tw_idx] = self.model.momentum_flow(spc_state, s)
             # energy
             spc_group["energy"][tw_idx] = self.model.energy_density(spc_state, s)
             # energy flow
-            spc_group["energy_flow"][tw_idx] = bp_o.energy_flow(
-                spc_state,
-                dv,
-                velocities,
-                mass)
+            spc_group["energy_flow"][tw_idx] = self.model.energy_flow(spc_state, s)
             # complete distribution
             if self.log_state:
                 spc_group["state"][tw_idx] = spc_state
