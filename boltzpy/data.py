@@ -92,6 +92,7 @@ class Data:
         # Todo This involves a scheme to determine "sub-rules"
         # Todo as the position of the boundary is important for its
         # todo behaviour / reinitialization
+        self.model = sim.model
 
         self._params = dict()
         # Keep as a "conditional" attribute?

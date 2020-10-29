@@ -11,11 +11,10 @@ def test_particle_number(key):
     # load results
     hdf_group = sim.file["results"]
     for s in sim.model.species:
-        dv = sim.model.vGrids[s].physical_spacing
         spc_group = hdf_group[str(s)]
         state = spc_group["state"][()]
         old_result = spc_group["particle_number"][()]
-        new_result = bp_o.number_density(state, dv)
+        new_result = sim.model.number_density(state, s)
         assert np.allclose(old_result, new_result)
 
 

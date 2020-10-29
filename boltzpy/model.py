@@ -214,8 +214,11 @@ class Model(bp.BaseClass):
     #####################################
     #               Indexing            #
     #####################################
-    def idx_range(self, s):
-        return np.s_[self.index_offset[s]: self.index_offset[s+1]]
+    def idx_range(self, s=None):
+        if s is None:
+            return np.s_[:]
+        else:
+            return np.s_[self.index_offset[s]: self.index_offset[s+1]]
 
     def get_idx(self,
                 species,
@@ -416,7 +419,7 @@ class Model(bp.BaseClass):
         # Todo edit these functions, to take optional parameters
         #  Also move them into model
         # compute momenta
-        number_density = bp_o.number_density(state, delta_v)
+        number_density = self.number_density(state, s)
         momentum = bp_o.momentum(state, delta_v, velocities, mass)
         mass_density = bp_o.mass_density(number_density, mass)
         mean_velocity = bp_o.mean_velocity(momentum, mass_density)
@@ -476,7 +479,7 @@ class Model(bp.BaseClass):
                                      temperature=init_params[s, self.ndim],
                                      mean_velocity=init_params[s, 0:self.ndim])
             # normalize meaxwellian to number density == 1
-            state /= bp_o.number_density(state, self.dv[s])
+            state /= self.number_density(state, s)
             # multiply to get the wanted number density
             state *= number_densities[s]
             initial_state[idx_range] = state
@@ -543,6 +546,21 @@ class Model(bp.BaseClass):
     # todo Add test for models (with default params) that its orthogonal to the moments
     def mf_orthogonal_heat_flow(self, mean_velocity, direction, s=None):
         raise NotImplementedError
+
+    ##################################
+    #            Moments             #
+    ##################################
+    def number_density(self, state, s=None):
+        r"""
+
+        Parameters
+        ----------
+        state : :obj:`~numpy.ndarray` [:obj:`float`]
+        """
+        dv = self.dv_array if s is None else self.dv[s]
+        if state.shape[-1] == self.size:
+            state = state[..., self.idx_range(s)]
+        return np.sum(dv**2 * state, axis=-1)
 
     ##################################
     #           Collisions           #

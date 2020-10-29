@@ -2,18 +2,6 @@
 import numpy as np
 
 
-def number_density(state, delta_v):
-    r"""
-
-    Parameters
-    ----------
-    state : :obj:`~numpy.ndarray` [:obj:`float`]
-    delta_v : :obj:`float`
-        The physical spacing of the current velocity grid.
-    """
-    return np.sum(state, axis=-1) * delta_v ** 2
-
-
 def mass_density(number_density, mass):
     r"""Compute the mass density
 

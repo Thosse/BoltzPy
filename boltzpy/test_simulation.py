@@ -99,3 +99,16 @@ def test_computed_state_is_equal(key):
 # the file is used in more tests, this is a simple hack to delete it after use
 def test_teardown_tmp_file():
     os.remove(test_helper.TMP_FILE)
+
+
+@pytest.mark.parametrize("key", SIMULATIONS.keys())
+def test_particle_number(key):
+    with h5py.File(FILE, mode="r") as file:
+        hdf_group = file[key]
+        sim = bp.Simulation.load(hdf_group)
+        for s in sim.model.species:
+            spc_group = hdf_group["results"][str(s)]
+            state = spc_group["state"][()]
+            old_result = spc_group["particle_number"][()]
+            new_result = sim.model.number_density(state, s)
+            assert np.allclose(old_result, new_result)

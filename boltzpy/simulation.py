@@ -149,7 +149,7 @@ class Simulation(bp.BaseClass):
             velocities = self.model.vGrids[s].pG
             spc_group = hdf_group[str(s)]
             # number_density
-            number_density = bp_o.number_density(spc_state, dv)
+            number_density = self.model.number_density(spc_state, s)
             spc_group["particle_number"][tw_idx] = number_density
 
             # momentum
