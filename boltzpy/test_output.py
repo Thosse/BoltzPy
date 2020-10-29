@@ -6,25 +6,6 @@ from boltzpy.test_simulation import SIMULATIONS
 
 
 @pytest.mark.parametrize("key", SIMULATIONS.keys())
-def test_mean_velocity(key):
-    sim = SIMULATIONS[key]
-    # load results
-    hdf_group = sim.file["results"]
-    for s in sim.model.species:
-        dv = sim.model.vGrids[s].physical_spacing
-        velocities = sim.model.vGrids[s].pG
-        mass = sim.model.masses[s]
-        spc_group = hdf_group[str(s)]
-        state = spc_group["state"][()]
-        particle_number = spc_group["particle_number"][()]
-        old_result = spc_group["mean_velocity"][()]
-        momentum = sim.model.momentum(state, s)
-        mass_density = particle_number * mass
-        new_result = bp_o.mean_velocity(momentum, mass_density)
-        assert np.allclose(old_result, new_result)
-
-
-@pytest.mark.parametrize("key", SIMULATIONS.keys())
 def test_temperature(key):
     sim = SIMULATIONS[key]
     # load results

@@ -157,7 +157,8 @@ class Simulation(bp.BaseClass):
             spc_group["momentum"][tw_idx] = momentum
 
             # mean velocity
-            mean_velocity = bp_o.mean_velocity(momentum, mass * number_density)
+            mass_density = self.model.mass_density(spc_state, s)
+            mean_velocity = self.model.mean_velocity(momentum, mass_density)
             spc_group["mean_velocity"][tw_idx] = mean_velocity
 
             # temperature

@@ -127,3 +127,19 @@ def test_momentum(key):
             old_result = spc_group["momentum"][()]
             new_result = model.momentum(state, s)
             assert np.allclose(old_result, new_result)
+
+
+@pytest.mark.parametrize("key", SIMULATIONS.keys())
+def test_mean_velocity(key):
+    with h5py.File(FILE, mode="r") as file:
+        hdf_group = file[key]
+        sim = bp.Simulation.load(hdf_group)
+        model = sim.model
+        for s in sim.model.species:
+            spc_group = hdf_group["results"][str(s)]
+            state = spc_group["state"][()]
+            old_result = spc_group["mean_velocity"][()]
+            momentum = model.momentum(state, s)
+            mass_density = model.mass_density(state, s)
+            new_result = model.mean_velocity(momentum, mass_density)
+            assert np.allclose(old_result, new_result)

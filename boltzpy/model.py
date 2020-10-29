@@ -422,7 +422,7 @@ class Model(bp.BaseClass):
         number_density = self.number_density(state, s)
         momentum = self.momentum(state, s)
         mass_density = self.mass_density(state, s)
-        mean_velocity = bp_o.mean_velocity(momentum, mass_density)
+        mean_velocity = self.mean_velocity(momentum, mass_density)
         pressure = bp_o.pressure(state, delta_v, velocities, mass, mean_velocity)
         temperature = bp_o.temperature(pressure, number_density)
         # return difference from wanted_moments
@@ -570,12 +570,6 @@ class Model(bp.BaseClass):
         return np.sum(dv**2 * mass * state, axis=-1)
 
     def momentum(self, state, s=None):
-        r"""
-
-        Parameters
-        ----------
-        state : :obj:`~numpy.ndarray` [:obj:`float`]
-        """
         state = self._get_state_of_species(state, s)
         # Reshape arrays to use np.dot
         shape = state.shape[:-1]
@@ -588,6 +582,16 @@ class Model(bp.BaseClass):
         velocities = self.velocities if s is None else self.vGrids[s].pG
         result = np.dot(dv**2 * mass * state, velocities)
         return result.reshape(new_shape)
+
+    @staticmethod
+    def mean_velocity(momentum, mass_density):
+        r"""
+        Parameters
+        ----------
+        momentum : :obj:`~numpy.ndarray` [:obj:`float`]
+        mass_density : :obj:`~numpy.ndarray` [:obj:`float`]
+        """
+        return momentum / mass_density[..., np.newaxis]
 
     ##################################
     #           Collisions           #
