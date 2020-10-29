@@ -181,6 +181,56 @@ def test_get_idx_on_shuffled_grid_with(key):
     if model.specimen <= 2:
         return
 
+
+def test_project_velocities():
+    for _ in range(10):
+        dim = 2 + int(2 * np.random.rand(1))
+        assert dim in [2, 3]
+        # set up random vectors
+        ndim = int(6 * np.random.random(1))
+        shape = np.array(1 + 10 * np.random.random(ndim), dtype=int)
+        shape = tuple(shape) + (dim,)
+        size = np.prod(shape)
+        vectors = np.random.random(size).reshape(shape)
+        # Test that proj of ith unit vector is the ith components
+        for i in range(dim):
+            direction = np.zeros(dim)
+            length = 10 * np.random.random(1)
+            direction[i] = length
+            result = bp.Model.project_velocities(vectors, direction)
+            angle = direction / np.linalg.norm(direction)
+            shape = result.shape
+            size = result.size
+            result = result.reshape((size, 1))
+            result = result * angle[np.newaxis, :]
+            result = result.reshape(shape + (dim,))
+            goal = np.zeros(result.shape)
+            goal[..., i] = vectors[..., i]
+            assert np.allclose(result, goal)
+        # for random directions
+        # test that the sum of proj of all orthogonal directions is the original
+        direction = np.zeros((dim, dim))
+        length = 10 * np.random.random(1)
+        direction[0] = length * np.random.random(dim)
+        direction[1, 0:2] = [-direction[0, 1], direction[0, 0]]
+        if dim == 3:
+            direction[2] = [-np.prod(direction[0, [0, 2]]),
+                            -np.prod(direction[0, [1, 2]]),
+                            np.sum(direction[0, 0:2]**2)]
+        result = np.zeros(vectors.shape)
+        for i in range(dim):
+            res = bp.Model.project_velocities(vectors, direction[i])
+            angle = direction[i] / np.linalg.norm(direction[i])
+            angle = angle.reshape((1, dim))
+            shape = res.shape
+            size = res.size
+            res = res.reshape((size, 1))
+            res = res * angle
+            result[:] += res.reshape(shape + (dim,))
+        assert np.allclose(result, vectors)
+    return
+
+
 # Todo/Idea: Implement collisions only for specimen tuples
 #  -> no need for get_idx  with its warnings
 

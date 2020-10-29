@@ -483,6 +483,68 @@ class Model(bp.BaseClass):
         return initial_state
 
     ##################################
+    #        Moment functions        #
+    ##################################
+    @staticmethod
+    def project_velocities(velocities, direction):
+        assert direction.shape == (velocities.shape[-1],)
+        assert np.linalg.norm(direction) > 1e-8
+        shape = velocities.shape[:-1]
+        size = np.prod(shape, dtype=int)
+        dim = velocities.shape[-1]
+        vector = velocities.reshape((size, dim))
+        angle = direction / np.linalg.norm(direction)
+        result = np.dot(vector, angle)
+        return result.reshape(shape)
+
+    @staticmethod
+    def is_orthogonal(direction_1, direction_2):
+        return np.allclose(np.dot(direction_1, direction_2), 0)
+
+    @staticmethod
+    def is_parallel(direction_1, direction_2):
+        norms = np.linalg.norm(direction_1) * np.linalg.norm(direction_2)
+        return np.allclose(np.dot(direction_1, direction_2), norms)
+
+    def mf_stress(self, mean_velocity, direction_1, direction_2, s=None):
+        assert direction_1.shape == (self.ndim,)
+        assert direction_2.shape == (self.ndim,)
+        assert (self.is_parallel(direction_1, direction_2)
+                or self.is_orthogonal(direction_1, direction_2))
+
+        mass = self.mass_array if s is None else self.masses[s]
+        c_vels = self.centered_velocities(mean_velocity)
+        proj_vels_1 = self.project_velocities(c_vels, direction_1)
+        proj_vels_2 = self.project_velocities(c_vels, direction_2)
+        return mass * proj_vels_1 * proj_vels_2
+
+    # todo Add test for models that it is orthogonal to the moments (no init_params necessary)
+    def mf_orthogonal_stress(self, mean_velocity, direction_1, direction_2, s=None):
+        result = self.mf_stress(mean_velocity, direction_1, direction_2, s)
+        if self.is_orthogonal(direction_1, direction_2):
+            return result
+        elif self.is_parallel(direction_1, direction_2):
+            mass = self.mass_array if s is None else self.masses[s]
+            c_vels = self.centered_velocities(mean_velocity)
+            # Todo implement this mf
+            mf_pressure = 1 / self.ndim * mass * np.sum(c_vels ** 2, axis=-1)
+            return result - mf_pressure
+        else:
+            raise ValueError
+
+    def mf_heat_flow(self, mean_velocity, direction, s=None):
+        assert direction.shape == (self.ndim,)
+        mass = self.mass_array if s is None else self.masses[s]
+        c_vels = self.centered_velocities(mean_velocity)
+        proj_vels = self.project_velocities(c_vels, direction)
+        squared_sum = np.sum(c_vels ** 2, axis=-1)
+        return mass * proj_vels * squared_sum
+
+    # todo Add test for models (with default params) that its orthogonal to the moments
+    def mf_orthogonal_heat_flow(self, mean_velocity, direction, s=None):
+        raise NotImplementedError
+
+    ##################################
     #           Collisions           #
     ##################################
     def compute_weights(self, relations=None):
