@@ -237,3 +237,5 @@ def test_project_velocities():
 # Todo __get__ für model -> nach species index
 #  + Grid __get__ nach index -> arbeiten mit lokalen indices möglich
 #  + für (get_)idx(specimen, indices) hinzu -Y generiert globale indices
+
+# Todo add tests for initialization, moment functions and moments

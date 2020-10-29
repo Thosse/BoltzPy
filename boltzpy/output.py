@@ -2,18 +2,6 @@
 import numpy as np
 
 
-def mass_density(number_density, mass):
-    r"""Compute the mass density
-
-    Parameters
-    ----------
-    number_density : :obj:`~numpy.ndarray` [:obj:`float`]
-    mass : :obj:`int`
-            The mass factor of the species.
-    """
-    return mass * number_density
-
-
 def momentum(state, delta_v, velocities, mass):
     r"""
 

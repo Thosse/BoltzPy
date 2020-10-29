@@ -421,7 +421,7 @@ class Model(bp.BaseClass):
         # compute momenta
         number_density = self.number_density(state, s)
         momentum = bp_o.momentum(state, delta_v, velocities, mass)
-        mass_density = bp_o.mass_density(number_density, mass)
+        mass_density = self.mass_density(state, s)
         mean_velocity = bp_o.mean_velocity(momentum, mass_density)
         pressure = bp_o.pressure(state, delta_v, velocities, mass, mean_velocity)
         temperature = bp_o.temperature(pressure, number_density)
@@ -551,16 +551,23 @@ class Model(bp.BaseClass):
     #            Moments             #
     ##################################
     def number_density(self, state, s=None):
-        r"""
-
-        Parameters
-        ----------
-        state : :obj:`~numpy.ndarray` [:obj:`float`]
-        """
         dv = self.dv_array if s is None else self.dv[s]
         if state.shape[-1] == self.size:
             state = state[..., self.idx_range(s)]
         return np.sum(dv**2 * state, axis=-1)
+
+    def mass_density(self, state=None, s=None, number_density=None):
+        # cannot compute total mass density from total number density
+        # as the specimen may have different masses
+        assert (s is not None) or (state is not None)
+        mass = self.mass_array if s is None else self.masses[s]
+        dv = self.dv_array if s is None else self.dv[s]
+        if number_density is not None and s is not None:
+            return mass * number_density
+        elif state is not None:
+            return np.sum(dv**2 * mass * state, axis=-1)
+        else:
+            raise ValueError
 
     ##################################
     #           Collisions           #
