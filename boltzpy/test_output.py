@@ -26,21 +26,6 @@ def test_temperature(key):
         assert np.allclose(old_result, new_result)
 
 
-@pytest.mark.parametrize("key", SIMULATIONS.keys())
-def test_energy(key):
-    sim = SIMULATIONS[key]
-    # load results
-    hdf_group = sim.file["results"]
-    for s in sim.model.species:
-        dv = sim.model.vGrids[s].physical_spacing
-        mass = sim.model.masses[s]
-        velocities = sim.model.vGrids[s].pG
-        spc_group = hdf_group[str(s)]
-        state = spc_group["state"][()]
-        old_result = spc_group["energy"][()]
-        new_result = bp_o.energy_density(state, dv, velocities, mass)
-        assert np.allclose(old_result, new_result)
-
 
 @pytest.mark.parametrize("key", SIMULATIONS.keys())
 def test_momentum_flow(key):

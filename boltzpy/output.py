@@ -3,52 +3,6 @@ import numpy as np
 
 
 
-
-
-def mean_velocity(momentum, mass_density):
-    r"""Compute the mean velocites in the current distribution.
-
-    Note    ----
-        Be aware that this must be computed separately for each single specimen.
-
-    Parameters
-    ----------
-    momentum : :obj:`~numpy.ndarray` [:obj:`float`]
-    mass_density : :obj:`~numpy.ndarray` [:obj:`float`]
-    """
-    shape = momentum.shape[:-1] + (1,)
-    mass_density = mass_density.reshape(shape)
-    return momentum / mass_density
-
-
-def energy_density(state, delta_v, velocities, mass):
-    r"""
-
-    Parameters
-    ----------
-    state : :obj:`~numpy.ndarray` [:obj:`float`]
-        Must be 2D array.
-    delta_v : :obj:`float`
-        The physical spacing of the current velocity grid.
-    velocities: :obj:`~numpy.ndarray` [:obj:`float`]
-        Each velocity is either 2 or 3 dimensional.
-        Must be a 2D array.
-    mass : :obj:`int`
-        The particle mass of the species.
-    """
-    assert velocities.ndim == 2
-    assert state.shape[-1] == velocities.shape[0]
-    # Reshape arrays to use np.dot
-    new_state = state.shape[:-1]
-    size = np.prod(new_state, dtype=int)
-    flat_shape = (size, state.shape[-1])
-    dim = velocities.shape[1]
-    state = state.reshape(flat_shape)
-    energy = 0.5 * mass * np.sum(velocities**2, axis=-1)
-    result = delta_v**dim * np.dot(state, energy)
-    return result.reshape(new_state)
-
-
 def pressure(state,
              delta_v,
              velocities,

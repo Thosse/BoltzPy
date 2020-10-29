@@ -177,11 +177,7 @@ class Simulation(bp.BaseClass):
                 velocities,
                 mass)
             # energy
-            spc_group["energy"][tw_idx] = bp_o.energy_density(
-                spc_state,
-                dv,
-                velocities,
-                mass)
+            spc_group["energy"][tw_idx] = self.model.energy_density(spc_state, s)
             # energy flow
             spc_group["energy_flow"][tw_idx] = bp_o.energy_flow(
                 spc_state,

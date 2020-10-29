@@ -560,14 +560,16 @@ class Model(bp.BaseClass):
 
     def number_density(self, state, s=None):
         state = self._get_state_of_species(state, s)
+        dim = self.ndim
         dv = self.dv_array if s is None else self.dv[s]
-        return np.sum(dv**2 * state, axis=-1)
+        return np.sum(dv**dim * state, axis=-1)
 
     def mass_density(self, state, s=None):
         state = self._get_state_of_species(state, s)
+        dim = self.ndim
         mass = self.mass_array if s is None else self.masses[s]
         dv = self.dv_array if s is None else self.dv[s]
-        return np.sum(dv**2 * mass * state, axis=-1)
+        return np.sum(dv**dim * mass * state, axis=-1)
 
     def momentum(self, state, s=None):
         state = self._get_state_of_species(state, s)
@@ -577,10 +579,11 @@ class Model(bp.BaseClass):
         flat_shape = (size, state.shape[-1])
         new_shape = shape + (self.ndim,)
         state = state.reshape(flat_shape)
+        dim = self.ndim
         mass = self.mass_array[np.newaxis, :] if s is None else self.masses[s]
         dv = self.dv_array[np.newaxis, :] if s is None else self.dv[s]
         velocities = self.velocities if s is None else self.vGrids[s].pG
-        result = np.dot(dv**2 * mass * state, velocities)
+        result = np.dot(dv**dim * mass * state, velocities)
         return result.reshape(new_shape)
 
     @staticmethod
@@ -592,6 +595,28 @@ class Model(bp.BaseClass):
         mass_density : :obj:`~numpy.ndarray` [:obj:`float`]
         """
         return momentum / mass_density[..., np.newaxis]
+
+    def energy_density(self, state, s):
+        r"""
+
+        Parameters
+        ----------
+        state : :obj:`~numpy.ndarray` [:obj:`float`]
+            Must be 2D array.
+        """
+        state = self._get_state_of_species(state, s)
+        # Reshape arrays to use np.dot
+        new_state = state.shape[:-1]
+        size = np.prod(new_state, dtype=int)
+        flat_shape = (size, state.shape[-1])
+        state = state.reshape(flat_shape)
+        dim = self.ndim
+        mass = self.mass_array[np.newaxis, :] if s is None else self.masses[s]
+        dv = self.dv_array[np.newaxis, :] if s is None else self.dv[s]
+        velocities = self.velocities if s is None else self.vGrids[s].pG
+        energy = 0.5 * mass * np.sum(velocities ** 2, axis=-1)
+        result = dv ** dim * np.dot(state, energy)
+        return result.reshape(new_state)
 
     ##################################
     #           Collisions           #
