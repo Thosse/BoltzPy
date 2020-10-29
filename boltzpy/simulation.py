@@ -162,11 +162,7 @@ class Simulation(bp.BaseClass):
             spc_group["mean_velocity"][tw_idx] = mean_velocity
 
             # temperature
-            pressure = bp_o.pressure(spc_state,
-                                     dv,
-                                     velocities,
-                                     mass,
-                                     mean_velocity)
+            pressure = self.model.pressure(spc_state, s, mean_velocity)
             temperature = bp_o.temperature(pressure, number_density)
             spc_group["temperature"][tw_idx] = temperature
 

@@ -188,6 +188,7 @@ class Model(bp.BaseClass):
     def velocities(self):
         return self.delta * self.iMG
 
+    # Todo change into s=None, mean velocities is constant over all specimen!, but may have higher ndim
     def centered_velocities(self, mean_velocities):
         assert isinstance(mean_velocities, np.ndarray)
         assert mean_velocities.shape == (self.specimen, self.ndim)
@@ -423,7 +424,7 @@ class Model(bp.BaseClass):
         momentum = self.momentum(state, s)
         mass_density = self.mass_density(state, s)
         mean_velocity = self.mean_velocity(momentum, mass_density)
-        pressure = bp_o.pressure(state, delta_v, velocities, mass, mean_velocity)
+        pressure = self.pressure(state, s, mean_velocity)
         temperature = bp_o.temperature(pressure, number_density)
         # return difference from wanted_moments
         moments = np.zeros(moment_parameters.shape, dtype=float)
@@ -516,22 +517,32 @@ class Model(bp.BaseClass):
                 or self.is_orthogonal(direction_1, direction_2))
 
         mass = self.mass_array if s is None else self.masses[s]
-        c_vels = self.centered_velocities(mean_velocity)
+        c_vels = self.centered_velocities(mean_velocity, s)
         proj_vels_1 = self.project_velocities(c_vels, direction_1)
         proj_vels_2 = self.project_velocities(c_vels, direction_2)
         return mass * proj_vels_1 * proj_vels_2
 
-    # todo Add test for models that it is orthogonal to the moments (no init_params necessary)
+    def mf_pressure(self, mean_velocity, s=None):
+        dim = self.ndim
+        mass = self.mass_array[np.newaxis, :] if s is None else self.masses[s]
+        velocities = self.velocities[self.idx_range(s), :]
+        # reshape mean_velocity (may have higher dimension)
+        # to subtract from velocities
+        shape = mean_velocity.shape[:-1]
+        size = np.prod(shape, dtype=int)
+        new_shape = shape + (velocities.shape[0],)
+        mean_velocity = mean_velocity.reshape((size, 1, dim))
+        velocities = velocities[np.newaxis, ...]
+        c_vels = velocities - mean_velocity
+        mf_pressure = mass / dim * np.sum(c_vels**2, axis=-1)
+        return mf_pressure.reshape(new_shape)
+
     def mf_orthogonal_stress(self, mean_velocity, direction_1, direction_2, s=None):
         result = self.mf_stress(mean_velocity, direction_1, direction_2, s)
         if self.is_orthogonal(direction_1, direction_2):
             return result
         elif self.is_parallel(direction_1, direction_2):
-            mass = self.mass_array if s is None else self.masses[s]
-            c_vels = self.centered_velocities(mean_velocity)
-            # Todo implement this mf
-            mf_pressure = 1 / self.ndim * mass * np.sum(c_vels ** 2, axis=-1)
-            return result - mf_pressure
+            return result - self.mf_pressure(mean_velocity, s)
         else:
             raise ValueError
 
@@ -550,6 +561,8 @@ class Model(bp.BaseClass):
     ##################################
     #            Moments             #
     ##################################
+    # Todo might be necessary to flatten all states (also in number density...
+    #  might be good to move this into _get_state_of_species
     def _get_state_of_species(self, state, s):
         if state.shape[-1] == self.size:
             state = state[..., self.idx_range(s)]
@@ -573,7 +586,7 @@ class Model(bp.BaseClass):
 
     def momentum(self, state, s=None):
         state = self._get_state_of_species(state, s)
-        # Reshape arrays to use np.dot
+        # Reshape arrays into 2d
         shape = state.shape[:-1]
         size = np.prod(shape, dtype=int)
         flat_shape = (size, state.shape[-1])
@@ -582,7 +595,7 @@ class Model(bp.BaseClass):
         dim = self.ndim
         mass = self.mass_array[np.newaxis, :] if s is None else self.masses[s]
         dv = self.dv_array[np.newaxis, :] if s is None else self.dv[s]
-        velocities = self.velocities if s is None else self.vGrids[s].pG
+        velocities = self.velocities[self.idx_range(s)]
         result = np.dot(dv**dim * mass * state, velocities)
         return result.reshape(new_shape)
 
@@ -605,7 +618,7 @@ class Model(bp.BaseClass):
             Must be 2D array.
         """
         state = self._get_state_of_species(state, s)
-        # Reshape arrays to use np.dot
+        # Reshape arrays into 2d
         new_state = state.shape[:-1]
         size = np.prod(new_state, dtype=int)
         flat_shape = (size, state.shape[-1])
@@ -613,10 +626,23 @@ class Model(bp.BaseClass):
         dim = self.ndim
         mass = self.mass_array[np.newaxis, :] if s is None else self.masses[s]
         dv = self.dv_array[np.newaxis, :] if s is None else self.dv[s]
-        velocities = self.velocities if s is None else self.vGrids[s].pG
+        velocities = self.velocities[self.idx_range(s)]
         energy = 0.5 * mass * np.sum(velocities ** 2, axis=-1)
         result = dv ** dim * np.dot(state, energy)
         return result.reshape(new_state)
+
+    def pressure(self, state, s, mean_velocity):
+        state = self._get_state_of_species(state, s)
+        # Reshape arrays into 2d
+        new_shape = state.shape[:-1]
+        size = np.prod(new_shape, dtype=int)
+        flat_shape = (size, state.shape[-1])
+        state = state.reshape(flat_shape)
+        dim = self.ndim
+        dv = self.dv_array[np.newaxis, :] if s is None else self.dv[s]
+        mf_pressure = self.mf_pressure(mean_velocity, s).reshape(flat_shape)
+        result = np.sum(dv**dim * mf_pressure * state, axis=-1)
+        return result.reshape(new_shape)
 
     ##################################
     #           Collisions           #

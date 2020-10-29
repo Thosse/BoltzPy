@@ -2,41 +2,6 @@
 import numpy as np
 
 
-
-def pressure(state,
-             delta_v,
-             velocities,
-             mass,
-             mean_velocity):
-    r"""
-
-    Parameters
-    ----------
-    state : :obj:`~numpy.ndarray` [:obj:`float`]
-    delta_v : :obj:`float`
-        The physical spacing of the respective velocity grid.
-    velocities: :obj:`~numpy.ndarray` [:obj:`float`]
-        An array of all velocities.
-        Each velocity is either 2 or 3 dimensional.
-        Must be a 2D array.
-    mass : :obj:`int`
-    mean_velocity : :obj:`~numpy.ndarray` [:obj:`float`]
-    """
-    assert velocities.ndim == 2
-    assert state.shape[-1] == velocities.shape[0]
-    # Reshape arrays to use np.dot
-    new_shape = state.shape[:-1]
-    size = np.prod(new_shape, dtype=int)
-    flat_shape = (size, state.shape[-1])
-    dim = velocities.shape[1]
-    state = state.reshape(flat_shape)
-    velocities = velocities[np.newaxis, ...]
-    mean_velocity = mean_velocity.reshape((size, 1, dim))
-    deviation = mass / dim * np.sum((velocities - mean_velocity) ** 2, axis=2)
-    result = delta_v**2 * np.sum(deviation * state, axis=1)
-    return result.reshape(new_shape)
-
-
 def temperature(pressure,
                 number_density):
     assert pressure.shape == number_density.shape
