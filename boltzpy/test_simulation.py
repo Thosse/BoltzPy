@@ -106,9 +106,24 @@ def test_particle_number(key):
     with h5py.File(FILE, mode="r") as file:
         hdf_group = file[key]
         sim = bp.Simulation.load(hdf_group)
+        model = sim.model
         for s in sim.model.species:
             spc_group = hdf_group["results"][str(s)]
             state = spc_group["state"][()]
             old_result = spc_group["particle_number"][()]
-            new_result = sim.model.number_density(state, s)
+            new_result = model.number_density(state, s)
+            assert np.allclose(old_result, new_result)
+
+
+@pytest.mark.parametrize("key", SIMULATIONS.keys())
+def test_momentum(key):
+    with h5py.File(FILE, mode="r") as file:
+        hdf_group = file[key]
+        sim = bp.Simulation.load(hdf_group)
+        model = sim.model
+        for s in sim.model.species:
+            spc_group = hdf_group["results"][str(s)]
+            state = spc_group["state"][()]
+            old_result = spc_group["momentum"][()]
+            new_result = model.momentum(state, s)
             assert np.allclose(old_result, new_result)

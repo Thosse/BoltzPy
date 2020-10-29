@@ -420,7 +420,7 @@ class Model(bp.BaseClass):
         #  Also move them into model
         # compute momenta
         number_density = self.number_density(state, s)
-        momentum = bp_o.momentum(state, delta_v, velocities, mass)
+        momentum = self.momentum(state, s)
         mass_density = self.mass_density(state, s)
         mean_velocity = bp_o.mean_velocity(momentum, mass_density)
         pressure = bp_o.pressure(state, delta_v, velocities, mass, mean_velocity)
@@ -550,24 +550,44 @@ class Model(bp.BaseClass):
     ##################################
     #            Moments             #
     ##################################
-    def number_density(self, state, s=None):
-        dv = self.dv_array if s is None else self.dv[s]
+    def _get_state_of_species(self, state, s):
         if state.shape[-1] == self.size:
             state = state[..., self.idx_range(s)]
+        else:
+            assert s is not None
+            assert state.shape[-1] == self.vGrids[s].size
+        return state
+
+    def number_density(self, state, s=None):
+        state = self._get_state_of_species(state, s)
+        dv = self.dv_array if s is None else self.dv[s]
         return np.sum(dv**2 * state, axis=-1)
 
-    def mass_density(self, state=None, s=None, number_density=None):
-        # cannot compute total mass density from total number density
-        # as the specimen may have different masses
-        assert (s is not None) or (state is not None)
+    def mass_density(self, state, s=None):
+        state = self._get_state_of_species(state, s)
         mass = self.mass_array if s is None else self.masses[s]
         dv = self.dv_array if s is None else self.dv[s]
-        if number_density is not None and s is not None:
-            return mass * number_density
-        elif state is not None:
-            return np.sum(dv**2 * mass * state, axis=-1)
-        else:
-            raise ValueError
+        return np.sum(dv**2 * mass * state, axis=-1)
+
+    def momentum(self, state, s=None):
+        r"""
+
+        Parameters
+        ----------
+        state : :obj:`~numpy.ndarray` [:obj:`float`]
+        """
+        state = self._get_state_of_species(state, s)
+        # Reshape arrays to use np.dot
+        shape = state.shape[:-1]
+        size = np.prod(shape, dtype=int)
+        flat_shape = (size, state.shape[-1])
+        new_shape = shape + (self.ndim,)
+        state = state.reshape(flat_shape)
+        mass = self.mass_array[np.newaxis, :] if s is None else self.masses[s]
+        dv = self.dv_array[np.newaxis, :] if s is None else self.dv[s]
+        velocities = self.velocities if s is None else self.vGrids[s].pG
+        result = np.dot(dv**2 * mass * state, velocities)
+        return result.reshape(new_shape)
 
     ##################################
     #           Collisions           #

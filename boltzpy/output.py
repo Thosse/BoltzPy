@@ -2,30 +2,7 @@
 import numpy as np
 
 
-def momentum(state, delta_v, velocities, mass):
-    r"""
 
-    Parameters
-    ----------
-    state : :obj:`~numpy.ndarray` [:obj:`float`]
-    delta_v : :obj:`float`
-        The physical spacing of the current velocity grid.
-    velocities: :obj:`~numpy.ndarray` [:obj:`float`]
-        Each velocity is either 2 or 3 dimensional.
-        Must be a 2D array.
-    mass : :obj:`int`
-    """
-    assert velocities.ndim == 2
-    assert state.shape[-1] == velocities.shape[0]
-    # Reshape arrays to use np.dot
-    shape = state.shape[:-1]
-    size = np.prod(shape, dtype=int)
-    flat_shape = (size, state.shape[-1])
-    dim = velocities.shape[1]
-    new_shape = shape + (dim,)
-    state = state.reshape(flat_shape)
-    result = delta_v**2 * mass * np.dot(state, velocities)
-    return result.reshape(new_shape)
 
 
 def mean_velocity(momentum, mass_density):

@@ -153,7 +153,7 @@ class Simulation(bp.BaseClass):
             spc_group["particle_number"][tw_idx] = number_density
 
             # momentum
-            momentum = bp_o.momentum(spc_state, dv, velocities, mass)
+            momentum = self.model.momentum(spc_state, s)
             spc_group["momentum"][tw_idx] = momentum
 
             # mean velocity
