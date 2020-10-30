@@ -407,15 +407,13 @@ class Model(bp.BaseClass):
         result = (number_density / divisor) * exponential
         return result
 
-    def _init_error(self, moment_parameters, wanted_moments, s):
+    def _init_error(self, moment_parameters, wanted_moments, s=None):
         dim = self.ndim
-
-        delta_v = self.dv[s]
-        mass = self.masses[s]
+        mass = self.mass_array if s is None else self.masses[s]
         velocities = self.velocities[self.idx_range(s)]
 
         # compute values of maxwellian on given velocities
-        state = Model.maxwellian(velocities=self.vGrids[s].pG,
+        state = Model.maxwellian(velocities=velocities,
                                  temperature=moment_parameters[dim],
                                  mass=mass,
                                  mean_velocity=moment_parameters[0: dim])
@@ -450,18 +448,14 @@ class Model(bp.BaseClass):
 
         # if all specimen have equal mean_velocities and temperatures
         # then create a maxwellian in equilibrium (invariant under collisions)
-        is_in_equilibrium = False   # np.allclose(wanted_moments, wanted_moments[0])
+        is_in_equilibrium = np.allclose(wanted_moments, wanted_moments[0])
         if is_in_equilibrium:
             # To create an equilibrium, all specimen must have equal init_params
             # We cannot achieve each specimen to fit the wanted_values
             # Thus we fit total moments to the wanted_values
-            raise NotImplementedError
-            # init_params = sp_newton(bp.Model._init_error,
-            #                         wanted_moments,
-            #                         args=(wanted_moments,
-            #                               self.velocities,
-            #                               self.mass_array,
-            #                               self.dv_array))
+            init_params[:] = sp_newton(self._init_error,
+                                       wanted_moments[0],
+                                       args=(wanted_moments[0], None))
         else:
             # Here we don't need an equilibrium,
             # all specimen may have different init_params
