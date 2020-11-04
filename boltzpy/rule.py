@@ -88,9 +88,9 @@ class Rule(bp.BaseClass):
         """Executes single collision step for the :attr:`affected_points`.
 
         The collision step is implemented as an euler scheme."""
-        # todo why changes using state = data.state.[affected_points] the result?
         coll = data.model.collision_operator(data.state[self.affected_points])
         data.state[self.affected_points] += data.dt * coll
+        assert np.all(data.state[self.affected_points] >= 0)
         return
 
     def transport(self, data):
@@ -266,7 +266,6 @@ class InnerPointRule(Rule):
                          model,
                          initial_state)
         return
-
 
     def transport(self, data):
         if data.p_dim != 1:

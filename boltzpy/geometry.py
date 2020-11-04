@@ -93,7 +93,7 @@ class Geometry(bp.Grid):
     #####################################
     def compute(self, data):
         """Executes a single time step, by operator splitting"""
-        # executie s single transport step
+        # execute a single transport step
         for rule in self.rules:
             rule.transport(data)
         # update data.state (transport writes into data.result)
