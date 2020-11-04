@@ -188,6 +188,8 @@ class Model(bp.BaseClass):
         return self.delta * self.iMG
 
     def centered_velocities(self, mean_velocity, s=None):
+        mean_velocity = np.array(mean_velocity)
+        assert mean_velocity.shape[-1] == self.ndim
         dim = self.ndim
         velocities = self.velocities[self.idx_range(s), :]
         # mean_velocity may have ndim > 1, thus reshape into 3D
@@ -505,6 +507,9 @@ class Model(bp.BaseClass):
         return np.allclose(np.dot(direction_1, direction_2), norms)
 
     def mf_stress(self, mean_velocity, direction_1, direction_2, s=None):
+        mean_velocity= np.array(mean_velocity)
+        direction_1 = np.array(direction_1)
+        direction_2 = np.array(direction_2)
         assert direction_1.shape == (self.ndim,)
         assert direction_2.shape == (self.ndim,)
         assert (self.is_parallel(direction_1, direction_2)
@@ -517,6 +522,7 @@ class Model(bp.BaseClass):
         return mass * proj_vels_1 * proj_vels_2
 
     def mf_pressure(self, mean_velocity, s=None):
+        mean_velocity= np.array(mean_velocity)
         dim = self.ndim
         mass = self.mass_array[np.newaxis, :] if s is None else self.masses[s]
         velocities = self.velocities[self.idx_range(s), :]
@@ -531,6 +537,9 @@ class Model(bp.BaseClass):
         return mf_pressure.reshape(new_shape)
 
     def mf_orthogonal_stress(self, mean_velocity, direction_1, direction_2, s=None):
+        mean_velocity= np.array(mean_velocity)
+        direction_1 = np.array(direction_1)
+        direction_2 = np.array(direction_2)
         result = self.mf_stress(mean_velocity, direction_1, direction_2, s)
         if self.is_orthogonal(direction_1, direction_2):
             return result
@@ -540,6 +549,8 @@ class Model(bp.BaseClass):
             raise ValueError
 
     def mf_heat_flow(self, mean_velocity, direction, s=None):
+        mean_velocity= np.array(mean_velocity)
+        direction = np.array(direction)
         assert direction.shape == (self.ndim,)
         mass = self.mass_array if s is None else self.masses[s]
         c_vels = self.centered_velocities(mean_velocity)
@@ -908,6 +919,9 @@ class Model(bp.BaseClass):
         Note that this is the collision of all species.
         Collisions of species i with species j are not implemented.
         ."""
+        shape = state.shape
+        size = np.prod(shape[:-1], dtype=int)
+        state = state.reshape((size, self.size))
         assert state.ndim == 2
         result = np.empty(state.shape, dtype=float)
         for p in range(state.shape[0]):
@@ -917,7 +931,7 @@ class Model(bp.BaseClass):
             u_c3 = state[p, self.collision_relations[:, 3]]
             col_factor = (np.multiply(u_c0, u_c2) - np.multiply(u_c1, u_c3))
             result[p] = self.collision_matrix.dot(col_factor)
-        return result
+        return result.reshape(shape)
 
     #####################################
     #           Coefficients            #
