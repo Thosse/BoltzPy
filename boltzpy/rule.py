@@ -8,16 +8,15 @@ import boltzpy.plot as bp_p
 
 
 class Rule(bp.BaseClass):
-    """Encapsulates the initialization methods
-    and computational behaviour during the Simulation
-    for all points, that are affected by this rule.
+    """Base Class for all Rules
+
+    Contains methods for initialization, saving, loading and plotting.
 
     Parameters
     ----------
     particle_number : :obj:`~numpy.array` [:obj:`float`]
     mean_velocity : :obj:`~numpy.array` [:obj:`float`]
     temperature : :obj:`~numpy.array` [:obj:`float`]
-    affected_points : :obj:`list`[:obj:`int`]
     model : :obj:`~boltzpy.Model`, optional
         Used to construct the initial state,
         if no initial_state parameter is given.
@@ -27,13 +26,13 @@ class Rule(bp.BaseClass):
                  particle_number,
                  mean_velocity,
                  temperature,
-                 affected_points,
                  model=None,
                  initial_state=None):
         self.particle_number = np.array(particle_number, dtype=float)
         self.mean_velocity = np.array(mean_velocity, dtype=float)
         self.temperature = np.array(temperature, dtype=float)
-        self.affected_points = np.array(affected_points, dtype=int)
+        self.ndim = self.mean_velocity.shape[1]
+        self.specimen = self.mean_velocity.shape[0]
         # Either initial_state is given as parameter
         if initial_state is not None:
             assert model is None
@@ -50,14 +49,13 @@ class Rule(bp.BaseClass):
         return {'InnerPointRule': InnerPointRule,
                 'ConstantPointRule': ConstantPointRule,
                 'BoundaryPointRule': BoundaryPointRule,
-                'HomogeneousPointRule': HomogeneousPointRule}
+                'HomogeneousRule': HomogeneousRule}
 
     @staticmethod
     def parameters():
         return {"particle_number",
                 "mean_velocity",
                 "temperature",
-                "affected_points",
                 "initial_state"}
 
     @staticmethod
@@ -66,14 +64,6 @@ class Rule(bp.BaseClass):
         attrs.update({"ndim",
                       "specimen"})
         return attrs
-
-    @property
-    def ndim(self):
-        return self.mean_velocity.shape[1]
-
-    @property
-    def specimen(self):
-        return self.mean_velocity.shape[0]
 
     def compute_initial_state(self, model):
         assert isinstance(model, bp.Model)
@@ -84,30 +74,10 @@ class Rule(bp.BaseClass):
                                                     self.temperature)
         return initial_state
 
-    def collision(self, data):
-        """Executes single collision step for the :attr:`affected_points`.
-
-        The collision step is implemented as an euler scheme."""
-        coll = data.model.collision_operator(data.state[self.affected_points])
-        data.state[self.affected_points] += data.dt * coll
-        assert np.all(data.state[self.affected_points] >= 0)
-        return
-
-    def transport(self, data):
-        """Executes single transport step for the :attr:`affected_points`.
-
-           This is a finite differences scheme.
-           It computes the inflow and outflow and, if necessary,
-           applies reflection or absorption.
-           Reads data.state
-           and writes the results in data.results"""
-        raise NotImplementedError
-
     def plot(self,
              model,
              specimen,
-             plot_object=None,
-             **plot_style):
+             plot_object=None):
         """Plot the initial state of a single specimen using matplotlib 3D."""
         assert isinstance(model, bp.Model)
         assert isinstance(specimen, int)
@@ -218,17 +188,6 @@ class Rule(bp.BaseClass):
         assert np.min(self.temperature) > 0
         assert self.particle_number.size == self.temperature.size
 
-        assert isinstance(self.affected_points, np.ndarray)
-        assert self.affected_points.ndim == 1
-        assert self.affected_points.dtype == int
-        assert self.affected_points.size > 0
-        assert np.min(self.affected_points) >= 0
-        # if context is not None and context.geometry.shape is not None:
-        #     assert np.max(affected_points) < context.geometry.size
-        assert self.affected_points.size == len(set(self.affected_points)), (
-            "Some points are affected twice be the same Rule:"
-            "{}".format(self.affected_points))
-
         assert isinstance(self.initial_state, np.ndarray)
         assert self.initial_state.dtype == float
         assert not np.any(np.isnan(self.initial_state)), (
@@ -251,7 +210,86 @@ class Rule(bp.BaseClass):
         return description
 
 
-class InnerPointRule(Rule):
+class InhomogeneousRule(Rule):
+    """Contains computational methods for spatial inhomogeneous points
+
+    Parameters
+    ----------
+    particle_number : :obj:`~numpy.array` [:obj:`float`]
+    mean_velocity : :obj:`~numpy.array` [:obj:`float`]
+    temperature : :obj:`~numpy.array` [:obj:`float`]
+    affected_points : :obj:`list`[:obj:`int`]
+    model : :obj:`~boltzpy.Model`, optional
+        Used to construct the initial state,
+        if no initial_state parameter is given.
+    initial_state : :obj:`~numpy.array` [:obj:`float`], optional
+    """
+    def __init__(self,
+                 particle_number,
+                 mean_velocity,
+                 temperature,
+                 affected_points,
+                 model=None,
+                 initial_state=None):
+        super().__init__(particle_number,
+                         mean_velocity,
+                         temperature,
+                         model,
+                         initial_state)
+        self.affected_points = np.array(affected_points, dtype=int)
+        InhomogeneousRule.check_integrity(self)
+        return
+
+    @staticmethod
+    def parameters():
+        params = Rule.parameters()
+        params.update({"affected_points"})
+        return params
+
+    @staticmethod
+    def attributes():
+        attrs = InhomogeneousRule.parameters()
+        attrs.update({"ndim",
+                      "specimen"})
+        return attrs
+
+    def collision(self, data):
+        """Executes single collision step for the :attr:`affected_points`.
+
+        The collision step is implemented as an euler scheme."""
+        coll = data.model.collision_operator(data.state[self.affected_points])
+        data.state[self.affected_points] += data.dt * coll
+        assert np.all(data.state[self.affected_points] >= 0)
+        return
+
+    def transport(self, data):
+        """Executes single transport step for the :attr:`affected_points`.
+
+           This is a finite differences scheme.
+           It computes the inflow and outflow and, if necessary,
+           applies reflection or absorption.
+           Reads data.state
+           and writes the results in data.results"""
+        raise NotImplementedError
+
+    def check_integrity(self, check_affected_points=True):
+        """Sanity Check."""
+        super(InhomogeneousRule, self).check_integrity()
+        if check_affected_points:
+            assert isinstance(self.affected_points, np.ndarray)
+            assert self.affected_points.ndim == 1
+            assert self.affected_points.dtype == int
+            assert self.affected_points.size > 0
+            assert np.min(self.affected_points) >= 0
+            # if context is not None and context.geometry.shape is not None:
+            #     assert np.max(affected_points) < context.geometry.size
+            assert self.affected_points.size == len(set(self.affected_points)), (
+                "Some points are affected twice be the same Rule:"
+                "{}".format(self.affected_points))
+        return
+
+
+class InnerPointRule(InhomogeneousRule):
     def __init__(self,
                  particle_number,
                  mean_velocity,
@@ -285,7 +323,7 @@ class InnerPointRule(Rule):
         return
 
 
-class ConstantPointRule(Rule):
+class ConstantPointRule(InhomogeneousRule):
     def __init__(self,
                  particle_number,
                  mean_velocity,
@@ -308,7 +346,7 @@ class ConstantPointRule(Rule):
         pass
 
 
-class BoundaryPointRule(Rule):
+class BoundaryPointRule(InhomogeneousRule):
     def __init__(self,
                  particle_number,
                  mean_velocity,
@@ -351,12 +389,12 @@ class BoundaryPointRule(Rule):
             self.incoming_velocities = self.compute_incoming_velocities(model, surface_normal)
             self.reflected_indices_inverse = self.compute_reflected_indices_inverse(model)
             self.reflected_indices_elastic = self.compute_reflected_indices_elastic(model, surface_normal)
-        super().__init__(particle_number,
-                         mean_velocity,
-                         temperature,
-                         affected_points,
-                         model,
-                         initial_state)
+        super(BoundaryPointRule, self).__init__(particle_number,
+                                                mean_velocity,
+                                                temperature,
+                                                affected_points,
+                                                model,
+                                                initial_state)
         if effective_particle_number is None:
             self.effective_particle_number = np.array([
                 model.number_density(
@@ -367,7 +405,7 @@ class BoundaryPointRule(Rule):
 
     @staticmethod
     def parameters():
-        params = Rule.parameters()
+        params = InhomogeneousRule.parameters()
         params.update({"reflection_rate_inverse",
                        "reflection_rate_elastic",
                        "reflection_rate_thermal",
@@ -412,7 +450,7 @@ class BoundaryPointRule(Rule):
             "doesn't even use surface normal currently")
         for (idx_v, v) in enumerate(model.iMG):
             spc = model.get_spc(idx_v)
-            v_refl= np.copy(v)
+            v_refl = np.copy(v)
             v_refl[0] = - v[0]
             idx_v_refl = model.get_idx(spc, v_refl)
             reflected_indices_elastic[idx_v] = idx_v_refl
@@ -523,7 +561,7 @@ class BoundaryPointRule(Rule):
                     "idx_array[idx_array]:\n{}".format(reflect_twice))
 
 
-class HomogeneousPointRule(Rule):
+class HomogeneousRule(Rule):
     """Implementation of a homogeneous Simulation.
     This means that no Transport happens in space.
     However, it is possible to provide a source term s,
@@ -537,14 +575,12 @@ class HomogeneousPointRule(Rule):
                  particle_number,
                  mean_velocity,
                  temperature,
-                 affected_points,
                  source_term=0.,
                  model=None,
                  initial_state=None):
         super().__init__(particle_number,
                          mean_velocity,
                          temperature,
-                         affected_points,
                          model,
                          initial_state)
         self.source_term = np.array(source_term, dtype=float)
@@ -556,19 +592,29 @@ class HomogeneousPointRule(Rule):
         params.update({"source_term"})
         return params
 
-    def collision(self, data):
-        bp_cp.collision_rkv4(data, self.affected_points)
+    @staticmethod
+    def attributes():
+        attrs = HomogeneousRule.parameters()
+        attrs.update({"ndim",
+                      "specimen"})
+        return attrs
+
+    def compute(self, data):
+        # Todo probably has the wrong shape! must be 2d!
+        state = self.initial_state
+        result = np.zeros(state.shape)
+        source_term = self.source_term
+        rkv_component = np.zeros(state.shape, float)
+        rkv_offset = np.array([0, 0.5, 0.5, 1])
+        rkv_weight = np.array([1 / 6, 2 / 6, 2 / 6, 1 / 6])
+        for (offset, weight) in zip(rkv_offset, rkv_weight):
+            coll = data.model.collision_operator(state + offset * rkv_component)
+            rkv_component = data.dt * (coll - source_term)
+            result += weight * rkv_component
+
         return
 
-    def transport(self, data):
-        """Implements the transport as a 4th order Runge-Kutta scheme.
-        This is possible since there are no complex boundary conditions.
-        """
-        state = data.state[self.affected_points]
-        data.result[self.affected_points] = state - self.source_term * data.dt
-        return
-
-    def check_integrity(self, complete_check=True, context=None):
-        super().check_integrity()
+    def check_integrity(self):
         if self.source_term.size != 1:
             assert self.source_term.shape == self.initial_state.shape
+
