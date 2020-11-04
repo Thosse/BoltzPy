@@ -31,13 +31,9 @@ Workflow
 """
 from boltzpy.BaseClass import BaseClass
 from boltzpy.grid import Grid
-from boltzpy.rule import Rule
-from boltzpy.rule import InhomogeneousRule
-from boltzpy.rule import InnerPointRule
-from boltzpy.rule import ConstantPointRule
-from boltzpy.rule import BoundaryPointRule
-from boltzpy.rule import HomogeneousRule
+from boltzpy.rule import *
 from boltzpy.geometry import Geometry
 from boltzpy.simulation import Simulation
 from boltzpy.model import Model
 from boltzpy.data import Data
+import boltzpy.AnimatedFigure as Plot
