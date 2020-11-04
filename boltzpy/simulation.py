@@ -129,9 +129,7 @@ class Simulation(bp.BaseClass):
         time_tracker = h_tt.TimeTracker()
         for (tw_idx, tw) in enumerate(data.tG[:, 0]):
             while data.t != tw:
-                bp_cp.operator_splitting(data,
-                                         self.geometry.transport,
-                                         self.geometry.collision)
+                self.geometry.compute(data)
             self.write_results(data, tw_idx, results)
             file.flush()
             # print time estimate
@@ -143,9 +141,6 @@ class Simulation(bp.BaseClass):
         for s in self.model.species:
             idx_range = self.model.idx_range(s)
             spc_state = data.state[..., idx_range]
-            dv = self.model.vGrids[s].physical_spacing
-            mass = self.model.masses[s]
-            velocities = self.model.vGrids[s].pG
             spc_group = hdf_group[str(s)]
             # number_density
             number_density = self.model.number_density(spc_state, s)

@@ -91,17 +91,20 @@ class Geometry(bp.Grid):
     #####################################
     #            Computation            #
     #####################################
-    def collision(self, data):
-        for rule in self.rules:
-            rule.collision(data)
-        return
-
-    def transport(self, data):
+    def compute(self, data):
+        """Executes a single time step, by operator splitting"""
+        # executie s single transport step
         for rule in self.rules:
             rule.transport(data)
         # Todo this should be in the operator splitting
         # update data.state (transport writes into data.result)
         data.state[...] = data.result[...]
+        assert np.all(data.state >= 0)
+        # increase current_timestep counter
+        data.t += 1
+        # executie s single collision step
+        for rule in self.rules:
+            rule.collision(data)
         return
 
     #####################################
