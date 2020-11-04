@@ -170,13 +170,6 @@ def no_transport(data, affected_points):
 #           Collisions           #
 ##################################
 
-def euler_scheme(data, affected_points):
-    """Executes a collision step, by using the 1st order Euler scheme"""
-    coll = data.model.collision_operator(data.state[affected_points])
-    data.state[affected_points] += data.dt * coll
-    return
-
-
 def collision_rkv4(data, affected_points):
     """Executes a collision step, by using the 4th order Runge Kutta scheme"""
     # Todo remove data, use sim.sv.size instead of state.shape[1]
@@ -192,9 +185,4 @@ def collision_rkv4(data, affected_points):
         rkv_component = data.dt * coll
         result += weight * rkv_component
     data.state[affected_points] += result
-    return
-
-
-def no_collisions(data, affected_points):
-    """No Collisions are done here"""
     return

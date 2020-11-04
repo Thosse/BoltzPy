@@ -79,7 +79,6 @@ class Rule(bp.BaseClass):
         assert isinstance(model, bp.Model)
         assert self.ndim == model.ndim
         assert self.specimen == model.specimen
-
         initial_state = model.compute_initial_state(self.particle_number,
                                                     self.mean_velocity,
                                                     self.temperature)
@@ -87,9 +86,12 @@ class Rule(bp.BaseClass):
 
     def collision(self, data):
         """Executes single collision step for the :attr:`affected_points`.
-           Reads data.state
-           and writes the results in data.results"""
-        raise NotImplementedError
+
+        The collision step is implemented as an euler scheme."""
+        # todo why changes using state = data.state.[affected_points] the result?
+        coll = data.model.collision_operator(data.state[self.affected_points])
+        data.state[self.affected_points] += data.dt * coll
+        return
 
     def transport(self, data):
         """Executes single transport step for the :attr:`affected_points`.
@@ -265,9 +267,6 @@ class InnerPointRule(Rule):
                          initial_state)
         return
 
-    def collision(self, data):
-        bp_cp.euler_scheme(data, self.affected_points)
-        return
 
     def transport(self, data):
         if data.p_dim != 1:
@@ -304,11 +303,7 @@ class ConstantPointRule(Rule):
         return
 
     def collision(self, data):
-        bp_cp.euler_scheme(data, self.affected_points)
-        # Todo replace by bp_cp.no_collisions(data, self.affected_points)
-        #  before that, implement proper initialization
-        #  constant points should not change under collisions
-        return
+        pass
 
     def transport(self, data):
         pass
