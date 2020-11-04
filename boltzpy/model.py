@@ -900,6 +900,25 @@ class Model(bp.BaseClass):
                          == np.sum(masses[2] * (w1 ** 2 - w0 ** 2), axis=-1))
         return np.all(cond, axis=0)
 
+    def collision_operator(self, state):
+        """Computes J[f,f],
+        with J[f,f] being the collision operator at all given points.
+        These points are the ones specified in state.
+
+        Note that this is the collision of all species.
+        Collisions of species i with species j are not implemented.
+        ."""
+        assert state.ndim == 2
+        result = np.empty(state.shape, dtype=float)
+        for p in range(state.shape[0]):
+            u_c0 = state[p, self.collision_relations[:, 0]]
+            u_c1 = state[p, self.collision_relations[:, 1]]
+            u_c2 = state[p, self.collision_relations[:, 2]]
+            u_c3 = state[p, self.collision_relations[:, 3]]
+            col_factor = (np.multiply(u_c0, u_c2) - np.multiply(u_c1, u_c3))
+            result[p] = self.collision_matrix.dot(col_factor)
+        return result
+
     #####################################
     #           Coefficients            #
     #####################################

@@ -169,34 +169,11 @@ def no_transport(data, affected_points):
 ##################################
 #           Collisions           #
 ##################################
-def collision_operator(state,
-                       collisions_relations,
-                       collision_matrix):
-    """Computes dt * J[f,f],
-    with J[f,f] being the collision operator at all given points.
-    These points are the ones specified in state.
-
-    Note that this is the collision of all species.
-    Collisions of species i with species j are not implemented.
-
-    It is faster to include the dt in the collision matrix, thus the result is
-    actually the collision operator times dt."""
-    result = np.empty(state.shape, dtype=float)
-    for p in range(state.shape[0]):
-        u_c0 = state[p, collisions_relations[:, 0]]
-        u_c1 = state[p, collisions_relations[:, 1]]
-        u_c2 = state[p, collisions_relations[:, 2]]
-        u_c3 = state[p, collisions_relations[:, 3]]
-        col_factor = (np.multiply(u_c0, u_c2) - np.multiply(u_c1, u_c3))
-        result[p] = collision_matrix.dot(col_factor)
-    return result
-
 
 def euler_scheme(data, affected_points):
     """Executes a collision step, by using the 1st order Euler scheme"""
-    data.state[affected_points] += collision_operator(data.state[affected_points],
-                                                      data.col,
-                                                      data.col_mat)
+    coll = data.model.collision_operator(data.state[affected_points])
+    data.state[affected_points] += data.dt * coll
     return
 
 
@@ -211,9 +188,8 @@ def collision_rkv4(data, affected_points):
     for i in np.arange(4):
         offset = rkv_offset[i]
         weight = rkv_weight[i]
-        rkv_component = collision_operator(state + offset * rkv_component,
-                                           data.col,
-                                           data.col_mat)
+        coll = data.model.collision_operator(state + offset * rkv_component)
+        rkv_component = data.dt * coll
         result += weight * rkv_component
     data.state[affected_points] += result
     return
