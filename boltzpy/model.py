@@ -487,14 +487,15 @@ class Model(bp.BaseClass):
     ##################################
     @staticmethod
     def project_velocities(velocities, direction):
+        direction = np.array(direction)
         assert direction.shape == (velocities.shape[-1],)
         assert np.linalg.norm(direction) > 1e-8
         shape = velocities.shape[:-1]
         size = np.prod(shape, dtype=int)
         dim = velocities.shape[-1]
-        vector = velocities.reshape((size, dim))
+        velocities = velocities.reshape((size, dim))
         angle = direction / np.linalg.norm(direction)
-        result = np.dot(vector, angle)
+        result = np.dot(velocities, angle)
         return result.reshape(shape)
 
     @staticmethod
@@ -506,8 +507,9 @@ class Model(bp.BaseClass):
         norms = np.linalg.norm(direction_1) * np.linalg.norm(direction_2)
         return np.allclose(np.dot(direction_1, direction_2), norms)
 
+    # TODO if directions = None, return tensor, check if this is easy to do
     def mf_stress(self, mean_velocity, direction_1, direction_2, s=None):
-        mean_velocity= np.array(mean_velocity)
+        mean_velocity = np.array(mean_velocity)
         direction_1 = np.array(direction_1)
         direction_2 = np.array(direction_2)
         assert direction_1.shape == (self.ndim,)
@@ -522,7 +524,7 @@ class Model(bp.BaseClass):
         return mass * proj_vels_1 * proj_vels_2
 
     def mf_pressure(self, mean_velocity, s=None):
-        mean_velocity= np.array(mean_velocity)
+        mean_velocity = np.array(mean_velocity)
         dim = self.ndim
         mass = self.mass_array[np.newaxis, :] if s is None else self.masses[s]
         velocities = self.velocities[self.idx_range(s), :]
@@ -537,7 +539,7 @@ class Model(bp.BaseClass):
         return mf_pressure.reshape(new_shape)
 
     def mf_orthogonal_stress(self, mean_velocity, direction_1, direction_2, s=None):
-        mean_velocity= np.array(mean_velocity)
+        mean_velocity = np.array(mean_velocity)
         direction_1 = np.array(direction_1)
         direction_2 = np.array(direction_2)
         result = self.mf_stress(mean_velocity, direction_1, direction_2, s)
@@ -549,17 +551,16 @@ class Model(bp.BaseClass):
             raise ValueError
 
     def mf_heat_flow(self, mean_velocity, direction, s=None):
-        mean_velocity= np.array(mean_velocity)
+        mean_velocity = np.array(mean_velocity)
         direction = np.array(direction)
         assert direction.shape == (self.ndim,)
         mass = self.mass_array if s is None else self.masses[s]
-        c_vels = self.centered_velocities(mean_velocity)
+        c_vels = self.centered_velocities(mean_velocity, s)
         proj_vels = self.project_velocities(c_vels, direction)
         squared_sum = np.sum(c_vels ** 2, axis=-1)
         return mass * proj_vels * squared_sum
 
-    # todo Add test for models (with default params) that its orthogonal to the moments
-    def mf_orthogonal_heat_flow(self, mean_velocity, direction, s=None):
+    def mf_orthogonal_heat_flow(self, mean_velocity, temperature, direction, s=None):
         raise NotImplementedError
 
     ##################################
