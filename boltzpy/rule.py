@@ -499,7 +499,7 @@ class BoundaryPointRule(InhomogeneousRule):
             reflected_inflow[:, self.reflected_indices_elastic] += elastic_inflow
 
             thermal_inflow = data.model.number_density(
-                self.reflection_rate_thermal[s] * inflow[..., beg:end],s)
+                self.reflection_rate_thermal[s] * inflow[..., beg:end], s)
             thermal_factor = (thermal_inflow / self.effective_particle_number[s])
             reflected_inflow[..., beg:end] += (
                 thermal_factor[:, np.newaxis]
@@ -575,14 +575,15 @@ class HomogeneousRule(Rule):
                  particle_number,
                  mean_velocity,
                  temperature,
-                 source_term=0.,
-                 model=None,
-                 initial_state=None):
+                 model,
+                 initial_state=None,
+                 source_term=0.0):
         super().__init__(particle_number,
                          mean_velocity,
                          temperature,
                          model,
                          initial_state)
+        self.model = model
         self.source_term = np.array(source_term, dtype=float)
         return
 
@@ -599,22 +600,45 @@ class HomogeneousRule(Rule):
                       "specimen"})
         return attrs
 
-    def compute(self, data):
-        # Todo probably has the wrong shape! must be 2d!
+    def compute(self, dt=None, maxiter=5000, _depth=0):
+        if dt is None:
+            max_weight = np.max(self.model.collision_matrix)
+            dt = 1 / (20 * max_weight)
         state = self.initial_state
-        result = np.zeros(state.shape)
-        source_term = self.source_term
-        rkv_component = np.zeros(state.shape, float)
-        rkv_offset = np.array([0, 0.5, 0.5, 1])
-        rkv_weight = np.array([1 / 6, 2 / 6, 2 / 6, 1 / 6])
-        for (offset, weight) in zip(rkv_offset, rkv_weight):
-            coll = data.model.collision_operator(state + offset * rkv_component)
-            rkv_component = data.dt * (coll - source_term)
-            result += weight * rkv_component
-
-        return
+        # store state at each timestep here
+        result = np.zeros((maxiter,) + state.shape)
+        result[0] = state
+        # store the interim results of the runge-kutta scheme here
+        # usually named k1,k2,k3,k4, only one is needed at the time
+        rks_component = np.zeros(state.shape, float)
+        # time offsets of the rks
+        rks_offset = np.array([0, 0.5, 0.5, 1])
+        # weights of each interim result / rks_component
+        rks_weight = np.array([1 / 6, 2 / 6, 2 / 6, 1 / 6])
+        # execute simulation
+        for i in range(1, maxiter):
+            state = result[i-1]
+            result[i] = state
+            # Runge Kutta steps
+            for (offset, weight) in zip(rks_offset, rks_weight):
+                interim_state = state + offset * rks_component
+                coll = self.model.collision_operator(interim_state)
+                rks_component = dt * (coll - self.source_term)
+                result[i] = result[i] + weight * rks_component
+            # break loop when reaching equilibrium
+            if np.allclose(result[i] - result[i-1], 0, atol=1e-8, rtol=1e-8):
+                return result[:i+1]
+            # reduce dt, if NaN Values show up, at most 2 times!
+            elif np.isnan(result[i]).any():
+                if _depth < 3:
+                    print("NaN-Value at i={}, set dt/100 = {}"
+                          "".format(i, dt/100))
+                    return self.compute(dt/100, maxiter, _depth + 1)
+                else:
+                    raise ValueError("NaN-Value at i={}".format(i))
+        raise ValueError("No equilibrium established")
 
     def check_integrity(self):
+        # Todo check source term is orthogonal to moments?
         if self.source_term.size != 1:
             assert self.source_term.shape == self.initial_state.shape
-
