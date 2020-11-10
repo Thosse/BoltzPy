@@ -287,6 +287,8 @@ class AnimatedBar3d(AnimatedObject):
         # use same color for each bar
         if "color" not in self.kwargs.keys():
             self.kwargs["color"] = "green"
+        if "alpha" not in self.kwargs.keys():
+            self.kwargs["alpha"] = 0.8
         # calculate bar-width
         if dx is not None:
             self.dx = dx
