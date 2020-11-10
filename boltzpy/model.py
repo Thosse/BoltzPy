@@ -201,6 +201,15 @@ class Model(bp.BaseClass):
         centered_velocities = velocities - mean_velocity
         return centered_velocities.reshape(new_shape)
 
+    def temperature_range(self, mean_velocity=0):
+        max_v = np.max(np.abs(self.maximum_velocity))
+        mean_v = np.max(np.abs(mean_velocity))
+        assert mean_v < max_v
+        min_mass = np.min(self.masses)
+        max_temp = (max_v - mean_v)**2 / min_mass
+        min_temp = 3 * np.max(self.spacings * self.delta)**2 / min_mass
+        return np.array([min_temp, max_temp], dtype=float)
+
     @property
     def mass_array(self):
         result = np.empty(self.size)
