@@ -5,49 +5,6 @@ import numpy as np
 import boltzpy as bp
 
 
-def plot_discrete_distribution(discrete_distribution,
-                               velocities,
-                               physcial_spacing,
-                               plot_object=None,
-                               **plot_style):
-    """Plot the discrete distribution of a single specimen using matplotlib 3D.
-
-    Parameters
-    ----------
-    plot_object : TODO Figure? matplotlib.pyplot?
-    """
-    if "color" not in plot_style.keys():
-        plot_style["color"] = "green"
-    if "alpha" not in plot_style.keys():
-        plot_style["alpha"] = 0.4
-
-    # show plot directly, if no object to store in is specified
-    show_plot_directly = plot_object is None
-
-    # Construct default plot object if None was given
-    if plot_object is None:
-        # Choose standard pyplot
-        plot_object = plt
-
-    # Set plot_object to be a 3d plot
-    ax = plot_object.gca(projection="3d")
-
-    # plot discrete distribution as a transparent 3D bar plot
-    #   subtract physical_spacing/2 to place the bars centered on the velocities
-    X = velocities[..., 0] - physcial_spacing / 2
-    Y = velocities[..., 1] - physcial_spacing / 2
-    Z = discrete_distribution
-
-    # Create 3d bar plot
-    ax.bar3d(X, Y, np.zeros(X.size),
-             physcial_spacing, physcial_spacing, Z,
-             **plot_style)
-
-    if show_plot_directly:
-        plot_object.show()
-    return plot_object
-
-
 def plot_continuous_maxwellian(particle_number,
                                mean_velocity,
                                temperature,

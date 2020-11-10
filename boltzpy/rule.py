@@ -4,7 +4,6 @@ import h5py
 
 import boltzpy as bp
 import boltzpy.compute as bp_cp
-import boltzpy.plot as bp_p
 
 
 class Rule(bp.BaseClass):
@@ -75,51 +74,36 @@ class Rule(bp.BaseClass):
         return initial_state
 
     def plot(self,
-             model,
-             specimen,
-             plot_object=None):
+             model):
         """Plot the initial state of a single specimen using matplotlib 3D."""
         assert isinstance(model, bp.Model)
-        assert isinstance(specimen, int)
-        assert 0 <= specimen < self.specimen
         assert self.ndim == 2, (
             "3D Plots are only implemented for 2D velocity spaces")
-        # show plot directly, if no object to store in is specified
-        show_plot_directly = plot_object is None
 
-        # Construct default plot object if None was given
-        if plot_object is None:
-            # Choose standard pyplot
-            import matplotlib as mpl
-            mpl.use('TkAgg')
-            import matplotlib.pyplot as plt
-            plot_object = plt
+        fig = bp.Plot.AnimatedFigure()
+        for s in model.species:
+            ax = fig.add_subplot((1, model.specimen, s + 1), 3)
+            idx_range = model.idx_range(s)
+            vels = model.velocities[idx_range]
+            ax.plot(vels[..., 0],
+                    vels[..., 1],
+                    self.initial_state[idx_range])
+        fig.show()
 
+        # Todo add Wireframe3D plot to animated figure
         # plot continuous maxwellian as a surface plot
-        mass = model.masses[specimen]
-        maximum_velocity = model.maximum_velocity
-        plot_object = bp_p.plot_continuous_maxwellian(
-            self.particle_number[specimen],
-            self.mean_velocity[specimen],
-            self.temperature[specimen],
-            mass,
-            -maximum_velocity,
-            maximum_velocity,
-            100,
-            plot_object)
-
-        # plot discrete distribution as a 3D bar plot
-        idx_range = model.idx_range(specimen)
-        # Todo replace by animated figure (in plot and here)
-        plot_object = bp_p.plot_discrete_distribution(
-            self.initial_state[idx_range],
-            model.vGrids[specimen].pG,
-            model.vGrids[specimen].physical_spacing,
-            plot_object,
-        )
-        if show_plot_directly:
-            plot_object.show()
-        return plot_object
+        # mass = model.masses[specimen]
+        # maximum_velocity = model.maximum_velocity
+        # plot_object = bp_p.plot_continuous_maxwellian(
+        #     self.particle_number[specimen],
+        #     self.mean_velocity[specimen],
+        #     self.temperature[specimen],
+        #     mass,
+        #     -maximum_velocity,
+        #     maximum_velocity,
+        #     100,
+        #     plot_object)
+        return
 
     @staticmethod
     def load(hdf5_group):
