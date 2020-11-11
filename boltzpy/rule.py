@@ -30,8 +30,12 @@ class Rule(bp.BaseClass):
         self.particle_number = np.array(particle_number, dtype=float)
         self.mean_velocity = np.array(mean_velocity, dtype=float)
         self.temperature = np.array(temperature, dtype=float)
-        self.ndim = self.mean_velocity.shape[1]
-        self.specimen = self.mean_velocity.shape[0]
+        self.ndim = self.mean_velocity.shape[-1]
+        self.specimen = self.particle_number.size
+        # assert matching shapes
+        assert self.particle_number.shape == (self.specimen,)
+        assert self.mean_velocity.shape == (self.specimen, self.ndim)
+        assert self.temperature.shape == (self.specimen,)
         # Either initial_state is given as parameter
         if initial_state is not None:
             assert model is None
