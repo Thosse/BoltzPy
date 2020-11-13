@@ -122,36 +122,13 @@ class Rule(bp.BaseClass):
         -------
         self : :class:`Rule`
         """
-        assert isinstance(hdf5_group, h5py.Group)
         assert hdf5_group.attrs["class"] in Rule.classes().keys()
         # choose derived class for new rule
         rule_class = Rule.classes()[hdf5_group.attrs["class"]]
-        parameters = dict()
-        for param in rule_class.parameters():
-            parameters[param] = hdf5_group[param][()]
+        parameters = rule_class.read_parameters_from_hdf_file(
+            hdf5_group,
+            rule_class.parameters())
         return rule_class(**parameters)
-
-    def save(self, hdf5_group, write_all=False):
-        """Write the main parameters of the :class:`Rule` instance
-        into the HDF5 group.
-
-        Parameters
-        ----------
-        hdf5_group : :obj:`h5py.Group <h5py:Group>`
-        write_all : :obj:`bool`
-            If True, write all attributes and properties to the file,
-            even the unnecessary ones. Useful for testing,
-        """
-        assert isinstance(hdf5_group, h5py.Group)
-        self.check_integrity()
-        # Clean State of Current group
-        for key in hdf5_group.keys():
-            del hdf5_group[key]
-        hdf5_group.attrs["class"] = self.__class__.__name__
-        attributes = self.attributes() if write_all else self.parameters()
-        for attr in attributes:
-            hdf5_group[attr] = self.__getattribute__(attr)
-        return
 
     def check_integrity(self):
         """Sanity Check."""

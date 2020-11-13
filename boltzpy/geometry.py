@@ -137,42 +137,6 @@ class Geometry(bp.Grid):
                 parameters[param] = hdf5_group[param][()]
         return Geometry(**parameters)
 
-    def save(self, hdf5_group, write_all=False):
-        """Write the main parameters of the :obj:`Geometry` instance
-        into the HDF5 group.
-
-        Parameters
-        ----------
-        hdf5_group : :obj:`h5py.Group <h5py:Group>`
-        write_all : :obj:`bool`
-            If True, write all attributes and properties to the file,
-            even the unnecessary ones. Useful for testing,
-        """
-        assert isinstance(hdf5_group, h5py.Group)
-        self.check_integrity()
-
-        # Clean State of Current group
-        for key in hdf5_group.keys():
-            del hdf5_group[key]
-        hdf5_group.attrs["class"] = self.__class__.__name__
-        attributes = self.attributes() if write_all else self.parameters()
-        for attr in attributes:
-            # rules are saved separately in a subgroup
-            if attr == "rules":
-                hdf5_group.create_group("rules")
-                hdf5_group["rules"].attrs["class"] = "Array"
-                hdf5_group["rules"].attrs["size"] = self.rules.size
-                for (idx_rule, rule) in enumerate(self.rules):
-                    key_rule = str(idx_rule)
-                    hdf5_group["rules"].create_group(key_rule)
-                    rule.save(hdf5_group["rules"][key_rule])
-            else:
-                hdf5_group[attr] = self.__getattribute__(attr)
-        # check that the class can be reconstructed from the save
-        other = Geometry.load(hdf5_group)
-        assert self == other
-        return
-
     #####################################
     #           Verification            #
     #####################################
