@@ -124,6 +124,8 @@ def test_load_from_file(key):
 def test_attributes(attribute, key):
     with h5py.File(FILE, mode="r") as file:
         old = file[key][attribute][()]
+        if type(old) == bytes:
+            old = file[key][attribute].asstr()[()]
         new = MODELS[key].__getattribute__(attribute)
         if isinstance(new, np.ndarray) and (new.dtype == float):
             assert np.allclose(old, new)

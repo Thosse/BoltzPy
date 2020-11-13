@@ -1013,6 +1013,8 @@ class Model(bp.BaseClass):
         parameters = dict()
         for param in Model.parameters():
             parameters[param] = hdf5_group[param][()]
+            if type(parameters[param]) == bytes:
+                parameters[param] = hdf5_group[param].asstr()[()]
         return Model(**parameters)
 
     def save(self, hdf5_group, write_all=False):
