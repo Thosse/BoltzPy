@@ -1,5 +1,4 @@
 import numpy as np
-import h5py
 from scipy.sparse import csr_matrix
 from scipy.optimize import newton as sp_newton
 from time import process_time
@@ -623,7 +622,7 @@ class Model(bp.BaseClass):
         """
         return momentum / mass_density[..., np.newaxis]
 
-    def energy_density(self, state, s):
+    def energy_density(self, state, s=None):
         r"""
 
         Parameters
@@ -991,28 +990,6 @@ class Model(bp.BaseClass):
             ax.plot(*vels, color="gray", linewidth=1)
         plt.show()
         return
-
-    #####################################
-    #           Serialization           #
-    #####################################
-    @staticmethod
-    def load(hdf5_group):
-        """Set up and return a :class:`Model` instance
-        based on the parameters in the given HDF5 group.
-
-        Parameters
-        ----------
-        hdf5_group : :obj:`h5py.Group <h5py:Group>`
-
-        Returns
-        -------
-        self : :class:`Model`
-        """
-        assert hdf5_group.attrs["class"] == "Model"
-        parameters = Model.read_parameters_from_hdf_file(
-            hdf5_group,
-            Model.parameters())
-        return Model(**parameters)
 
     #####################################
     #           Verification            #

@@ -1,6 +1,5 @@
 
 import numpy as np
-import h5py
 
 import boltzpy as bp
 
@@ -104,38 +103,6 @@ class Geometry(bp.Grid):
         # increase current_timestep counter
         data.t += 1
         return
-
-    #####################################
-    #           Serialization           #
-    #####################################
-    @staticmethod
-    def load(hdf5_group):
-        """Set up and return a :class:`Geometry` instance
-        based on the parameters in the given HDF5 group.
-
-        Parameters
-        ----------
-        hdf5_group : :obj:`h5py.Group <h5py:Group>`
-
-        Returns
-        -------
-        self : :class:`Geometry`
-        """
-        assert isinstance(hdf5_group, h5py.Group)
-        assert hdf5_group.attrs["class"] == "Geometry"
-        # read parameters from file
-        parameters = dict()
-        for param in Geometry.parameters():
-            # load rules separately
-            if param == "rules":
-                rules = np.empty(hdf5_group["rules"].attrs["size"],
-                                 dtype=bp.Rule)
-                for r in range(rules.size):
-                    rules[r] = bp.Rule.load(hdf5_group["rules"][str(r)])
-                parameters["rules"] = rules
-            else:
-                parameters[param] = hdf5_group[param][()]
-        return Geometry(**parameters)
 
     #####################################
     #           Verification            #

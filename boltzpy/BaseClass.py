@@ -1,6 +1,7 @@
 import numpy as np
 import scipy.sparse
 import h5py
+import boltzpy as bp
 
 
 class BaseClass:
@@ -66,6 +67,34 @@ class BaseClass:
     #           Serialization           #
     #####################################
     @staticmethod
+    def subclasses(subclass=None):
+        """Returns the Class object of the given subclass.
+        If no subclass is given, then returns a dictionary of all subclasses.
+
+        Parameters
+        ----------
+        subclass : :obj:`str`, optional
+
+        Returns
+        -------
+        self : :obj:`type`
+        """
+        # this distionary contains all possible subclasses
+        subclasses = {
+            'Grid': bp.Grid,
+            'Model': bp.Model,
+            'Geometry': bp.Geometry,
+            'InnerPointRule': bp.InnerPointRule,
+            'ConstantPointRule': bp.ConstantPointRule,
+            'BoundaryPointRule': bp.BoundaryPointRule,
+            'HomogeneousRule': bp.HomogeneousRule}
+        # this is mainly used for asserts
+        if subclass is None:
+            return subclasses
+        else:
+            return subclasses[subclass]
+
+    @staticmethod
     def parameters():
         raise NotImplementedError
 
@@ -74,7 +103,7 @@ class BaseClass:
         raise NotImplementedError
 
     @staticmethod
-    def read_parameters_from_hdf_file(hdf5_group, parameters):
+    def read_parameters_from_hdf_file(hdf5_group, parameters=None):
         """Read a set of parameters from a given HDF5 group.
         Returns a dictionary of the read values.
 
@@ -88,18 +117,48 @@ class BaseClass:
         self : :obj:`dict`
         """
         assert isinstance(hdf5_group, h5py.Group)
+        # if no parameters are given, then derive from hdf5 attribute "class"
+        if parameters is None:
+            subclass = BaseClass.subclasses(hdf5_group.attrs["class"])
+            parameters = subclass.parameters()
+        # if only a single parameter is given, change into list for consistency
         if type(parameters) is str:
             parameters = [parameters]
         else:
             assert type(parameters) in [list, set]
             assert all(type(p) is str for p in parameters)
+        # read parameters and store in dict
         result = dict()
         for p in parameters:
-            val = hdf5_group[p][()]
-            if type(val) == bytes:
-                result[p] = hdf5_group[p].asstr()[()]
+            # Datasets are read directly
+            if isinstance(hdf5_group[p], h5py.Dataset):
+                val = hdf5_group[p][()]
+                # strings must be decoded into urf-8
+                # simply reading would return a byte string
+                if type(val) == bytes:
+                    result[p] = hdf5_group[p].asstr()[()]
+                else:
+                    result[p] = val
+            # Groups contain either a Baseclass, or an object-array
+            elif isinstance(hdf5_group[p], h5py.Group):
+                cls = hdf5_group[p].attrs["class"]
+                # group contains a Baseclass
+                if cls in BaseClass.subclasses().keys():
+                    subclass = BaseClass.subclasses(cls)
+                    result[p] = subclass.load(hdf5_group[p])
+                # group is an array of BaseClasses
+                if cls == "Array":
+                    size = hdf5_group[p].attrs["size"]
+                    result[p] = np.empty(size, dtype=object)
+                    for idx in range(size):
+                        grp = hdf5_group[p][str(idx)]
+                        subclass = BaseClass.subclasses(grp.attrs["class"])
+                        result[p][idx] = subclass.load(grp)
+                # group must contain one of those two options
+                else:
+                    raise ValueError
             else:
-                result[p] = val
+                raise ValueError
         return result
 
     @staticmethod
@@ -110,12 +169,20 @@ class BaseClass:
         Parameters
         ----------
         hdf5_group : :obj:`h5py.Group <h5py:Group>`
+
+        Returns
+        -------
+        self : :class:`BaseClass`
         """
-        raise NotImplementedError
+        assert hdf5_group.attrs["class"] in BaseClass.subclasses().keys()
+        subclass = BaseClass.subclasses(hdf5_group.attrs["class"])
+        # read parameters from file
+        parameters = BaseClass.read_parameters_from_hdf_file(
+            hdf5_group)
+        return subclass(**parameters)
 
     def save(self, hdf5_group, write_all=False):
-        """Write the main parameters of the :class:`Model` instance
-        into the HDF5 group.
+        """Write the parameters of the Class into the HDF5 group.
 
         Parameters
         ----------
@@ -126,10 +193,10 @@ class BaseClass:
         """
         assert isinstance(hdf5_group, h5py.Group)
         self.check_integrity()
-
-        # Clean State of Current group
+        # Remove all keys and attributes in  current group
         for key in hdf5_group.keys():
             del hdf5_group[key]
+        # save class name for automatic loading/initialization
         hdf5_group.attrs["class"] = self.__class__.__name__
         # choose attributes to save
         if write_all:
@@ -139,11 +206,9 @@ class BaseClass:
         # save attributes to file
         for attr in attributes:
             value = self.__getattribute__(attr)
-            # transform sparse matrices to normal np.arrays
-            if isinstance(value, scipy.sparse.csr_matrix):
-                value = value.toarray()
             # save Base class attributes in subgroup
             if isinstance(value, BaseClass):
+                hdf5_group.create_group(attr)
                 value.save(hdf5_group[attr])
             # save arrays of objects in sub-subgroups
             is_array_of_objects = isinstance(value, np.ndarray) and value.dtype == 'object'
@@ -159,6 +224,9 @@ class BaseClass:
                     hdf5_group[attr].create_group(idx)
                     element.save(hdf5_group[attr][idx])
             else:
+                # transform sparse matrices to normal np.arrays
+                if isinstance(value, scipy.sparse.csr_matrix):
+                    value = value.toarray()
                 hdf5_group[attr] = value
 
         # check that the class can be reconstructed from the save
@@ -169,4 +237,3 @@ class BaseClass:
     def check_integrity(self):
         """Sanity Check."""
         raise NotImplementedError
-

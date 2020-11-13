@@ -1,6 +1,5 @@
 
 import numpy as np
-import h5py
 
 import boltzpy as bp
 
@@ -302,28 +301,6 @@ class Grid(bp.BaseClass):
             # noinspection PyUnboundLocalVariable
             plt.show()
         return plot_object
-
-    #####################################
-    #           Serialization           #
-    #####################################
-    @staticmethod
-    def load(hdf5_group):
-        """Set up and return a :class:`Grid` instance
-        based on the parameters in the given HDF5 group.
-
-        Parameters
-        ----------
-        hdf5_group : :obj:`h5py.Group <h5py:Group>`
-
-        Returns
-        -------
-        self : :class:`Grid`
-        """
-        assert hdf5_group.attrs["class"] == "Grid"
-        parameters = Grid.read_parameters_from_hdf_file(
-            hdf5_group,
-            Grid.parameters())
-        return Grid(**parameters)
 
     #####################################
     #           Verification            #

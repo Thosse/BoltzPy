@@ -1,6 +1,5 @@
 
 import numpy as np
-import h5py
 
 import boltzpy as bp
 import boltzpy.compute as bp_cp
@@ -9,7 +8,7 @@ import boltzpy.compute as bp_cp
 class Rule(bp.BaseClass):
     """Base Class for all Rules
 
-    Contains methods for initialization, saving, loading and plotting.
+    Contains methods for initialization and plotting.
 
     Parameters
     ----------
@@ -46,13 +45,6 @@ class Rule(bp.BaseClass):
             self.initial_state = self.compute_initial_state(model)
         Rule.check_integrity(self)
         return
-
-    @staticmethod
-    def classes():
-        return {'InnerPointRule': InnerPointRule,
-                'ConstantPointRule': ConstantPointRule,
-                'BoundaryPointRule': BoundaryPointRule,
-                'HomogeneousRule': HomogeneousRule}
 
     @staticmethod
     def parameters():
@@ -108,27 +100,6 @@ class Rule(bp.BaseClass):
         #     100,
         #     plot_object)
         return
-
-    @staticmethod
-    def load(hdf5_group):
-        """Set up and return a :class:`Rule` instance
-        based on the parameters in the given HDF5 group.
-
-        Parameters
-        ----------
-        hdf5_group : :obj:`h5py.Group <h5py:Group>`
-
-        Returns
-        -------
-        self : :class:`Rule`
-        """
-        assert hdf5_group.attrs["class"] in Rule.classes().keys()
-        # choose derived class for new rule
-        rule_class = Rule.classes()[hdf5_group.attrs["class"]]
-        parameters = rule_class.read_parameters_from_hdf_file(
-            hdf5_group,
-            rule_class.parameters())
-        return rule_class(**parameters)
 
     def check_integrity(self):
         """Sanity Check."""
