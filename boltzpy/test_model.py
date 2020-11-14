@@ -183,6 +183,28 @@ def test_get_idx_on_shuffled_grid_with(key):
     if model.specimen <= 2:
         return
 
+@pytest.mark.parametrize("key", MODELS.keys())
+def test_invariance_of_collision_operator(key):
+    model = MODELS[key]
+    for _ in range(100):
+        state = np.random.random(model.size)
+        # test that all momenta of the collision_differences are zero
+        # since these are additive this tests that the momenta are collision invariant
+        collision_differences = model.collision_operator(state)
+        # number density of each species stays the same
+        for s in model.species:
+            number_density = model.number_density(collision_differences, s)
+            assert np.isclose(number_density, 0)
+        # assert total number/mass stays the same (should be unnecessary)
+        number_density = model.number_density(collision_differences)
+        assert np.isclose(number_density, 0)
+        mass_density = model.mass_density(collision_differences)
+        assert np.isclose(mass_density, 0)
+        momentum = model.momentum(collision_differences)
+        assert np.allclose(momentum, 0)
+        energy = model.energy_density(collision_differences)
+        assert np.isclose(energy, 0)
+
 
 def test_project_velocities():
     for _ in range(10):

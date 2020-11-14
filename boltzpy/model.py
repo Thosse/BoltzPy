@@ -960,6 +960,11 @@ class Model(bp.BaseClass):
             u_c3 = state[p, self.collision_relations[:, 3]]
             col_factor = (np.multiply(u_c0, u_c2) - np.multiply(u_c1, u_c3))
             result[p] = self.collision_matrix.dot(col_factor)
+        # adjust changes to divverent velocity-grid deltas
+        # this is necessary for invariance of moments
+        # multiplicate with min(dv) keep the order of magnidute of the weights
+        eq_factor = np.min(self.dv) / self.dv_array[np.newaxis, :]**self.ndim
+        result[:] *= eq_factor
         return result.reshape(shape)
 
     #####################################
