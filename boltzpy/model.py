@@ -537,14 +537,14 @@ class Model(bp.BaseClass):
         mass = self.mass_array[np.newaxis, :] if s is None else self.masses[s]
         velocities = self.velocities[self.idx_range(s), :]
         # reshape mean_velocity (may have higher dimension)
-        # to subtract from velocities
         shape = mean_velocity.shape[:-1]
         size = np.prod(shape, dtype=int)
-        new_shape = shape + (velocities.shape[0],)
+        # Todo this could be wrong! how exactly goes massinto this for mixtures?
         mean_velocity = mean_velocity.reshape((size, 1, dim))
         c_vels = self.centered_velocities(mean_velocity, s)
+        # compute pressure moment function
         mf_pressure = mass / dim * np.sum(c_vels**2, axis=-1)
-        return mf_pressure.reshape(new_shape)
+        return mf_pressure.reshape(shape + (velocities.shape[0],))
 
     def mf_orthogonal_stress(self, mean_velocity, direction_1, direction_2, s=None):
         mean_velocity = np.array(mean_velocity)
@@ -574,8 +574,6 @@ class Model(bp.BaseClass):
     ##################################
     #            Moments             #
     ##################################
-    # Todo might be necessary to flatten all states (also in number density...
-    #  might be good to move this into _get_state_of_species
     def _get_state_of_species(self, state, s):
         if state.shape[-1] == self.size:
             state = state[..., self.idx_range(s)]
@@ -586,31 +584,45 @@ class Model(bp.BaseClass):
 
     def number_density(self, state, s=None):
         state = self._get_state_of_species(state, s)
+        # Reshape state into 2d
+        shape = state.shape[:-1]
+        size = np.prod(shape, dtype=int)
+        state = state.reshape((size, state.shape[-1]))
+        # compute number density
         dim = self.ndim
-        dv = self.dv_array if s is None else self.dv[s]
-        return np.sum(dv**dim * state, axis=-1)
+        dv = self.dv_array[np.newaxis, :] if s is None else self.dv[s]
+        result = np.sum(dv**dim * state, axis=-1)
+        # return result, reshaped into old shape
+        return result.reshape(shape)
 
     def mass_density(self, state, s=None):
         state = self._get_state_of_species(state, s)
+        # Reshape state into 2d
+        shape = state.shape[:-1]
+        size = np.prod(shape, dtype=int)
+        state = state.reshape((size, state.shape[-1]))
+        # compute mass density
         dim = self.ndim
-        mass = self.mass_array if s is None else self.masses[s]
-        dv = self.dv_array if s is None else self.dv[s]
-        return np.sum(dv**dim * mass * state, axis=-1)
+        mass = self.mass_array[np.newaxis, :] if s is None else self.masses[s]
+        dv = self.dv_array[np.newaxis, :] if s is None else self.dv[s]
+        result = np.sum(dv**dim * mass * state, axis=-1)
+        # return result, reshaped into old shape
+        return result.reshape(shape)
 
     def momentum(self, state, s=None):
         state = self._get_state_of_species(state, s)
-        # Reshape arrays into 2d
+        # Reshape state into 2d
         shape = state.shape[:-1]
         size = np.prod(shape, dtype=int)
-        flat_shape = (size, state.shape[-1])
-        new_shape = shape + (self.ndim,)
-        state = state.reshape(flat_shape)
+        state = state.reshape((size, state.shape[-1]))
+        # compute momentum
         dim = self.ndim
         mass = self.mass_array[np.newaxis, :] if s is None else self.masses[s]
         dv = self.dv_array[np.newaxis, :] if s is None else self.dv[s]
         velocities = self.velocities[self.idx_range(s)]
         result = np.dot(dv**dim * mass * state, velocities)
-        return result.reshape(new_shape)
+        # return result, reshaped into old shape
+        return result.reshape(shape + (dim,))
 
     @staticmethod
     def mean_velocity(momentum, mass_density):
@@ -628,34 +640,40 @@ class Model(bp.BaseClass):
         Parameters
         ----------
         state : :obj:`~numpy.ndarray` [:obj:`float`]
-            Must be 2D array.
+        s : :obj:`int`, optional
         """
         state = self._get_state_of_species(state, s)
-        # Reshape arrays into 2d
-        new_state = state.shape[:-1]
-        size = np.prod(new_state, dtype=int)
-        flat_shape = (size, state.shape[-1])
-        state = state.reshape(flat_shape)
+        # Reshape state into 2d
+        shape = state.shape[:-1]
+        size = np.prod(shape, dtype=int)
+        state = state.reshape((size, state.shape[-1]))
+        # compute momentum
         dim = self.ndim
-        mass = self.mass_array[np.newaxis, :] if s is None else self.masses[s]
+        mass = self.mass_array if s is None else self.masses[s]
         dv = self.dv_array[np.newaxis, :] if s is None else self.dv[s]
         velocities = self.velocities[self.idx_range(s)]
+        # compute energy density
         energy = 0.5 * mass * np.sum(velocities ** 2, axis=-1)
-        result = dv ** dim * np.dot(state, energy)
-        return result.reshape(new_state)
+        result = np.dot(dv**dim * state, energy)
+        # return result, reshaped into old shape
+        return result.reshape(shape)
 
     def pressure(self, state, s, mean_velocity):
         state = self._get_state_of_species(state, s)
-        # Reshape arrays into 2d
-        new_shape = state.shape[:-1]
-        size = np.prod(new_shape, dtype=int)
-        flat_shape = (size, state.shape[-1])
-        state = state.reshape(flat_shape)
+        # Reshape state into 2d
+        shape = state.shape[:-1]
+        size = np.prod(shape, dtype=int)
+        state = state.reshape((size, state.shape[-1]))
+        # compute momentum
         dim = self.ndim
         dv = self.dv_array[np.newaxis, :] if s is None else self.dv[s]
-        mf_pressure = self.mf_pressure(mean_velocity, s).reshape(flat_shape)
+        # compute energy density
+        mf_pressure = self.mf_pressure(mean_velocity, s)
+        # mf_pressure.shape[0] might be 1 or state.shape[0]
+        mf_pressure = mf_pressure.reshape((-1, state.shape[-1]))
         result = np.sum(dv**dim * mf_pressure * state, axis=-1)
-        return result.reshape(new_shape)
+        # return result, reshaped into old shape
+        return result.reshape(shape)
 
     @staticmethod
     def temperature(pressure, number_density):
@@ -669,16 +687,18 @@ class Model(bp.BaseClass):
         state : :obj:`~numpy.ndarray` [:obj:`float`]
         """
         state = self._get_state_of_species(state, s)
-        # Reshape arrays to use np.dot
+        # Reshape state into 2d
         shape = state.shape[:-1]
         size = np.prod(shape, dtype=int)
-        flat_shape = (size, state.shape[-1])
-        state = state.reshape(flat_shape)
+        state = state.reshape((size, state.shape[-1]))
+        # compute momentum
         dim = self.ndim
         mass = self.mass_array[np.newaxis, :] if s is None else self.masses[s]
         dv = self.dv_array[np.newaxis, :] if s is None else self.dv[s]
         velocities = self.velocities[self.idx_range(s)]
+        # compute momentum flow
         result = np.dot(dv**dim * mass * state, velocities ** 2)
+        # return result, reshaped into old shape
         return result.reshape(shape + (dim,))
 
     def energy_flow(self, state, s):
@@ -687,18 +707,20 @@ class Model(bp.BaseClass):
         ----------
         state : :obj:`~numpy.ndarray` [:obj:`float`]
         """
-        assert state.ndim == 2
-        # Reshape arrays to use np.dot
+        state = self._get_state_of_species(state, s)
+        # Reshape state into 2d
         shape = state.shape[:-1]
         size = np.prod(shape, dtype=int)
-        flat_shape = (size, state.shape[-1])
-        state = state.reshape(flat_shape)
+        state = state.reshape((size, state.shape[-1]))
+        # compute momentum
         dim = self.ndim
         mass = self.mass_array[np.newaxis, :] if s is None else self.masses[s]
         dv = self.dv_array[np.newaxis, :] if s is None else self.dv[s]
         velocities = self.velocities[self.idx_range(s)]
+        # compute energy flow
         energies = 0.5 * mass * np.sum(velocities ** 2, axis=1)[:, np.newaxis]
         result = np.dot(dv**dim * state, energies * velocities)
+        # return result, reshaped into old shape
         return result.reshape(shape + (dim,))
 
     ##################################
