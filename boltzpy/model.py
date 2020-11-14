@@ -183,6 +183,14 @@ class Model(bp.BaseClass):
         return self.delta * self.spacings
 
     @property
+    def dv_array(self):
+        result = np.empty(self.size)
+        dv = self.dv
+        for s in self.species:
+            result[self.idx_range(s)] = dv[s]
+        return result
+
+    @property
     def velocities(self):
         return self.delta * self.iMG
 
@@ -194,11 +202,9 @@ class Model(bp.BaseClass):
         # mean_velocity may have ndim > 1, thus reshape into 3D
         shape = mean_velocity.shape[:-1]
         size = np.prod(shape, dtype=int)
-        new_shape = shape + (velocities.shape[0], dim)
         mean_velocity = mean_velocity.reshape((size, 1, dim))
-        velocities = velocities[np.newaxis, ...]
-        centered_velocities = velocities - mean_velocity
-        return centered_velocities.reshape(new_shape)
+        result = velocities[np.newaxis, ...] - mean_velocity
+        return result.reshape(shape + (velocities.shape[0], dim))
 
     def temperature_range(self, mean_velocity=0):
         max_v = np.max(np.abs(self.maximum_velocity))
@@ -214,14 +220,6 @@ class Model(bp.BaseClass):
         result = np.empty(self.size)
         for s in self.species:
             result[self.idx_range(s)] = self.masses[s]
-        return result
-
-    @property
-    def dv_array(self):
-        result = np.empty(self.size)
-        dv = self.dv
-        for s in self.species:
-            result[self.idx_range(s)] = dv[s]
         return result
 
     #####################################
@@ -539,9 +537,9 @@ class Model(bp.BaseClass):
         # reshape mean_velocity (may have higher dimension)
         shape = mean_velocity.shape[:-1]
         size = np.prod(shape, dtype=int)
-        # Todo this could be wrong! how exactly goes massinto this for mixtures?
-        mean_velocity = mean_velocity.reshape((size, 1, dim))
+        mean_velocity = mean_velocity.reshape((size, dim))
         c_vels = self.centered_velocities(mean_velocity, s)
+        c_vels = c_vels.reshape((size,) + velocities.shape)
         # compute pressure moment function
         mf_pressure = mass / dim * np.sum(c_vels**2, axis=-1)
         return mf_pressure.reshape(shape + (velocities.shape[0],))
