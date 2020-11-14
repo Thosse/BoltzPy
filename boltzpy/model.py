@@ -1,6 +1,7 @@
 import numpy as np
 import h5py
 from scipy.sparse import csr_matrix
+from scipy.optimize import newton as sp_newton
 from time import process_time
 
 import boltzpy as bp
@@ -138,14 +139,6 @@ class Model(bp.BaseClass):
         return np.arange(self.specimen)
 
     @property
-    def index_range(self):
-        # Todo remove soon
-        result = np.zeros((self.specimen, 2), dtype=int)
-        result[:, 0] = self.index_offset[0:self.specimen]
-        result[:, 1] = self.index_offset[1:]
-        return result
-
-    @property
     def maximum_velocity(self):
         """:obj:`float`
         Maximum physical velocity for every sub grid."""
@@ -181,15 +174,66 @@ class Model(bp.BaseClass):
                       "collision_matrix",
                       "specimen",
                       "index_offset",
-                      "index_range",
                       "species",
                       "maximum_velocity",
                       "collision_invariants"})
         return attrs
 
+    @property
+    def dv(self):
+        return self.delta * self.spacings
+
+    @property
+    def velocities(self):
+        return self.delta * self.iMG
+
+    def centered_velocities(self, mean_velocity, s=None):
+        mean_velocity = np.array(mean_velocity)
+        assert mean_velocity.shape[-1] == self.ndim
+        dim = self.ndim
+        velocities = self.velocities[self.idx_range(s), :]
+        # mean_velocity may have ndim > 1, thus reshape into 3D
+        shape = mean_velocity.shape[:-1]
+        size = np.prod(shape, dtype=int)
+        new_shape = shape + (velocities.shape[0], dim)
+        mean_velocity = mean_velocity.reshape((size, 1, dim))
+        velocities = velocities[np.newaxis, ...]
+        centered_velocities = velocities - mean_velocity
+        return centered_velocities.reshape(new_shape)
+
+    def temperature_range(self, mean_velocity=0):
+        max_v = np.max(np.abs(self.maximum_velocity))
+        mean_v = np.max(np.abs(mean_velocity))
+        assert mean_v < max_v
+        min_mass = np.min(self.masses)
+        max_temp = (max_v - mean_v)**2 / min_mass
+        min_temp = 3 * np.max(self.spacings * self.delta)**2 / min_mass
+        return np.array([min_temp, max_temp], dtype=float)
+
+    @property
+    def mass_array(self):
+        result = np.empty(self.size)
+        for s in self.species:
+            result[self.idx_range(s)] = self.masses[s]
+        return result
+
+    @property
+    def dv_array(self):
+        result = np.empty(self.size)
+        dv = self.dv
+        for s in self.species:
+            result[self.idx_range(s)] = dv[s]
+        return result
+
     #####################################
     #               Indexing            #
     #####################################
+    def idx_range(self, s=None):
+        if s is None:
+            return np.s_[:]
+        else:
+            return np.s_[self.index_offset[s]: self.index_offset[s+1]]
+
     def get_idx(self,
                 species,
                 velocities):
@@ -356,6 +400,309 @@ class Model(bp.BaseClass):
             return relations[positions]
 
     ##################################
+    #      Initial Distribution      #
+    ##################################
+    @staticmethod
+    def maxwellian(velocities,
+                   temperature,
+                   mass=1,
+                   number_density=1,
+                   mean_velocity=0):
+        dim = velocities.shape[-1]
+        # compute exponential with matching mean velocity and temperature
+        exponential = np.exp(
+            -0.5 * mass / temperature
+            * np.sum((velocities - mean_velocity)**2, axis=-1))
+        divisor = np.sqrt(2*np.pi * temperature / mass) ** (dim / 2)
+        # multiply to get desired number density
+        result = (number_density / divisor) * exponential
+        return result
+
+    def _init_error(self, moment_parameters, wanted_moments, s=None):
+        dim = self.ndim
+        mass = self.mass_array if s is None else self.masses[s]
+        velocities = self.velocities[self.idx_range(s)]
+
+        # compute values of maxwellian on given velocities
+        state = Model.maxwellian(velocities=velocities,
+                                 temperature=moment_parameters[dim],
+                                 mass=mass,
+                                 mean_velocity=moment_parameters[0: dim])
+        # compute momenta
+        number_density = self.number_density(state, s)
+        momentum = self.momentum(state, s)
+        mass_density = self.mass_density(state, s)
+        mean_velocity = self.mean_velocity(momentum, mass_density)
+        pressure = self.pressure(state, s, mean_velocity)
+        temperature = self.temperature(pressure, number_density)
+        # return difference from wanted_moments
+        moments = np.zeros(moment_parameters.shape, dtype=float)
+        moments[0: dim] = mean_velocity
+        moments[dim] = temperature
+        return moments - wanted_moments
+
+    def compute_initial_state(self,
+                              number_densities,
+                              mean_velocities,
+                              temperatures):
+        # number densities can be multiplied on the distribution at the end
+        number_densities = np.array(number_densities)
+        assert number_densities.shape == (self.specimen,)
+
+        # mean velocites and temperatures are the targets for the newton scheme
+        wanted_moments = np.zeros((self.specimen, self.ndim + 1), dtype=float)
+        wanted_moments[:, : self.ndim] = mean_velocities
+        wanted_moments[:, self.ndim] = temperatures
+
+        # initialization parameters for the maxwellians
+        init_params = np.zeros((self.specimen, self.ndim + 1), dtype=float)
+
+        # if all specimen have equal mean_velocities and temperatures
+        # then create a maxwellian in equilibrium (invariant under collisions)
+        is_in_equilibrium = np.allclose(wanted_moments, wanted_moments[0])
+        if is_in_equilibrium:
+            # To create an equilibrium, all specimen must have equal init_params
+            # We cannot achieve each specimen to fit the wanted_values
+            # Thus we fit total moments to the wanted_values
+            init_params[:] = sp_newton(self._init_error,
+                                       wanted_moments[0],
+                                       args=(wanted_moments[0], None))
+        else:
+            # Here we don't need an equilibrium,
+            # all specimen may have different init_params
+            # Thus we can fit each specimen to its wanted_values
+            for s in self.species:
+                init_params[s] = sp_newton(self._init_error,
+                                           wanted_moments[s],
+                                           args=(wanted_moments[s], s))
+
+        # set up initial state, compute maxwellians with the init_params
+        initial_state = np.zeros(self.size, dtype=float)
+        for s in self.species:
+            idx_range = self.idx_range(s)
+            state = Model.maxwellian(velocities=self.velocities[idx_range],
+                                     mass=self.masses[s],
+                                     temperature=init_params[s, self.ndim],
+                                     mean_velocity=init_params[s, 0:self.ndim])
+            # normalize meaxwellian to number density == 1
+            state /= self.number_density(state, s)
+            # multiply to get the wanted number density
+            state *= number_densities[s]
+            initial_state[idx_range] = state
+        return initial_state
+
+    ##################################
+    #        Moment functions        #
+    ##################################
+    @staticmethod
+    def project_velocities(velocities, direction):
+        direction = np.array(direction)
+        assert direction.shape == (velocities.shape[-1],)
+        assert np.linalg.norm(direction) > 1e-8
+        shape = velocities.shape[:-1]
+        size = np.prod(shape, dtype=int)
+        dim = velocities.shape[-1]
+        velocities = velocities.reshape((size, dim))
+        angle = direction / np.linalg.norm(direction)
+        result = np.dot(velocities, angle)
+        return result.reshape(shape)
+
+    @staticmethod
+    def is_orthogonal(direction_1, direction_2):
+        return np.allclose(np.dot(direction_1, direction_2), 0)
+
+    @staticmethod
+    def is_parallel(direction_1, direction_2):
+        norms = np.linalg.norm(direction_1) * np.linalg.norm(direction_2)
+        return np.allclose(np.dot(direction_1, direction_2), norms)
+
+    # TODO if directions = None, return tensor, check if this is easy to do
+    def mf_stress(self, mean_velocity, direction_1, direction_2, s=None):
+        mean_velocity = np.array(mean_velocity)
+        direction_1 = np.array(direction_1)
+        direction_2 = np.array(direction_2)
+        assert direction_1.shape == (self.ndim,)
+        assert direction_2.shape == (self.ndim,)
+        assert (self.is_parallel(direction_1, direction_2)
+                or self.is_orthogonal(direction_1, direction_2))
+
+        mass = self.mass_array if s is None else self.masses[s]
+        c_vels = self.centered_velocities(mean_velocity, s)
+        proj_vels_1 = self.project_velocities(c_vels, direction_1)
+        proj_vels_2 = self.project_velocities(c_vels, direction_2)
+        return mass * proj_vels_1 * proj_vels_2
+
+    def mf_pressure(self, mean_velocity, s=None):
+        mean_velocity = np.array(mean_velocity)
+        dim = self.ndim
+        mass = self.mass_array[np.newaxis, :] if s is None else self.masses[s]
+        velocities = self.velocities[self.idx_range(s), :]
+        # reshape mean_velocity (may have higher dimension)
+        # to subtract from velocities
+        shape = mean_velocity.shape[:-1]
+        size = np.prod(shape, dtype=int)
+        new_shape = shape + (velocities.shape[0],)
+        mean_velocity = mean_velocity.reshape((size, 1, dim))
+        c_vels = self.centered_velocities(mean_velocity, s)
+        mf_pressure = mass / dim * np.sum(c_vels**2, axis=-1)
+        return mf_pressure.reshape(new_shape)
+
+    def mf_orthogonal_stress(self, mean_velocity, direction_1, direction_2, s=None):
+        mean_velocity = np.array(mean_velocity)
+        direction_1 = np.array(direction_1)
+        direction_2 = np.array(direction_2)
+        result = self.mf_stress(mean_velocity, direction_1, direction_2, s)
+        if self.is_orthogonal(direction_1, direction_2):
+            return result
+        elif self.is_parallel(direction_1, direction_2):
+            return result - self.mf_pressure(mean_velocity, s)
+        else:
+            raise ValueError
+
+    def mf_heat_flow(self, mean_velocity, direction, s=None):
+        mean_velocity = np.array(mean_velocity)
+        direction = np.array(direction)
+        assert direction.shape == (self.ndim,)
+        mass = self.mass_array if s is None else self.masses[s]
+        c_vels = self.centered_velocities(mean_velocity, s)
+        proj_vels = self.project_velocities(c_vels, direction)
+        squared_sum = np.sum(c_vels ** 2, axis=-1)
+        return mass * proj_vels * squared_sum
+
+    def mf_orthogonal_heat_flow(self, mean_velocity, temperature, direction, s=None):
+        raise NotImplementedError
+
+    ##################################
+    #            Moments             #
+    ##################################
+    # Todo might be necessary to flatten all states (also in number density...
+    #  might be good to move this into _get_state_of_species
+    def _get_state_of_species(self, state, s):
+        if state.shape[-1] == self.size:
+            state = state[..., self.idx_range(s)]
+        else:
+            assert s is not None
+            assert state.shape[-1] == self.vGrids[s].size
+        return state
+
+    def number_density(self, state, s=None):
+        state = self._get_state_of_species(state, s)
+        dim = self.ndim
+        dv = self.dv_array if s is None else self.dv[s]
+        return np.sum(dv**dim * state, axis=-1)
+
+    def mass_density(self, state, s=None):
+        state = self._get_state_of_species(state, s)
+        dim = self.ndim
+        mass = self.mass_array if s is None else self.masses[s]
+        dv = self.dv_array if s is None else self.dv[s]
+        return np.sum(dv**dim * mass * state, axis=-1)
+
+    def momentum(self, state, s=None):
+        state = self._get_state_of_species(state, s)
+        # Reshape arrays into 2d
+        shape = state.shape[:-1]
+        size = np.prod(shape, dtype=int)
+        flat_shape = (size, state.shape[-1])
+        new_shape = shape + (self.ndim,)
+        state = state.reshape(flat_shape)
+        dim = self.ndim
+        mass = self.mass_array[np.newaxis, :] if s is None else self.masses[s]
+        dv = self.dv_array[np.newaxis, :] if s is None else self.dv[s]
+        velocities = self.velocities[self.idx_range(s)]
+        result = np.dot(dv**dim * mass * state, velocities)
+        return result.reshape(new_shape)
+
+    @staticmethod
+    def mean_velocity(momentum, mass_density):
+        r"""
+        Parameters
+        ----------
+        momentum : :obj:`~numpy.ndarray` [:obj:`float`]
+        mass_density : :obj:`~numpy.ndarray` [:obj:`float`]
+        """
+        return momentum / mass_density[..., np.newaxis]
+
+    def energy_density(self, state, s):
+        r"""
+
+        Parameters
+        ----------
+        state : :obj:`~numpy.ndarray` [:obj:`float`]
+            Must be 2D array.
+        """
+        state = self._get_state_of_species(state, s)
+        # Reshape arrays into 2d
+        new_state = state.shape[:-1]
+        size = np.prod(new_state, dtype=int)
+        flat_shape = (size, state.shape[-1])
+        state = state.reshape(flat_shape)
+        dim = self.ndim
+        mass = self.mass_array[np.newaxis, :] if s is None else self.masses[s]
+        dv = self.dv_array[np.newaxis, :] if s is None else self.dv[s]
+        velocities = self.velocities[self.idx_range(s)]
+        energy = 0.5 * mass * np.sum(velocities ** 2, axis=-1)
+        result = dv ** dim * np.dot(state, energy)
+        return result.reshape(new_state)
+
+    def pressure(self, state, s, mean_velocity):
+        state = self._get_state_of_species(state, s)
+        # Reshape arrays into 2d
+        new_shape = state.shape[:-1]
+        size = np.prod(new_shape, dtype=int)
+        flat_shape = (size, state.shape[-1])
+        state = state.reshape(flat_shape)
+        dim = self.ndim
+        dv = self.dv_array[np.newaxis, :] if s is None else self.dv[s]
+        mf_pressure = self.mf_pressure(mean_velocity, s).reshape(flat_shape)
+        result = np.sum(dv**dim * mf_pressure * state, axis=-1)
+        return result.reshape(new_shape)
+
+    @staticmethod
+    def temperature(pressure, number_density):
+        assert pressure.shape == number_density.shape
+        return pressure / number_density
+
+    def momentum_flow(self, state, s):
+        r"""
+        Parameters
+        ----------
+        state : :obj:`~numpy.ndarray` [:obj:`float`]
+        """
+        state = self._get_state_of_species(state, s)
+        # Reshape arrays to use np.dot
+        shape = state.shape[:-1]
+        size = np.prod(shape, dtype=int)
+        flat_shape = (size, state.shape[-1])
+        state = state.reshape(flat_shape)
+        dim = self.ndim
+        mass = self.mass_array[np.newaxis, :] if s is None else self.masses[s]
+        dv = self.dv_array[np.newaxis, :] if s is None else self.dv[s]
+        velocities = self.velocities[self.idx_range(s)]
+        result = np.dot(dv**dim * mass * state, velocities ** 2)
+        return result.reshape(shape + (dim,))
+
+    def energy_flow(self, state, s):
+        r"""
+        Parameters
+        ----------
+        state : :obj:`~numpy.ndarray` [:obj:`float`]
+        """
+        assert state.ndim == 2
+        # Reshape arrays to use np.dot
+        shape = state.shape[:-1]
+        size = np.prod(shape, dtype=int)
+        flat_shape = (size, state.shape[-1])
+        state = state.reshape(flat_shape)
+        dim = self.ndim
+        mass = self.mass_array[np.newaxis, :] if s is None else self.masses[s]
+        dv = self.dv_array[np.newaxis, :] if s is None else self.dv[s]
+        velocities = self.velocities[self.idx_range(s)]
+        energies = 0.5 * mass * np.sum(velocities ** 2, axis=1)[:, np.newaxis]
+        result = np.dot(dv**dim * state, energies * velocities)
+        return result.reshape(shape + (dim,))
+
+    ##################################
     #           Collisions           #
     ##################################
     def compute_weights(self, relations=None):
@@ -411,7 +758,7 @@ class Model(bp.BaseClass):
                 repr_rels = dict()
                 for key in group.keys():
                     # generate collisions in extended grids
-                    # allows transfering the results without losing collisions
+                    # allows transferring the results without losing collisions
                     repr_rels[key] = coll_func(
                         [self.vGrids[i].extension(2) for i in [s0, s0, s1, s1]],
                         self.masses[[s0, s0, s1, s1]],
@@ -422,8 +769,7 @@ class Model(bp.BaseClass):
                         # shift extended colvels
                         new_colvels = repr_rels[key] + (v0 - repr[key])
                         # get indices
-                        new_rels = self.get_idx([s0, s0, s1, s1],
-                                                 new_colvels)
+                        new_rels = self.get_idx([s0, s0, s1, s1], new_colvels)
 
                         # remove out-of-bounds or useless collisions
                         choice = np.where(
@@ -575,6 +921,44 @@ class Model(bp.BaseClass):
                          == np.sum(masses[2] * (w1 ** 2 - w0 ** 2), axis=-1))
         return np.all(cond, axis=0)
 
+    def collision_operator(self, state):
+        """Computes J[f,f],
+        with J[f,f] being the collision operator at all given points.
+        These points are the ones specified in state.
+
+        Note that this is the collision of all species.
+        Collisions of species i with species j are not implemented.
+        ."""
+        shape = state.shape
+        size = np.prod(shape[:-1], dtype=int)
+        state = state.reshape((size, self.size))
+        assert state.ndim == 2
+        result = np.empty(state.shape, dtype=float)
+        for p in range(state.shape[0]):
+            u_c0 = state[p, self.collision_relations[:, 0]]
+            u_c1 = state[p, self.collision_relations[:, 1]]
+            u_c2 = state[p, self.collision_relations[:, 2]]
+            u_c3 = state[p, self.collision_relations[:, 3]]
+            col_factor = (np.multiply(u_c0, u_c2) - np.multiply(u_c1, u_c3))
+            result[p] = self.collision_matrix.dot(col_factor)
+        return result.reshape(shape)
+
+    #####################################
+    #           Coefficients            #
+    #####################################
+    def viscosity(self,
+                  number_densities,
+                  mean_velocity,
+                  temperature,
+                  direction_1=None,
+                  direction_2=None,
+                  plot=False):
+        # initialize homogeneous rule
+        # set up source term -> update rule
+        # run simulation for L^1f
+        # compute viscosity as scalar product
+        pass
+
     #####################################
     #           Visualization           #
     #####################################
@@ -702,21 +1086,18 @@ class Model(bp.BaseClass):
             isinstance(G, bp.Grid)
             G.check_integrity()
 
-        assert isinstance(self.index_range, np.ndarray)
-        assert self.index_range.dtype == int
-        assert self.index_range.ndim == 2
-        assert self.specimen == self.index_range.shape[0]
-        assert self.index_range.shape[1] == 2
-        assert np.all(self.index_range >= 0)
-        assert np.all(self.index_range[1:, 0] == self.index_range[0:-1, 1])
-        assert np.all(self.index_range[:, 0] < self.index_range[:, 1])
+        assert isinstance(self.index_offset, np.ndarray)
+        assert self.index_offset.dtype == int
+        assert self.index_offset.shape == (self.specimen + 1,)
+        assert np.all(self.index_offset >= 0)
+        assert np.all(self.index_offset[1:] > self.index_offset[:-1])
         assert np.array_equal(self.index_offset[1:] - self.index_offset[:-1],
                               np.array([G.size for G in self.vGrids]))
 
         assert isinstance(self.iMG, np.ndarray)
         assert self.iMG.dtype == int
         assert self.iMG.ndim == 2
-        assert self.iMG.shape[0] == self.index_range[-1, 1]
+        assert self.iMG.shape[0] == self.index_offset[-1]
 
         assert self.algorithm_relations in {"all", "convergent", "naive"}
         assert self.algorithm_weights in {"uniform"}

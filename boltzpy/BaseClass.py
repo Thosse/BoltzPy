@@ -41,19 +41,22 @@ class BaseClass:
                               "\n\tself.attr.shape = ", value.shape,
                               "\n\tother.attr.shape) = ", other_value.shape)
                     return False
-                if np.any(value != other_value):
-                    if print_message:
-                        print("An attribute has differing values:",
-                              "\n\tAttribute = ", key,
-                              "\n\tself.attr = ", value,
-                              "\n\tother.attr = ", other_value)
-                    return False
+                if value.dtype == float:
+                    if not np.allclose(value, other_value):
+                        if print_message:
+                            print("An attribute has differing values:",
+                                  "\n\tAttribute = ", key)
+                        return False
+                else:
+                    if not np.array_equal(value, other_value):
+                        if print_message:
+                            print("An attribute has differing values:",
+                                  "\n\tAttribute = ", key)
+                        return False
             else:
                 if value != other_value:
                     if print_message:
                         print("An attribute has differing values:",
-                              "\n\tAttribute = ", key,
-                              "\n\ttype(self) = ", value,
-                              "\n\ttype(other) = ", other_value)
+                              "\n\tAttribute = ", key)
                     return False
         return True

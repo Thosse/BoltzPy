@@ -55,11 +55,13 @@ def assert_files_are_equal(addresses):
                             "Differing data types for {}:\t"
                             "{} vs {}".format(key, type(val_1), type(val_2)))
                     if isinstance(val_1, np.ndarray):
-                        assert np.array_equal(val_1, val_2), (
-                            "Differing values for {}:\t"
-                            "{} vs {}".format(key, val_1, val_2))
+                        if val_1.dtype == float:
+                            assert np.allclose(val_1, val_2), (
+                                "Differing values for {}".format(key))
+                        else:
+                            assert np.array_equal(val_1, val_2), (
+                                "Differing values for {}".format(key))
                     else:
                         assert val_1 == val_2, (
-                            "Differing values for {}:\t"
-                            "{} vs {}".format(key, val_1, val_2))
+                            "Differing values for {}".format(key))
     return

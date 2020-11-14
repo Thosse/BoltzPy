@@ -8,15 +8,6 @@ Simulation
 .. autoclass:: boltzpy.Simulation
     :members:
 
-Species
--------
-.. autoclass:: boltzpy.Species
-    :members:
-
-Specimen
---------
-.. autoclass:: boltzpy.Specimen
-    :members:
 
 Grid
 ----
@@ -25,7 +16,7 @@ Grid
 
 SVGrid
 ------
-.. autoclass:: boltzpy.SVGrid
+.. autoclass:: boltzpy.Model
     :members:
 
 Rule
@@ -37,13 +28,4 @@ Geometry
 --------
 .. autoclass:: boltzpy.Geometry
     :members:
-    
-Scheme
-------
-.. autoclass:: boltzpy.Scheme
-    :members:
-
-Collisions
-----------
-.. autoclass:: boltzpy.Collisions
-    :members:
+  

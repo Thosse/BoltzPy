@@ -79,9 +79,7 @@ def test_load_from_file(key):
         new = SIMULATIONS[key]
         assert isinstance(old, bp.Simulation)
         assert isinstance(new, bp.Simulation)
-        assert old == new, (
-            "\n{}\nis not equal to\n\n{}".format(old, new)
-        )
+        assert old == new
 
 
 @pytest.mark.parametrize("key", SIMULATIONS.keys())
@@ -94,10 +92,115 @@ def test_computed_state_is_equal(key):
             for s in file_old[key]["results"].keys():
                 state_old = file_old[key]["results"][s]["state"][()]
                 state_new = file_new[key]["results"][s]["state"][()]
-                assert np.array_equal(state_old, state_new), (
+                assert np.allclose(state_old, state_new), (
                     "\n{}\nis not equal to\n\n{}".format(state_old, state_new))
 
 
 # the file is used in more tests, this is a simple hack to delete it after use
 def test_teardown_tmp_file():
     os.remove(test_helper.TMP_FILE)
+
+
+@pytest.mark.parametrize("key", SIMULATIONS.keys())
+def test_particle_number(key):
+    with h5py.File(FILE, mode="r") as file:
+        hdf_group = file[key]
+        sim = bp.Simulation.load(hdf_group)
+        model = sim.model
+        for s in model.species:
+            spc_group = hdf_group["results"][str(s)]
+            state = spc_group["state"][()]
+            old_result = spc_group["particle_number"][()]
+            new_result = model.number_density(state, s)
+            assert np.allclose(old_result, new_result)
+
+
+@pytest.mark.parametrize("key", SIMULATIONS.keys())
+def test_momentum(key):
+    with h5py.File(FILE, mode="r") as file:
+        hdf_group = file[key]
+        sim = bp.Simulation.load(hdf_group)
+        model = sim.model
+        for s in model.species:
+            spc_group = hdf_group["results"][str(s)]
+            state = spc_group["state"][()]
+            old_result = spc_group["momentum"][()]
+            new_result = model.momentum(state, s)
+            assert np.allclose(old_result, new_result)
+
+
+@pytest.mark.parametrize("key", SIMULATIONS.keys())
+def test_mean_velocity(key):
+    with h5py.File(FILE, mode="r") as file:
+        hdf_group = file[key]
+        sim = bp.Simulation.load(hdf_group)
+        model = sim.model
+        for s in model.species:
+            spc_group = hdf_group["results"][str(s)]
+            state = spc_group["state"][()]
+            old_result = spc_group["mean_velocity"][()]
+            momentum = model.momentum(state, s)
+            mass_density = model.mass_density(state, s)
+            new_result = model.mean_velocity(momentum, mass_density)
+            assert np.allclose(old_result, new_result)
+
+
+@pytest.mark.parametrize("key", SIMULATIONS.keys())
+def test_energy_density(key):
+    with h5py.File(FILE, mode="r") as file:
+        hdf_group = file[key]
+        sim = bp.Simulation.load(hdf_group)
+        model = sim.model
+        for s in model.species:
+            spc_group = hdf_group["results"][str(s)]
+            state = spc_group["state"][()]
+            old_result = spc_group["energy"][()]
+            new_result = model.energy_density(state, s)
+            assert np.allclose(old_result, new_result)
+
+
+@pytest.mark.parametrize("key", SIMULATIONS.keys())
+def test_temperature(key):
+    with h5py.File(FILE, mode="r") as file:
+        hdf_group = file[key]
+        sim = bp.Simulation.load(hdf_group)
+        model = sim.model
+        for s in model.species:
+            spc_group = hdf_group["results"][str(s)]
+            state = spc_group["state"][()]
+            number_density = spc_group["particle_number"][()]
+            mean_velocity = spc_group["mean_velocity"][()]
+            pressure = model.pressure(state, s, mean_velocity)
+            old_result = spc_group["temperature"][()]
+            new_result = model.temperature(pressure, number_density)
+            assert old_result.shape == new_result.shape
+            assert np.allclose(old_result, new_result)
+
+
+@pytest.mark.parametrize("key", SIMULATIONS.keys())
+def test_momentum_flow(key):
+    with h5py.File(FILE, mode="r") as file:
+        hdf_group = file[key]
+        sim = bp.Simulation.load(hdf_group)
+        model = sim.model
+        for s in model.species:
+            spc_group = hdf_group["results"][str(s)]
+            state = spc_group["state"][()]
+            old_result = spc_group["momentum_flow"][()]
+            new_result = model.momentum_flow(state, s)
+            assert np.allclose(old_result, new_result)
+
+
+@pytest.mark.parametrize("key", SIMULATIONS.keys())
+def test_energy_flow(key):
+    with h5py.File(FILE, mode="r") as file:
+        hdf_group = file[key]
+        sim = bp.Simulation.load(hdf_group)
+        model = sim.model
+        for s in model.species:
+            spc_group = hdf_group["results"][str(s)]
+            for t in range(sim.timing.size):
+                state = spc_group["state"][t]
+                old_result = spc_group["energy_flow"][t]
+                new_result = model.energy_flow(state, s)
+                assert np.allclose(old_result, new_result)

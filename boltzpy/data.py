@@ -59,7 +59,10 @@ class Data:
         self.result = np.copy(self.state)
 
         # Velocity Grid parameters
-        self.v_range = sim.model.index_range
+        self.v_range = np.zeros((sim.model.specimen, 2), dtype=int)
+        self.v_range[:, 0] = sim.model.index_offset[0: sim.model.specimen]
+        self.v_range[:, 1] = sim.model.index_offset[1:]
+
         self.vG = sim.model.delta * sim.model.iMG
         # Todo reimplement offset -> geometry or simulation?
         self.velocity_offset = np.zeros(sim.model.ndim)
@@ -89,10 +92,7 @@ class Data:
         # Todo This involves a scheme to determine "sub-rules"
         # Todo as the position of the boundary is important for its
         # todo behaviour / reinitialization
-
-        self._params = dict()
-        # Keep as a "conditional" attribute?
-        self._params["col_mat"] = sim.model.collision_matrix * sim.timing.delta
+        self.model = sim.model
         return
 
     def __getattr__(self, item):

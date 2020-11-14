@@ -130,9 +130,7 @@ def test_load_from_file(key):
         new = RULES[key]
         assert isinstance(old, bp.Rule)
         assert isinstance(new, bp.Rule)
-        assert old == new, (
-            "\n{}\nis not equal to\n\n{}".format(old, new)
-        )
+        assert old == new
 
 
 @pytest.mark.parametrize("key", CLASSES["InnerPointRule"].keys())
@@ -141,7 +139,10 @@ def test_attributes_of_inner_points(attribute, key):
     with h5py.File(FILE, mode="r") as file:
         old = file[key][attribute][()]
         new = RULES[key].__getattribute__(attribute)
-        assert np.all(old == new)
+        if isinstance(new, np.ndarray) and (new.dtype == float):
+            assert np.allclose(old, new)
+        else:
+            assert np.all(old == new)
 
 
 @pytest.mark.parametrize("key", CLASSES["ConstantPointRule"].keys())
@@ -150,7 +151,10 @@ def test_attributes_of_constant_points(attribute, key):
     with h5py.File(FILE, mode="r") as file:
         old = file[key][attribute][()]
         new = RULES[key].__getattribute__(attribute)
-        assert np.all(old == new)
+        if isinstance(new, np.ndarray) and (new.dtype == float):
+            assert np.allclose(old, new)
+        else:
+            assert np.all(old == new)
 
 
 @pytest.mark.parametrize("key", CLASSES["BoundaryPointRule"].keys())
@@ -159,7 +163,10 @@ def test_attributes_of_boundary_points(attribute, key):
     with h5py.File(FILE, mode="r") as file:
         old = file[key][attribute][()]
         new = RULES[key].__getattribute__(attribute)
-        assert np.all(old == new)
+        if isinstance(new, np.ndarray) and (new.dtype == float):
+            assert np.allclose(old, new)
+        else:
+            assert np.all(old == new)
 
 
 @pytest.mark.parametrize("key", RULES.keys())

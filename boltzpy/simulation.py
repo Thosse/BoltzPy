@@ -5,7 +5,6 @@ import numpy as np
 import boltzpy.helpers.TimeTracker as h_tt
 import boltzpy.AnimatedFigure as bp_af
 import boltzpy.compute as bp_cp
-import boltzpy.output as bp_o
 import boltzpy as bp
 
 
@@ -130,68 +129,46 @@ class Simulation(bp.BaseClass):
         time_tracker = h_tt.TimeTracker()
         for (tw_idx, tw) in enumerate(data.tG[:, 0]):
             while data.t != tw:
-                bp_cp.operator_splitting(data,
-                                         self.geometry.transport,
-                                         self.geometry.collision)
+                self.geometry.compute(data)
             self.write_results(data, tw_idx, results)
             file.flush()
             # print time estimate
             time_tracker.print(tw, data.tG[-1, 0])
         return
 
+    # Todo this needs an overhaul
     def write_results(self, data, tw_idx, hdf_group):
         for s in self.model.species:
-            (beg, end) = self.model.index_range[s]
-            spc_state = data.state[..., beg:end]
-            dv = self.model.vGrids[s].physical_spacing
-            mass = self.model.masses[s]
-            velocities = self.model.vGrids[s].pG
+            idx_range = self.model.idx_range(s)
+            spc_state = data.state[..., idx_range]
             spc_group = hdf_group[str(s)]
-            # particle_number
-            particle_number = bp_o.particle_number(spc_state, dv)
-            spc_group["particle_number"][tw_idx] = particle_number
+            # number_density
+            number_density = self.model.number_density(spc_state, s)
+            spc_group["particle_number"][tw_idx] = number_density
+
+            # momentum
+            momentum = self.model.momentum(spc_state, s)
+            spc_group["momentum"][tw_idx] = momentum
 
             # mean velocity
-            mean_velocity = bp_o.mean_velocity(spc_state,
-                                               dv,
-                                               velocities,
-                                               particle_number)
+            mass_density = self.model.mass_density(spc_state, s)
+            mean_velocity = self.model.mean_velocity(momentum, mass_density)
             spc_group["mean_velocity"][tw_idx] = mean_velocity
+
             # temperature
-            temperature = bp_o.temperature(spc_state,
-                                           dv,
-                                           velocities,
-                                           mass,
-                                           particle_number,
-                                           mean_velocity)
+            pressure = self.model.pressure(spc_state, s, mean_velocity)
+            temperature = self.model.temperature(pressure, number_density)
             spc_group["temperature"][tw_idx] = temperature
-            # momentum
-            spc_group["momentum"][tw_idx] = bp_o.momentum(
-                spc_state,
-                dv,
-                velocities,
-                mass)
+
             # momentum flow
-            spc_group["momentum_flow"][tw_idx] = bp_o.momentum_flow(
-                spc_state,
-                dv,
-                velocities,
-                mass)
+            spc_group["momentum_flow"][tw_idx] = self.model.momentum_flow(spc_state, s)
             # energy
-            spc_group["energy"][tw_idx] = bp_o.energy(
-                spc_state,
-                dv,
-                velocities,
-                mass)
+            spc_group["energy"][tw_idx] = self.model.energy_density(spc_state, s)
             # energy flow
-            spc_group["energy_flow"][tw_idx] = bp_o.energy_flow(
-                spc_state,
-                dv,
-                velocities,
-                mass)
+            spc_group["energy_flow"][tw_idx] = self.model.energy_flow(spc_state, s)
             # complete distribution
             if self.log_state:
-                spc_group["state"][tw_idx] = data.state[..., beg:end]
+                spc_group["state"][tw_idx] = spc_state
         # update index of current time step
         hdf_group.attrs["t"] = tw_idx + 1
         return
@@ -327,7 +304,8 @@ class Simulation(bp.BaseClass):
         self.model.check_integrity()
         assert self.model.ndim >= self.geometry.ndim
         assert self.geometry.model_size == self.model.size
-        assert self.geometry.rules.size >= self.model.specimen
+        for r in self.geometry.rules:
+            assert r.specimen >= self.model.specimen
         assert isinstance(self.file, h5py.Group)
         assert isinstance(self.log_state, np.bool)
         assert isinstance(self.order_operator_splitting, int)

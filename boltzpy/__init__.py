@@ -31,8 +31,9 @@ Workflow
 """
 from boltzpy.BaseClass import BaseClass
 from boltzpy.grid import Grid
-from boltzpy.rule import Rule, InnerPointRule, ConstantPointRule, BoundaryPointRule
+from boltzpy.rule import *
 from boltzpy.geometry import Geometry
 from boltzpy.simulation import Simulation
 from boltzpy.model import Model
 from boltzpy.data import Data
+import boltzpy.AnimatedFigure as Plot

@@ -60,19 +60,6 @@ r""""..todo::
 import numpy as np
 
 
-##################################
-#       Operator Splitting       #
-##################################
-def operator_splitting(data, func_transport, func_collision):
-    """Executes a single time step"""
-    # executing time step
-    func_transport(data)
-    func_collision(data)
-    assert np.all(data.state >= 0)
-    data.t += 1
-    return
-
-
 #################################
 #           Transport           #
 #################################
@@ -103,6 +90,7 @@ def transport_inflow_innerPoint(data, affected_points):
                                                pos_vels)]
                            )
     return result
+
 
 # Todo test that this is equivalent to innerPoint, with all velocities allowed
 def transport_inflow_boundaryPoint(data,
@@ -181,19 +169,20 @@ def no_transport(data, affected_points):
 ##################################
 #           Collisions           #
 ##################################
-# Todo this needs the col_mat, make sure this is the case
-def euler_scheme(data, affected_points):
-    """Executes a single collision step on complete P-Grid"""
-    for p in affected_points:
-        u_c0 = data.state[p, data.col[:, 0]]
-        u_c1 = data.state[p, data.col[:, 1]]
-        u_c2 = data.state[p, data.col[:, 2]]
-        u_c3 = data.state[p, data.col[:, 3]]
-        col_factor = (np.multiply(u_c0, u_c2) - np.multiply(u_c1, u_c3))
-        data.state[p] += data.col_mat.dot(col_factor)
-    return
 
-
-def no_collisions(data, affected_points):
-    """No Collisions are done here"""
+def collision_rkv4(data, affected_points):
+    """Executes a collision step, by using the 4th order Runge Kutta scheme"""
+    # Todo remove data, use sim.sv.size instead of state.shape[1]
+    state = data.state[affected_points]
+    result = np.zeros(state.shape, float)
+    rkv_component = np.zeros(state.shape, float)
+    rkv_offset = np.array([0, 0.5, 0.5, 1])
+    rkv_weight = np.array([1/6, 2/6, 2/6, 1/6])
+    for i in np.arange(4):
+        offset = rkv_offset[i]
+        weight = rkv_weight[i]
+        coll = data.model.collision_operator(state + offset * rkv_component)
+        rkv_component = data.dt * coll
+        result += weight * rkv_component
+    data.state[affected_points] += result
     return

@@ -143,7 +143,7 @@ class Grid(bp.BaseClass):
 
         Returns
         -------
-        values : :obj:`~numpy.array` [:obj:`int']
+        values : :obj:`~numpy.array` [:obj:`int`]
         """
         assert np.all(idx >= 0)
         assert np.all(idx < self.size)
@@ -167,7 +167,7 @@ class Grid(bp.BaseClass):
 
         Returns
         -------
-        values : :obj:`~numpy.array` [:obj:`float']
+        values : :obj:`~numpy.array` [:obj:`float`]
         """
         return self.iv(idx) * self.delta
 
@@ -181,7 +181,7 @@ class Grid(bp.BaseClass):
 
         Returns
         -------
-        index : :obj:`~numpy.array` [:obj:`int']
+        index : :obj:`~numpy.array` [:obj:`int`]
         """
         assert isinstance(values, np.ndarray), (
             "values must be an np.array, not {}".format(type(values)))
