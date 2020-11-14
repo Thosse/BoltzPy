@@ -75,7 +75,7 @@ RULES["equalMass/RightBoundary"] = bp.BoundaryPointRule(
 # Sub dictionaries for specific attribute tests
 CLASSES = {name: {key: item for (key, item) in RULES.items()
                   if isinstance(item, subclass)}
-           for (name, subclass) in bp.Rule.classes().items()}
+           for (name, subclass) in bp.Rule.subclasses().items()}
 
 
 def setup_file(file_address=FILE):

@@ -1,6 +1,5 @@
 
 import numpy as np
-import h5py
 
 import boltzpy as bp
 import boltzpy.compute as bp_cp
@@ -9,7 +8,7 @@ import boltzpy.compute as bp_cp
 class Rule(bp.BaseClass):
     """Base Class for all Rules
 
-    Contains methods for initialization, saving, loading and plotting.
+    Contains methods for initialization and plotting.
 
     Parameters
     ----------
@@ -46,13 +45,6 @@ class Rule(bp.BaseClass):
             self.initial_state = self.compute_initial_state(model)
         Rule.check_integrity(self)
         return
-
-    @staticmethod
-    def classes():
-        return {'InnerPointRule': InnerPointRule,
-                'ConstantPointRule': ConstantPointRule,
-                'BoundaryPointRule': BoundaryPointRule,
-                'HomogeneousRule': HomogeneousRule}
 
     @staticmethod
     def parameters():
@@ -107,50 +99,6 @@ class Rule(bp.BaseClass):
         #     maximum_velocity,
         #     100,
         #     plot_object)
-        return
-
-    @staticmethod
-    def load(hdf5_group):
-        """Set up and return a :class:`Rule` instance
-        based on the parameters in the given HDF5 group.
-
-        Parameters
-        ----------
-        hdf5_group : :obj:`h5py.Group <h5py:Group>`
-
-        Returns
-        -------
-        self : :class:`Rule`
-        """
-        assert isinstance(hdf5_group, h5py.Group)
-        assert hdf5_group.attrs["class"] in Rule.classes().keys()
-        # choose derived class for new rule
-        rule_class = Rule.classes()[hdf5_group.attrs["class"]]
-        parameters = dict()
-        for param in rule_class.parameters():
-            parameters[param] = hdf5_group[param][()]
-        return rule_class(**parameters)
-
-    def save(self, hdf5_group, write_all=False):
-        """Write the main parameters of the :class:`Rule` instance
-        into the HDF5 group.
-
-        Parameters
-        ----------
-        hdf5_group : :obj:`h5py.Group <h5py:Group>`
-        write_all : :obj:`bool`
-            If True, write all attributes and properties to the file,
-            even the unnecessary ones. Useful for testing,
-        """
-        assert isinstance(hdf5_group, h5py.Group)
-        self.check_integrity()
-        # Clean State of Current group
-        for key in hdf5_group.keys():
-            del hdf5_group[key]
-        hdf5_group.attrs["class"] = self.__class__.__name__
-        attributes = self.attributes() if write_all else self.parameters()
-        for attr in attributes:
-            hdf5_group[attr] = self.__getattribute__(attr)
         return
 
     def check_integrity(self):
