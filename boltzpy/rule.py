@@ -520,7 +520,8 @@ class HomogeneousRule(Rule):
                          model,
                          initial_state)
         self.model = model
-        self.source_term = np.array(source_term, dtype=float)
+        self.source_term = np.zeros(self.initial_state.shape, dtype=float)
+        self.source_term[...] = source_term
         return
 
     @staticmethod
@@ -537,6 +538,7 @@ class HomogeneousRule(Rule):
         return attrs
 
     def compute(self, dt=None, maxiter=5000, _depth=0):
+        self.check_integrity()
         if dt is None:
             max_weight = np.max(self.model.collision_matrix)
             dt = 1 / (20 * max_weight)
@@ -575,6 +577,11 @@ class HomogeneousRule(Rule):
         raise ValueError("No equilibrium established")
 
     def check_integrity(self):
-        # Todo check source term is orthogonal to moments?
-        if self.source_term.size != 1:
-            assert self.source_term.shape == self.initial_state.shape
+        assert self.source_term.shape == self.initial_state.shape
+        # source term must be orthogonal to all moments
+        # otherwise no equilibrium can be established
+        for s in self.model.species:
+            number_density = self.model.number_density(self.source_term, s)
+            assert np.isclose(number_density, 0)
+        assert np.allclose(self.model.momentum(self.source_term), 0)
+        assert np.allclose(self.model.energy_density(self.source_term), 0)
