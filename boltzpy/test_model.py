@@ -184,7 +184,7 @@ def test_get_idx_on_shuffled_grid_with(key):
         return
 
 @pytest.mark.parametrize("key", MODELS.keys())
-def test_invariance_of_collision_operator(key):
+def test_invariance_of_moments_under_collision_operator(key):
     model = MODELS[key]
     for _ in range(100):
         state = np.random.random(model.size)
@@ -204,6 +204,23 @@ def test_invariance_of_collision_operator(key):
         assert np.allclose(momentum, 0)
         energy = model.energy_density(collision_differences)
         assert np.isclose(energy, 0)
+
+
+@pytest.mark.parametrize("key", MODELS.keys())
+def test_maxwellians_are_invariant_unter_collision_operator(key):
+    model = MODELS[key]
+    # choose random mean velocity and temperature parameters
+    for _ in range(100):
+        max_v = model.maximum_velocity
+        mean_velocity = 2 * max_v * np.random.random(model.ndim) - max_v
+        temperature = 100 * np.random.random() + 1
+        # use parameters directly, dont initialize here (might lead to errors, definitely complicates things!)
+        state = model.maxwellian(velocities=model.velocities,
+                                 temperature=temperature,
+                                 mass=model.mass_array,
+                                 mean_velocity=mean_velocity)
+        collision_differences = model.collision_operator(state)
+        assert np.allclose(collision_differences, 0)
 
 
 def test_project_velocities():
