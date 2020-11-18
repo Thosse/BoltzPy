@@ -183,6 +183,23 @@ def test_get_idx_on_shuffled_grid_with(key):
     if model.specimen <= 2:
         return
 
+
+def assert_all_moments_are_zero(model, state):
+    # number density of each species stays the same
+    for s in model.species:
+        number_density = model.number_density(state, s)
+        assert np.isclose(number_density, 0)
+    # assert total number/mass stays the same (should be unnecessary)
+    number_density = model.number_density(state)
+    assert np.isclose(number_density, 0)
+    mass_density = model.mass_density(state)
+    assert np.isclose(mass_density, 0)
+    momentum = model.momentum(state)
+    assert np.allclose(momentum, 0)
+    energy = model.energy_density(state)
+    assert np.isclose(energy, 0)
+
+
 @pytest.mark.parametrize("key", MODELS.keys())
 def test_invariance_of_moments_under_collision_operator(key):
     model = MODELS[key]
@@ -191,19 +208,7 @@ def test_invariance_of_moments_under_collision_operator(key):
         # test that all momenta of the collision_differences are zero
         # since these are additive this tests that the momenta are collision invariant
         collision_differences = model.collision_operator(state)
-        # number density of each species stays the same
-        for s in model.species:
-            number_density = model.number_density(collision_differences, s)
-            assert np.isclose(number_density, 0)
-        # assert total number/mass stays the same (should be unnecessary)
-        number_density = model.number_density(collision_differences)
-        assert np.isclose(number_density, 0)
-        mass_density = model.mass_density(collision_differences)
-        assert np.isclose(mass_density, 0)
-        momentum = model.momentum(collision_differences)
-        assert np.allclose(momentum, 0)
-        energy = model.energy_density(collision_differences)
-        assert np.isclose(energy, 0)
+        assert_all_moments_are_zero(model, collision_differences)
 
 
 @pytest.mark.parametrize("key", MODELS.keys())
@@ -270,6 +275,39 @@ def test_project_velocities():
             result[:] += res.reshape(shape + (dim,))
         assert np.allclose(result, vectors)
     return
+
+
+@pytest.mark.parametrize("key", MODELS.keys())
+def test_mf_orthogonal_stress_is_orthogonal(key):
+    model = MODELS[key]
+    # moment functions are only orthogonal if the mean velocity is 0,
+    # this is due to discretization effects!
+    mean_velocity = np.zeros(model.ndim, dtype=float)
+    for _ in range(10):
+        # choose random temperature
+        temperature = 100 * np.random.random() + 1
+        # use parameters directly, dont initialize here (might lead to errors, definitely complicates things!)
+        state = model.maxwellian(velocities=model.velocities,
+                                 temperature=temperature,
+                                 mass=model.mass_array,
+                                 mean_velocity=mean_velocity)
+        # choose random direction1
+        for __ in range(10):
+            direction1 = np.random.random(model.ndim)
+            # test parallel stress mf
+            mf = model.mf_orthogonal_stress(mean_velocity,
+                                            direction1,
+                                            direction1)
+            assert_all_moments_are_zero(model, mf)
+            assert_all_moments_are_zero(model, mf * state)
+            # ro test nonparallel stress, choose simple orthogonal direction
+            direction2 = np.zeros(model.ndim)
+            direction2[:2] = (-direction1[1], direction1[0])
+            mf = model.mf_orthogonal_stress(mean_velocity,
+                                            direction1,
+                                            direction2)
+            assert_all_moments_are_zero(model, mf)
+            assert_all_moments_are_zero(model, mf * state)
 
 
 # Todo/Idea: Implement collisions only for specimen tuples
