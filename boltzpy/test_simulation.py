@@ -139,9 +139,7 @@ def test_mean_velocity(key):
             spc_group = hdf_group["results"][str(s)]
             state = spc_group["state"][()]
             old_result = spc_group["mean_velocity"][()]
-            momentum = model.momentum(state, s)
-            mass_density = model.mass_density(state, s)
-            new_result = model.mean_velocity(momentum, mass_density)
+            new_result = model.mean_velocity(state, s)
             assert np.allclose(old_result, new_result)
 
 
@@ -168,11 +166,8 @@ def test_temperature(key):
         for s in model.species:
             spc_group = hdf_group["results"][str(s)]
             state = spc_group["state"][()]
-            number_density = spc_group["particle_number"][()]
-            mean_velocity = spc_group["mean_velocity"][()]
-            pressure = model.pressure(state, s, mean_velocity)
             old_result = spc_group["temperature"][()]
-            new_result = model.temperature(pressure, number_density)
+            new_result = model.temperature(state, s)
             assert old_result.shape == new_result.shape
             assert np.allclose(old_result, new_result)
 

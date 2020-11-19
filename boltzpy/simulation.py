@@ -151,13 +151,13 @@ class Simulation(bp.BaseClass):
             spc_group["momentum"][tw_idx] = momentum
 
             # mean velocity
-            mass_density = self.model.mass_density(spc_state, s)
-            mean_velocity = self.model.mean_velocity(momentum, mass_density)
+            mean_velocity = self.model.mean_velocity(spc_state, s,
+                                                     momentum=momentum)
             spc_group["mean_velocity"][tw_idx] = mean_velocity
 
             # temperature
-            pressure = self.model.pressure(spc_state, s, mean_velocity)
-            temperature = self.model.temperature(pressure, number_density)
+            temperature = self.model.temperature(spc_state, s,
+                                                 number_density=number_density)
             spc_group["temperature"][tw_idx] = temperature
 
             # momentum flow
