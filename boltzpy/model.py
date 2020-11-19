@@ -566,8 +566,25 @@ class Model(bp.BaseClass):
         squared_sum = np.sum(c_vels ** 2, axis=-1)
         return mass * proj_vels * squared_sum
 
-    def mf_orthogonal_heat_flow(self, mean_velocity, temperature, direction, s=None):
-        raise NotImplementedError
+    def mf_orthogonal_heat_flow(self, state, direction, s=None):
+        direction = np.array(direction)
+        direction = direction / np.sum(direction**2)
+        # compute mean velocity
+        mass = self.mass_density(state, s)
+        momentum = self.momentum(state, s)
+        mean_velocity = self.mean_velocity(momentum, mass)
+        # compute non-orthogonal moment function
+        mf = self.mf_heat_flow(mean_velocity, direction, s)
+        # subtract non-orthogonal part
+        # in continuum this is (d+2)*T * centered_velocities
+        # however this is not precise enough in grids
+        # thus subtract correction term based on state
+        p_vels = self.centered_velocities(mean_velocity) @ direction
+        ct = (self.momentum(mf * state) @ direction
+              / (self.momentum(p_vels*state) @ direction)
+              * p_vels)
+        result = mf - ct
+        return result
 
     ##################################
     #            Moments             #

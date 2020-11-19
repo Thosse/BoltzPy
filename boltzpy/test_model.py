@@ -310,6 +310,29 @@ def test_mf_orthogonal_stress_is_orthogonal(key):
             assert_all_moments_are_zero(model, mf * state)
 
 
+@pytest.mark.parametrize("key", MODELS.keys())
+def test_mf_orthogonal_heat_flow_is_orthogonal(key):
+    model = MODELS[key]
+    # moment functions are only orthogonal if the mean velocity is 0,
+    # this is due to discretization effects!
+    # in this case, the number density is usually != 0
+    mean_velocity = np.zeros(model.ndim, dtype=float)
+    for _ in range(10):
+        # choose random temperature
+        temperature = 100 * np.random.random() + 1
+        # use parameters directly, dont initialize here (might lead to errors, definitely complicates things!)
+        state = model.maxwellian(velocities=model.velocities,
+                                 temperature=temperature,
+                                 mass=model.mass_array,
+                                 mean_velocity=mean_velocity)
+        # choose random direction1
+        for __ in range(10):
+            direction1 = np.random.random(model.ndim)
+            # test parallel stress mf
+            mf = model.mf_orthogonal_heat_flow(state, direction1)
+            assert_all_moments_are_zero(model, mf * state)
+
+
 # Todo/Idea: Implement collisions only for specimen tuples
 #  -> no need for get_idx  with its warnings
 
