@@ -420,26 +420,27 @@ class BoundaryPointRule(InhomogeneousRule):
                                                       self.incoming_velocities
                                                       )
         data.result[self.affected_points, :] += self.reflection(inflow,
-                                                                data)
+                                                                data.model)
         return
 
-    def reflection(self, inflow, data):
+    def reflection(self, inflow, model):
+        assert isinstance(model, bp.Model)
         reflected_inflow = np.zeros(inflow.shape, dtype=float)
         # compute each reflection separately for every species
-        for s in range(data.n_spc):
-            beg, end = data.v_range[s]
+        for s in model.species:
+            idx_range = model.idx_range(s)
             inverse_inflow = self.reflection_rate_inverse[s] * inflow
             reflected_inflow[:, self.reflected_indices_inverse] += inverse_inflow
 
             elastic_inflow = self.reflection_rate_elastic[s] * inflow
             reflected_inflow[:, self.reflected_indices_elastic] += elastic_inflow
 
-            thermal_inflow = data.model.number_density(
-                self.reflection_rate_thermal[s] * inflow[..., beg:end], s)
+            thermal_inflow = model.number_density(
+                self.reflection_rate_thermal[s] * inflow[..., idx_range], s)
             thermal_factor = (thermal_inflow / self.effective_particle_number[s])
-            reflected_inflow[..., beg:end] += (
+            reflected_inflow[..., idx_range] += (
                 thermal_factor[:, np.newaxis]
-                * self.initial_state[np.newaxis, beg:end]
+                * self.initial_state[np.newaxis, idx_range]
             )
         return reflected_inflow
 
