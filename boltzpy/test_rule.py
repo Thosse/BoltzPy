@@ -183,6 +183,25 @@ def test_reflected_indices_inverse(key):
         assert np.all(v == -v_refl)
 
 
+@pytest.mark.parametrize("key", CLASSES["BoundaryPointRule"].keys())
+def test_reflection_keeps_total_mass(key):
+    rule = RULES[key]
+    # get model
+    model_key = h5py.File(FILE, mode='r')[key].attrs["Model"]
+    model = MODELS[model_key]
+    for _ in range(100):
+        inflow = np.zeros((1, model.size))
+        n_incoming_vels = rule.incoming_velocities.size
+        rand_vals = np.random.random(n_incoming_vels)
+        inflow[..., rule.incoming_velocities] = rand_vals
+        reflected_inflow = rule.reflection(inflow, model)
+        for s in model.species:
+            mass_in = model.mass_density(inflow, s)
+            mass_refl = model.mass_density(reflected_inflow, s)
+            absorption = rule.absorption_rate[s]
+            assert np.isclose((1 - absorption) * mass_in, mass_refl)
+
+
 # Todo 2D_small from test_models does not work. What are proper criteria?
 #  if possible: what parameter needs to change?
 # Todo why doesn't this initialize?

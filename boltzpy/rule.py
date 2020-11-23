@@ -426,22 +426,22 @@ class BoundaryPointRule(InhomogeneousRule):
     def reflection(self, inflow, model):
         assert isinstance(model, bp.Model)
         reflected_inflow = np.zeros(inflow.shape, dtype=float)
+
+        reflected_inflow += (np.dot(model.species_matrix, self.reflection_rate_inverse[:model.specimen])
+                             * inflow[:, self.reflected_indices_inverse])
+        reflected_inflow += (np.dot(model.species_matrix, self.reflection_rate_elastic[:model.specimen])
+                             * inflow[:, self.reflected_indices_elastic])
+
         # compute each reflection separately for every species
+        # Todo This is still wrong! faster velocities are depleted faster then slow vels
+        #  thus slow vels accumulate, fast vels are reduced over time thus temperature is reduced
         for s in model.species:
             idx_range = model.idx_range(s)
-            inverse_inflow = self.reflection_rate_inverse[s] * inflow
-            reflected_inflow[:, self.reflected_indices_inverse] += inverse_inflow
-
-            elastic_inflow = self.reflection_rate_elastic[s] * inflow
-            reflected_inflow[:, self.reflected_indices_elastic] += elastic_inflow
-
-            thermal_inflow = model.number_density(
-                self.reflection_rate_thermal[s] * inflow[..., idx_range], s)
-            thermal_factor = (thermal_inflow / self.effective_particle_number[s])
-            reflected_inflow[..., idx_range] += (
-                thermal_factor[:, np.newaxis]
-                * self.initial_state[np.newaxis, idx_range]
-            )
+            refl_thermal = (model.number_density(inflow, s)
+                            / self.effective_particle_number[s]
+                            * self.reflection_rate_thermal[s]
+                            * self.initial_state[..., idx_range])
+            reflected_inflow[..., idx_range] += refl_thermal
         return reflected_inflow
 
     def check_integrity(self, complete_check=True, context=None):
