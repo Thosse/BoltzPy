@@ -104,6 +104,10 @@ class Model(bp.BaseClass):
         for s in self.species:
             self.index_offset[s + 1:] += self.vGrids[s].size
 
+        self.species_matrix = np.zeros((self.size, self.specimen), dtype=int)
+        for s in self.species:
+            self.species_matrix[self.idx_range(s), s] = 1
+
         # setup collisions
         if collision_relations is None:
             self.collision_relations = self.compute_relations()
@@ -217,10 +221,7 @@ class Model(bp.BaseClass):
 
     @property
     def mass_array(self):
-        result = np.empty(self.size)
-        for s in self.species:
-            result[self.idx_range(s)] = self.masses[s]
-        return result
+        return np.dot(self.species_matrix, self.masses)
 
     #####################################
     #               Indexing            #
