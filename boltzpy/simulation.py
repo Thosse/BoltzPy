@@ -4,7 +4,6 @@ import numpy as np
 
 import boltzpy.helpers.TimeTracker as h_tt
 import boltzpy.AnimatedFigure as bp_af
-import boltzpy.compute as bp_cp
 import boltzpy as bp
 
 

@@ -2,7 +2,6 @@
 import numpy as np
 
 import boltzpy as bp
-import boltzpy.compute as bp_cp
 
 
 class Rule(bp.BaseClass):
@@ -206,6 +205,9 @@ class InhomogeneousRule(Rule):
         result = ((1 - outflow_percentage) * data.state[self.affected_points])
         return result
 
+    def transport_inflow(self, data):
+        raise NotImplementedError
+
     def transport(self, data):
         """Executes single transport step for the :attr:`affected_points`.
 
@@ -249,6 +251,25 @@ class InnerPointRule(InhomogeneousRule):
                          initial_state)
         return
 
+    def transport_inflow(self, data):
+        pv = data.vG + data.velocity_offset
+        inflow_percentage = (data.dt / data.dp * np.abs(pv[:, 0]))
+        result = np.zeros((self.affected_points.size, data.vG.shape[0]),
+                          dtype=float)
+
+        neg_vels = np.where(pv[:, 0] < 0)[0]
+        result[:, neg_vels] = (inflow_percentage[neg_vels]
+                               * data.state[np.ix_(self.affected_points + 1,
+                                                   neg_vels)]
+                               )
+
+        pos_vels = np.where(pv[:, 0] > 0)[0]
+        result[:, pos_vels] = (inflow_percentage[pos_vels]
+                               * data.state[np.ix_(self.affected_points - 1,
+                                                   pos_vels)]
+                               )
+        return result
+
     def transport(self, data):
         if data.p_dim != 1:
             message = 'Transport is currently only implemented ' \
@@ -257,10 +278,7 @@ class InnerPointRule(InhomogeneousRule):
         # simulate outflow
         data.result[self.affected_points, :] = self.transport_outflow_remains(data)
         # simulate inflow
-        data.result[self.affected_points, :] += bp_cp.transport_inflow_innerPoint(
-            data,
-            self.affected_points
-        )
+        data.result[self.affected_points, :] += self.transport_inflow(data)
         return
 
 
@@ -281,6 +299,12 @@ class ConstantPointRule(InhomogeneousRule):
         return
 
     def collision(self, data):
+        pass
+
+    def transport_outflow_remains(self, data):
+        pass
+
+    def transport_inflow(self, data):
         pass
 
     def transport(self, data):
@@ -409,6 +433,27 @@ class BoundaryPointRule(InhomogeneousRule):
     def collision(self, data):
         pass
 
+    def transport_outflow_remains(self, data):
+        result = super().transport_outflow_remains(data)
+        return result
+
+    def transport_inflow(self, data):
+        pv = (data.vG + data.velocity_offset)[:, :]
+        inflow_percentage = (data.dt / data.dp * np.abs(pv[:, 0]))
+        result = np.zeros((self.affected_points.size, data.vG.shape[0]),
+                          dtype=float)
+
+        neg_incomings_vels = np.where(pv[self.incoming_velocities, 0] < 0)[0]
+        neg_vels = self.incoming_velocities[neg_incomings_vels]
+        result[:, neg_vels] = (inflow_percentage[neg_vels]
+                               * data.state[np.ix_(self.affected_points + 1, neg_vels)])
+
+        pos_incomings_vels = np.where(pv[self.incoming_velocities, 0] > 0)[0]
+        pos_vels = self.incoming_velocities[pos_incomings_vels]
+        result[:, pos_vels] = (inflow_percentage[pos_vels]
+                               * data.state[np.ix_(self.affected_points - 1, pos_vels)])
+        return result
+
     def transport(self, data):
         if data.p_dim != 1:
             message = 'Transport is currently only implemented ' \
@@ -417,10 +462,7 @@ class BoundaryPointRule(InhomogeneousRule):
         # Simulate Outflowing
         data.result[self.affected_points, :] = self.transport_outflow_remains(data)
         # Simulate Inflow
-        inflow = bp_cp.transport_inflow_boundaryPoint(data,
-                                                      self.affected_points,
-                                                      self.incoming_velocities
-                                                      )
+        inflow = self.transport_inflow(data)
         data.result[self.affected_points, :] += self.reflection(inflow,
                                                                 data.model)
         return
