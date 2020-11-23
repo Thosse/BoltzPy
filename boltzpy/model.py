@@ -592,7 +592,7 @@ class Model(bp.BaseClass):
             assert state.shape[-1] == self.vGrids[s].size
         return state
 
-    def number_density(self, state, s=None):
+    def number_density(self, state, s=None, separately=False):
         state = self._get_state_of_species(state, s)
         # Reshape state into 2d
         shape = state.shape[:-1]
@@ -601,8 +601,16 @@ class Model(bp.BaseClass):
         # prepare paramters
         dim = self.ndim
         dv = self.dv_array[np.newaxis, :] if s is None else self.dv[s]
+        if separately:
+            assert s is None
+            state = state[..., np.newaxis] * self.species_matrix[np.newaxis, ...]
+            shape = shape + (self.specimen,)
+            dv = dv[..., np.newaxis]
+            axis = -2
+        else:
+            axis = -1
         # compute number density
-        result = np.sum(dv**dim * state, axis=-1)
+        result = np.sum(dv**dim * state, axis=axis)
         return result.reshape(shape)
 
     def mass_density(self, state, s=None):
