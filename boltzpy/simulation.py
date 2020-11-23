@@ -177,10 +177,19 @@ class Simulation(bp.BaseClass):
     #             Animation             #
     #####################################
     # Todo give moments as tuple(arrays, ) (self.file...)
-    def animate(self, shape=(3, 2), moments=None):
+    def animate(self, tmin=None, tmax=None, shape=(3, 2), moments=None):
         hdf_group = self.file["results"]
-        tmax = int(hdf_group.attrs["t"])
-        figure = bp_af.AnimatedFigure(tmax=tmax)
+
+        # chosse time frame
+        if tmax is None:
+            tmax = int(hdf_group.attrs["t"])
+        if tmin is None:
+            tmin = 0
+        assert tmax >= tmin >= 0
+        time_frame = np.s_[tmin: tmax]
+        n_frames = tmax - tmin
+        figure = bp_af.AnimatedFigure(tmax=n_frames,
+                                      backend="agg")
         if moments is None:
             moments = ['particle_number',
                        'mean_velocity',
@@ -199,13 +208,16 @@ class Simulation(bp.BaseClass):
             for s in self.model.species:
                 spc_group = hdf_group[str(s)]
                 if spc_group[moment].ndim == 2:
-                    ydata = spc_group[moment][0:tmax, 1:-1]
+                    ydata = spc_group[moment][time_frame, 1:-1]
                 elif spc_group[moment].ndim == 3:
-                    ydata = spc_group[moment][0:tmax, 1:-1, 0]
+                    ydata = spc_group[moment][time_frame, 1:-1, 0]
                 else:
                     raise Exception
                 ax.plot(xdata, ydata)
-        figure.save(self.file.file.filename[:-5] + '.mp4')
+        if n_frames == 1:
+            figure.save(self.file.file.filename[:-5] + '.jpeg')
+        else:
+            figure.save(self.file.file.filename[:-5] + '.mp4')
         return
 
     #####################################
