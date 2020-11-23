@@ -63,14 +63,6 @@ import numpy as np
 #################################
 #           Transport           #
 #################################
-def transport_outflow_remains(data, affected_points):
-    # Todo make this an attribute of data? Or just pv = VG + offset?
-    outflow_percentage = (np.abs(data.vG[:, 0] + data.velocity_offset[0])
-                          * data.dt
-                          / data.dp)
-    result = ((1 - outflow_percentage) * data.state[affected_points, :])
-    return result
-
 
 def transport_inflow_innerPoint(data, affected_points):
     # # Todo move this into data.pv or something, is often needed

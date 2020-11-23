@@ -198,6 +198,14 @@ class InhomogeneousRule(Rule):
         assert np.all(data.state[self.affected_points] >= 0)
         return
 
+    def transport_outflow_remains(self, data):
+        # Todo make this an attribute of data / simulation
+        outflow_percentage = (np.abs(data.vG[:, 0] + data.velocity_offset[0])
+                              * data.dt
+                              / data.dp)
+        result = ((1 - outflow_percentage) * data.state[self.affected_points])
+        return result
+
     def transport(self, data):
         """Executes single transport step for the :attr:`affected_points`.
 
@@ -247,10 +255,7 @@ class InnerPointRule(InhomogeneousRule):
                       'for 1D Problems'
             raise NotImplementedError(message)
         # simulate outflow
-        data.result[self.affected_points, :] = bp_cp.transport_outflow_remains(
-            data,
-            self.affected_points
-        )
+        data.result[self.affected_points, :] = self.transport_outflow_remains(data)
         # simulate inflow
         data.result[self.affected_points, :] += bp_cp.transport_inflow_innerPoint(
             data,
@@ -410,10 +415,7 @@ class BoundaryPointRule(InhomogeneousRule):
                       'for 1D Problems'
             raise NotImplementedError(message)
         # Simulate Outflowing
-        data.result[self.affected_points, :] = bp_cp.transport_outflow_remains(
-            data,
-            self.affected_points
-        )
+        data.result[self.affected_points, :] = self.transport_outflow_remains(data)
         # Simulate Inflow
         inflow = bp_cp.transport_inflow_boundaryPoint(data,
                                                       self.affected_points,
