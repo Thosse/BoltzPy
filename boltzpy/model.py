@@ -80,6 +80,8 @@ class Model(bp.BaseClass):
         self.spacings = np.array(spacings, dtype=int)
         assert self.spacings.ndim == 1
 
+        self.dv = self.delta * self.spacings
+
         assert isinstance(collision_factors, (list, tuple, np.ndarray))
         self.collision_factors = np.array(collision_factors,
                                           dtype=float)
@@ -182,9 +184,7 @@ class Model(bp.BaseClass):
                       "collision_invariants"})
         return attrs
 
-    @property
-    def dv(self):
-        return self.delta * self.spacings
+
 
     @property
     def dv_array(self):
