@@ -215,6 +215,7 @@ def test_invariance_of_moments_under_collision_operator(key):
 def test_maxwellians_are_invariant_unter_collision_operator(key):
     model = MODELS[key]
     # choose random mean velocity and temperature parameters
+    mass_array = model.get_array(model.masses)
     for _ in range(100):
         max_v = model.maximum_velocity
         mean_velocity = 2 * max_v * np.random.random(model.ndim) - max_v
@@ -222,7 +223,7 @@ def test_maxwellians_are_invariant_unter_collision_operator(key):
         # use parameters directly, dont initialize here (might lead to errors, definitely complicates things!)
         state = model.maxwellian(velocities=model.velocities,
                                  temperature=temperature,
-                                 mass=model.mass_array,
+                                 mass=mass_array,
                                  mean_velocity=mean_velocity)
         collision_differences = model.collision_operator(state)
         assert np.allclose(collision_differences, 0)
@@ -283,13 +284,14 @@ def test_mf_orthogonal_stress_is_orthogonal(key):
     # moment functions are only orthogonal if the mean velocity is 0,
     # this is due to discretization effects!
     mean_velocity = np.zeros(model.ndim, dtype=float)
+    mass_array = model.get_array(model.masses)
     for _ in range(10):
         # choose random temperature
         temperature = 100 * np.random.random() + 1
         # use parameters directly, dont initialize here (might lead to errors, definitely complicates things!)
         state = model.maxwellian(velocities=model.velocities,
                                  temperature=temperature,
-                                 mass=model.mass_array,
+                                 mass=mass_array,
                                  mean_velocity=mean_velocity)
         # choose random direction1
         for __ in range(10):
@@ -317,13 +319,14 @@ def test_mf_orthogonal_heat_flow_is_orthogonal(key):
     # this is due to discretization effects!
     # in this case, the number density is usually != 0
     mean_velocity = np.zeros(model.ndim, dtype=float)
+    mass_array = model.get_array(model.masses)
     for _ in range(10):
         # choose random temperature
         temperature = 100 * np.random.random() + 1
         # use parameters directly, dont initialize here (might lead to errors, definitely complicates things!)
         state = model.maxwellian(velocities=model.velocities,
                                  temperature=temperature,
-                                 mass=model.mass_array,
+                                 mass=mass_array,
                                  mean_velocity=mean_velocity)
         # choose random direction1
         for __ in range(10):

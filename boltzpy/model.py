@@ -184,7 +184,13 @@ class Model(bp.BaseClass):
                       "collision_invariants"})
         return attrs
 
-
+    def get_array(self, parameter):
+        assert parameter.shape[-1] == self.specimen
+        shape = parameter.shape[:-1] + (self.size,)
+        parameter = parameter.reshape((-1, 1, self.specimen))
+        species_matrix = self.species_matrix[:, np.newaxis, :]
+        result = np.sum(species_matrix * parameter, axis=-1)
+        return result.reshape(shape)
 
     @property
     def dv_array(self):
@@ -218,10 +224,6 @@ class Model(bp.BaseClass):
         max_temp = (max_v - mean_v)**2 / min_mass
         min_temp = 3 * np.max(self.spacings * self.delta)**2 / min_mass
         return np.array([min_temp, max_temp], dtype=float)
-
-    @property
-    def mass_array(self):
-        return np.dot(self.species_matrix, self.masses)
 
     #####################################
     #               Indexing            #
@@ -418,7 +420,7 @@ class Model(bp.BaseClass):
 
     def _init_error(self, moment_parameters, wanted_moments, s=None):
         dim = self.ndim
-        mass = self.mass_array if s is None else self.masses[s]
+        mass = self.get_array(self.masses) if s is None else self.masses[s]
         velocities = self.velocities[self.idx_range(s)]
 
         # compute values of maxwellian on given velocities
@@ -520,7 +522,7 @@ class Model(bp.BaseClass):
         assert (self.is_parallel(direction_1, direction_2)
                 or self.is_orthogonal(direction_1, direction_2))
 
-        mass = self.mass_array if s is None else self.masses[s]
+        mass = self.get_array(self.masses) if s is None else self.masses[s]
         c_vels = self.centered_velocities(mean_velocity, s)
         proj_vels_1 = self.project_velocities(c_vels, direction_1)
         proj_vels_2 = self.project_velocities(c_vels, direction_2)
@@ -529,7 +531,8 @@ class Model(bp.BaseClass):
     def mf_pressure(self, mean_velocity, s=None):
         mean_velocity = np.array(mean_velocity)
         dim = self.ndim
-        mass = self.mass_array[np.newaxis, :] if s is None else self.masses[s]
+        mass = (self.get_array(self.masses)[np.newaxis, :]
+                if s is None else self.masses[s])
         velocities = self.velocities[self.idx_range(s), :]
         # reshape mean_velocity (may have higher dimension)
         shape = mean_velocity.shape[:-1]
@@ -557,7 +560,7 @@ class Model(bp.BaseClass):
         mean_velocity = np.array(mean_velocity)
         direction = np.array(direction)
         assert direction.shape == (self.ndim,)
-        mass = self.mass_array if s is None else self.masses[s]
+        mass = self.get_array(self.masses) if s is None else self.masses[s]
         c_vels = self.centered_velocities(mean_velocity, s)
         proj_vels = self.project_velocities(c_vels, direction)
         squared_sum = np.sum(c_vels ** 2, axis=-1)
@@ -621,7 +624,8 @@ class Model(bp.BaseClass):
         state = state.reshape((size, state.shape[-1]))
         # prepare paramters
         dim = self.ndim
-        mass = self.mass_array[np.newaxis, :] if s is None else self.masses[s]
+        mass = (self.get_array(self.masses)[np.newaxis, :]
+                if s is None else self.masses[s])
         dv = self.dv_array[np.newaxis, :] if s is None else self.dv[s]
         # compute mass density
         result = np.sum(dv**dim * mass * state, axis=-1)
@@ -635,7 +639,8 @@ class Model(bp.BaseClass):
         state = state.reshape((size, state.shape[-1]))
         # prepare paramters
         dim = self.ndim
-        mass = self.mass_array[np.newaxis, :] if s is None else self.masses[s]
+        mass = (self.get_array(self.masses)[np.newaxis, :]
+                if s is None else self.masses[s])
         dv = self.dv_array[np.newaxis, :] if s is None else self.dv[s]
         velocities = self.velocities[self.idx_range(s)]
         # compute momentum
@@ -679,7 +684,7 @@ class Model(bp.BaseClass):
         state = state.reshape((size, state.shape[-1]))
         # prepare paramters
         dim = self.ndim
-        mass = self.mass_array if s is None else self.masses[s]
+        mass = self.get_array(self.masses) if s is None else self.masses[s]
         dv = self.dv_array[np.newaxis, :] if s is None else self.dv[s]
         velocities = self.velocities[self.idx_range(s)]
         # compute energy density
@@ -736,7 +741,8 @@ class Model(bp.BaseClass):
         state = state.reshape((size, state.shape[-1]))
         # prepare paramters
         dim = self.ndim
-        mass = self.mass_array[np.newaxis, :] if s is None else self.masses[s]
+        mass = (self.get_array(self.masses)[np.newaxis, :]
+                if s is None else self.masses[s])
         dv = self.dv_array[np.newaxis, :] if s is None else self.dv[s]
         velocities = self.velocities[self.idx_range(s)]
         # compute momentum flow
@@ -756,7 +762,8 @@ class Model(bp.BaseClass):
         state = state.reshape((size, state.shape[-1]))
         # prepare paramters
         dim = self.ndim
-        mass = self.mass_array[np.newaxis, :] if s is None else self.masses[s]
+        mass = (self.get_array(self.masses)[np.newaxis, :]
+                if s is None else self.masses[s])
         dv = self.dv_array[np.newaxis, :] if s is None else self.dv[s]
         velocities = self.velocities[self.idx_range(s)]
         # compute energy flow
