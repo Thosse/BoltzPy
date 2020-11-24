@@ -38,8 +38,6 @@ class Model(bp.BaseClass):
 
     Attributes
     ----------
-    size : :obj:`int` :
-        The total number of velocity grid points over all grids.
     specimen : :obj:`int` :
         The number of different specimen or velocity grids.
     index_offset : :obj:`~numpy.array` [:obj:`int`]
@@ -94,8 +92,6 @@ class Model(bp.BaseClass):
         self.algorithm_relations = str(algorithm_relations)
         self.algorithm_weights = str(algorithm_weights)
 
-        # Todo make property, rename nvels
-        self.size = np.sum(np.prod(self.shapes, axis=1))
         # todo make property, rename nspc
         self.specimen = self.masses.size
 
@@ -115,7 +111,7 @@ class Model(bp.BaseClass):
             self.index_offset[s + 1:] += self.vGrids[s].size
 
         # todo rename spc_matrix
-        self.species_matrix = np.zeros((self.size, self.specimen), dtype=int)
+        self.species_matrix = np.zeros((self.nvels, self.specimen), dtype=int)
         for s in self.species:
             self.species_matrix[self.idx_range(s), s] = 1
 
@@ -130,7 +126,7 @@ class Model(bp.BaseClass):
             self.collision_weights = np.array(collision_weights)
 
         # create collision_matrix
-        col_mat = np.zeros((self.size, self.collision_weights.size), dtype=float)
+        col_mat = np.zeros((self.nvels, self.collision_weights.size), dtype=float)
         for [r, rel] in enumerate(self.collision_relations):
             weight = self.collision_weights[r]
             col_mat[rel, r] = weight * np.array([-1, 1, -1, 1])
@@ -155,6 +151,12 @@ class Model(bp.BaseClass):
         return self.shapes.shape[-1]
 
     @property
+    def nvels(self):
+        """:obj:`int` :
+        The total number of velocity grid points over all grids."""
+        return np.sum(np.prod(self.shapes, axis=-1))
+
+    @property
     def species(self):
         return np.arange(self.specimen)
 
@@ -172,7 +174,7 @@ class Model(bp.BaseClass):
     @property
     def collision_invariants(self):
         rank = np.linalg.matrix_rank(self.collision_matrix.toarray())
-        maximum_rank = np.min([self.size, self.collision_weights.size])
+        maximum_rank = np.min([self.nvels, self.collision_weights.size])
         return maximum_rank - rank
 
     @staticmethod
@@ -191,7 +193,7 @@ class Model(bp.BaseClass):
     def attributes():
         attrs = Model.parameters()
         attrs.update({"ndim",
-                      "size",
+                      "nvels",
                       "collision_matrix",
                       "specimen",
                       "index_offset",
@@ -202,7 +204,7 @@ class Model(bp.BaseClass):
 
     def get_array(self, parameter):
         assert parameter.shape[-1] == self.specimen
-        shape = parameter.shape[:-1] + (self.size,)
+        shape = parameter.shape[:-1] + (self.nvels,)
         parameter = parameter.reshape((-1, 1, self.specimen))
         species_matrix = self.species_matrix[:, np.newaxis, :]
         result = np.sum(species_matrix * parameter, axis=-1)
@@ -483,7 +485,7 @@ class Model(bp.BaseClass):
                                            args=(wanted_moments[s], s))
 
         # set up initial state, compute maxwellians with the init_params
-        initial_state = np.zeros(self.size, dtype=float)
+        initial_state = np.zeros(self.nvels, dtype=float)
         for s in self.species:
             idx_range = self.idx_range(s)
             state = Model.maxwellian(velocities=self.velocities[idx_range],
@@ -599,7 +601,7 @@ class Model(bp.BaseClass):
     #            Moments             #
     ##################################
     def _get_state_of_species(self, state, s):
-        if state.shape[-1] == self.size:
+        if state.shape[-1] == self.nvels:
             state = state[..., self.idx_range(s)]
         else:
             assert s is not None
@@ -1018,7 +1020,7 @@ class Model(bp.BaseClass):
         ."""
         shape = state.shape
         size = np.prod(shape[:-1], dtype=int)
-        state = state.reshape((size, self.size))
+        state = state.reshape((size, self.nvels))
         assert state.ndim == 2
         result = np.empty(state.shape, dtype=float)
         for p in range(state.shape[0]):
@@ -1149,7 +1151,7 @@ class Model(bp.BaseClass):
         """
         description = ''
         description += "Dimension = {}\n".format(self.ndim)
-        description += "Total Size = {}\n".format(self.size)
+        description += "Total Size = {}\n".format(self.nvels)
 
         if self.vGrids is not None:
             for (idx_G, vGrid) in enumerate(self.vGrids):

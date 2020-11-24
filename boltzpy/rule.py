@@ -398,7 +398,7 @@ class BoundaryPointRule(InhomogeneousRule):
 
     @staticmethod
     def compute_reflected_indices_inverse(model):
-        reflected_indices_inverse = np.zeros(model.size, dtype=int)
+        reflected_indices_inverse = np.zeros(model.nvels, dtype=int)
         for (idx_v, v) in enumerate(model.iMG):
             spc = model.get_spc(idx_v)
             v_refl = -v
@@ -408,7 +408,7 @@ class BoundaryPointRule(InhomogeneousRule):
 
     @staticmethod
     def compute_reflected_indices_elastic(model, surface_normal):
-        reflected_indices_elastic = np.zeros(model.size, dtype=int)
+        reflected_indices_elastic = np.zeros(model.nvels, dtype=int)
         # Todo only works in 1D Geometries
         assert np.sum(np.abs(surface_normal)) == 1, (
             "only works in 1D Geometries, "

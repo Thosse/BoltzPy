@@ -137,13 +137,13 @@ def test_attributes(attribute, key):
 def test_get_spc_on_shuffled_grid(key):
     model = MODELS[key]
     # setup the species each gridpoint/velocity belongs to, for comparison
-    species = np.zeros(model.size)
+    species = np.zeros(model.nvels)
     for s in model.species:
         beg, end = model.index_offset[s:s+2]
         species[beg:end] = s
     # shuffle velocities/species
     rng = np.random.default_rng()
-    shuffled_idx = rng.permutation(model.size)
+    shuffled_idx = rng.permutation(model.nvels)
     # test for 0d arrays/elements
     for idx in shuffled_idx:
         assert model.get_spc(idx).ndim == 0
@@ -204,7 +204,7 @@ def assert_all_moments_are_zero(model, state):
 def test_invariance_of_moments_under_collision_operator(key):
     model = MODELS[key]
     for _ in range(100):
-        state = np.random.random(model.size)
+        state = np.random.random(model.nvels)
         # test that all momenta of the collision_differences are zero
         # since these are additive this tests that the momenta are collision invariant
         collision_differences = model.collision_operator(state)

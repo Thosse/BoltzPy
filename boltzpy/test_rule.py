@@ -190,7 +190,7 @@ def test_reflection_keeps_total_mass(key):
     model_key = h5py.File(FILE, mode='r')[key].attrs["Model"]
     model = MODELS[model_key]
     for _ in range(100):
-        inflow = np.zeros((1, model.size))
+        inflow = np.zeros((1, model.nvels))
         n_incoming_vels = rule.incoming_velocities.size
         rand_vals = np.random.random(n_incoming_vels)
         inflow[..., rule.incoming_velocities] = rand_vals
