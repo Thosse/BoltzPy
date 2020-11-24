@@ -252,13 +252,14 @@ class CollisionModel(bp.VelocityModel):
                 '{}'.format(self.algorithm_relations)
             )
 
+        subgrids = self.subgrids()
         # Iterate over Specimen pairs
         for s0 in self.species:
             for s1 in np.arange(s0, self.nspc):
 
                 # group grid[0] points by distance to grid[2]
-                group = bp.Grid.group(self.vGrids[s0].iG,
-                                      self.vGrids[s1].key_distance)
+                group = bp.Grid.group(subgrids[s0].iG,
+                                      subgrids[s1].key_distance)
                 # generate relations for a representative of each group
                 repr = {key: group[key][0] for key in group.keys()}
                 repr_rels = dict()
@@ -266,7 +267,7 @@ class CollisionModel(bp.VelocityModel):
                     # generate collisions in extended grids
                     # allows transferring the results without losing collisions
                     repr_rels[key] = coll_func(
-                        [self.vGrids[i].extension(2) for i in [s0, s0, s1, s1]],
+                        [subgrids[i].extension(2) for i in [s0, s0, s1, s1]],
                         self.masses[[s0, s0, s1, s1]],
                         repr[key])
                 for key, velocities in group.items():
@@ -491,7 +492,7 @@ class CollisionModel(bp.VelocityModel):
         ax = plt.figure().add_subplot(projection=projection)
         # Plot Grids as scatter plot
         for s in species:
-            self.vGrids[s].plot(ax, **(self.plot_styles[s]))
+            self.subgrids(s).plot(ax, **(self.plot_styles[s]))
         # plot collisions
         for r in relations:
             # repeat the collision to "close" the rectangle / trapezoid

@@ -98,7 +98,7 @@ class Simulation(bp.BaseClass):
                 "state": (
                     self.timing.size,
                     self.geometry.size,
-                    self.model.vGrids[s].size)}
+                    self.model.subgrids(s).size)}
             if not self.log_state:
                 del shapes[s]["state"]
         return shapes

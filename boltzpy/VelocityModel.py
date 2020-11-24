@@ -38,8 +38,6 @@ class VelocityModel(bp.BaseClass):
     _idx_offset : :obj:`~numpy.array` [:obj:`int`]
         Denotes the beginning of the respective velocity grid
         in the multi grid :attr:`iMG`.
-    vGrids : :obj:`~numpy.array` [:class:`~boltzpy.Grid`]
-        Array of all Velocity :class:`Grids <boltzpy.Grid>`.
     iMG : :obj:`~numpy.array` [:obj:`int`]
         The *integer Multi-Grid*.
         It is a concatenation of all
@@ -69,20 +67,11 @@ class VelocityModel(bp.BaseClass):
 
         # Todo make property
         self.dv = self.base_delta * self.spacings
-
-        # set up each Velocity Grid
-        # todo make method(s)
-        self.vGrids = np.array([bp.Grid(self.shapes[i],
-                                        self.base_delta,
-                                        self.spacings[i],
-                                        is_centered=True)
-                                for i in self.species],
-                               dtype=bp.Grid)
-        self.iMG = np.concatenate([G.iG for G in self.vGrids])
+        self.iMG = np.concatenate([G.iG for G in self.subgrids()])
 
         self._idx_offset = np.zeros(self.nspc + 1, dtype=int)
         for s in self.species:
-            self._idx_offset[s + 1:] += self.vGrids[s].size
+            self._idx_offset[s + 1:] += self.subgrids(s).size
 
         self.spc_matrix = np.zeros((self.nvels, self.nspc), dtype=int)
         for s in self.species:
@@ -143,6 +132,23 @@ class VelocityModel(bp.BaseClass):
     @property
     def species(self):
         return np.arange(self.nspc)
+
+    def subgrids(self, s=None):
+        if np.issubdtype(s, np.integer):
+            return bp.Grid(self.shapes[s],
+                           self.base_delta,
+                           self.spacings[s],
+                           is_centered=True)
+        grids = np.array([bp.Grid(self.shapes[s],
+                                  self.base_delta,
+                                  self.spacings[s],
+                                  is_centered=True)
+                          for s in self.species],
+                         dtype=bp.Grid)
+        if s is None:
+            return grids
+        else:
+            return grids[s]
 
     @property
     def vels(self):
@@ -209,46 +215,41 @@ class VelocityModel(bp.BaseClass):
 
     def get_idx(self,
                 species,
-                velocities):
+                integer_velocities):
         """Find index of given grid_entry in :attr:`iMG`
         Returns None, if the value is not in the specified Grid.
 
         Parameters
         ----------
         species : :obj:`~numpy.array` [:obj:`int`]
-        velocities : :obj:`~numpy.array` [:obj:`int`]
+        integer_velocities : :obj:`~numpy.array` [:obj:`int`]
 
         Returns
         -------
         global_index : :obj:`int` of :obj:`None`
 
         """
-        # reshape arrays for vectorization
-        species = np.array(species)
-        assert species.ndim in [0, 1], "species must be 0d or 1d array"
-        # species must be 1d array
+        assert integer_velocities.dtype == int
+        # turn species into array of ndim at least 1
         species = np.array(species, ndmin=1)
-        assert velocities.ndim in [1, 2, 3], "velocities must be 1d, 2d, or 3d array"
-        # reshape the result/indices at the end
-        shape_indices = velocities.shape[:-1]
-        # reshape velocities into 3d
-        n_vels = velocities.size // (species.size * self.ndim)
-        shape_velocities = (n_vels, species.size, self.ndim)
-        velocities = velocities.reshape(shape_velocities)
+        assert integer_velocities.shape[-1] == self.ndim
+        # reshape velocities for vectorization
+        shape = integer_velocities.shape[:-1]
+        integer_velocities = integer_velocities.reshape((-1, species.size, self.ndim))
 
-        assert species.ndim == 1 and velocities.ndim == 3
-        indices = np.zeros(velocities.shape[0:2], dtype=int)
-        for col, s in enumerate(species):
-            local_indices = self.vGrids[s].get_idx(velocities[:, col, :])
-            indices[..., col] = np.where(local_indices >= 0,
-                                         local_indices + self._idx_offset[s],
-                                         -1)
-
-        # noinspection PyUnreachableCode
-        if __debug__:
-            pos = np.where(np.all(indices >= 0, axis=-1))
-            assert np.all(self.iMG[indices[pos]] == velocities[pos])
-        return indices.reshape(shape_indices)
+        # Todo vectorize with np.unique
+        subgrids = self.subgrids()
+        indices = np.zeros(integer_velocities.shape[0:2], dtype=int)
+        for idx_s, s in enumerate(species):
+            local_indices = subgrids[s].get_idx(integer_velocities[:, idx_s, :])
+            indices[..., idx_s] = np.where(local_indices >= 0,
+                                           local_indices + self._idx_offset[s],
+                                           -1)
+        # Todo move this into a test file
+        pos = np.where(np.all(indices >= 0, axis=-1))
+        assert np.all(self.iMG[indices[pos]] == integer_velocities[pos])
+        assert np.all(self.iMG[indices[pos]] == integer_velocities[pos])
+        return indices.reshape(shape)
 
     def get_spc(self, indices):
         """Get the specimen of given indices of :attr:`iMG`.
@@ -463,7 +464,8 @@ class VelocityModel(bp.BaseClass):
             state = state[..., self.idx_range(s)]
         else:
             assert s is not None
-            assert state.shape[-1] == self.vGrids[s].size
+            grid_size = self._idx_offset[s+1] - self._idx_offset[s]
+            assert state.shape[-1] == grid_size
         return state
 
     def number_density(self, state, s=None, separately=False):
@@ -703,28 +705,22 @@ class VelocityModel(bp.BaseClass):
         assert self.base_delta > 0
 
         assert isinstance(self.shapes, np.ndarray)
-        assert self.shapes.shape[0] == self.nspc
-        assert np.array_equal(self.shapes,
-                              np.array([G.shape for G in self.vGrids]))
-        assert len({shape.ndim for shape in self.shapes}) <= 1, (
-            "All Grids must have the same dimension.\n"
-            "Given dimensions = "
-            "{}".format([shape.shape[1] for shape in self.shapes]))
-        assert all(len(set(shape)) == 1 for shape in self.shapes), (
-            "All Velocity Grids must be squares.\n"
-            "Given shapes = "
-            "{}".format(self.shapes))
+        assert self.shapes.dtype == int
+        assert self.shapes.shape == (self.nspc, self.ndim)
+        assert np.array_equal([G.shape for G in self.subgrids()],
+                              self.shapes)
 
         assert isinstance(self.spacings, np.ndarray)
-        assert self.spacings.shape[0] == self.nspc
-        assert np.array_equal(self.spacings,
-                              np.array([G.spacing for G in self.vGrids]))
+        assert self.spacings.dtype == int
+        assert self.spacings.shape == (self.nspc,)
+        assert np.array_equal([G.spacing for G in self.subgrids()],
+                              self.spacings,)
 
-        assert isinstance(self.vGrids, np.ndarray)
-        assert self.vGrids.size == self.nspc
-        assert self.vGrids.ndim == 1
-        assert self.vGrids.dtype == 'object'
-        for G in self.vGrids:
+        assert isinstance(self.subgrids(), np.ndarray)
+        assert self.subgrids().shape == (self.nspc,)
+        assert self.subgrids().ndim == 1
+        assert self.subgrids().dtype == 'object'
+        for G in self.subgrids():
             isinstance(G, bp.Grid)
             G.check_integrity()
 
@@ -734,13 +730,13 @@ class VelocityModel(bp.BaseClass):
         assert np.all(self._idx_offset >= 0)
         assert np.all(self._idx_offset[1:] > self._idx_offset[:-1])
         assert np.array_equal(self._idx_offset[1:] - self._idx_offset[:-1],
-                              np.array([G.size for G in self.vGrids]))
+                              [G.size for G in self.subgrids()])
         assert self._idx_offset[-1] == self.nvels
 
         assert isinstance(self.iMG, np.ndarray)
         assert self.iMG.dtype == int
-        assert self.iMG.ndim == 2
         assert self.iMG.shape == (self.nvels, self.ndim)
+        assert self.iMG.ndim == 2
         return
 
     def __str__(self,
@@ -752,10 +748,9 @@ class VelocityModel(bp.BaseClass):
         description += "Dimension = {}\n".format(self.ndim)
         description += "Total Size = {}\n".format(self.nvels)
 
-        if self.vGrids is not None:
-            for (idx_G, vGrid) in enumerate(self.vGrids):
-                description += 'Specimen_{idx}:\n\t'.format(idx=idx_G)
-                grid_str = vGrid.__str__(write_physical_grid)
-                description += grid_str.replace('\n', '\n\t')
-                description += '\n'
+        for (idx_G, G) in enumerate(self.subgrids()):
+            description += 'Specimen_{idx}:\n\t'.format(idx=idx_G)
+            grid_str = G.__str__(write_physical_grid)
+            description += grid_str.replace('\n', '\n\t')
+            description += '\n'
         return description[:-1]
