@@ -200,11 +200,11 @@ def test_maxwellians_are_invariant_unter_collision_operator(key):
     # choose random mean velocity and temperature parameters
     mass_array = model.get_array(model.masses)
     for _ in range(100):
-        max_v = model.maximum_velocity
+        max_v = model.max_vel
         mean_velocity = 2 * max_v * np.random.random(model.ndim) - max_v
         temperature = 100 * np.random.random() + 1
         # use parameters directly, dont initialize here (might lead to errors, definitely complicates things!)
-        state = model.maxwellian(velocities=model.velocities,
+        state = model.maxwellian(velocities=model.vels,
                                  temperature=temperature,
                                  mass=mass_array,
                                  mean_velocity=mean_velocity)
@@ -227,7 +227,7 @@ def test_project_velocities():
             direction = np.zeros(dim)
             length = 10 * np.random.random(1)
             direction[i] = length
-            result = bp.Model.project_velocities(vectors, direction)
+            result = bp.Model.p_vels(vectors, direction)
             angle = direction / np.linalg.norm(direction)
             shape = result.shape
             size = result.size
@@ -249,7 +249,7 @@ def test_project_velocities():
                             np.sum(direction[0, 0:2]**2)]
         result = np.zeros(vectors.shape)
         for i in range(dim):
-            res = bp.Model.project_velocities(vectors, direction[i])
+            res = bp.Model.p_vels(vectors, direction[i])
             angle = direction[i] / np.linalg.norm(direction[i])
             angle = angle.reshape((1, dim))
             shape = res.shape
@@ -272,7 +272,7 @@ def test_mf_orthogonal_stress_is_orthogonal(key):
         # choose random temperature
         temperature = 100 * np.random.random() + 1
         # use parameters directly, dont initialize here (might lead to errors, definitely complicates things!)
-        state = model.maxwellian(velocities=model.velocities,
+        state = model.maxwellian(velocities=model.vels,
                                  temperature=temperature,
                                  mass=mass_array,
                                  mean_velocity=mean_velocity)
@@ -307,7 +307,7 @@ def test_mf_orthogonal_heat_flow_is_orthogonal(key):
         # choose random temperature
         temperature = 100 * np.random.random() + 1
         # use parameters directly, dont initialize here (might lead to errors, definitely complicates things!)
-        state = model.maxwellian(velocities=model.velocities,
+        state = model.maxwellian(velocities=model.vels,
                                  temperature=temperature,
                                  mass=mass_array,
                                  mean_velocity=mean_velocity)

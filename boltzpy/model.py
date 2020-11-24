@@ -104,10 +104,9 @@ class Model(bp.BaseClass):
         for s in self.species:
             self._idx_offset[s + 1:] += self.vGrids[s].size
 
-        # todo rename spc_matrix
-        self.species_matrix = np.zeros((self.nvels, self.nspc), dtype=int)
+        self.spc_matrix = np.zeros((self.nvels, self.nspc), dtype=int)
         for s in self.species:
-            self.species_matrix[self.idx_range(s), s] = 1
+            self.spc_matrix[self.idx_range(s), s] = 1
 
         # setup collisions
         if collision_relations is None:
@@ -127,56 +126,6 @@ class Model(bp.BaseClass):
         self.collision_matrix = csr_matrix(col_mat)
         return
 
-    # Todo properly vectorize
-    @staticmethod
-    def default_spacing(masses):
-        # compute spacings by mass ratio
-        lcm = int(np.lcm.reduce(masses))
-        spacings = [2 * lcm // int(m) for m in masses]
-        return spacings
-
-    #####################################
-    #           Properties              #
-    #####################################
-    @property
-    def ndim(self):
-        """:obj:`int`
-        Dimensionality of all Velocity Grids`."""
-        return self.shapes.shape[-1]
-
-    @property
-    def nspc(self):
-        """:obj:`int` :
-        The number of different specimen / velocity grids."""
-        return self.masses.size
-
-    @property
-    def nvels(self):
-        """:obj:`int` :
-        The total number of velocity grid points over all grids."""
-        return np.sum(np.prod(self.shapes, axis=-1))
-
-    @property
-    def species(self):
-        return np.arange(self.nspc)
-
-    @property
-    def maximum_velocity(self):
-        """:obj:`float`
-        Maximum physical velocity for every sub grid."""
-        return np.max(self.iMG * self.base_delta)
-
-    # todo rename ncolls
-    @property
-    def collisions(self):
-        return self.collision_weights.size
-
-    @property
-    def collision_invariants(self):
-        rank = np.linalg.matrix_rank(self.collision_matrix.toarray())
-        maximum_rank = np.min([self.nvels, self.collision_weights.size])
-        return maximum_rank - rank
-
     @staticmethod
     def parameters():
         return {"masses",
@@ -194,33 +143,80 @@ class Model(bp.BaseClass):
         attrs = Model.parameters()
         attrs.update({"ndim",
                       "nvels",
-                      "collision_matrix",
                       "nspc",
+                      "ncols",
+                      "vels",
+                      "collision_matrix",
                       "_idx_offset",
                       "species",
-                      "maximum_velocity",
+                      "max_vel",
                       "collision_invariants"})
         return attrs
 
-    def get_array(self, parameter):
-        assert parameter.shape[-1] == self.nspc
-        shape = parameter.shape[:-1] + (self.nvels,)
-        parameter = parameter.reshape((-1, 1, self.nspc))
-        species_matrix = self.species_matrix[:, np.newaxis, :]
-        result = np.sum(species_matrix * parameter, axis=-1)
-        return result.reshape(shape)
+    # Todo properly vectorize
+    @staticmethod
+    def default_spacing(masses):
+        # compute spacings by mass ratio
+        lcm = int(np.lcm.reduce(masses))
+        spacings = [2 * lcm // int(m) for m in masses]
+        return spacings
 
-    # todo rename vels
+    #####################################
+    #           Properties              #
+    #####################################
     @property
-    def velocities(self):
+    def ndim(self):
+        """:obj:`int`
+        The dimension of all Velocity Grids`."""
+        return self.shapes.shape[-1]
+
+    @property
+    def nspc(self):
+        """:obj:`int` :
+        The number of different specimen / velocity grids."""
+        return self.masses.size
+
+    @property
+    def nvels(self):
+        """:obj:`int` :
+        The total number of velocity grid points over all grids."""
+        return np.sum(np.prod(self.shapes, axis=-1))
+
+    @property
+    def ncols(self):
+        """:obj:`int` :
+        The total number of collision relations."""
+        assert self.collision_relations.shape == (self.collision_weights.size, 4)
+        return self.collision_weights.size
+
+    @property
+    def species(self):
+        return np.arange(self.nspc)
+
+    @property
+    def collision_invariants(self):
+        rank = np.linalg.matrix_rank(self.collision_matrix.toarray())
+        maximum_rank = np.min([self.nvels, self.collision_weights.size])
+        return maximum_rank - rank
+
+    @property
+    def vels(self):
+        """:obj:`~numpy.array` [:obj:`float`]
+        The array of all velocities.
+        These are the concatenated velocity grids for each specimen"""
         return self.base_delta * self.iMG
 
-    # todo rename cvels
-    def centered_velocities(self, mean_velocity, s=None):
+    @property
+    def max_vel(self):
+        """:obj:`float`
+        Maximum physical velocity of all sub grids."""
+        return np.max(np.abs(self.vels))
+
+    def c_vels(self, mean_velocity, s=None):
         mean_velocity = np.array(mean_velocity)
         assert mean_velocity.shape[-1] == self.ndim
         dim = self.ndim
-        velocities = self.velocities[self.idx_range(s), :]
+        velocities = self.vels[self.idx_range(s), :]
         # mean_velocity may have ndim > 1, thus reshape into 3D
         shape = mean_velocity.shape[:-1]
         size = np.prod(shape, dtype=int)
@@ -228,8 +224,28 @@ class Model(bp.BaseClass):
         result = velocities[np.newaxis, ...] - mean_velocity
         return result.reshape(shape + (velocities.shape[0], dim))
 
+    @staticmethod
+    def p_vels(velocities, direction):
+        direction = np.array(direction)
+        assert direction.shape == (velocities.shape[-1],)
+        assert np.linalg.norm(direction) > 1e-8
+        shape = velocities.shape[:-1]
+        size = np.prod(shape, dtype=int)
+        velocities = velocities.reshape((size, direction.size))
+        angle = direction / np.linalg.norm(direction)
+        result = np.dot(velocities, angle)
+        return result.reshape(shape)
+
+    def get_array(self, parameter):
+        assert parameter.shape[-1] == self.nspc
+        shape = parameter.shape[:-1] + (self.nvels,)
+        parameter = parameter.reshape((-1, 1, self.nspc))
+        spc_matrix = self.spc_matrix[:, np.newaxis, :]
+        result = np.sum(spc_matrix * parameter, axis=-1)
+        return result.reshape(shape)
+
     def temperature_range(self, mean_velocity=0):
-        max_v = np.max(np.abs(self.maximum_velocity))
+        max_v = self.max_vel
         mean_v = np.max(np.abs(mean_velocity))
         assert mean_v < max_v
         min_mass = np.min(self.masses)
@@ -433,7 +449,7 @@ class Model(bp.BaseClass):
     def _init_error(self, moment_parameters, wanted_moments, s=None):
         dim = self.ndim
         mass = self.get_array(self.masses) if s is None else self.masses[s]
-        velocities = self.velocities[self.idx_range(s)]
+        velocities = self.vels[self.idx_range(s)]
 
         # compute values of maxwellian on given velocities
         state = Model.maxwellian(velocities=velocities,
@@ -488,7 +504,7 @@ class Model(bp.BaseClass):
         initial_state = np.zeros(self.nvels, dtype=float)
         for s in self.species:
             idx_range = self.idx_range(s)
-            state = Model.maxwellian(velocities=self.velocities[idx_range],
+            state = Model.maxwellian(velocities=self.vels[idx_range],
                                      mass=self.masses[s],
                                      temperature=init_params[s, self.ndim],
                                      mean_velocity=init_params[s, 0:self.ndim])
@@ -502,20 +518,6 @@ class Model(bp.BaseClass):
     ##################################
     #        Moment functions        #
     ##################################
-    # todo move to cvels, rename pvels
-    @staticmethod
-    def project_velocities(velocities, direction):
-        direction = np.array(direction)
-        assert direction.shape == (velocities.shape[-1],)
-        assert np.linalg.norm(direction) > 1e-8
-        shape = velocities.shape[:-1]
-        size = np.prod(shape, dtype=int)
-        dim = velocities.shape[-1]
-        velocities = velocities.reshape((size, dim))
-        angle = direction / np.linalg.norm(direction)
-        result = np.dot(velocities, angle)
-        return result.reshape(shape)
-
     @staticmethod
     def is_orthogonal(direction_1, direction_2):
         return np.allclose(np.dot(direction_1, direction_2), 0)
@@ -536,22 +538,22 @@ class Model(bp.BaseClass):
                 or self.is_orthogonal(direction_1, direction_2))
 
         mass = self.get_array(self.masses) if s is None else self.masses[s]
-        c_vels = self.centered_velocities(mean_velocity, s)
-        proj_vels_1 = self.project_velocities(c_vels, direction_1)
-        proj_vels_2 = self.project_velocities(c_vels, direction_2)
-        return mass * proj_vels_1 * proj_vels_2
+        c_vels = self.c_vels(mean_velocity, s)
+        p_vels_1 = self.p_vels(c_vels, direction_1)
+        p_vels_2 = self.p_vels(c_vels, direction_2)
+        return mass * p_vels_1 * p_vels_2
 
     def mf_pressure(self, mean_velocity, s=None):
         mean_velocity = np.array(mean_velocity)
         dim = self.ndim
         mass = (self.get_array(self.masses)[np.newaxis, :]
                 if s is None else self.masses[s])
-        velocities = self.velocities[self.idx_range(s), :]
+        velocities = self.vels[self.idx_range(s), :]
         # reshape mean_velocity (may have higher dimension)
         shape = mean_velocity.shape[:-1]
         size = np.prod(shape, dtype=int)
         mean_velocity = mean_velocity.reshape((size, dim))
-        c_vels = self.centered_velocities(mean_velocity, s)
+        c_vels = self.c_vels(mean_velocity, s)
         c_vels = c_vels.reshape((size,) + velocities.shape)
         # compute pressure moment function
         mf_pressure = mass / dim * np.sum(c_vels**2, axis=-1)
@@ -574,10 +576,10 @@ class Model(bp.BaseClass):
         direction = np.array(direction)
         assert direction.shape == (self.ndim,)
         mass = self.get_array(self.masses) if s is None else self.masses[s]
-        c_vels = self.centered_velocities(mean_velocity, s)
-        proj_vels = self.project_velocities(c_vels, direction)
+        c_vels = self.c_vels(mean_velocity, s)
+        p_vels = self.p_vels(c_vels, direction)
         squared_sum = np.sum(c_vels ** 2, axis=-1)
-        return mass * proj_vels * squared_sum
+        return mass * p_vels * squared_sum
 
     def mf_orthogonal_heat_flow(self, state, direction, s=None):
         direction = np.array(direction)
@@ -587,10 +589,10 @@ class Model(bp.BaseClass):
         # compute non-orthogonal moment function
         mf = self.mf_heat_flow(mean_velocity, direction, s)
         # subtract non-orthogonal part
-        # in continuum this is (d+2)*T * centered_velocities
+        # in continuum this is (d+2)*T * c_vels
         # however this is not precise enough in grids
         # thus subtract correction term based on state
-        p_vels = self.centered_velocities(mean_velocity) @ direction
+        p_vels = self.c_vels(mean_velocity) @ direction
         ct = (self.momentum(mf * state) @ direction
               / (self.momentum(p_vels*state) @ direction)
               * p_vels)
@@ -620,7 +622,7 @@ class Model(bp.BaseClass):
               if s is None else self.dv[s])
         if separately:
             assert s is None
-            state = state[..., np.newaxis] * self.species_matrix[np.newaxis, ...]
+            state = state[..., np.newaxis] * self.spc_matrix[np.newaxis, ...]
             shape = shape + (self.nspc,)
             dv = dv[..., np.newaxis]
             axis = -2
@@ -658,7 +660,7 @@ class Model(bp.BaseClass):
                 if s is None else self.masses[s])
         dv = (self.get_array(self.dv)[np.newaxis, :]
               if s is None else self.dv[s])
-        velocities = self.velocities[self.idx_range(s)]
+        velocities = self.vels[self.idx_range(s)]
         # compute momentum
         result = np.dot(dv**dim * mass * state, velocities)
         return result.reshape(shape + (dim,))
@@ -703,7 +705,7 @@ class Model(bp.BaseClass):
         mass = self.get_array(self.masses) if s is None else self.masses[s]
         dv = (self.get_array(self.dv)[np.newaxis, :]
               if s is None else self.dv[s])
-        velocities = self.velocities[self.idx_range(s)]
+        velocities = self.vels[self.idx_range(s)]
         # compute energy density
         energy = 0.5 * mass * np.sum(velocities ** 2, axis=-1)
         result = np.dot(dv**dim * state, energy)
@@ -763,7 +765,7 @@ class Model(bp.BaseClass):
                 if s is None else self.masses[s])
         dv = (self.get_array(self.dv)[np.newaxis, :]
               if s is None else self.dv[s])
-        velocities = self.velocities[self.idx_range(s)]
+        velocities = self.vels[self.idx_range(s)]
         # compute momentum flow
         result = np.dot(dv**dim * mass * state, velocities ** 2)
         return result.reshape(shape + (dim,))
@@ -785,7 +787,7 @@ class Model(bp.BaseClass):
                 if s is None else self.masses[s])
         dv = (self.get_array(self.dv)[np.newaxis, :]
               if s is None else self.dv[s])
-        velocities = self.velocities[self.idx_range(s)]
+        velocities = self.vels[self.idx_range(s)]
         # compute energy flow
         energies = 0.5 * mass * np.sum(velocities ** 2, axis=1)[:, np.newaxis]
         result = np.dot(dv**dim * state, energies * velocities)
@@ -1095,8 +1097,8 @@ class Model(bp.BaseClass):
         assert isinstance(self.ndim, int)
         assert self.ndim in {2, 3}
 
-        assert isinstance(self.maximum_velocity, float)
-        assert self.maximum_velocity > 0
+        assert isinstance(self.max_vel, float)
+        assert self.max_vel > 0
 
         assert isinstance(self.base_delta, float)
         assert self.base_delta > 0
