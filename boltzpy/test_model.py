@@ -167,6 +167,33 @@ def test_get_idx_on_shuffled_grid(key):
     assert np.all(result_idx == shuffled_idx)
 
 
+@pytest.mark.parametrize("key", MODELS.keys())
+def test_get_idx_on_random_integers(key):
+    model = MODELS[key]
+    # number of random values
+    nvals = 1000
+    # generate random species
+    spc_idx = np.random.randint(model.nspc, size=(nvals,))
+    # generate random integer velocities
+    max_val = np.max(model.spacings[:, np.newaxis] * model.shapes)
+    i_vels = np.random.randint(max_val, size=(nvals, model.ndim))
+    # Test vectorized
+    result_idx = model.get_idx(spc_idx, i_vels)
+
+    # check accepted values, returned index must point to the original velocity
+    pos_match = np.flatnonzero(result_idx >= 0)
+    idx_match = result_idx[pos_match]
+    vels_match = i_vels[pos_match]
+    assert np.array_equal(model.iMG[idx_match], vels_match)
+
+    # rejected values (result_idx == -1), must not be in the grid
+    pos_miss = np.flatnonzero(result_idx < 0)
+    subgrids = model.subgrids()
+    for i in pos_miss:
+        s = spc_idx[i]
+        assert i_vels[i] not in subgrids[s]
+
+
 def assert_all_moments_are_zero(model, state):
     # number density of each species stays the same
     for s in model.species:

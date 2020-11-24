@@ -236,8 +236,7 @@ class VelocityModel(bp.BaseClass):
         # reshape velocities for vectorization
         shape = integer_velocities.shape[:-1]
         integer_velocities = integer_velocities.reshape((-1, species.size, self.ndim))
-
-        # Todo vectorize with np.unique
+        
         subgrids = self.subgrids()
         indices = np.zeros(integer_velocities.shape[0:2], dtype=int)
         for idx_s, s in enumerate(species):
@@ -245,10 +244,6 @@ class VelocityModel(bp.BaseClass):
             indices[..., idx_s] = np.where(local_indices >= 0,
                                            local_indices + self._idx_offset[s],
                                            -1)
-        # Todo move this into a test file
-        pos = np.where(np.all(indices >= 0, axis=-1))
-        assert np.all(self.iMG[indices[pos]] == integer_velocities[pos])
-        assert np.all(self.iMG[indices[pos]] == integer_velocities[pos])
         return indices.reshape(shape)
 
     def get_spc(self, indices):
