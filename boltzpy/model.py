@@ -38,8 +38,6 @@ class Model(bp.BaseClass):
 
     Attributes
     ----------
-    specimen : :obj:`int` :
-        The number of different specimen or velocity grids.
     index_offset : :obj:`~numpy.array` [:obj:`int`]
         Denotes the beginning of the respective velocity grid
         in the multi grid :attr:`iMG`.
@@ -92,9 +90,6 @@ class Model(bp.BaseClass):
         self.algorithm_relations = str(algorithm_relations)
         self.algorithm_weights = str(algorithm_weights)
 
-        # todo make property, rename nspc
-        self.specimen = self.masses.size
-
         # set up each Velocity Grid
         # todo make method(s)
         self.vGrids = np.array([bp.Grid(self.shapes[i],
@@ -106,12 +101,12 @@ class Model(bp.BaseClass):
 
         self.iMG = np.concatenate([G.iG for G in self.vGrids])
         # Todo rename _idx_offset
-        self.index_offset = np.zeros(self.specimen + 1, dtype=int)
+        self.index_offset = np.zeros(self.nspc + 1, dtype=int)
         for s in self.species:
             self.index_offset[s + 1:] += self.vGrids[s].size
 
         # todo rename spc_matrix
-        self.species_matrix = np.zeros((self.nvels, self.specimen), dtype=int)
+        self.species_matrix = np.zeros((self.nvels, self.nspc), dtype=int)
         for s in self.species:
             self.species_matrix[self.idx_range(s), s] = 1
 
@@ -151,6 +146,12 @@ class Model(bp.BaseClass):
         return self.shapes.shape[-1]
 
     @property
+    def nspc(self):
+        """:obj:`int` :
+        The number of different specimen / velocity grids."""
+        return self.masses.size
+
+    @property
     def nvels(self):
         """:obj:`int` :
         The total number of velocity grid points over all grids."""
@@ -158,7 +159,7 @@ class Model(bp.BaseClass):
 
     @property
     def species(self):
-        return np.arange(self.specimen)
+        return np.arange(self.nspc)
 
     @property
     def maximum_velocity(self):
@@ -195,7 +196,7 @@ class Model(bp.BaseClass):
         attrs.update({"ndim",
                       "nvels",
                       "collision_matrix",
-                      "specimen",
+                      "nspc",
                       "index_offset",
                       "species",
                       "maximum_velocity",
@@ -203,9 +204,9 @@ class Model(bp.BaseClass):
         return attrs
 
     def get_array(self, parameter):
-        assert parameter.shape[-1] == self.specimen
+        assert parameter.shape[-1] == self.nspc
         shape = parameter.shape[:-1] + (self.nvels,)
-        parameter = parameter.reshape((-1, 1, self.specimen))
+        parameter = parameter.reshape((-1, 1, self.nspc))
         species_matrix = self.species_matrix[:, np.newaxis, :]
         result = np.sum(species_matrix * parameter, axis=-1)
         return result.reshape(shape)
@@ -455,15 +456,15 @@ class Model(bp.BaseClass):
                               temperatures):
         # number densities can be multiplied on the distribution at the end
         number_densities = np.array(number_densities)
-        assert number_densities.shape == (self.specimen,)
+        assert number_densities.shape == (self.nspc,)
 
         # mean velocites and temperatures are the targets for the newton scheme
-        wanted_moments = np.zeros((self.specimen, self.ndim + 1), dtype=float)
+        wanted_moments = np.zeros((self.nspc, self.ndim + 1), dtype=float)
         wanted_moments[:, : self.ndim] = mean_velocities
         wanted_moments[:, self.ndim] = temperatures
 
         # initialization parameters for the maxwellians
-        init_params = np.zeros((self.specimen, self.ndim + 1), dtype=float)
+        init_params = np.zeros((self.nspc, self.ndim + 1), dtype=float)
 
         # if all specimen have equal mean_velocities and temperatures
         # then create a maxwellian in equilibrium (invariant under collisions)
@@ -621,7 +622,7 @@ class Model(bp.BaseClass):
         if separately:
             assert s is None
             state = state[..., np.newaxis] * self.species_matrix[np.newaxis, ...]
-            shape = shape + (self.specimen,)
+            shape = shape + (self.nspc,)
             dv = dv[..., np.newaxis]
             axis = -2
         else:
@@ -837,7 +838,7 @@ class Model(bp.BaseClass):
 
         # Iterate over Specimen pairs
         for s0 in self.species:
-            for s1 in np.arange(s0, self.specimen):
+            for s1 in np.arange(s0, self.nspc):
 
                 # group grid[0] points by distance to grid[2]
                 group = bp.Grid.group(self.vGrids[s0].iG,
@@ -1102,7 +1103,7 @@ class Model(bp.BaseClass):
         assert self.base_delta > 0
 
         assert isinstance(self.shapes, np.ndarray)
-        assert self.shapes.shape[0] == self.specimen
+        assert self.shapes.shape[0] == self.nspc
         assert np.array_equal(self.shapes,
                               np.array([G.shape for G in self.vGrids]))
         assert len({shape.ndim for shape in self.shapes}) <= 1, (
@@ -1115,12 +1116,12 @@ class Model(bp.BaseClass):
             "{}".format(self.shapes))
 
         assert isinstance(self.spacings, np.ndarray)
-        assert self.spacings.shape[0] == self.specimen
+        assert self.spacings.shape[0] == self.nspc
         assert np.array_equal(self.spacings,
                               np.array([G.spacing for G in self.vGrids]))
 
         assert isinstance(self.vGrids, np.ndarray)
-        assert self.vGrids.size == self.specimen
+        assert self.vGrids.size == self.nspc
         assert self.vGrids.ndim == 1
         assert self.vGrids.dtype == 'object'
         for G in self.vGrids:
@@ -1129,7 +1130,7 @@ class Model(bp.BaseClass):
 
         assert isinstance(self.index_offset, np.ndarray)
         assert self.index_offset.dtype == int
-        assert self.index_offset.shape == (self.specimen + 1,)
+        assert self.index_offset.shape == (self.nspc + 1,)
         assert np.all(self.index_offset >= 0)
         assert np.all(self.index_offset[1:] > self.index_offset[:-1])
         assert np.array_equal(self.index_offset[1:] - self.index_offset[:-1],

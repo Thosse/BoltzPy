@@ -62,7 +62,7 @@ class Rule(bp.BaseClass):
     def compute_initial_state(self, model):
         assert isinstance(model, bp.Model)
         assert self.ndim == model.ndim
-        assert self.specimen == model.specimen
+        assert self.specimen == model.nspc
         initial_state = model.compute_initial_state(self.particle_number,
                                                     self.mean_velocity,
                                                     self.temperature)
@@ -77,7 +77,7 @@ class Rule(bp.BaseClass):
 
         fig = bp.Plot.AnimatedFigure()
         for s in model.species:
-            ax = fig.add_subplot((1, model.specimen, s + 1), 3)
+            ax = fig.add_subplot((1, model.nspc, s + 1), 3)
             idx_range = model.idx_range(s)
             vels = model.velocities[idx_range]
             ax.plot(vels[..., 0],
@@ -471,9 +471,9 @@ class BoundaryPointRule(InhomogeneousRule):
         assert isinstance(model, bp.Model)
         reflected_inflow = np.zeros(inflow.shape, dtype=float)
 
-        reflected_inflow += (np.dot(model.species_matrix, self.reflection_rate_inverse[:model.specimen])
+        reflected_inflow += (np.dot(model.species_matrix, self.reflection_rate_inverse[:model.nspc])
                              * inflow[:, self.reflected_indices_inverse])
-        reflected_inflow += (np.dot(model.species_matrix, self.reflection_rate_elastic[:model.specimen])
+        reflected_inflow += (np.dot(model.species_matrix, self.reflection_rate_elastic[:model.nspc])
                              * inflow[:, self.reflected_indices_elastic])
 
         # compute each reflection separately for every species

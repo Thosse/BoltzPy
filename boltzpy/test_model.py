@@ -180,7 +180,7 @@ def test_get_idx_on_shuffled_grid_with(key):
         assert np.all(model.get_idx(s, shuffled_vels) == shuffled_idx)
     # Todo add tests for 1d species array
     # test 1d species arrays
-    if model.specimen <= 2:
+    if model.nspc <= 2:
         return
 
 

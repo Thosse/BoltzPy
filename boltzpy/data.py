@@ -59,8 +59,8 @@ class Data:
         self.result = np.copy(self.state)
 
         # Velocity Grid parameters
-        self.v_range = np.zeros((sim.model.specimen, 2), dtype=int)
-        self.v_range[:, 0] = sim.model.index_offset[0: sim.model.specimen]
+        self.v_range = np.zeros((sim.model.nspc, 2), dtype=int)
+        self.v_range[:, 0] = sim.model.index_offset[0: sim.model.nspc]
         self.v_range[:, 1] = sim.model.index_offset[1:]
 
         self.vG = sim.model.velocities
@@ -72,7 +72,7 @@ class Data:
         self.dv = np.array([sim.model.vGrids[s].physical_spacing
                             for s in sim.model.species])
 
-        self.n_spc = sim.model.specimen
+        self.n_spc = sim.model.nspc
         self.m = sim.model.masses
 
         self.t = 0
