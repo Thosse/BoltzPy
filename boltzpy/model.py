@@ -193,14 +193,6 @@ class Model(bp.BaseClass):
         return result.reshape(shape)
 
     @property
-    def dv_array(self):
-        result = np.empty(self.size)
-        dv = self.dv
-        for s in self.species:
-            result[self.idx_range(s)] = dv[s]
-        return result
-
-    @property
     def velocities(self):
         return self.delta * self.iMG
 
@@ -603,7 +595,8 @@ class Model(bp.BaseClass):
         state = state.reshape((size, state.shape[-1]))
         # prepare paramters
         dim = self.ndim
-        dv = self.dv_array[np.newaxis, :] if s is None else self.dv[s]
+        dv = (self.get_array(self.dv)[np.newaxis, :]
+              if s is None else self.dv[s])
         if separately:
             assert s is None
             state = state[..., np.newaxis] * self.species_matrix[np.newaxis, ...]
@@ -626,7 +619,8 @@ class Model(bp.BaseClass):
         dim = self.ndim
         mass = (self.get_array(self.masses)[np.newaxis, :]
                 if s is None else self.masses[s])
-        dv = self.dv_array[np.newaxis, :] if s is None else self.dv[s]
+        dv = (self.get_array(self.dv)[np.newaxis, :]
+              if s is None else self.dv[s])
         # compute mass density
         result = np.sum(dv**dim * mass * state, axis=-1)
         return result.reshape(shape)
@@ -641,7 +635,8 @@ class Model(bp.BaseClass):
         dim = self.ndim
         mass = (self.get_array(self.masses)[np.newaxis, :]
                 if s is None else self.masses[s])
-        dv = self.dv_array[np.newaxis, :] if s is None else self.dv[s]
+        dv = (self.get_array(self.dv)[np.newaxis, :]
+              if s is None else self.dv[s])
         velocities = self.velocities[self.idx_range(s)]
         # compute momentum
         result = np.dot(dv**dim * mass * state, velocities)
@@ -685,7 +680,8 @@ class Model(bp.BaseClass):
         # prepare paramters
         dim = self.ndim
         mass = self.get_array(self.masses) if s is None else self.masses[s]
-        dv = self.dv_array[np.newaxis, :] if s is None else self.dv[s]
+        dv = (self.get_array(self.dv)[np.newaxis, :]
+              if s is None else self.dv[s])
         velocities = self.velocities[self.idx_range(s)]
         # compute energy density
         energy = 0.5 * mass * np.sum(velocities ** 2, axis=-1)
@@ -703,7 +699,8 @@ class Model(bp.BaseClass):
             mean_velocity = self.mean_velocity(state, s)
         # prepare paramters
         dim = self.ndim
-        dv = self.dv_array[np.newaxis, :] if s is None else self.dv[s]
+        dv = (self.get_array(self.dv)[np.newaxis, :]
+              if s is None else self.dv[s])
         # compute pressure
         mf_pressure = self.mf_pressure(mean_velocity, s)
         # mf_pressure.shape[0] might be 1 or state.shape[0]
@@ -743,7 +740,8 @@ class Model(bp.BaseClass):
         dim = self.ndim
         mass = (self.get_array(self.masses)[np.newaxis, :]
                 if s is None else self.masses[s])
-        dv = self.dv_array[np.newaxis, :] if s is None else self.dv[s]
+        dv = (self.get_array(self.dv)[np.newaxis, :]
+              if s is None else self.dv[s])
         velocities = self.velocities[self.idx_range(s)]
         # compute momentum flow
         result = np.dot(dv**dim * mass * state, velocities ** 2)
@@ -764,7 +762,8 @@ class Model(bp.BaseClass):
         dim = self.ndim
         mass = (self.get_array(self.masses)[np.newaxis, :]
                 if s is None else self.masses[s])
-        dv = self.dv_array[np.newaxis, :] if s is None else self.dv[s]
+        dv = (self.get_array(self.dv)[np.newaxis, :]
+              if s is None else self.dv[s])
         velocities = self.velocities[self.idx_range(s)]
         # compute energy flow
         energies = 0.5 * mass * np.sum(velocities ** 2, axis=1)[:, np.newaxis]
@@ -1013,7 +1012,8 @@ class Model(bp.BaseClass):
         # adjust changes to divverent velocity-grid deltas
         # this is necessary for invariance of moments
         # multiplicate with min(dv) keep the order of magnidute of the weights
-        eq_factor = np.min(self.dv) / self.dv_array[np.newaxis, :]**self.ndim
+        dv_array = self.get_array(self.dv)[np.newaxis, :]
+        eq_factor = np.min(self.dv) / dv_array**self.ndim
         result[:] *= eq_factor
         return result.reshape(shape)
 
