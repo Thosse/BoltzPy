@@ -30,7 +30,7 @@ class Model(bp.BaseClass):
         Denotes the masses of all specimen.
     shapes : :obj:`~numpy.array` [:obj:`int`]
         Denotes the shape of each :class:`boltzpy.Grid`.
-    delta : :obj:`float`
+    base_delta : :obj:`float`
         Internal step size (delta) of all :class:`Grids <boltzpy.Grid>`.
         This is NOT the physical distance between grid points.
     spacings : :obj:`~numpy.array` [:obj:`int`]
@@ -59,7 +59,7 @@ class Model(bp.BaseClass):
     def __init__(self,
                  masses,
                  shapes,
-                 delta,
+                 base_delta,
                  spacings,
                  collision_factors,
                  collision_relations=None,
@@ -74,8 +74,7 @@ class Model(bp.BaseClass):
         self.shapes = np.array(shapes, dtype=int)
         assert self.shapes.ndim == 2
 
-        # Todo rename -> base_delta
-        self.delta = np.float(delta)
+        self.base_delta = np.float(base_delta)
 
         # give default value = default_spacing
         assert isinstance(spacings, (list, tuple, np.ndarray))
@@ -83,7 +82,7 @@ class Model(bp.BaseClass):
         assert self.spacings.ndim == 1
 
         # Todo make property
-        self.dv = self.delta * self.spacings
+        self.dv = self.base_delta * self.spacings
 
         # todo rename spc_collision_probability, default = np.ones
         #  must be in [0, 1]
@@ -107,7 +106,7 @@ class Model(bp.BaseClass):
         # set up each Velocity Grid
         # todo make method(s)
         self.vGrids = np.array([bp.Grid(self.shapes[i],
-                                        self.delta,
+                                        self.base_delta,
                                         self.spacings[i],
                                         is_centered=True)
                                 for i in self.species],
@@ -161,7 +160,7 @@ class Model(bp.BaseClass):
     def maximum_velocity(self):
         """:obj:`float`
         Maximum physical velocity for every sub grid."""
-        return np.max(self.iMG * self.delta)
+        return np.max(self.iMG * self.base_delta)
 
     # todo rename ncolls
     @property
@@ -178,7 +177,7 @@ class Model(bp.BaseClass):
     def parameters():
         return {"masses",
                 "shapes",
-                "delta",
+                "base_delta",
                 "spacings",
                 "collision_factors",
                 "collision_relations",
@@ -210,7 +209,7 @@ class Model(bp.BaseClass):
     # todo rename vels
     @property
     def velocities(self):
-        return self.delta * self.iMG
+        return self.base_delta * self.iMG
 
     # todo rename cvels
     def centered_velocities(self, mean_velocity, s=None):
@@ -231,7 +230,7 @@ class Model(bp.BaseClass):
         assert mean_v < max_v
         min_mass = np.min(self.masses)
         max_temp = (max_v - mean_v)**2 / min_mass
-        min_temp = 3 * np.max(self.spacings * self.delta)**2 / min_mass
+        min_temp = 3 * np.max(self.spacings * self.base_delta)**2 / min_mass
         return np.array([min_temp, max_temp], dtype=float)
 
     #####################################
@@ -1079,7 +1078,7 @@ class Model(bp.BaseClass):
             # repeat the collision to "close" the rectangle / trapezoid
             rels = np.tile(r, 2)
             # transpose the velocities, for easy unpacking
-            vels = (self.iMG[rels] * self.delta).transpose()
+            vels = (self.iMG[rels] * self.base_delta).transpose()
             ax.plot(*vels, color="gray", linewidth=1)
         plt.show()
         return
@@ -1095,8 +1094,8 @@ class Model(bp.BaseClass):
         assert isinstance(self.maximum_velocity, float)
         assert self.maximum_velocity > 0
 
-        assert isinstance(self.delta, float)
-        assert self.delta > 0
+        assert isinstance(self.base_delta, float)
+        assert self.base_delta > 0
 
         assert isinstance(self.shapes, np.ndarray)
         assert self.shapes.shape[0] == self.specimen

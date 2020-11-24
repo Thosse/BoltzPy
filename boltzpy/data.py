@@ -63,7 +63,7 @@ class Data:
         self.v_range[:, 0] = sim.model.index_offset[0: sim.model.specimen]
         self.v_range[:, 1] = sim.model.index_offset[1:]
 
-        self.vG = sim.model.delta * sim.model.iMG
+        self.vG = sim.model.velocities
         # Todo reimplement offset -> geometry or simulation?
         self.velocity_offset = np.zeros(sim.model.ndim)
         #np.array(sim.scheme.Transport_VelocityOffset)
