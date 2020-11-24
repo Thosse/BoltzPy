@@ -38,8 +38,6 @@ class Model(bp.BaseClass):
 
     Attributes
     ----------
-    ndim : :obj:`int`
-        Dimensionality of all Velocity :class:`Grids <boltzpy.Grid>`.
     size : :obj:`int` :
         The total number of velocity grid points over all grids.
     specimen : :obj:`int` :
@@ -96,8 +94,6 @@ class Model(bp.BaseClass):
         self.algorithm_relations = str(algorithm_relations)
         self.algorithm_weights = str(algorithm_weights)
 
-        # Todo make property
-        self.ndim = self.shapes.shape[1]
         # Todo make property, rename nvels
         self.size = np.sum(np.prod(self.shapes, axis=1))
         # todo make property, rename nspc
@@ -152,6 +148,12 @@ class Model(bp.BaseClass):
     #####################################
     #           Properties              #
     #####################################
+    @property
+    def ndim(self):
+        """:obj:`int`
+        Dimensionality of all Velocity Grids`."""
+        return self.shapes.shape[-1]
+
     @property
     def species(self):
         return np.arange(self.specimen)
