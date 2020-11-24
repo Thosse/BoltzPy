@@ -38,7 +38,7 @@ class Model(bp.BaseClass):
 
     Attributes
     ----------
-    index_offset : :obj:`~numpy.array` [:obj:`int`]
+    _idx_offset : :obj:`~numpy.array` [:obj:`int`]
         Denotes the beginning of the respective velocity grid
         in the multi grid :attr:`iMG`.
     vGrids : :obj:`~numpy.array` [:class:`~boltzpy.Grid`]
@@ -98,12 +98,11 @@ class Model(bp.BaseClass):
                                         is_centered=True)
                                 for i in self.species],
                                dtype=bp.Grid)
-
         self.iMG = np.concatenate([G.iG for G in self.vGrids])
-        # Todo rename _idx_offset
-        self.index_offset = np.zeros(self.nspc + 1, dtype=int)
+
+        self._idx_offset = np.zeros(self.nspc + 1, dtype=int)
         for s in self.species:
-            self.index_offset[s + 1:] += self.vGrids[s].size
+            self._idx_offset[s + 1:] += self.vGrids[s].size
 
         # todo rename spc_matrix
         self.species_matrix = np.zeros((self.nvels, self.nspc), dtype=int)
@@ -197,7 +196,7 @@ class Model(bp.BaseClass):
                       "nvels",
                       "collision_matrix",
                       "nspc",
-                      "index_offset",
+                      "_idx_offset",
                       "species",
                       "maximum_velocity",
                       "collision_invariants"})
@@ -245,7 +244,7 @@ class Model(bp.BaseClass):
         if s is None:
             return np.s_[:]
         else:
-            return np.s_[self.index_offset[s]: self.index_offset[s+1]]
+            return np.s_[self._idx_offset[s]: self._idx_offset[s+1]]
 
     def get_idx(self,
                 species,
@@ -281,7 +280,7 @@ class Model(bp.BaseClass):
         for col, s in enumerate(species):
             local_indices = self.vGrids[s].get_idx(velocities[:, col, :])
             indices[..., col] = np.where(local_indices >= 0,
-                                         local_indices + self.index_offset[s],
+                                         local_indices + self._idx_offset[s],
                                          -1)
 
         # noinspection PyUnreachableCode
@@ -311,9 +310,9 @@ class Model(bp.BaseClass):
             indices = np.array(indices)
         species = np.full(indices.shape, -1, dtype=int)
         for s in self.species:
-            offset = self.index_offset[s]
+            offset = self._idx_offset[s]
             species = np.where(indices >= offset, s, species)
-        species = np.where(indices >= self.index_offset[-1], -1, species)
+        species = np.where(indices >= self._idx_offset[-1], -1, species)
         assert np.all(species >= 0)
         return species
 
@@ -1128,18 +1127,19 @@ class Model(bp.BaseClass):
             isinstance(G, bp.Grid)
             G.check_integrity()
 
-        assert isinstance(self.index_offset, np.ndarray)
-        assert self.index_offset.dtype == int
-        assert self.index_offset.shape == (self.nspc + 1,)
-        assert np.all(self.index_offset >= 0)
-        assert np.all(self.index_offset[1:] > self.index_offset[:-1])
-        assert np.array_equal(self.index_offset[1:] - self.index_offset[:-1],
+        assert isinstance(self._idx_offset, np.ndarray)
+        assert self._idx_offset.dtype == int
+        assert self._idx_offset.shape == (self.nspc + 1,)
+        assert np.all(self._idx_offset >= 0)
+        assert np.all(self._idx_offset[1:] > self._idx_offset[:-1])
+        assert np.array_equal(self._idx_offset[1:] - self._idx_offset[:-1],
                               np.array([G.size for G in self.vGrids]))
+        assert self._idx_offset[-1] == self.nvels
 
         assert isinstance(self.iMG, np.ndarray)
         assert self.iMG.dtype == int
         assert self.iMG.ndim == 2
-        assert self.iMG.shape[0] == self.index_offset[-1]
+        assert self.iMG.shape == (self.nvels, self.ndim)
 
         assert self.algorithm_relations in {"all", "convergent", "naive"}
         assert self.algorithm_weights in {"uniform"}

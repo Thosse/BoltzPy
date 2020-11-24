@@ -60,8 +60,8 @@ class Data:
 
         # Velocity Grid parameters
         self.v_range = np.zeros((sim.model.nspc, 2), dtype=int)
-        self.v_range[:, 0] = sim.model.index_offset[0: sim.model.nspc]
-        self.v_range[:, 1] = sim.model.index_offset[1:]
+        self.v_range[:, 0] = sim.model._idx_offset[0: sim.model.nspc]
+        self.v_range[:, 1] = sim.model._idx_offset[1:]
 
         self.vG = sim.model.velocities
         # Todo reimplement offset -> geometry or simulation?

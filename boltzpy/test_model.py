@@ -136,52 +136,35 @@ def test_attributes(attribute, key):
 @pytest.mark.parametrize("key", MODELS.keys())
 def test_get_spc_on_shuffled_grid(key):
     model = MODELS[key]
-    # setup the species each gridpoint/velocity belongs to, for comparison
-    species = np.zeros(model.nvels)
-    for s in model.species:
-        beg, end = model.index_offset[s:s+2]
-        species[beg:end] = s
-    # shuffle velocities/species
+    # determines the species for each velocity
+    species = model.get_array(model.species)
+    # generate shuffled velocity indices
     rng = np.random.default_rng()
-    shuffled_idx = rng.permutation(model.nvels)
+    shuffled_vel_idx = rng.permutation(model.nvels)
     # test for 0d arrays/elements
-    for idx in shuffled_idx:
+    for idx in shuffled_vel_idx:
         assert model.get_spc(idx).ndim == 0
         assert model.get_spc(idx) == species[idx]
-    # test for different ndims >= 1
+    # test_get_spc for higher dimensions
     for ndmin in range(1, 6):
-        shuffled_idx = np.array(shuffled_idx, ndmin=ndmin)
+        # prepend ndmin 1s to the shape
+        shuffled_idx = np.array(shuffled_vel_idx, ndmin=ndmin)
         shuffles_spc = species[shuffled_idx]
         assert np.all(model.get_spc(shuffled_idx) == shuffles_spc)
 
 
 @pytest.mark.parametrize("key", MODELS.keys())
-def test_get_idx_on_shuffled_grid_with(key):
+def test_get_idx_on_shuffled_grid(key):
     model = MODELS[key]
+    # generate shuffled velocities and (matching) species indices
     rng = np.random.default_rng()
-    # test 0d species arrays
-    for s in model.species:
-        beg, end = model.index_offset[s:s+2]
-        indices = np.arange(beg, end)
-        shuffle = rng.permutation(indices.size)
-        shuffled_idx = indices[shuffle]
-        # test 1d velocity arrays
-        for idx in shuffled_idx:
-            assert np.all(model.get_idx(s, model.iMG[idx]) == idx)
-        # test 2d velocity arrays (n_Vels x dim)
-        shuffled_vels = model.iMG[shuffled_idx]
-        assert shuffled_vels.ndim == 2
-        assert np.all(model.get_idx(s, shuffled_vels) == shuffled_idx)
-        # test 3d velocity arrays (n_vels x 1 x dim)
-        shuffled_idx = indices[shuffle][:, np.newaxis]
-        shuffled_vels = model.iMG[shuffled_idx]
-        assert shuffled_idx.ndim == 2
-        assert shuffled_vels.ndim == 3
-        assert np.all(model.get_idx(s, shuffled_vels) == shuffled_idx)
-    # Todo add tests for 1d species array
-    # test 1d species arrays
-    if model.nspc <= 2:
-        return
+    shuffled_idx = rng.permutation(model.nvels)
+    spc_idx = model.get_array(model.species)
+    shuffled_spc_idx = spc_idx[shuffled_idx]
+    shuffled_vels = model.iMG[shuffled_idx]
+    # Test vectorized
+    result_idx = model.get_idx(shuffled_spc_idx, shuffled_vels)
+    assert np.all(result_idx == shuffled_idx)
 
 
 def assert_all_moments_are_zero(model, state):
