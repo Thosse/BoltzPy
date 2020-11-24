@@ -35,39 +35,43 @@ class VelocityModel(bp.BaseClass):
 
     Attributes
     ----------
+    ndim : :obj:`int`
+        The dimension of all Velocity Grids`.
+    nspc : :obj:`int` :
+        The number of different specimen / velocity grids.
+    nvels : :obj:`int` :
+        The total number of velocity grid points over all grids.
+    i_vels : :obj:`~numpy.array` [:obj:`int`]
+        The array of all integer velocities.
+        These are the concatenated integer velocities of each specimen
+    vels : :obj:`~numpy.array` [:obj:`float`]
+        The array of all velocities.
+        These are the concatenated velocity grids for each specimen
     _idx_offset : :obj:`~numpy.array` [:obj:`int`]
         Denotes the beginning of the respective velocity grid
         in the multi grid :attr:`iMG`.
-    iMG : :obj:`~numpy.array` [:obj:`int`]
-        The *integer Multi-Grid*.
-        It is a concatenation of all
-        Velocity integer Grids
-        (:attr:`Grid.iG <boltzpy.Grid>`).
     """
 
     def __init__(self,
                  masses,
                  shapes,
                  base_delta,
-                 spacings):
-        assert isinstance(masses, (list, tuple, np.ndarray))
+                 spacings=None):
         self.masses = np.array(masses, dtype=int)
-        assert self.masses.ndim == 1
-
-        assert isinstance(shapes, (list, tuple, np.ndarray))
         self.shapes = np.array(shapes, dtype=int)
-        assert self.shapes.ndim == 2
-
         self.base_delta = np.float(base_delta)
-
         # give default value = default_spacing
-        assert isinstance(spacings, (list, tuple, np.ndarray))
-        self.spacings = np.array(spacings, dtype=int)
-        assert self.spacings.ndim == 1
+        if spacings is None:
+            self.spacings = 2 * np.lcm.reduce(self.masses) // self.masses
+        else:
+            self.spacings = np.array(spacings, dtype=int)
 
-        # Todo make property
+        self.ndim = self.shapes.shape[-1]
+        self.nspc = self.masses.size
+        self.nvels = np.sum(np.prod(self.shapes, axis=-1))
         self.dv = self.base_delta * self.spacings
-        self.iMG = np.concatenate([G.iG for G in self.subgrids()])
+        self.i_vels = np.concatenate([G.iG for G in self.subgrids()])
+        self.vels = self.base_delta * self.i_vels
 
         self._idx_offset = np.zeros(self.nspc + 1, dtype=int)
         for s in self.species:
@@ -77,6 +81,8 @@ class VelocityModel(bp.BaseClass):
         for s in self.species:
             self.spc_matrix[self.idx_range(s), s] = 1
 
+        if type(self) == VelocityModel:
+            self.check_integrity()
         return
 
     @staticmethod
@@ -100,35 +106,9 @@ class VelocityModel(bp.BaseClass):
                       "max_vel"})
         return attrs
 
-    # Todo properly vectorize
-    @staticmethod
-    def default_spacing(masses):
-        # compute spacings by mass ratio
-        lcm = int(np.lcm.reduce(masses))
-        spacings = [2 * lcm // int(m) for m in masses]
-        return spacings
-
     #####################################
     #           Properties              #
     #####################################
-    @property
-    def ndim(self):
-        """:obj:`int`
-        The dimension of all Velocity Grids`."""
-        return self.shapes.shape[-1]
-
-    @property
-    def nspc(self):
-        """:obj:`int` :
-        The number of different specimen / velocity grids."""
-        return self.masses.size
-
-    @property
-    def nvels(self):
-        """:obj:`int` :
-        The total number of velocity grid points over all grids."""
-        return np.sum(np.prod(self.shapes, axis=-1))
-
     @property
     def species(self):
         return np.arange(self.nspc)
@@ -149,13 +129,6 @@ class VelocityModel(bp.BaseClass):
             return grids
         else:
             return grids[s]
-
-    @property
-    def vels(self):
-        """:obj:`~numpy.array` [:obj:`float`]
-        The array of all velocities.
-        These are the concatenated velocity grids for each specimen"""
-        return self.base_delta * self.iMG
 
     @property
     def max_vel(self):
@@ -216,7 +189,7 @@ class VelocityModel(bp.BaseClass):
     def get_idx(self,
                 species,
                 integer_velocities):
-        """Find index of given grid_entry in :attr:`iMG`
+        """Find index of given grid_entry in :attr:`i_vels`
         Returns None, if the value is not in the specified Grid.
 
         Parameters
@@ -236,7 +209,7 @@ class VelocityModel(bp.BaseClass):
         # reshape velocities for vectorization
         shape = integer_velocities.shape[:-1]
         integer_velocities = integer_velocities.reshape((-1, species.size, self.ndim))
-        
+
         subgrids = self.subgrids()
         indices = np.zeros(integer_velocities.shape[0:2], dtype=int)
         for idx_s, s in enumerate(species):
@@ -247,7 +220,7 @@ class VelocityModel(bp.BaseClass):
         return indices.reshape(shape)
 
     def get_spc(self, indices):
-        """Get the specimen of given indices of :attr:`iMG`.
+        """Get the specimen of given indices of :attr:`i_vels`.
 
         Parameters
         ----------
@@ -256,12 +229,6 @@ class VelocityModel(bp.BaseClass):
         Returns
         -------
         species : :obj:`~numpy.array` [ :obj:`int` ]
-
-        Raises
-        ------
-        err_idx : :obj:`IndexError`
-            If *velocity_idx* is out of the range of
-            :attr:`Model.iMG`.
         """
         if not isinstance(indices, np.ndarray):
             indices = np.array(indices)
@@ -557,7 +524,6 @@ class VelocityModel(bp.BaseClass):
         if mass_density is None:
             mass_density = self.mass_density(state, s)
         if np.any(np.isclose(mass_density, 0)):
-            # Todo What to do in this case?
             raise ValueError
         return momentum / mass_density[..., np.newaxis]
 
@@ -634,7 +600,6 @@ class VelocityModel(bp.BaseClass):
         if number_density is None:
             number_density = self.number_density(state, s)
         if np.any(np.isclose(number_density, 0)):
-            # Todo What to do in this case?
             raise ValueError
         return pressure / number_density
 
@@ -728,10 +693,10 @@ class VelocityModel(bp.BaseClass):
                               [G.size for G in self.subgrids()])
         assert self._idx_offset[-1] == self.nvels
 
-        assert isinstance(self.iMG, np.ndarray)
-        assert self.iMG.dtype == int
-        assert self.iMG.shape == (self.nvels, self.ndim)
-        assert self.iMG.ndim == 2
+        assert isinstance(self.i_vels, np.ndarray)
+        assert self.i_vels.dtype == int
+        assert self.i_vels.shape == (self.nvels, self.ndim)
+        assert self.i_vels.ndim == 2
         return
 
     def __str__(self,

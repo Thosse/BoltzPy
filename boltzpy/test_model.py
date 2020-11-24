@@ -161,7 +161,7 @@ def test_get_idx_on_shuffled_grid(key):
     shuffled_idx = rng.permutation(model.nvels)
     spc_idx = model.get_array(model.species)
     shuffled_spc_idx = spc_idx[shuffled_idx]
-    shuffled_vels = model.iMG[shuffled_idx]
+    shuffled_vels = model.i_vels[shuffled_idx]
     # Test vectorized
     result_idx = model.get_idx(shuffled_spc_idx, shuffled_vels)
     assert np.all(result_idx == shuffled_idx)
@@ -184,7 +184,7 @@ def test_get_idx_on_random_integers(key):
     pos_match = np.flatnonzero(result_idx >= 0)
     idx_match = result_idx[pos_match]
     vels_match = i_vels[pos_match]
-    assert np.array_equal(model.iMG[idx_match], vels_match)
+    assert np.array_equal(model.i_vels[idx_match], vels_match)
 
     # rejected values (result_idx == -1), must not be in the grid
     pos_miss = np.flatnonzero(result_idx < 0)

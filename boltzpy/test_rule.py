@@ -178,8 +178,8 @@ def test_reflected_indices_inverse(key):
         return
     refl = rule.reflected_indices_inverse
     assert np.all(refl[refl] == np.arange(refl.size))
-    for (idx_v, v) in enumerate(model.iMG):
-        v_refl = model.iMG[refl[idx_v]]
+    for (idx_v, v) in enumerate(model.i_vels):
+        v_refl = model.i_vels[refl[idx_v]]
         assert np.all(v == -v_refl)
 
 

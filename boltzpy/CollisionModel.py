@@ -12,11 +12,11 @@ class CollisionModel(bp.VelocityModel):
     Note
     ----
     Just as in the :class:`Grid` class,
-    the parameter :attr:`iMG` describes the
+    the parameter :attr:`i_vels` describes the
     position/physical values of all  Grid points.
     All entries must be viewed as multiples of :attr:`delta:
 
-        :math:`pMG = iMG \cdot d`.
+        :math:`pMG = i_vels \cdot d`.
 
     Note that velocity grid points may occur in multiple
     :class:`Velocity Grids <boltzpy.Grid>`.
@@ -127,7 +127,7 @@ class CollisionModel(bp.VelocityModel):
         return np.sort(species, axis=-1)
 
     def key_area(self, relations):
-        (v0, v1, w0, w1) = self.iMG[relations.transpose()]
+        (v0, v1, w0, w1) = self.i_vels[relations.transpose()]
         # in 2D cross returns only the z component -> use absolute
         result = np.zeros(relations.shape[:-1] + (2,), dtype=float)
         if self.ndim == 2:
@@ -147,7 +147,7 @@ class CollisionModel(bp.VelocityModel):
         return result
 
     def key_angle(self, relations):
-        (v0, v1, w0, w1) = self.iMG[relations.transpose()]
+        (v0, v1, w0, w1) = self.i_vels[relations.transpose()]
         dv = v1 - v0
         gcd = np.gcd.reduce(dv.transpose())
         if self.ndim == 2:
@@ -289,7 +289,7 @@ class CollisionModel(bp.VelocityModel):
                         # Add chosen Relations/Weights to the list
                         assert np.array_equal(
                                 new_colvels[choice],
-                                self.iMG[new_rels[choice]])
+                                self.i_vels[new_rels[choice]])
                         relations.extend(new_rels[choice])
                     # relations += new_rels
                     # weights += new_weights
@@ -498,7 +498,7 @@ class CollisionModel(bp.VelocityModel):
             # repeat the collision to "close" the rectangle / trapezoid
             rels = np.tile(r, 2)
             # transpose the velocities, for easy unpacking
-            vels = (self.iMG[rels] * self.base_delta).transpose()
+            vels = (self.vels).transpose()
             ax.plot(*vels, color="gray", linewidth=1)
         plt.show()
         return

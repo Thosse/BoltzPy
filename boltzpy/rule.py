@@ -393,13 +393,13 @@ class BoundaryPointRule(InhomogeneousRule):
         # the incoming velocities are used to calculate the inflow during transport
         # we calculate the scalar product for each entry and check if its > 0
         # thus the velocity points towards the border
-        incoming_velocities = np.where(model.iMG @ surface_normal > 0)[0]
+        incoming_velocities = np.where(model.i_vels @ surface_normal > 0)[0]
         return incoming_velocities
 
     @staticmethod
     def compute_reflected_indices_inverse(model):
         reflected_indices_inverse = np.zeros(model.nvels, dtype=int)
-        for (idx_v, v) in enumerate(model.iMG):
+        for (idx_v, v) in enumerate(model.i_vels):
             spc = model.get_spc(idx_v)
             v_refl = -v
             idx_v_refl = model.get_idx(spc, v_refl)
@@ -413,7 +413,7 @@ class BoundaryPointRule(InhomogeneousRule):
         assert np.sum(np.abs(surface_normal)) == 1, (
             "only works in 1D Geometries, "
             "doesn't even use surface normal currently")
-        for (idx_v, v) in enumerate(model.iMG):
+        for (idx_v, v) in enumerate(model.i_vels):
             spc = model.get_spc(idx_v)
             v_refl = np.copy(v)
             v_refl[0] = - v[0]
