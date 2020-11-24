@@ -34,6 +34,7 @@ from boltzpy.grid import Grid
 from boltzpy.rule import *
 from boltzpy.geometry import Geometry
 from boltzpy.simulation import Simulation
-from boltzpy.model import Model
+from boltzpy.VelocityModel import VelocityModel
+from boltzpy.CollisionModel import CollisionModel
 from boltzpy.data import Data
 import boltzpy.AnimatedFigure as Plot

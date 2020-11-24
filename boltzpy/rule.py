@@ -60,7 +60,7 @@ class Rule(bp.BaseClass):
         return attrs
 
     def compute_initial_state(self, model):
-        assert isinstance(model, bp.Model)
+        assert isinstance(model, bp.VelocityModel)
         assert self.ndim == model.ndim
         assert self.specimen == model.nspc
         initial_state = model.compute_initial_state(self.particle_number,
@@ -71,7 +71,7 @@ class Rule(bp.BaseClass):
     def plot(self,
              model):
         """Plot the initial state of a single specimen using matplotlib 3D."""
-        assert isinstance(model, bp.Model)
+        assert isinstance(model, bp.VelocityModel)
         assert self.ndim == 2, (
             "3D Plots are only implemented for 2D velocity spaces")
 
@@ -468,7 +468,7 @@ class BoundaryPointRule(InhomogeneousRule):
         return
 
     def reflection(self, inflow, model):
-        assert isinstance(model, bp.Model)
+        assert isinstance(model, bp.VelocityModel)
         reflected_inflow = np.zeros(inflow.shape, dtype=float)
 
         reflected_inflow += (np.dot(model.spc_matrix, self.reflection_rate_inverse[:model.nspc])

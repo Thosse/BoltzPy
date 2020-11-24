@@ -2,6 +2,9 @@
 # Desired Command / Road Map
 import boltzpy as bp
 import numpy as np
+# import boltzpy.test_simulation as t
+# t.setup_file()
+# input("DONE!")
 
 exisiting_simulation_file = None
 if exisiting_simulation_file is not None:
@@ -9,11 +12,12 @@ if exisiting_simulation_file is not None:
     sim = bp.Simulation.load(h5py.File(exisiting_simulation_file, mode='r'))
 else:
     timing = bp.Grid((201,), 1/1000, 5)
-    model = bp.Model([2, 3],
-                     [(5, 5), (7, 7)],
-                     0.25,
-                     [6, 4],
-                     np.array([[50, 50], [50, 50]]))
+    model = bp.CollisionModel([2, 3],
+                              [(5, 5), (7, 7)],
+                              0.25,
+                              [6, 4],
+                              np.array([[50, 50], [50, 50]]))
+
     geometry = bp.Geometry(
         (31, ),
         0.5,

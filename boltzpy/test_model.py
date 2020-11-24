@@ -11,7 +11,7 @@ import boltzpy as bp
 ###################################
 FILE = test_helper.DIRECTORY + 'Models.hdf5'
 MODELS = dict()
-MODELS["2D_small/Model"] = bp.Model(
+MODELS["2D_small/Model"] = bp.CollisionModel(
     masses=[2, 3],
     shapes=[[5, 5], [7, 7]],
     base_delta=1/8,
@@ -19,7 +19,7 @@ MODELS["2D_small/Model"] = bp.Model(
     collision_factors=[[50, 50], [50, 50]],
     algorithm_relations="all",
     algorithm_weights="uniform")
-MODELS["2D_small_convergent/Model"] = bp.Model(
+MODELS["2D_small_convergent/Model"] = bp.CollisionModel(
     masses=[2, 3],
     shapes=[[5, 5], [7, 7]],
     base_delta=1/8,
@@ -28,7 +28,7 @@ MODELS["2D_small_convergent/Model"] = bp.Model(
     algorithm_relations="convergent",
     algorithm_weights="uniform")
 # Todo This might lead to weird results! Check this!
-MODELS["equalSpacing/Model"] = bp.Model(
+MODELS["equalSpacing/Model"] = bp.CollisionModel(
     masses=[1, 2],
     shapes=[[7, 7], [7, 7]],
     base_delta=1/7,
@@ -36,7 +36,7 @@ MODELS["equalSpacing/Model"] = bp.Model(
     collision_factors=[[50, 50], [50, 50]],
     algorithm_relations="all",
     algorithm_weights="uniform")
-MODELS["equalMass/Model"] = bp.Model(
+MODELS["equalMass/Model"] = bp.CollisionModel(
     masses=[3, 3],
     shapes=[[5, 5], [5, 5]],
     base_delta=3/8,
@@ -53,7 +53,7 @@ MODELS["equalMass/Model"] = bp.Model(
 #     collision_factors=[[50, 50], [50, 50]],
 #     algorithm_relations="all",
 #     algorithm_weights="uniform")
-MODELS["mixed_spacing/Model"] = bp.Model(
+MODELS["mixed_spacing/Model"] = bp.CollisionModel(
     masses=[3, 4],
     shapes=[[6, 6], [7, 7]],
     base_delta=1/14,
@@ -61,7 +61,7 @@ MODELS["mixed_spacing/Model"] = bp.Model(
     collision_factors=[[50, 50], [50, 50]],
     algorithm_relations="all",
     algorithm_weights="uniform")
-MODELS["3D_small/Model"] = bp.Model(
+MODELS["3D_small/Model"] = bp.CollisionModel(
     masses=[2, 3],
     shapes=[[2, 2, 2], [2, 2, 2]],
     base_delta=1/8,
@@ -81,7 +81,7 @@ def setup_file(file_address=FILE):
 
     with h5py.File(file_address, mode="w") as file:
         for (key, item) in MODELS.items():
-            assert isinstance(item, bp.Model)
+            assert isinstance(item, bp.CollisionModel)
             file.create_group(key)
             item.save(file[key], True)
     return
@@ -113,15 +113,15 @@ def test_hdf5_groups_exist(key):
 def test_load_from_file(key):
     with h5py.File(FILE, mode="r") as file:
         hdf_group = file[key]
-        old = bp.Model.load(hdf_group)
+        old = bp.CollisionModel.load(hdf_group)
         new = MODELS[key]
-        assert isinstance(old, bp.Model)
-        assert isinstance(new, bp.Model)
+        assert isinstance(old, bp.CollisionModel)
+        assert isinstance(new, bp.CollisionModel)
         assert old == new
 
 
 @pytest.mark.parametrize("key", MODELS.keys())
-@pytest.mark.parametrize("attribute", bp.Model.attributes())
+@pytest.mark.parametrize("attribute", bp.CollisionModel.attributes())
 def test_attributes(attribute, key):
     with h5py.File(FILE, mode="r") as file:
         read_dict = bp.BaseClass.read_parameters_from_hdf_file(file[key], attribute)
@@ -227,7 +227,7 @@ def test_project_velocities():
             direction = np.zeros(dim)
             length = 10 * np.random.random(1)
             direction[i] = length
-            result = bp.Model.p_vels(vectors, direction)
+            result = bp.CollisionModel.p_vels(vectors, direction)
             angle = direction / np.linalg.norm(direction)
             shape = result.shape
             size = result.size
@@ -249,7 +249,7 @@ def test_project_velocities():
                             np.sum(direction[0, 0:2]**2)]
         result = np.zeros(vectors.shape)
         for i in range(dim):
-            res = bp.Model.p_vels(vectors, direction[i])
+            res = bp.CollisionModel.p_vels(vectors, direction[i])
             angle = direction[i] / np.linalg.norm(direction[i])
             angle = angle.reshape((1, dim))
             shape = res.shape

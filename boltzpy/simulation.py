@@ -240,7 +240,7 @@ class Simulation(bp.BaseClass):
 
         timing = bp.Grid.load(file["timing"])
         geometry = bp.Geometry.load(file["geometry"])
-        model = bp.Model.load(file["model"])
+        model = bp.CollisionModel.load(file["model"])
         log_state = np.bool(file.attrs["log_state"][()])
         order_operator_splitting = file.attrs["order_operator_splitting"][()]
         order_transport = file.attrs["order_transport"][()]
@@ -311,7 +311,7 @@ class Simulation(bp.BaseClass):
         assert self.timing.ndim == 1
         assert isinstance(self.geometry, bp.Geometry)
         self.geometry.check_integrity()
-        assert isinstance(self.model, bp.Model)
+        assert isinstance(self.model, bp.CollisionModel)
         self.model.check_integrity()
         assert self.model.ndim >= self.geometry.ndim
         assert self.geometry.model_size == self.model.nvels
