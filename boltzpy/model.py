@@ -74,14 +74,21 @@ class Model(bp.BaseClass):
         self.shapes = np.array(shapes, dtype=int)
         assert self.shapes.ndim == 2
 
+        # Todo rename -> base_delta
         self.delta = np.float(delta)
 
+        # give default value = default_spacing
         assert isinstance(spacings, (list, tuple, np.ndarray))
         self.spacings = np.array(spacings, dtype=int)
         assert self.spacings.ndim == 1
 
+        # Todo make property
         self.dv = self.delta * self.spacings
 
+        # todo rename spc_collision_probability, default = np.ones
+        #  must be in [0, 1]
+        #  adjust by setting number density
+        #  add epsilon method(state) for this
         assert isinstance(collision_factors, (list, tuple, np.ndarray))
         self.collision_factors = np.array(collision_factors,
                                           dtype=float)
@@ -90,22 +97,29 @@ class Model(bp.BaseClass):
         self.algorithm_relations = str(algorithm_relations)
         self.algorithm_weights = str(algorithm_weights)
 
+        # Todo make property
         self.ndim = self.shapes.shape[1]
+        # Todo make property, rename nvels
         self.size = np.sum(np.prod(self.shapes, axis=1))
+        # todo make property, rename nspc
         self.specimen = self.masses.size
 
         # set up each Velocity Grid
+        # todo make method(s)
         self.vGrids = np.array([bp.Grid(self.shapes[i],
                                         self.delta,
                                         self.spacings[i],
                                         is_centered=True)
                                 for i in self.species],
                                dtype=bp.Grid)
+
         self.iMG = np.concatenate([G.iG for G in self.vGrids])
+        # Todo rename _idx_offset
         self.index_offset = np.zeros(self.specimen + 1, dtype=int)
         for s in self.species:
             self.index_offset[s + 1:] += self.vGrids[s].size
 
+        # todo rename spc_matrix
         self.species_matrix = np.zeros((self.size, self.specimen), dtype=int)
         for s in self.species:
             self.species_matrix[self.idx_range(s), s] = 1
@@ -149,6 +163,7 @@ class Model(bp.BaseClass):
         Maximum physical velocity for every sub grid."""
         return np.max(self.iMG * self.delta)
 
+    # todo rename ncolls
     @property
     def collisions(self):
         return self.collision_weights.size
@@ -192,10 +207,12 @@ class Model(bp.BaseClass):
         result = np.sum(species_matrix * parameter, axis=-1)
         return result.reshape(shape)
 
+    # todo rename vels
     @property
     def velocities(self):
         return self.delta * self.iMG
 
+    # todo rename cvels
     def centered_velocities(self, mean_velocity, s=None):
         mean_velocity = np.array(mean_velocity)
         assert mean_velocity.shape[-1] == self.ndim
@@ -482,6 +499,7 @@ class Model(bp.BaseClass):
     ##################################
     #        Moment functions        #
     ##################################
+    # todo move to cvels, rename pvels
     @staticmethod
     def project_velocities(velocities, direction):
         direction = np.array(direction)
