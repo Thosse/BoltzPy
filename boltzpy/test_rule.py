@@ -73,9 +73,7 @@ RULES["equalMass/RightBoundary"] = bp.BoundaryPointRule(
     surface_normal=np.array([1, 0], dtype=int))
 
 # Sub dictionaries for specific attribute tests
-CLASSES = {name: {key: item for (key, item) in RULES.items()
-                  if isinstance(item, subclass)}
-           for (name, subclass) in bp.Rule.subclasses().items()}
+POSSIBLE_PARAMETERS = set().union(*[rule.parameters() for rule in RULES.values()])
 
 
 def setup_file(file_address=FILE):
@@ -133,36 +131,16 @@ def test_load_from_file(key):
         assert old == new
 
 
-@pytest.mark.parametrize("key", CLASSES["InnerPointRule"].keys())
-@pytest.mark.parametrize("attribute", bp.InnerPointRule.attributes())
-def test_attributes_of_inner_points(attribute, key):
+@pytest.mark.parametrize("parameter", POSSIBLE_PARAMETERS)
+@pytest.mark.parametrize("key", RULES.keys())
+def test_parameters_are_equal(key, parameter):
+    rule = RULES[key]
+    # skip parameters of other classes
+    if parameter not in rule.parameters():
+        return
     with h5py.File(FILE, mode="r") as file:
-        old = file[key][attribute][()]
-        new = RULES[key].__getattribute__(attribute)
-        if isinstance(new, np.ndarray) and (new.dtype == float):
-            assert np.allclose(old, new)
-        else:
-            assert np.all(old == new)
-
-
-@pytest.mark.parametrize("key", CLASSES["ConstantPointRule"].keys())
-@pytest.mark.parametrize("attribute", bp.ConstantPointRule.attributes())
-def test_attributes_of_constant_points(attribute, key):
-    with h5py.File(FILE, mode="r") as file:
-        old = file[key][attribute][()]
-        new = RULES[key].__getattribute__(attribute)
-        if isinstance(new, np.ndarray) and (new.dtype == float):
-            assert np.allclose(old, new)
-        else:
-            assert np.all(old == new)
-
-
-@pytest.mark.parametrize("key", CLASSES["BoundaryPointRule"].keys())
-@pytest.mark.parametrize("attribute", bp.BoundaryPointRule.attributes())
-def test_attributes_of_boundary_points(attribute, key):
-    with h5py.File(FILE, mode="r") as file:
-        old = file[key][attribute][()]
-        new = RULES[key].__getattribute__(attribute)
+        old = file[key][parameter][()]
+        new = RULES[key].__getattribute__(parameter)
         if isinstance(new, np.ndarray) and (new.dtype == float):
             assert np.allclose(old, new)
         else:
@@ -183,9 +161,13 @@ def test_reflected_indices_inverse(key):
         assert np.all(v == -v_refl)
 
 
-@pytest.mark.parametrize("key", CLASSES["BoundaryPointRule"].keys())
+@pytest.mark.parametrize("key", RULES)
 def test_reflection_keeps_total_mass(key):
     rule = RULES[key]
+    # only check BoundaryPoints
+    if not isinstance(rule, bp.BoundaryPointRule):
+        return
+    assert isinstance(rule, bp.BoundaryPointRule)
     # get model
     model_key = h5py.File(FILE, mode='r')[key].attrs["Model"]
     model = MODELS[model_key]
