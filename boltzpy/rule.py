@@ -236,21 +236,6 @@ class InhomogeneousRule(Rule):
 
 
 class InnerPointRule(InhomogeneousRule):
-    def __init__(self,
-                 particle_number,
-                 mean_velocity,
-                 temperature,
-                 affected_points,
-                 model=None,
-                 initial_state=None):
-        super().__init__(particle_number,
-                         mean_velocity,
-                         temperature,
-                         affected_points,
-                         model,
-                         initial_state)
-        return
-
     def transport_inflow(self, data):
         pv = data.vG + data.velocity_offset
         inflow_percentage = (data.dt / data.dp * np.abs(pv[:, 0]))
