@@ -301,31 +301,32 @@ class BoundaryPointRule(InhomogeneousRule):
                  particle_number,
                  mean_velocity,
                  temperature,
-                 reflection_rate_inverse,
-                 reflection_rate_elastic,
-                 reflection_rate_thermal,
-                 absorption_rate,
+                 refl_inverse,
+                 refl_elastic,
+                 refl_thermal,
+                 refl_absorbs,
                  affected_points,
                  surface_normal=None,
-                 incoming_velocities=None,
-                 reflected_indices_inverse=None,
-                 reflected_indices_elastic=None,
+                 vels_in=None,
+                 refl_idx_inverse=None,
+                 refl_idx_elastic=None,
                  effective_particle_number=None,
                  model=None,
                  initial_state=None):
-        self.reflection_rate_inverse = np.array(reflection_rate_inverse, dtype=float)
-        self.reflection_rate_elastic = np.array(reflection_rate_elastic, dtype=float)
-        self.reflection_rate_thermal = np.array(reflection_rate_thermal, dtype=float)
-        self.absorption_rate = np.array(absorption_rate, dtype=float)
+        # reflection rates
+        self.refl_inverse = np.array(refl_inverse, dtype=float)
+        self.refl_elastic = np.array(refl_elastic, dtype=float)
+        self.refl_thermal = np.array(refl_thermal, dtype=float)
+        self.refl_absorbs = np.array(refl_absorbs, dtype=float)
 
         # Either the incoming velocities and reflections are given as parameters
         if surface_normal is None:
-            assert reflected_indices_inverse is not None
-            assert reflected_indices_elastic is not None
-            assert incoming_velocities is not None
-            self.reflected_indices_inverse = np.array(reflected_indices_inverse,  dtype=int)
-            self.reflected_indices_elastic = np.array(reflected_indices_elastic, dtype=int)
-            self.incoming_velocities = np.array(incoming_velocities, dtype=int)
+            assert refl_idx_inverse is not None
+            assert refl_idx_elastic is not None
+            assert vels_in is not None
+            self.refl_idx_inverse = np.array(refl_idx_inverse,  dtype=int)
+            self.refl_idx_elastic = np.array(refl_idx_elastic, dtype=int)
+            self.vels_in = np.array(vels_in, dtype=int)
             self.effective_particle_number = np.array(effective_particle_number, dtype=float)
         # Or they must be generated based on the surface normal and the model
         else:
@@ -336,9 +337,9 @@ class BoundaryPointRule(InhomogeneousRule):
                 "A surface normal must have entries from [-1, 0, 1]."
                 "surface_normal = {}".format(surface_normal)
             )
-            self.incoming_velocities = self.compute_incoming_velocities(model, surface_normal)
-            self.reflected_indices_inverse = self.compute_reflected_indices_inverse(model)
-            self.reflected_indices_elastic = self.compute_reflected_indices_elastic(model, surface_normal)
+            self.vels_in = self.compute_vels_in(model, surface_normal)
+            self.refl_idx_inverse = self.compute_refl_idx_inverse(model)
+            self.refl_idx_elastic = self.compute_refl_idx_elastic(model, surface_normal)
         super(BoundaryPointRule, self).__init__(particle_number,
                                                 mean_velocity,
                                                 temperature,
@@ -356,13 +357,13 @@ class BoundaryPointRule(InhomogeneousRule):
     @staticmethod
     def parameters():
         params = InhomogeneousRule.parameters()
-        params.update({"reflection_rate_inverse",
-                       "reflection_rate_elastic",
-                       "reflection_rate_thermal",
-                       "absorption_rate",
-                       "incoming_velocities",
-                       "reflected_indices_inverse",
-                       "reflected_indices_elastic",
+        params.update({"refl_inverse",
+                       "refl_elastic",
+                       "refl_thermal",
+                       "refl_absorbs",
+                       "vels_in",
+                       "refl_idx_inverse",
+                       "refl_idx_elastic",
                        "effective_particle_number"})
         return params
 
@@ -374,26 +375,26 @@ class BoundaryPointRule(InhomogeneousRule):
         return attrs
 
     @staticmethod
-    def compute_incoming_velocities(model, surface_normal):
+    def compute_vels_in(model, surface_normal):
         # the incoming velocities are used to calculate the inflow during transport
         # we calculate the scalar product for each entry and check if its > 0
         # thus the velocity points towards the border
-        incoming_velocities = np.where(model.i_vels @ surface_normal > 0)[0]
-        return incoming_velocities
+        vels_in = np.where(model.i_vels @ surface_normal > 0)[0]
+        return vels_in
 
     @staticmethod
-    def compute_reflected_indices_inverse(model):
-        reflected_indices_inverse = np.zeros(model.nvels, dtype=int)
+    def compute_refl_idx_inverse(model):
+        refl_idx_inverse = np.zeros(model.nvels, dtype=int)
         for (idx_v, v) in enumerate(model.i_vels):
             spc = model.get_spc(idx_v)
             v_refl = -v
             idx_v_refl = model.get_idx(spc, v_refl)
-            reflected_indices_inverse[idx_v] = idx_v_refl
-        return reflected_indices_inverse
+            refl_idx_inverse[idx_v] = idx_v_refl
+        return refl_idx_inverse
 
     @staticmethod
-    def compute_reflected_indices_elastic(model, surface_normal):
-        reflected_indices_elastic = np.zeros(model.nvels, dtype=int)
+    def compute_refl_idx_elastic(model, surface_normal):
+        refl_idx_elastic = np.zeros(model.nvels, dtype=int)
         # Todo only works in 1D Geometries
         assert np.sum(np.abs(surface_normal)) == 1, (
             "only works in 1D Geometries, "
@@ -403,13 +404,13 @@ class BoundaryPointRule(InhomogeneousRule):
             v_refl = np.copy(v)
             v_refl[0] = - v[0]
             idx_v_refl = model.get_idx(spc, v_refl)
-            reflected_indices_elastic[idx_v] = idx_v_refl
-        return reflected_indices_elastic
+            refl_idx_elastic[idx_v] = idx_v_refl
+        return refl_idx_elastic
 
     def compute_initial_state(self, model):
         full_initial_state = super().compute_initial_state(model)
         # compute outgoing velocities, by relfecting incoming velocities
-        outgoing_velocities = self.reflected_indices_inverse[self.incoming_velocities]
+        outgoing_velocities = self.refl_idx_inverse[self.vels_in]
         # Set initial state to zero for all non-outgoing velocities
         initial_state = np.zeros(full_initial_state.shape)
         initial_state[outgoing_velocities] = full_initial_state[outgoing_velocities]
@@ -428,13 +429,13 @@ class BoundaryPointRule(InhomogeneousRule):
         result = np.zeros((self.affected_points.size, data.vG.shape[0]),
                           dtype=float)
 
-        neg_incomings_vels = np.where(pv[self.incoming_velocities, 0] < 0)[0]
-        neg_vels = self.incoming_velocities[neg_incomings_vels]
+        neg_incomings_vels = np.where(pv[self.vels_in, 0] < 0)[0]
+        neg_vels = self.vels_in[neg_incomings_vels]
         result[:, neg_vels] = (inflow_percentage[neg_vels]
                                * data.state[np.ix_(self.affected_points + 1, neg_vels)])
 
-        pos_incomings_vels = np.where(pv[self.incoming_velocities, 0] > 0)[0]
-        pos_vels = self.incoming_velocities[pos_incomings_vels]
+        pos_incomings_vels = np.where(pv[self.vels_in, 0] > 0)[0]
+        pos_vels = self.vels_in[pos_incomings_vels]
         result[:, pos_vels] = (inflow_percentage[pos_vels]
                                * data.state[np.ix_(self.affected_points - 1, pos_vels)])
         return result
@@ -456,10 +457,10 @@ class BoundaryPointRule(InhomogeneousRule):
         assert isinstance(model, bp.VelocityModel)
         reflected_inflow = np.zeros(inflow.shape, dtype=float)
 
-        reflected_inflow += (np.dot(model.spc_matrix, self.reflection_rate_inverse[:model.nspc])
-                             * inflow[:, self.reflected_indices_inverse])
-        reflected_inflow += (np.dot(model.spc_matrix, self.reflection_rate_elastic[:model.nspc])
-                             * inflow[:, self.reflected_indices_elastic])
+        reflected_inflow += (np.dot(model.spc_matrix, self.refl_inverse[:model.nspc])
+                             * inflow[:, self.refl_idx_inverse])
+        reflected_inflow += (np.dot(model.spc_matrix, self.refl_elastic[:model.nspc])
+                             * inflow[:, self.refl_idx_elastic])
 
         # compute each reflection separately for every species
         # Todo This is still wrong! faster velocities are depleted faster then slow vels
@@ -468,7 +469,7 @@ class BoundaryPointRule(InhomogeneousRule):
             idx_range = model.idx_range(s)
             refl_thermal = (model.number_density(inflow, s)
                             / self.effective_particle_number[s]
-                            * self.reflection_rate_thermal[s]
+                            * self.refl_thermal[s]
                             * self.initial_state[..., idx_range])
             reflected_inflow[..., idx_range] += refl_thermal
         return reflected_inflow
@@ -480,37 +481,34 @@ class BoundaryPointRule(InhomogeneousRule):
             "{}".format(self.mean_velocity)
         )
 
-        rates = [self.reflection_rate_inverse,
-                 self.reflection_rate_elastic,
-                 self.reflection_rate_thermal,
-                 self.absorption_rate]
+        rates = [self.refl_inverse,
+                 self.refl_elastic,
+                 self.refl_thermal,
+                 self.refl_absorbs]
         for rate in rates:
             assert isinstance(rate, np.ndarray)
             assert rate.dtype == float, (
                 "Any reflection/absorption rate must be of type float. "
-                "type(rate) = {}".format(type(rate))
-            )
+                "type(rate) = {}".format(type(rate)))
             assert rate.ndim == 1, (
                 "All rates must be 1 dimensional arrays."
-                "A single float for each species."
-            )
+                "A single float for each species.")
             assert np.all(0 <= rate) and np.all(rate <= 1), (
                 "Reflection/Absorption rates must be between 0 and 1. "
-                "Rates = {}".format(rates)
-            )
+                "Rates = {}".format(rates))
+
         assert len({len(rate) for rate in rates}) == 1, (
             "All rates must have the same length (number of species)."
-            "Rates = {}".format(rates)
-        )
+            "Rates = {}".format(rates))
         assert np.allclose(np.sum(rates, axis=0), 1.0, atol=1e-12), (
             "Reflection/Absorption rates must sum up to 1 for each species.\n"
             "Rates = {}\n"
             "Sums = {}".format(rates, np.sum(rates, axis=0))
         )
 
-        for indices in [self.incoming_velocities,
-                        self.reflected_indices_inverse,
-                        self.reflected_indices_elastic]:
+        for indices in [self.vels_in,
+                        self.refl_idx_inverse,
+                        self.refl_idx_elastic]:
             assert isinstance(indices, np.ndarray)
             assert indices.dtype == int
             assert len(set(indices)) == indices.size, (
@@ -518,8 +516,8 @@ class BoundaryPointRule(InhomogeneousRule):
                 "idx_array:\n{}".format(indices)
             )
 
-        for reflection_indices in [self.reflected_indices_inverse,
-                                   self.reflected_indices_elastic]:
+        for reflection_indices in [self.refl_idx_inverse,
+                                   self.refl_idx_elastic]:
             no_reflecion = np.arange(reflection_indices.size)
             reflect_twice = reflection_indices[reflection_indices]
             assert np.all(no_reflecion == reflect_twice), (

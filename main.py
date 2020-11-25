@@ -38,10 +38,10 @@ else:
             mean_velocity=[[0.0, 0.0], [0.0, 0.0]],
             temperature=[.5, .5],
             affected_points=[30],
-            reflection_rate_inverse=[.3, .3],
-            reflection_rate_elastic=[.3, .3],
-            reflection_rate_thermal=[0.3, .3],
-            absorption_rate=[0.1, .1],
+            refl_inverse=[.3, .3],
+            refl_elastic=[.3, .3],
+            refl_thermal=[0.3, .3],
+            refl_absorbs=[0.1, .1],
             surface_normal=np.array([1, 0], dtype=int),
             model=model)
          ]

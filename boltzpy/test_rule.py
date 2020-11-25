@@ -32,10 +32,10 @@ RULES["2D_small/RightBoundary"] = bp.BoundaryPointRule(
     temperature=[1, 1],
     affected_points=[9],
     model=MODELS["2D_small/Model"],
-    reflection_rate_inverse=[0.25, 0.25, 0.25, 0.25],
-    reflection_rate_elastic=[0.25, 0.25, 0.25, 0.25],
-    reflection_rate_thermal=[0.25, 0.25, 0.25, 0.25],
-    absorption_rate=[0.25, 0.25, 0.25, 0.25],
+    refl_inverse=[0.25, 0.25, 0.25, 0.25],
+    refl_elastic=[0.25, 0.25, 0.25, 0.25],
+    refl_thermal=[0.25, 0.25, 0.25, 0.25],
+    refl_absorbs=[0.25, 0.25, 0.25, 0.25],
     surface_normal=np.array([1, 0], dtype=int))
 RULES["equalMass/LeftBoundary"] = bp.BoundaryPointRule(
     particle_number=[2, 2],
@@ -43,10 +43,10 @@ RULES["equalMass/LeftBoundary"] = bp.BoundaryPointRule(
     temperature=[1, 1],
     affected_points=[0],
     model=MODELS["equalMass/Model"],
-    reflection_rate_inverse=[0.45, 0.45, 0.45, 0.45],
-    reflection_rate_elastic=[0.45, 0.45, 0.45, 0.45],
-    reflection_rate_thermal=[0.1, 0.1, 0.1, 0.1],
-    absorption_rate=[0, 0, 0, 0],
+    refl_inverse=[0.45, 0.45, 0.45, 0.45],
+    refl_elastic=[0.45, 0.45, 0.45, 0.45],
+    refl_thermal=[0.1, 0.1, 0.1, 0.1],
+    refl_absorbs=[0, 0, 0, 0],
     surface_normal=np.array([-1, 0], dtype=int))
 RULES["equalMass/LeftInterior"] = bp.InnerPointRule(
     particle_number=[2, 2],
@@ -66,10 +66,10 @@ RULES["equalMass/RightBoundary"] = bp.BoundaryPointRule(
     temperature=[1, 1],
     affected_points=[9],
     model=MODELS["equalMass/Model"],
-    reflection_rate_inverse=[0.15, 0.15, 0.15, 0.15],
-    reflection_rate_elastic=[0.15, 0.15, 0.15, 0.15],
-    reflection_rate_thermal=[0.15, 0.15, 0.15, 0.15],
-    absorption_rate=[0.55, 0.55, 0.55, 0.55],
+    refl_inverse=[0.15, 0.15, 0.15, 0.15],
+    refl_elastic=[0.15, 0.15, 0.15, 0.15],
+    refl_thermal=[0.15, 0.15, 0.15, 0.15],
+    refl_absorbs=[0.55, 0.55, 0.55, 0.55],
     surface_normal=np.array([1, 0], dtype=int))
 
 # Sub dictionaries for specific attribute tests
@@ -154,7 +154,7 @@ def test_reflected_indices_inverse(key):
     model = MODELS[h5py.File(FILE, mode='r')[key].attrs["Model"]]
     if not isinstance(rule, bp.BoundaryPointRule):
         return
-    refl = rule.reflected_indices_inverse
+    refl = rule.refl_idx_inverse
     assert np.all(refl[refl] == np.arange(refl.size))
     for (idx_v, v) in enumerate(model.i_vels):
         v_refl = model.i_vels[refl[idx_v]]
@@ -173,14 +173,14 @@ def test_reflection_keeps_total_mass(key):
     model = MODELS[model_key]
     for _ in range(100):
         inflow = np.zeros((1, model.nvels))
-        n_incoming_vels = rule.incoming_velocities.size
+        n_incoming_vels = rule.vels_in.size
         rand_vals = np.random.random(n_incoming_vels)
-        inflow[..., rule.incoming_velocities] = rand_vals
+        inflow[..., rule.vels_in] = rand_vals
         reflected_inflow = rule.reflection(inflow, model)
         for s in model.species:
             mass_in = model.mass_density(inflow, s)
             mass_refl = model.mass_density(reflected_inflow, s)
-            absorption = rule.absorption_rate[s]
+            absorption = rule.refl_absorbs[s]
             assert np.isclose((1 - absorption) * mass_in, mass_refl)
 
 
