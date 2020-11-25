@@ -148,7 +148,7 @@ class BaseClass:
                     subclass = BaseClass.subclasses(cls)
                     result[p] = subclass.load(hdf5_group[p])
                 # group is an array of BaseClasses
-                if cls == "Array":
+                elif cls == "Array":
                     size = hdf5_group[p].attrs["size"]
                     result[p] = np.empty(size, dtype=object)
                     for idx in range(size):
@@ -212,8 +212,7 @@ class BaseClass:
                 hdf5_group.create_group(attr)
                 value.save(hdf5_group[attr])
             # save arrays of objects in sub-subgroups
-            is_array_of_objects = isinstance(value, np.ndarray) and value.dtype == 'object'
-            if is_array_of_objects:
+            elif isinstance(value, np.ndarray) and value.dtype == 'object':
                 # create subgroup
                 hdf5_group.create_group(attr)
                 hdf5_group[attr].attrs["class"] = "Array"
@@ -224,10 +223,11 @@ class BaseClass:
                     idx = str(idx)
                     hdf5_group[attr].create_group(idx)
                     element.save(hdf5_group[attr][idx])
+            # transform sparse matrices to normal np.arrays
+            elif isinstance(value, scipy.sparse.csr_matrix):
+                value = value.toarray()
+                hdf5_group[attr] = value
             else:
-                # transform sparse matrices to normal np.arrays
-                if isinstance(value, scipy.sparse.csr_matrix):
-                    value = value.toarray()
                 hdf5_group[attr] = value
 
         # check that the class can be reconstructed from the save
