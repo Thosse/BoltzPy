@@ -70,7 +70,7 @@ class Simulation(bp.BaseClass):
         shapes = np.empty(self.model.nspc, dtype=dict)
         for s in self.model.species:
             shapes[s] = {
-                'particle_number': (
+                'number_density': (
                     self.timing.size,
                     self.geometry.size),
                 'mean_velocity': (
@@ -88,7 +88,7 @@ class Simulation(bp.BaseClass):
                 'temperature': (
                     self.timing.size,
                     self.geometry.size),
-                'energy': (
+                'energy_density': (
                     self.timing.size,
                     self.geometry.size),
                 'energy_flow': (
@@ -141,29 +141,23 @@ class Simulation(bp.BaseClass):
             idx_range = self.model.idx_range(s)
             spc_state = data.state[..., idx_range]
             spc_group = hdf_group[str(s)]
-            # number_density
-            number_density = self.model.cmp_number_density(spc_state, s)
-            spc_group["particle_number"][tw_idx] = number_density
 
-            # momentum
+            number_density = self.model.cmp_number_density(spc_state, s)
+            spc_group["number_density"][tw_idx] = number_density
             momentum = self.model.cmp_momentum(spc_state, s)
             spc_group["momentum"][tw_idx] = momentum
-
-            # mean velocity
-            mean_velocity = self.model.cmp_mean_velocity(spc_state, s,
-                                                     momentum=momentum)
+            mean_velocity = self.model.cmp_mean_velocity(
+                spc_state,
+                s,
+                momentum=momentum)
             spc_group["mean_velocity"][tw_idx] = mean_velocity
-
-            # temperature
-            temperature = self.model.cmp_temperature(spc_state, s,
-                                                 number_density=number_density)
-            spc_group["temperature"][tw_idx] = temperature
-
-            # momentum flow
+            spc_group["temperature"][tw_idx] = self.model.cmp_temperature(
+                spc_state,
+                s,
+                number_density=number_density,
+                mean_velocity=mean_velocity)
             spc_group["momentum_flow"][tw_idx] = self.model.cmp_momentum_flow(spc_state, s)
-            # energy
-            spc_group["energy"][tw_idx] = self.model.cmp_energy_density(spc_state, s)
-            # energy flow
+            spc_group["energy_density"][tw_idx] = self.model.cmp_energy_density(spc_state, s)
             spc_group["energy_flow"][tw_idx] = self.model.cmp_energy_flow(spc_state, s)
             # complete distribution
             if self.log_state:
@@ -190,12 +184,12 @@ class Simulation(bp.BaseClass):
         figure = bp_af.AnimatedFigure(tmax=n_frames,
                                       backend="agg")
         if moments is None:
-            moments = ['particle_number',
+            moments = ['number_density',
                        'mean_velocity',
                        'momentum',
                        'momentum_flow',
                        'temperature',
-                       'energy']
+                       'energy_density']
         else:
             assert len(moments) <= np.prod(shape)
         # xdata (geometry) is shared over all plots

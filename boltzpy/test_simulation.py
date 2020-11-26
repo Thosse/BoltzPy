@@ -31,10 +31,10 @@ SIMULATIONS["equalMass/Simulation"] = bp.Simulation(
     True)
 
 SAVED_MOMENTS = [
-    # "particle_number", # Comment out , as it is now names number_density
+    "number_density",
     "momentum",
     "mean_velocity",
-    # "energy",     # now named energy_density
+    "energy_density",
     "temperature",
     "momentum_flow",
     "energy_flow"]
@@ -135,32 +135,6 @@ def test_computing_moments_on_old_state_gives_old_results(key, moment):
             new_result = compute_moment(state, s)
             assert np.allclose(old_result, new_result)
 
-
-@pytest.mark.parametrize("key", SIMULATIONS.keys())
-def test_model_particle_number(key):
-    with h5py.File(FILE, mode="r") as file:
-        hdf_group = file[key]
-        sim = bp.Simulation.load(hdf_group)
-        model = sim.model
-        for s in model.species:
-            spc_group = hdf_group["results"][str(s)]
-            state = spc_group["state"][()]
-            old_result = spc_group["particle_number"][()]
-            new_result = model.cmp_number_density(state, s)
-            assert np.allclose(old_result, new_result)
-
-@pytest.mark.parametrize("key", SIMULATIONS.keys())
-def test_model_energy_density(key):
-    with h5py.File(FILE, mode="r") as file:
-        hdf_group = file[key]
-        sim = bp.Simulation.load(hdf_group)
-        model = sim.model
-        for s in model.species:
-            spc_group = hdf_group["results"][str(s)]
-            state = spc_group["state"][()]
-            old_result = spc_group["energy"][()]
-            new_result = model.cmp_energy_density(state, s)
-            assert np.allclose(old_result, new_result)
 
 # the file is used in more tests, this is a simple hack to delete it after use
 def test_teardown_tmp_file():
