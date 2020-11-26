@@ -82,7 +82,7 @@ class BaseModel(bp.BaseClass):
             self.spc_matrix[self.idx_range(s), s] = 1
 
         if type(self) == BaseModel:
-            self.check_integrity()
+            raise NotImplementedError
         return
 
     @staticmethod
@@ -99,9 +99,9 @@ class BaseModel(bp.BaseClass):
         attrs.update({"ndim",
                       "nvels",
                       "nspc",
-                      "ncols",
                       "vels",
                       "_idx_offset",
+                      "spc_matrix",
                       "species",
                       "max_vel"})
         return attrs

@@ -73,7 +73,7 @@ RULES["equalMass/RightBoundary"] = bp.BoundaryPointRule(
     surface_normal=np.array([1, 0], dtype=int))
 
 # Sub dictionaries for specific attribute tests
-POSSIBLE_PARAMETERS = set().union(*[rule.parameters() for rule in RULES.values()])
+POSSIBLE_ATTRIBUTES = set().union(*[rule.attributes() for rule in RULES.values()])
 
 
 def setup_file(file_address=FILE):
@@ -131,9 +131,9 @@ def test_load_from_file(key):
         assert old == new
 
 
-@pytest.mark.parametrize("parameter", POSSIBLE_PARAMETERS)
+@pytest.mark.parametrize("parameter", POSSIBLE_ATTRIBUTES)
 @pytest.mark.parametrize("key", RULES.keys())
-def test_parameters_are_equal(key, parameter):
+def test_attributes_are_equal(key, parameter):
     rule = RULES[key]
     # skip parameters of other classes
     if parameter not in rule.parameters():

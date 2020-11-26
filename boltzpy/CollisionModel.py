@@ -93,7 +93,8 @@ class CollisionModel(bp.BaseModel):
     def attributes():
         attrs = CollisionModel.parameters()
         attrs.update(bp.BaseModel.attributes())
-        attrs.update({"collision_matrix",
+        attrs.update({"ncols",
+                      "collision_matrix",
                       "collision_invariants"})
         return attrs
 
