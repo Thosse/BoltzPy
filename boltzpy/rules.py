@@ -421,9 +421,9 @@ class BoundaryPointRule(InhomogeneousRule):
     def reflection(self, inflow):
         reflected_inflow = np.zeros(inflow.shape, dtype=float)
 
-        reflected_inflow += (np.dot(self.spc_matrix, self.refl_inverse[:self.nspc])
+        reflected_inflow += (np.dot(self.spc_matrix, self.refl_inverse)
                              * inflow[:, self.refl_idx_inverse])
-        reflected_inflow += (np.dot(self.spc_matrix, self.refl_elastic[:self.nspc])
+        reflected_inflow += (np.dot(self.spc_matrix, self.refl_elastic)
                              * inflow[:, self.refl_idx_elastic])
 
         # compute each reflection separately for every species
@@ -456,7 +456,7 @@ class BoundaryPointRule(InhomogeneousRule):
             assert isinstance(rate, np.ndarray)
             assert rate.dtype == float
             assert rate.ndim == 1
-            # Todo assert rate.shape == (self.nspc,)
+            assert rate.shape == (self.nspc,)
             assert np.all(0 <= rate) and np.all(rate <= 1), (
                 "Reflection/Absorption rates must be between 0 and 1. "
                 "Rates = {}".format(rates))
