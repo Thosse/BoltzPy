@@ -18,7 +18,7 @@ class Geometry(bp.Grid):
         List of Initialization :obj:`Rules<Rule>`
     """
     def __init__(self,  shape, delta, rules):
-        rules = np.array(rules, dtype=bp.Rule)
+        rules = np.array(rules, dtype=bp.BaseRule)
         self.rules = rules
         super().__init__(shape,
                          delta,
@@ -114,10 +114,10 @@ class Geometry(bp.Grid):
         assert not self.is_centered
 
         assert isinstance(self.rules, np.ndarray)
-        assert self.rules.dtype == bp.Rule
+        assert self.rules.dtype == bp.BaseRule
         assert self.rules.ndim == 1
         for rule in self.rules:
-            assert isinstance(rule, bp.Rule)
+            assert isinstance(rule, bp.BaseRule)
             rule.check_integrity()
         # all points are affected at most once
         assert self.affected_points.size == len(set(self.affected_points)), (

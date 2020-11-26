@@ -86,7 +86,7 @@ def setup_file(file_address=FILE):
 
     with h5py.File(file_address, mode="w") as file:
         for (key, item) in RULES.items():
-            assert isinstance(item, bp.Rule)
+            assert isinstance(item, bp.BaseRule)
             file.create_group(key)
             item.save(file[key], True)
 
@@ -124,10 +124,10 @@ def test_hdf5_groups_exist(key):
 def test_load_from_file(key):
     with h5py.File(FILE, mode="r") as file:
         hdf_group = file[key]
-        old = bp.Rule.load(hdf_group)
+        old = bp.BaseRule.load(hdf_group)
         new = RULES[key]
-        assert isinstance(old, bp.Rule)
-        assert isinstance(new, bp.Rule)
+        assert isinstance(old, bp.BaseRule)
+        assert isinstance(new, bp.BaseRule)
         assert old == new
 
 

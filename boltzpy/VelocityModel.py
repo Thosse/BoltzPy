@@ -3,7 +3,7 @@ from scipy.optimize import newton as sp_newton
 import boltzpy as bp
 
 
-class VelocityModel(bp.BaseClass):
+class BaseModel(bp.BaseClass):
     r"""Manages the Velocity Grids of all
     :class:`~boltzpy.Species`.
 
@@ -81,7 +81,7 @@ class VelocityModel(bp.BaseClass):
         for s in self.species:
             self.spc_matrix[self.idx_range(s), s] = 1
 
-        if type(self) == VelocityModel:
+        if type(self) == BaseModel:
             self.check_integrity()
         return
 
@@ -95,7 +95,7 @@ class VelocityModel(bp.BaseClass):
 
     @staticmethod
     def attributes():
-        attrs = VelocityModel.parameters()
+        attrs = BaseModel.parameters()
         attrs.update({"ndim",
                       "nvels",
                       "nspc",

@@ -82,7 +82,6 @@ class BaseClass:
         # this distionary contains all possible subclasses
         subclasses = {
             'Grid': bp.Grid,
-            'VelocityModel': bp.VelocityModel,
             'CollisionModel': bp.CollisionModel,
             'Geometry': bp.Geometry,
             'InnerPointRule': bp.InnerPointRule,

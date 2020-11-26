@@ -4,7 +4,7 @@ import numpy as np
 import boltzpy as bp
 
 
-class Rule(bp.BaseClass):
+class BaseRule(bp.BaseClass):
     """Base Class for all Rules
 
     Contains methods for initialization and plotting.
@@ -42,7 +42,7 @@ class Rule(bp.BaseClass):
         else:
             assert model is not None
             self.initial_state = self.compute_initial_state(model)
-        Rule.check_integrity(self)
+        BaseRule.check_integrity(self)
         return
 
     @staticmethod
@@ -54,13 +54,13 @@ class Rule(bp.BaseClass):
 
     @staticmethod
     def attributes():
-        attrs = Rule.parameters()
+        attrs = BaseRule.parameters()
         attrs.update({"ndim",
                       "specimen"})
         return attrs
 
     def compute_initial_state(self, model):
-        assert isinstance(model, bp.VelocityModel)
+        assert isinstance(model, bp.BaseModel)
         assert self.ndim == model.ndim
         assert self.specimen == model.nspc
         initial_state = model.compute_initial_state(self.particle_number,
@@ -71,7 +71,7 @@ class Rule(bp.BaseClass):
     def plot(self,
              model):
         """Plot the initial state of a single specimen using matplotlib 3D."""
-        assert isinstance(model, bp.VelocityModel)
+        assert isinstance(model, bp.BaseModel)
         assert self.ndim == 2, (
             "3D Plots are only implemented for 2D velocity spaces")
 
@@ -145,7 +145,7 @@ class Rule(bp.BaseClass):
         return description
 
 
-class InhomogeneousRule(Rule):
+class InhomogeneousRule(BaseRule):
     """Contains computational methods for spatial inhomogeneous points
 
     Parameters
@@ -177,7 +177,7 @@ class InhomogeneousRule(Rule):
 
     @staticmethod
     def parameters():
-        params = Rule.parameters()
+        params = BaseRule.parameters()
         params.update({"affected_points"})
         return params
 
@@ -454,7 +454,7 @@ class BoundaryPointRule(InhomogeneousRule):
         return
 
     def reflection(self, inflow, model):
-        assert isinstance(model, bp.VelocityModel)
+        assert isinstance(model, bp.BaseModel)
         reflected_inflow = np.zeros(inflow.shape, dtype=float)
 
         reflected_inflow += (np.dot(model.spc_matrix, self.refl_inverse[:model.nspc])
@@ -525,7 +525,7 @@ class BoundaryPointRule(InhomogeneousRule):
                     "idx_array[idx_array]:\n{}".format(reflect_twice))
 
 
-class HomogeneousRule(Rule):
+class HomogeneousRule(BaseRule):
     """Implementation of a homogeneous Simulation.
     This means that no Transport happens in space.
     However, it is possible to provide a source term s,
@@ -554,7 +554,7 @@ class HomogeneousRule(Rule):
 
     @staticmethod
     def parameters():
-        params = Rule.parameters()
+        params = BaseRule.parameters()
         params.update({"source_term"})
         return params
 

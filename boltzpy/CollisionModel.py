@@ -4,7 +4,7 @@ from time import process_time
 import boltzpy as bp
 
 
-class CollisionModel(bp.VelocityModel):
+class CollisionModel(bp.BaseModel):
     r"""Manages the Velocity Grids of all
     :class:`~boltzpy.Species`.
 
@@ -81,7 +81,7 @@ class CollisionModel(bp.VelocityModel):
 
     @staticmethod
     def parameters():
-        params = bp.VelocityModel.parameters()
+        params = bp.BaseModel.parameters()
         params.update({"collision_factors",
                        "collision_relations",
                        "collision_weights",
@@ -92,7 +92,7 @@ class CollisionModel(bp.VelocityModel):
     @staticmethod
     def attributes():
         attrs = CollisionModel.parameters()
-        attrs.update(bp.VelocityModel.attributes())
+        attrs.update(bp.BaseModel.attributes())
         attrs.update({"collision_matrix",
                       "collision_invariants"})
         return attrs

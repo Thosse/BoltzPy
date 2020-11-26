@@ -83,9 +83,9 @@ def test_attributes(attribute, key):
     with h5py.File(FILE, mode="r") as file:
         if attribute == "rules":
             old = np.empty(file[key]["rules"].attrs["size"],
-                           dtype=bp.Rule)
+                           dtype=bp.BaseRule)
             for r in range(old.size):
-                old[r] = bp.Rule.load(file[key]["rules"][str(r)])
+                old[r] = bp.BaseRule.load(file[key]["rules"][str(r)])
         else:
             old = file[key][attribute][()]
         new = GEOMETRIES[key].__getattribute__(attribute)
