@@ -125,7 +125,7 @@ def test_old_and_new_moments_are_equal(key, moment):
 def test_computing_moments_on_old_state_gives_old_results(key, moment):
     with h5py.File(FILE, mode="r") as file:
         hdf_group = file[key]
-        sim = bp.Simulation.load(hdf_group)
+        sim = SIMULATIONS[key]
         model = sim.model
         compute_moment = model.__getattribute__("cmp_" + moment)
         for s in model.species:
