@@ -196,17 +196,18 @@ def test_get_idx_on_random_integers(key):
 
 def assert_all_moments_are_zero(model, state):
     # number density of each species stays the same
+    # Todo replace using "seperately"
     for s in model.species:
-        number_density = model.number_density(state, s)
+        number_density = model.cmp_number_density(state, s)
         assert np.isclose(number_density, 0)
     # assert total number/mass stays the same (should be unnecessary)
-    number_density = model.number_density(state)
+    number_density = model.cmp_number_density(state)
     assert np.isclose(number_density, 0)
-    mass_density = model.mass_density(state)
+    mass_density = model.cmp_mass_density(state)
     assert np.isclose(mass_density, 0)
-    momentum = model.momentum(state)
+    momentum = model.cmp_momentum(state)
     assert np.allclose(momentum, 0)
-    energy = model.energy_density(state)
+    energy = model.cmp_energy_density(state)
     assert np.isclose(energy, 0)
 
 

@@ -142,29 +142,29 @@ class Simulation(bp.BaseClass):
             spc_state = data.state[..., idx_range]
             spc_group = hdf_group[str(s)]
             # number_density
-            number_density = self.model.number_density(spc_state, s)
+            number_density = self.model.cmp_number_density(spc_state, s)
             spc_group["particle_number"][tw_idx] = number_density
 
             # momentum
-            momentum = self.model.momentum(spc_state, s)
+            momentum = self.model.cmp_momentum(spc_state, s)
             spc_group["momentum"][tw_idx] = momentum
 
             # mean velocity
-            mean_velocity = self.model.mean_velocity(spc_state, s,
+            mean_velocity = self.model.cmp_mean_velocity(spc_state, s,
                                                      momentum=momentum)
             spc_group["mean_velocity"][tw_idx] = mean_velocity
 
             # temperature
-            temperature = self.model.temperature(spc_state, s,
+            temperature = self.model.cmp_temperature(spc_state, s,
                                                  number_density=number_density)
             spc_group["temperature"][tw_idx] = temperature
 
             # momentum flow
-            spc_group["momentum_flow"][tw_idx] = self.model.momentum_flow(spc_state, s)
+            spc_group["momentum_flow"][tw_idx] = self.model.cmp_momentum_flow(spc_state, s)
             # energy
-            spc_group["energy"][tw_idx] = self.model.energy_density(spc_state, s)
+            spc_group["energy"][tw_idx] = self.model.cmp_energy_density(spc_state, s)
             # energy flow
-            spc_group["energy_flow"][tw_idx] = self.model.energy_flow(spc_state, s)
+            spc_group["energy_flow"][tw_idx] = self.model.cmp_energy_flow(spc_state, s)
             # complete distribution
             if self.log_state:
                 spc_group["state"][tw_idx] = spc_state

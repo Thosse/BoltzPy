@@ -178,8 +178,8 @@ def test_reflection_keeps_total_mass(key):
         inflow[..., rule.vels_in] = rand_vals
         reflected_inflow = rule.reflection(inflow, model)
         for s in model.species:
-            mass_in = model.mass_density(inflow, s)
-            mass_refl = model.mass_density(reflected_inflow, s)
+            mass_in = model.cmp_mass_density(inflow, s)
+            mass_refl = model.cmp_mass_density(reflected_inflow, s)
             absorption = rule.refl_absorbs[s]
             assert np.isclose((1 - absorption) * mass_in, mass_refl)
 

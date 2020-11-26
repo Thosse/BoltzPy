@@ -270,18 +270,18 @@ class BaseModel(bp.BaseClass):
                                 mass=mass,
                                 mean_velocity=moment_parameters[0: dim])
         # compute momenta
-        mean_velocity = self.mean_velocity(state, s)
-        temperature = self.temperature(state, s, mean_velocity=mean_velocity)
+        mean_velocity = self.cmp_mean_velocity(state, s)
+        temperature = self.cmp_temperature(state, s, mean_velocity=mean_velocity)
         # return difference from wanted_moments
         moments = np.zeros(moment_parameters.shape, dtype=float)
         moments[0: dim] = mean_velocity
         moments[dim] = temperature
         return moments - wanted_moments
 
-    def compute_initial_state(self,
-                              number_densities,
-                              mean_velocities,
-                              temperatures):
+    def cmp_initial_state(self,
+                          number_densities,
+                          mean_velocities,
+                          temperatures):
         # number densities can be multiplied on the distribution at the end
         number_densities = np.array(number_densities)
         assert number_densities.shape == (self.nspc,)
@@ -322,7 +322,7 @@ class BaseModel(bp.BaseClass):
                                     temperature=init_params[s, self.ndim],
                                     mean_velocity=init_params[s, 0:self.ndim])
             # normalize meaxwellian to number density == 1
-            state /= self.number_density(state, s)
+            state /= self.cmp_number_density(state, s)
             # multiply to get the wanted number density
             state *= number_densities[s]
             initial_state[idx_range] = state
@@ -398,7 +398,7 @@ class BaseModel(bp.BaseClass):
         direction = np.array(direction)
         direction = direction / np.sum(direction**2)
         # compute mean velocity
-        mean_velocity = self.mean_velocity(state, s)
+        mean_velocity = self.cmp_mean_velocity(state, s)
         # compute non-orthogonal moment function
         mf = self.mf_heat_flow(mean_velocity, direction, s)
         # subtract non-orthogonal part
@@ -406,8 +406,8 @@ class BaseModel(bp.BaseClass):
         # however this is not precise enough in grids
         # thus subtract correction term based on state
         p_vels = self.c_vels(mean_velocity) @ direction
-        ct = (self.momentum(mf * state) @ direction
-              / (self.momentum(p_vels*state) @ direction)
+        ct = (self.cmp_momentum(mf * state) @ direction
+              / (self.cmp_momentum(p_vels*state) @ direction)
               * p_vels)
         result = mf - ct
         return result
@@ -430,7 +430,7 @@ class BaseModel(bp.BaseClass):
             assert state.shape[-1] == grid_size
         return state
 
-    def number_density(self, state, s=None, separately=False):
+    def cmp_number_density(self, state, s=None, separately=False):
         r"""
         Parameters
         ----------
@@ -459,7 +459,7 @@ class BaseModel(bp.BaseClass):
         result = np.sum(dv**dim * state, axis=axis)
         return result.reshape(shape)
 
-    def mass_density(self, state, s=None):
+    def cmp_mass_density(self, state, s=None):
         r"""
         Parameters
         ----------
@@ -481,7 +481,7 @@ class BaseModel(bp.BaseClass):
         result = np.sum(dv**dim * mass * state, axis=-1)
         return result.reshape(shape)
 
-    def momentum(self, state, s=None):
+    def cmp_momentum(self, state, s=None):
         r"""
         Parameters
         ----------
@@ -504,11 +504,11 @@ class BaseModel(bp.BaseClass):
         result = np.dot(dv**dim * mass * state, velocities)
         return result.reshape(shape + (dim,))
 
-    def mean_velocity(self,
-                      state=None,
-                      s=None,
-                      momentum=None,
-                      mass_density=None):
+    def cmp_mean_velocity(self,
+                          state=None,
+                          s=None,
+                          momentum=None,
+                          mass_density=None):
         r"""
         Parameters
         ----------
@@ -520,14 +520,14 @@ class BaseModel(bp.BaseClass):
         if state is None:
             assert momentum is not None and mass_density is not None
         if momentum is None:
-            momentum = self.momentum(state, s)
+            momentum = self.cmp_momentum(state, s)
         if mass_density is None:
-            mass_density = self.mass_density(state, s)
+            mass_density = self.cmp_mass_density(state, s)
         if np.any(np.isclose(mass_density, 0)):
             raise ValueError
         return momentum / mass_density[..., np.newaxis]
 
-    def energy_density(self, state, s=None):
+    def cmp_energy_density(self, state, s=None):
         r"""
 
         Parameters
@@ -552,7 +552,7 @@ class BaseModel(bp.BaseClass):
         # return result, reshaped into old shape
         return result.reshape(shape)
 
-    def pressure(self, state, s=None, mean_velocity=None):
+    def cmp_pressure(self, state, s=None, mean_velocity=None):
         r"""
         Parameters
         ----------
@@ -566,7 +566,7 @@ class BaseModel(bp.BaseClass):
         size = np.prod(shape, dtype=int)
         state = state.reshape((size, state.shape[-1]))
         if mean_velocity is None:
-            mean_velocity = self.mean_velocity(state, s)
+            mean_velocity = self.cmp_mean_velocity(state, s)
         # prepare paramters
         dim = self.ndim
         dv = (self.get_array(self.dv)[np.newaxis, :]
@@ -578,12 +578,12 @@ class BaseModel(bp.BaseClass):
         result = np.sum(dv**dim * mf_pressure * state, axis=-1)
         return result.reshape(shape)
 
-    def temperature(self,
-                    state=None,
-                    s=None,
-                    pressure=None,
-                    number_density=None,
-                    mean_velocity=None):
+    def cmp_temperature(self,
+                        state=None,
+                        s=None,
+                        pressure=None,
+                        number_density=None,
+                        mean_velocity=None):
         r"""
         Parameters
         ----------
@@ -596,14 +596,14 @@ class BaseModel(bp.BaseClass):
         if state is None:
             assert pressure is not None and number_density is not None
         if pressure is None:
-            pressure = self.pressure(state, s, mean_velocity)
+            pressure = self.cmp_pressure(state, s, mean_velocity)
         if number_density is None:
-            number_density = self.number_density(state, s)
+            number_density = self.cmp_number_density(state, s)
         if np.any(np.isclose(number_density, 0)):
             raise ValueError
         return pressure / number_density
 
-    def momentum_flow(self, state, s=None):
+    def cmp_momentum_flow(self, state, s=None):
         r"""
         Parameters
         ----------
@@ -626,7 +626,7 @@ class BaseModel(bp.BaseClass):
         result = np.dot(dv**dim * mass * state, velocities ** 2)
         return result.reshape(shape + (dim,))
 
-    def energy_flow(self, state, s=None):
+    def cmp_energy_flow(self, state, s=None):
         r"""
         Parameters
         ----------

@@ -127,7 +127,7 @@ def test_computing_moments_on_old_state_gives_old_results(key, moment):
         hdf_group = file[key]
         sim = bp.Simulation.load(hdf_group)
         model = sim.model
-        compute_moment = model.__getattribute__(moment)
+        compute_moment = model.__getattribute__("cmp_" + moment)
         for s in model.species:
             spc_group = hdf_group["results"][str(s)]
             state = spc_group["state"][()]
@@ -146,7 +146,7 @@ def test_model_particle_number(key):
             spc_group = hdf_group["results"][str(s)]
             state = spc_group["state"][()]
             old_result = spc_group["particle_number"][()]
-            new_result = model.number_density(state, s)
+            new_result = model.cmp_number_density(state, s)
             assert np.allclose(old_result, new_result)
 
 @pytest.mark.parametrize("key", SIMULATIONS.keys())
@@ -159,7 +159,7 @@ def test_model_energy_density(key):
             spc_group = hdf_group["results"][str(s)]
             state = spc_group["state"][()]
             old_result = spc_group["energy"][()]
-            new_result = model.energy_density(state, s)
+            new_result = model.cmp_energy_density(state, s)
             assert np.allclose(old_result, new_result)
 
 # the file is used in more tests, this is a simple hack to delete it after use

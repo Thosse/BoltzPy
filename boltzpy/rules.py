@@ -63,9 +63,9 @@ class BaseRule(bp.BaseClass):
         assert isinstance(model, bp.BaseModel)
         assert self.ndim == model.ndim
         assert self.specimen == model.nspc
-        initial_state = model.compute_initial_state(self.particle_number,
-                                                    self.mean_velocity,
-                                                    self.temperature)
+        initial_state = model.cmp_initial_state(self.particle_number,
+                                                self.mean_velocity,
+                                                self.temperature)
         return initial_state
 
     def plot(self,
@@ -348,7 +348,7 @@ class BoundaryPointRule(InhomogeneousRule):
                                                 initial_state)
         if effective_particle_number is None:
             self.effective_particle_number = np.array([
-                model.number_density(
+                model.cmp_number_density(
                     self.initial_state[np.newaxis, model.idx_range(s)], s)
                 for s in model.species])
         self.check_integrity()
@@ -467,7 +467,7 @@ class BoundaryPointRule(InhomogeneousRule):
         #  thus slow vels accumulate, fast vels are reduced over time thus temperature is reduced
         for s in model.species:
             idx_range = model.idx_range(s)
-            refl_thermal = (model.number_density(inflow, s)
+            refl_thermal = (model.cmp_number_density(inflow, s)
                             / self.effective_particle_number[s]
                             * self.refl_thermal[s]
                             * self.initial_state[..., idx_range])
