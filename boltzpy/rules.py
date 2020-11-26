@@ -24,7 +24,8 @@ class BaseRule(bp.BaseModel):
                  shapes,
                  base_delta,
                  spacings=None,
-                 initial_state=None):
+                 initial_state=None,
+                 **kwargs):
         super().__init__(masses, shapes, base_delta, spacings)
         self.number_densities = np.array(number_densities, dtype=float)
         self.mean_velocities = np.array(mean_velocities, dtype=float)
@@ -157,7 +158,8 @@ class InhomogeneousRule(BaseRule):
                  shapes,
                  base_delta,
                  spacings=None,
-                 initial_state=None):
+                 initial_state=None,
+                 **kwargs):
         # Todo replace, by using locals() -> what happens with Boundary points?
         #  That would require Rule(**kwargs)
         super().__init__(number_densities,
@@ -167,7 +169,8 @@ class InhomogeneousRule(BaseRule):
                          shapes,
                          base_delta,
                          spacings,
-                         initial_state)
+                         initial_state,
+                         **kwargs)
         self.affected_points = np.array(affected_points, dtype=int)
         InhomogeneousRule.check_integrity(self)
         return
@@ -292,7 +295,8 @@ class BoundaryPointRule(InhomogeneousRule):
                  shapes,
                  base_delta,
                  spacings=None,
-                 initial_state=None):
+                 initial_state=None,
+                 **kwargs):
         super().__init__(number_densities,
                          mean_velocities,
                          temperatures,
@@ -301,7 +305,8 @@ class BoundaryPointRule(InhomogeneousRule):
                          shapes,
                          base_delta,
                          spacings,
-                         initial_state)
+                         initial_state,
+                         **kwargs)
         self.surface_normal = np.array(surface_normal, dtype=int)
         self.refl_inverse = np.array(refl_inverse, dtype=float)
         self.refl_elastic = np.array(refl_elastic, dtype=float)
@@ -501,7 +506,8 @@ class HomogeneousRule(BaseRule):
                  mean_velocities,
                  temperatures,
                  initial_state=None,
-                 source_term=0.0):
+                 source_term=0.0,
+                 **kwargs):
         super().__init__(number_densities,
                          mean_velocities,
                          temperatures,

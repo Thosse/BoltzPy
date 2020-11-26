@@ -56,7 +56,8 @@ class BaseModel(bp.BaseClass):
                  masses,
                  shapes,
                  base_delta,
-                 spacings=None):
+                 spacings=None,
+                 **kwargs):
         self.masses = np.array(masses, dtype=int)
         self.shapes = np.array(shapes, dtype=int)
         self.base_delta = np.float(base_delta)

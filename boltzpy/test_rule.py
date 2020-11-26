@@ -13,67 +13,64 @@ from boltzpy.test_model import MODELS
 ###################################
 FILE = test_helper.DIRECTORY + 'Rules.hdf5'
 # setup dictionary of model parameters, for Rule initialization
-MODEL_PARAMS = {key: {param: model.__getattribute__(param)
-                      for param in bp.BaseModel.parameters()}
-                for (key, model) in MODELS.items()}
 RULES = dict()
 RULES["2D_small/LeftConstant"] = bp.ConstantPointRule(
     number_densities=[2, 2],
     mean_velocities=[[0, 0], [0, 0]],
     temperatures=[1, 1],
     affected_points=[0],
-    **MODEL_PARAMS["2D_small/Model"])
+    **MODELS["2D_small/Model"].__dict__)
 RULES["2D_small/Interior"] = bp.InnerPointRule(
     number_densities=[1, 1],
     mean_velocities=[[0, 0], [0, 0]],
     temperatures=[1, 1],
     affected_points=np.arange(1, 9),
-    **MODEL_PARAMS["2D_small/Model"])
+    **MODELS["2D_small/Model"].__dict__)
 RULES["2D_small/RightBoundary"] = bp.BoundaryPointRule(
     number_densities=[1, 1],
     mean_velocities=[[0, 0], [0, 0]],
     temperatures=[1, 1],
     affected_points=[9],
-    **MODEL_PARAMS["2D_small/Model"],
     refl_inverse=[0.25, 0.25],
     refl_elastic=[0.25, 0.25],
     refl_thermal=[0.25, 0.25],
     refl_absorbs=[0.25, 0.25],
-    surface_normal=np.array([1, 0], dtype=int))
+    surface_normal=np.array([1, 0], dtype=int),
+    **MODELS["2D_small/Model"].__dict__)
 RULES["equalMass/LeftBoundary"] = bp.BoundaryPointRule(
     number_densities=[2, 2],
     mean_velocities=[[0, 0], [0, 0]],
     temperatures=[1, 1],
     affected_points=[0],
-    **MODEL_PARAMS["equalMass/Model"],
     refl_inverse=[0.45, 0.45],
     refl_elastic=[0.45, 0.45],
     refl_thermal=[0.1, 0.1],
     refl_absorbs=[0, 0],
-    surface_normal=np.array([-1, 0], dtype=int))
+    surface_normal=np.array([-1, 0], dtype=int),
+    **MODELS["equalMass/Model"].__dict__)
 RULES["equalMass/LeftInterior"] = bp.InnerPointRule(
     number_densities=[2, 2],
     mean_velocities=[[0, 0], [0, 0]],
     temperatures=[1, 1],
     affected_points=np.arange(1, 5),
-    **MODEL_PARAMS["equalMass/Model"])
+    **MODELS["equalMass/Model"].__dict__)
 RULES["equalMass/RightInterior"] = bp.InnerPointRule(
     number_densities=[1, 1],
     mean_velocities=[[0, 0], [0, 0]],
     temperatures=[1, 1],
     affected_points=np.arange(5, 9),
-    **MODEL_PARAMS["equalMass/Model"])
+    **MODELS["equalMass/Model"].__dict__)
 RULES["equalMass/RightBoundary"] = bp.BoundaryPointRule(
     number_densities=[1, 1],
     mean_velocities=[[0, 0], [0, 0]],
     temperatures=[1, 1],
     affected_points=[9],
-    **MODEL_PARAMS["equalMass/Model"],
     refl_inverse=[0.15, 0.15],
     refl_elastic=[0.15, 0.15],
     refl_thermal=[0.15, 0.15],
     refl_absorbs=[0.55, 0.55],
-    surface_normal=np.array([1, 0], dtype=int))
+    surface_normal=np.array([1, 0], dtype=int),
+    **MODELS["equalMass/Model"].__dict__)
 
 # Sub dictionaries for specific attribute tests
 POSSIBLE_ATTRIBUTES = set().union(*[rule.attributes() for rule in RULES.values()])
