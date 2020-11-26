@@ -44,11 +44,13 @@ class CollisionModel(bp.BaseModel):
                  collision_relations=None,
                  collision_weights=None,
                  algorithm_relations="all",
-                 algorithm_weights="uniform"):
-        super().__init__(masses,
-                         shapes,
-                         base_delta,
-                         spacings)
+                 algorithm_weights="uniform",
+                 **kwargs):
+        bp.BaseModel.__init__(self,
+                              masses,
+                              shapes,
+                              base_delta,
+                              spacings)
         # todo rename spc_collision_probability, default = np.ones
         #  must be in [0, 1]
         #  adjust by setting number density
@@ -499,7 +501,7 @@ class CollisionModel(bp.BaseModel):
             # repeat the collision to "close" the rectangle / trapezoid
             rels = np.tile(r, 2)
             # transpose the velocities, for easy unpacking
-            vels = (self.vels).transpose()
+            vels = (self.vels[rels]).transpose()
             ax.plot(*vels, color="gray", linewidth=1)
         plt.show()
         return
@@ -509,7 +511,7 @@ class CollisionModel(bp.BaseModel):
     #####################################
     def check_integrity(self):
         """Sanity Check."""
-        super().check_integrity()
+        bp.BaseModel.check_integrity(self)
         assert self.algorithm_relations in {"all", "convergent", "naive"}
         assert self.algorithm_weights in {"uniform"}
         return

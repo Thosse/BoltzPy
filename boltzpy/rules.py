@@ -26,7 +26,7 @@ class BaseRule(bp.BaseModel):
                  spacings=None,
                  initial_state=None,
                  **kwargs):
-        super().__init__(masses, shapes, base_delta, spacings)
+        bp.BaseModel.__init__(self, masses, shapes, base_delta, spacings)
         self.number_densities = np.array(number_densities, dtype=float)
         self.mean_velocities = np.array(mean_velocities, dtype=float)
         self.temperatures = np.array(temperatures, dtype=float)
@@ -67,9 +67,10 @@ class BaseRule(bp.BaseModel):
             mean_velocities = self.mean_velocities
         if temperatures is None:
             temperatures = self.temperatures
-        initial_state = super().cmp_initial_state(number_densities,
-                                                  mean_velocities,
-                                                  temperatures)
+        initial_state = bp.BaseModel.cmp_initial_state(self,
+                                                       number_densities,
+                                                       mean_velocities,
+                                                       temperatures)
         return initial_state
 
     # Todo rework this, is probably obsolete
@@ -106,7 +107,7 @@ class BaseRule(bp.BaseModel):
 
     def check_integrity(self):
         """Sanity Check."""
-        super().check_integrity()
+        bp.BaseModel.check_integrity(self)
         assert isinstance(self.number_densities, np.ndarray)
         assert self.number_densities.dtype == float
         assert self.number_densities.ndim == 1
@@ -162,15 +163,16 @@ class InhomogeneousRule(BaseRule):
                  **kwargs):
         # Todo replace, by using locals() -> what happens with Boundary points?
         #  That would require Rule(**kwargs)
-        super().__init__(number_densities,
-                         mean_velocities,
-                         temperatures,
-                         masses,
-                         shapes,
-                         base_delta,
-                         spacings,
-                         initial_state,
-                         **kwargs)
+        BaseRule.__init__(self,
+                          number_densities,
+                          mean_velocities,
+                          temperatures,
+                          masses,
+                          shapes,
+                          base_delta,
+                          spacings,
+                          initial_state,
+                          **kwargs)
         self.affected_points = np.array(affected_points, dtype=int)
         InhomogeneousRule.check_integrity(self)
         return
@@ -197,7 +199,7 @@ class InhomogeneousRule(BaseRule):
         return
 
     def transport_outflow_remains(self, data):
-        # Todo make this an attribute of data / simulation
+        # Todo make this an attribute of simulation (data, if it still exists)
         outflow_percentage = (np.abs(data.vG[:, 0] + data.velocity_offset[0])
                               * data.dt
                               / data.dp)
@@ -297,16 +299,17 @@ class BoundaryPointRule(InhomogeneousRule):
                  spacings=None,
                  initial_state=None,
                  **kwargs):
-        super().__init__(number_densities,
-                         mean_velocities,
-                         temperatures,
-                         affected_points,
-                         masses,
-                         shapes,
-                         base_delta,
-                         spacings,
-                         initial_state,
-                         **kwargs)
+        InhomogeneousRule.__init__(self,
+                                   number_densities,
+                                   mean_velocities,
+                                   temperatures,
+                                   affected_points,
+                                   masses,
+                                   shapes,
+                                   base_delta,
+                                   spacings,
+                                   initial_state,
+                                   **kwargs)
         self.surface_normal = np.array(surface_normal, dtype=int)
         self.refl_inverse = np.array(refl_inverse, dtype=float)
         self.refl_elastic = np.array(refl_elastic, dtype=float)
@@ -444,7 +447,7 @@ class BoundaryPointRule(InhomogeneousRule):
         return reflected_inflow
 
     def check_integrity(self, complete_check=True, context=None):
-        super().check_integrity()
+        InhomogeneousRule.check_integrity(self)
         assert np.all(self.mean_velocities == 0), (
             "BoundaryPointRules must have no drift! Drift ="
             "{}".format(self.mean_velocities)
@@ -491,7 +494,7 @@ class BoundaryPointRule(InhomogeneousRule):
                     "idx_array[idx_array]:\n{}".format(reflect_twice))
 
 
-class HomogeneousRule(BaseRule):
+class HomogeneousRule(BaseRule, bp.CollisionModel):
     """Implementation of a homogeneous Simulation.
     This means that no Transport happens in space.
     However, it is possible to provide a source term s,
@@ -505,73 +508,93 @@ class HomogeneousRule(BaseRule):
                  number_densities,
                  mean_velocities,
                  temperatures,
+                 masses,
+                 shapes,
+                 base_delta,
+                 spacings,
                  initial_state=None,
                  source_term=0.0,
                  **kwargs):
-        super().__init__(number_densities,
-                         mean_velocities,
-                         temperatures,
-                         initial_state)
+        BaseRule.__init__(self,
+                          number_densities,
+                          mean_velocities,
+                          temperatures,
+                          masses,
+                          shapes,
+                          base_delta,
+                          spacings,
+                          initial_state)
+        bp.CollisionModel.__init__(self,
+                                   masses,
+                                   shapes,
+                                   base_delta,
+                                   spacings,
+                                   **kwargs)
         self.source_term = np.zeros(self.initial_state.shape, dtype=float)
         self.source_term[...] = source_term
+        self.check_integrity()
         return
-#
-#     @staticmethod
-#     def parameters():
-#         params = BaseRule.parameters()
-#         params.update({"source_term"})
-#         return params
-#
-#     @staticmethod
-#     def attributes():
-#         attrs = HomogeneousRule.parameters()
-#         return attrs
-#
-#     def compute(self, dt=None, maxiter=5000, _depth=0):
-#         self.check_integrity()
-#         if dt is None:
-#             max_weight = np.max(self.model.collision_matrix)
-#             dt = 1 / (20 * max_weight)
-#         state = self.initial_state
-#         # store state at each timestep here
-#         result = np.zeros((maxiter,) + state.shape)
-#         result[0] = state
-#         # store the interim results of the runge-kutta scheme here
-#         # usually named k1,k2,k3,k4, only one is needed at the time
-#         rks_component = np.zeros(state.shape, float)
-#         # time offsets of the rks
-#         rks_offset = np.array([0, 0.5, 0.5, 1])
-#         # weights of each interim result / rks_component
-#         rks_weight = np.array([1 / 6, 2 / 6, 2 / 6, 1 / 6])
-#         # execute simulation
-#         for i in range(1, maxiter):
-#             state = result[i-1]
-#             result[i] = state
-#             # Runge Kutta steps
-#             for (offset, weight) in zip(rks_offset, rks_weight):
-#                 interim_state = state + offset * rks_component
-#                 coll = self.model.collision_operator(interim_state)
-#                 rks_component = dt * (coll - self.source_term)
-#                 result[i] = result[i] + weight * rks_component
-#             # break loop when reaching equilibrium
-#             if np.allclose(result[i] - result[i-1], 0, atol=1e-8, rtol=1e-8):
-#                 return result[:i+1]
-#             # reduce dt, if NaN Values show up, at most 2 times!
-#             elif np.isnan(result[i]).any():
-#                 if _depth < 3:
-#                     print("NaN-Value at i={}, set dt/100 = {}"
-#                           "".format(i, dt/100))
-#                     return self.compute(dt/100, maxiter, _depth + 1)
-#                 else:
-#                     raise ValueError("NaN-Value at i={}".format(i))
-#         raise ValueError("No equilibrium established")
-#
-#     def check_integrity(self):
-#         assert self.source_term.shape == self.initial_state.shape
-#         # source term must be orthogonal to all moments
-#         # otherwise no equilibrium can be established
-#         for s in self.model.species:
-#             number_density = self.model.number_density(self.source_term, s)
-#             assert np.isclose(number_density, 0)
-#         assert np.allclose(self.model.momentum(self.source_term), 0)
-#         assert np.allclose(self.model.energy_density(self.source_term), 0)
+
+    @staticmethod
+    def parameters():
+        params = BaseRule.parameters()
+        params.update(bp.CollisionModel.parameters())
+        params.update({"source_term"})
+        return params
+
+    @staticmethod
+    def attributes():
+        attrs = HomogeneousRule.attributes()
+        attrs.update(bp.CollisionModel.attributes())
+        return attrs
+
+    def compute(self, dt=None, maxiter=5000, _depth=0):
+        self.check_integrity()
+        if dt is None:
+            max_weight = np.max(self.collision_matrix)
+            dt = 1 / (20 * max_weight)
+        state = self.initial_state
+        # store state at each timestep here
+        result = np.zeros((maxiter,) + state.shape)
+        result[0] = state
+        # store the interim results of the runge-kutta scheme here
+        # usually named k1,k2,k3,k4, only one is needed at the time
+        rks_component = np.zeros(state.shape, float)
+        # time offsets of the rks
+        rks_offset = np.array([0, 0.5, 0.5, 1])
+        # weights of each interim result / rks_component
+        rks_weight = np.array([1 / 6, 2 / 6, 2 / 6, 1 / 6])
+        # execute simulation
+        for i in range(1, maxiter):
+            state = result[i-1]
+            result[i] = state
+            # Runge Kutta steps
+            for (offset, weight) in zip(rks_offset, rks_weight):
+                interim_state = state + offset * rks_component
+                coll = self.collision_operator(interim_state)
+                rks_component = dt * (coll - self.source_term)
+                result[i] = result[i] + weight * rks_component
+            # break loop when reaching equilibrium
+            if np.allclose(result[i] - result[i-1], 0, atol=1e-8, rtol=1e-8):
+                return result[:i+1]
+            # reduce dt, if NaN Values show up, at most 2 times!
+            elif np.isnan(result[i]).any():
+                if _depth < 3:
+                    print("NaN-Value at i={}, set dt/100 = {}"
+                          "".format(i, dt/100))
+                    return self.compute(dt/100, maxiter, _depth + 1)
+                else:
+                    raise ValueError("NaN-Value at i={}".format(i))
+        raise ValueError("No equilibrium established")
+
+    def check_integrity(self):
+        BaseRule.check_integrity(self)
+        bp.CollisionModel.check_integrity(self)
+        assert self.source_term.shape == self.initial_state.shape
+        # source term must be orthogonal to all moments
+        # otherwise no equilibrium can be established
+        for s in self.species:
+            number_density = self.cmp_number_density(self.source_term, s)
+            assert np.isclose(number_density, 0)
+        assert np.allclose(self.cmp_momentum(self.source_term), 0)
+        assert np.allclose(self.cmp_energy_density(self.source_term), 0)
