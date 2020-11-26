@@ -12,60 +12,64 @@ from boltzpy.test_model import MODELS
 #           Setup Cases           #
 ###################################
 FILE = test_helper.DIRECTORY + 'Rules.hdf5'
+# setup dictionary of model parameters, for Rule initialization
+MODEL_PARAMS = {key: {param: model.__getattribute__(param)
+                      for param in bp.BaseModel.parameters()}
+                for (key, model) in MODELS.items()}
 RULES = dict()
 # Test rules allow up to 4 specimen
 RULES["2D_small/LeftConstant"] = bp.ConstantPointRule(
-    particle_number=[2, 2],
-    mean_velocity=[[0, 0], [0, 0]],
-    temperature=[1, 1],
+    number_densities=[2, 2],
+    mean_velocities=[[0, 0], [0, 0]],
+    temperatures=[1, 1],
     affected_points=[0],
-    model=MODELS["2D_small/Model"])
+    **MODEL_PARAMS["2D_small/Model"])
 RULES["2D_small/Interior"] = bp.InnerPointRule(
-    particle_number=[1, 1],
-    mean_velocity=[[0, 0], [0, 0]],
-    temperature=[1, 1],
+    number_densities=[1, 1],
+    mean_velocities=[[0, 0], [0, 0]],
+    temperatures=[1, 1],
     affected_points=np.arange(1, 9),
-    model=MODELS["2D_small/Model"])
+    **MODEL_PARAMS["2D_small/Model"])
 RULES["2D_small/RightBoundary"] = bp.BoundaryPointRule(
-    particle_number=[1, 1],
-    mean_velocity=[[0, 0], [0, 0]],
-    temperature=[1, 1],
+    number_densities=[1, 1],
+    mean_velocities=[[0, 0], [0, 0]],
+    temperatures=[1, 1],
     affected_points=[9],
-    model=MODELS["2D_small/Model"],
+    **MODEL_PARAMS["2D_small/Model"],
     refl_inverse=[0.25, 0.25, 0.25, 0.25],
     refl_elastic=[0.25, 0.25, 0.25, 0.25],
     refl_thermal=[0.25, 0.25, 0.25, 0.25],
     refl_absorbs=[0.25, 0.25, 0.25, 0.25],
     surface_normal=np.array([1, 0], dtype=int))
 RULES["equalMass/LeftBoundary"] = bp.BoundaryPointRule(
-    particle_number=[2, 2],
-    mean_velocity=[[0, 0], [0, 0]],
-    temperature=[1, 1],
+    number_densities=[2, 2],
+    mean_velocities=[[0, 0], [0, 0]],
+    temperatures=[1, 1],
     affected_points=[0],
-    model=MODELS["equalMass/Model"],
+    **MODEL_PARAMS["equalMass/Model"],
     refl_inverse=[0.45, 0.45, 0.45, 0.45],
     refl_elastic=[0.45, 0.45, 0.45, 0.45],
     refl_thermal=[0.1, 0.1, 0.1, 0.1],
     refl_absorbs=[0, 0, 0, 0],
     surface_normal=np.array([-1, 0], dtype=int))
 RULES["equalMass/LeftInterior"] = bp.InnerPointRule(
-    particle_number=[2, 2],
-    mean_velocity=[[0, 0], [0, 0]],
-    temperature=[1, 1],
+    number_densities=[2, 2],
+    mean_velocities=[[0, 0], [0, 0]],
+    temperatures=[1, 1],
     affected_points=np.arange(1, 5),
-    model=MODELS["equalMass/Model"])
+    **MODEL_PARAMS["equalMass/Model"])
 RULES["equalMass/RightInterior"] = bp.InnerPointRule(
-    particle_number=[1, 1],
-    mean_velocity=[[0, 0], [0, 0]],
-    temperature=[1, 1],
+    number_densities=[1, 1],
+    mean_velocities=[[0, 0], [0, 0]],
+    temperatures=[1, 1],
     affected_points=np.arange(5, 9),
-    model=MODELS["equalMass/Model"])
+    **MODEL_PARAMS["equalMass/Model"])
 RULES["equalMass/RightBoundary"] = bp.BoundaryPointRule(
-    particle_number=[1, 1],
-    mean_velocity=[[0, 0], [0, 0]],
-    temperature=[1, 1],
+    number_densities=[1, 1],
+    mean_velocities=[[0, 0], [0, 0]],
+    temperatures=[1, 1],
     affected_points=[9],
-    model=MODELS["equalMass/Model"],
+    **MODEL_PARAMS["equalMass/Model"],
     refl_inverse=[0.15, 0.15, 0.15, 0.15],
     refl_elastic=[0.15, 0.15, 0.15, 0.15],
     refl_thermal=[0.15, 0.15, 0.15, 0.15],
@@ -150,14 +154,12 @@ def test_attributes_are_equal(key, parameter):
 @pytest.mark.parametrize("key", RULES.keys())
 def test_reflected_indices_inverse(key):
     rule = RULES[key]
-    # get model
-    model = MODELS[h5py.File(FILE, mode='r')[key].attrs["Model"]]
     if not isinstance(rule, bp.BoundaryPointRule):
         return
     refl = rule.refl_idx_inverse
     assert np.all(refl[refl] == np.arange(refl.size))
-    for (idx_v, v) in enumerate(model.i_vels):
-        v_refl = model.i_vels[refl[idx_v]]
+    for (idx_v, v) in enumerate(rule.i_vels):
+        v_refl = rule.i_vels[refl[idx_v]]
         assert np.all(v == -v_refl)
 
 
@@ -168,18 +170,15 @@ def test_reflection_keeps_total_mass(key):
     if not isinstance(rule, bp.BoundaryPointRule):
         return
     assert isinstance(rule, bp.BoundaryPointRule)
-    # get model
-    model_key = h5py.File(FILE, mode='r')[key].attrs["Model"]
-    model = MODELS[model_key]
     for _ in range(100):
-        inflow = np.zeros((1, model.nvels))
+        inflow = np.zeros((1, rule.nvels))
         n_incoming_vels = rule.vels_in.size
         rand_vals = np.random.random(n_incoming_vels)
         inflow[..., rule.vels_in] = rand_vals
-        reflected_inflow = rule.reflection(inflow, model)
-        for s in model.species:
-            mass_in = model.cmp_mass_density(inflow, s)
-            mass_refl = model.cmp_mass_density(reflected_inflow, s)
+        reflected_inflow = rule.reflection(inflow)
+        for s in rule.species:
+            mass_in = rule.cmp_mass_density(inflow, s)
+            mass_refl = rule.cmp_mass_density(reflected_inflow, s)
             absorption = rule.refl_absorbs[s]
             assert np.isclose((1 - absorption) * mass_in, mass_refl)
 

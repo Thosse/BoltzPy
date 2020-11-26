@@ -2,9 +2,6 @@
 # Desired Command / Road Map
 import boltzpy as bp
 import numpy as np
-# import boltzpy.test_simulation as t
-# t.setup_file()
-# input("DONE!")
 
 exisiting_simulation_file = None
 if exisiting_simulation_file is not None:
@@ -22,28 +19,37 @@ else:
         (31, ),
         0.5,
         [bp.ConstantPointRule(
-            particle_number=[1.0, 1.0],
-            mean_velocity=[[0.0, 0.0], [0.0, 0.0]],
-            temperature=[.50, .50],
+            number_densities=[1.0, 1.0],
+            mean_velocities=[[0.0, 0.0], [0.0, 0.0]],
+            temperatures=[.50, .50],
             affected_points=[0],
-            model=model),
+            masses=[2, 3],
+            shapes=[(5, 5), (7, 7)],
+            base_delta=0.25,
+            spacings=[6, 4]),
          bp.InnerPointRule(
-            particle_number=[1.0, 1.0],
-            mean_velocity=[[0.0, 0.0], [0.0, 0.0]],
-            temperature=[.50, .50],
+            number_densities=[1.0, 1.0],
+            mean_velocities=[[0.0, 0.0], [0.0, 0.0]],
+            temperatures=[.50, .50],
             affected_points=np.arange(1, 30),
-            model=model),
+            masses=[2, 3],
+            shapes=[(5, 5), (7, 7)],
+            base_delta=0.25,
+            spacings=[6, 4]),
          bp.BoundaryPointRule(
-            particle_number=[1.0, 1.0],
-            mean_velocity=[[0.0, 0.0], [0.0, 0.0]],
-            temperature=[.5, .5],
+            number_densities=[1.0, 1.0],
+            mean_velocities=[[0.0, 0.0], [0.0, 0.0]],
+            temperatures=[.5, .5],
             affected_points=[30],
             refl_inverse=[.3, .3],
             refl_elastic=[.3, .3],
             refl_thermal=[0.3, .3],
             refl_absorbs=[0.1, .1],
             surface_normal=np.array([1, 0], dtype=int),
-            model=model)
+            masses=[2, 3],
+            shapes=[(5, 5), (7, 7)],
+            base_delta=0.25,
+            spacings=[6, 4]),
          ]
     )
     sim = bp.Simulation(timing, geometry, model, exisiting_simulation_file)
