@@ -229,6 +229,7 @@ class BaseClass:
             else:
                 hdf5_group[attr] = value
 
+        # Todo move into testcase
         # check that the class can be reconstructed from the save
         other = self.load(hdf5_group)
         assert self == other
@@ -236,4 +237,7 @@ class BaseClass:
 
     def check_integrity(self):
         """Sanity Check."""
-        raise NotImplementedError
+        assert isinstance(self.parameters(), set)
+        assert isinstance(self.attributes(), set)
+        assert self.parameters().issubset(self.attributes())
+

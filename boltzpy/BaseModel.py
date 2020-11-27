@@ -656,6 +656,7 @@ class BaseModel(bp.BaseClass):
     #####################################
     def check_integrity(self):
         """Sanity Check."""
+        bp.BaseClass.check_integrity(self)
         assert isinstance(self.ndim, int)
         assert self.ndim in {2, 3}
 

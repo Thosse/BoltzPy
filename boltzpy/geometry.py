@@ -109,7 +109,7 @@ class Geometry(bp.Grid):
     #####################################
     def check_integrity(self):
         """Sanity Check"""
-        super().check_integrity()
+        bp.Grid.check_integrity(self)
         assert self.spacing == 1
         assert not self.is_centered
 

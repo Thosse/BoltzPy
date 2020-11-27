@@ -307,6 +307,7 @@ class Grid(bp.BaseClass):
     #####################################
     def check_integrity(self):
         """Sanity Check"""
+        bp.BaseClass.check_integrity(self)
         assert isinstance(self.ndim, int)
         assert self.ndim >= 0
 
