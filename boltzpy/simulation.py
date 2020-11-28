@@ -3,7 +3,6 @@ import h5py
 import numpy as np
 
 import boltzpy.helpers.TimeTracker as h_tt
-import boltzpy.AnimatedFigure as bp_af
 import boltzpy as bp
 
 
@@ -20,7 +19,7 @@ class Simulation(bp.BaseClass):
         - Add Knudsen Number Attribute or Property?
             * Add method to get candidate for characteristic length
 
-    Attributes
+    Parameters
     ----------
     timing : :class:`Grid`
         The Time Grid.
@@ -29,19 +28,34 @@ class Simulation(bp.BaseClass):
         Contains the :class:`initialization rules <Rule>`
     model : :class:`CollisionModel`
         Velocity-Space Grids of all Specimen.
+    t : :obj:`numpy.int`
+        Current time step.
+    state : :obj:`~numpy.array` [:obj:`float`]
+        Denotes the current state of the simulation.
     file : :obj:`h5py.Group <h5py:Group>`
     log_state : :obj:`numpy.bool`
+
+    Attributes
+    ----------
+    dt : :obj:`float`
+        Temporal step size.
+    dp : :obj:`float`
+        Positional step size.
     """
     def __init__(self,
                  timing,
                  geometry,
                  model,
+                 t=None,
+                 state=None,
                  file=None,
                  log_state=False):
         assert isinstance(timing, bp.Grid)
         self.timing = timing
+
         assert isinstance(geometry, bp.Geometry)
         self.geometry = geometry
+
         assert isinstance(model, bp.CollisionModel)
         self.model = model
         # store large model attrributes (vels, i_vels, spc_matrix) only once
@@ -50,7 +64,21 @@ class Simulation(bp.BaseClass):
             # all point to the same objects
             setattr(r, attr, getattr(model, attr))
 
+        self.dt = self.timing.delta
+        self.dp = self.geometry.delta
+
+        self.t = np.int(0 if t is None else t)
+        if state is None:
+            self.state = self.geometry.initial_state
+        else:
+            self.state = np.array(state, dtype=float)
+        self.interim = np.copy(self.state)
+        # todo add results = dict(), use method set_results(hdf_group=None)
+        #  default return dict of np.arrays
+        #  this is a parameter
+
         self.log_state = np.bool(log_state)
+        # todo this needs to be removed, as it creates empty files during tests
         if file is None:
             idx = 0
             while True:
@@ -69,7 +97,8 @@ class Simulation(bp.BaseClass):
         params = {"timing",
                   "geometry",
                   "model",
-                  "file",
+                  #"t",
+                  # "state",
                   "log_state"}
         return params
 
@@ -132,28 +161,27 @@ class Simulation(bp.BaseClass):
         results = hdf_group["results"]
         file = hdf_group.file
 
-        # Todo remove Data, move into Simulation
-        # Generate Computation data
-        data = bp.Data(hdf_group)
-        data.check_stability_conditions()
-
         print('Start Computation:')
         results.attrs["t"] = 1
         time_tracker = h_tt.TimeTracker()
-        for (tw_idx, tw) in enumerate(data.tG[:, 0]):
-            while data.t != tw:
-                self.geometry.compute(data)
-            self.write_results(data, tw_idx, results)
+        for (tw_idx, tw) in enumerate(self.timing.iG[:, 0]):
+            while self.t != tw:
+                self.geometry.compute(self)
+            self.write_results(tw_idx, results)
             file.flush()
             # print time estimate
-            time_tracker.print(tw, data.tG[-1, 0])
+            time_tracker.print(tw, self.timing.iG[-1, 0])
+        # Todo this is only a temporary hack, do this properly!
+        self.t = np.int(0)
+        self.state = self.geometry.initial_state
+        self.interim = self.state
         return
 
     # Todo this needs an overhaul
-    def write_results(self, data, tw_idx, hdf_group):
+    def write_results(self, tw_idx, hdf_group):
         for s in self.model.species:
             idx_range = self.model.idx_range(s)
-            spc_state = data.state[..., idx_range]
+            spc_state = self.state[..., idx_range]
             spc_group = hdf_group[str(s)]
 
             number_density = self.model.cmp_number_density(spc_state, s)
@@ -195,8 +223,8 @@ class Simulation(bp.BaseClass):
         assert tmax >= tmin >= 0
         time_frame = np.s_[tmin: tmax]
         n_frames = tmax - tmin
-        figure = bp_af.AnimatedFigure(tmax=n_frames,
-                                      backend="agg")
+        figure = bp.Plot.AnimatedFigure(tmax=n_frames,
+                                        backend="agg")
         if moments is None:
             moments = ['number_density',
                        'mean_velocity',
@@ -230,57 +258,10 @@ class Simulation(bp.BaseClass):
     #####################################
     #           Serialization           #
     #####################################
-    @staticmethod
-    def load(file):
-        """Set up and return a :class:`Simulation` instance
-        based on the parameters in the given HDF5 group.
-
-        Parameters
-        ----------
-        file : :obj:`h5py.Group <h5py:Group>`
-
-        Returns
-        -------
-        self : :class:`Simulation`
-        """
-        assert isinstance(file, h5py.Group)
-        assert file.attrs["class"] == "Simulation"
-
-        timing = bp.Grid.load(file["timing"])
-        geometry = bp.Geometry.load(file["geometry"])
-        model = bp.CollisionModel.load(file["model"])
-        log_state = np.bool(file.attrs["log_state"][()])
-
-        self = Simulation(timing,
-                          geometry,
-                          model,
-                          file,
-                          log_state)
-        return self
-
     def save(self, hdf_group=None, write_all=False):
-        """Write all parameters of the :class:`Simulation` instance
-        to a HDF5 file.
-
-        Parameters
-        ----------
-        hdf_group : :obj:`h5py.Group <h5py:Group>`
-        """
-        self.check_integrity()
         if hdf_group is None:
             hdf_group = self.file
-        assert isinstance(hdf_group, h5py.Group)
-        assert hdf_group.file.mode == "r+"
-        # delete all current group content
-        for key in hdf_group.keys():
-            del hdf_group[key]
-
-        hdf_group.attrs["class"] = "Simulation"
-        hdf_group.attrs["log_state"] = self.log_state
-
-        self.timing.save(hdf_group.create_group("timing"))
-        self.geometry.save(hdf_group.create_group("geometry"))
-        self.model.save(hdf_group.create_group("model"))
+        bp.BaseClass.save(self, hdf_group, write_all)
 
         key = "results"
         hdf_group.create_group(key)
@@ -326,8 +307,16 @@ class Simulation(bp.BaseClass):
         for (r, attr) in zip(self.geometry.rules, bp.BaseModel.shared_attributes()):
             assert getattr(r, attr) is getattr(self.model, attr)
             np.shares_memory(getattr(r, attr), getattr(self.model, attr))
+
         assert isinstance(self.file, h5py.Group)
+
         assert isinstance(self.log_state, np.bool)
+
+        # check Courant-Friedrichs-Levy-Condition
+        vels_norm = np.linalg.norm(self.model.vels)
+        max_vels_norm = np.max(vels_norm)
+        # Courant–Friedrichs–Lewy (CFL) condition
+        assert max_vels_norm * (self.dt/self.dp) < 1/2
         return
 
     def __eq__(self, other, ignore=None, print_message=True):

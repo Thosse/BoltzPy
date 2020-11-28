@@ -40,5 +40,4 @@ from boltzpy.rules import BoundaryPointRule
 from boltzpy.rules import HomogeneousRule
 from boltzpy.geometry import Geometry
 from boltzpy.simulation import Simulation
-from boltzpy.data import Data
 import boltzpy.AnimatedFigure as Plot

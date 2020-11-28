@@ -72,9 +72,11 @@ class Grid(bp.BaseClass):
         self.size = np.int(np.prod(self.shape))
         # if the grid is centered, all values are shifted by +offset
         # Note that True/False == 1/0
+        # todo rename into shift
         self.offset = -(self.spacing
                         * (np.array(self.shape, dtype=int) - 1)
                         // 2) * self.is_centered
+        # todo rename into i_vals
         self.iG = self.iv(np.arange(self.size))
 
         self.check_integrity()
@@ -92,6 +94,7 @@ class Grid(bp.BaseClass):
         """
         return self.delta * self.spacing
 
+    # Todo rename into vals
     @property
     def pG(self):
         r""":obj:`~numpy.array` [:obj:`float`] :
@@ -126,6 +129,7 @@ class Grid(bp.BaseClass):
     #####################################
     #         Indexes and Values        #
     #####################################
+    # todo rename get_i_vals
     def iv(self, idx):
         """Return the integer values of the indexed grid points`
         Parameters
@@ -150,6 +154,7 @@ class Grid(bp.BaseClass):
         values += self.offset
         return values
 
+    # todo rename get_vals
     def pv(self, idx):
         """Return the physical values of the indexed grid points`
         Parameters

@@ -90,18 +90,18 @@ class Geometry(bp.Grid):
     #####################################
     #            Computation            #
     #####################################
-    def compute(self, data):
+    def compute(self, sim):
         """Executes a single time step, by operator splitting"""
         # execute a single transport step
         for rule in self.rules:
-            rule.transport(data)
+            rule.transport(sim)
         # update data.state (transport writes into data.result)
-        (data.state, data.result) = (data.result, data.state)
+        (sim.state, sim.interim) = (sim.interim, sim.state)
         # executie s single collision step
         for rule in self.rules:
-            rule.collision(data)
+            rule.collision(sim)
         # increase current_timestep counter
-        data.t += 1
+        sim.t += 1
         return
 
     #####################################

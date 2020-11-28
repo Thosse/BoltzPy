@@ -19,17 +19,17 @@ FILE = DIRECTORY + 'Simulations.hdf5'
 _open_file = h5py.File(FILE, mode="r")
 SIMULATIONS = dict()
 SIMULATIONS["2D_small/Simulation"] = bp.Simulation(
-    GRIDS["Grid/2D_small"],
-    GEOMETRIES["Geometry/2D_small"],
-    MODELS["Model/2D_small"],
-    _open_file["2D_small/Simulation"],
-    True)
+    timing=GRIDS["Grid/2D_small"],
+    geometry=GEOMETRIES["Geometry/2D_small"],
+    model=MODELS["Model/2D_small"],
+    file=_open_file["2D_small/Simulation"],
+    log_state=True)
 SIMULATIONS["equalMass/Simulation"] = bp.Simulation(
-    GRIDS["Grid/equalMass"],
-    GEOMETRIES["Geometry/equalMass"],
-    MODELS["Model/equalMass"],
-    _open_file["equalMass/Simulation"],
-    True)
+    timing=GRIDS["Grid/equalMass"],
+    geometry=GEOMETRIES["Geometry/equalMass"],
+    model=MODELS["Model/equalMass"],
+    file=_open_file["equalMass/Simulation"],
+    log_state=True)
 
 SAVED_MOMENTS = [
     "number_density",

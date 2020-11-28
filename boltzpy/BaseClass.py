@@ -87,7 +87,8 @@ class BaseClass:
             'InnerPointRule': bp.InnerPointRule,
             'ConstantPointRule': bp.ConstantPointRule,
             'BoundaryPointRule': bp.BoundaryPointRule,
-            'HomogeneousRule': bp.HomogeneousRule}
+            'HomogeneousRule': bp.HomogeneousRule,
+            "Simulation": bp.Simulation}
         # this is mainly used for asserts
         if subclass is None:
             return subclasses
@@ -242,4 +243,3 @@ class BaseClass:
         assert isinstance(self.parameters(), set)
         assert isinstance(self.attributes(), set)
         assert self.parameters().issubset(self.attributes())
-
