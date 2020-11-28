@@ -106,33 +106,29 @@ class BaseClass:
         raise NotImplementedError
 
     @staticmethod
-    def read_parameters_from_hdf_file(hdf5_group, parameters=None):
+    def load_attributes(hdf5_group, attributes):
         """Read a set of parameters from a given HDF5 group.
         Returns a dictionary of the read values.
 
         Parameters
         ----------
         hdf5_group : :obj:`h5py.Group <h5py:Group>`
-        parameters : :obj:`str`, :obj:`list`, or  :obj:`set`
+        attributes : :obj:`str`, :obj:`list`, or  :obj:`set`
 
         Returns
         -------
         self : :obj:`dict`
         """
         assert isinstance(hdf5_group, h5py.Group)
-        # if no parameters are given, then derive from hdf5 attribute "class"
-        if parameters is None:
-            subclass = BaseClass.subclasses(hdf5_group.attrs["class"])
-            parameters = subclass.parameters()
         # if only a single parameter is given, change into list for consistency
-        if type(parameters) is str:
-            parameters = [parameters]
+        if type(attributes) is str:
+            attributes = [attributes]
         else:
-            assert type(parameters) in [list, set]
-            assert all(type(p) is str for p in parameters)
+            assert type(attributes) in [list, set]
+            assert all(type(p) is str for p in attributes)
         # read parameters and store in dict
         result = dict()
-        for p in parameters:
+        for p in attributes:
             # Datasets are read directly
             if isinstance(hdf5_group[p], h5py.Dataset):
                 val = hdf5_group[p][()]
@@ -180,8 +176,8 @@ class BaseClass:
         assert hdf5_group.attrs["class"] in BaseClass.subclasses().keys()
         subclass = BaseClass.subclasses(hdf5_group.attrs["class"])
         # read parameters from file
-        parameters = BaseClass.read_parameters_from_hdf_file(
-            hdf5_group)
+        parameters = BaseClass.load_attributes(hdf5_group,
+                                               subclass.parameters())
         return subclass(**parameters)
 
     def save(self, hdf5_group, write_all=False):

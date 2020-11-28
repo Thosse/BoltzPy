@@ -72,7 +72,7 @@ def test_load_from_file(key):
 @pytest.mark.parametrize("key, attr", TEST_ATTRIBUTES)
 def test_attributes(key, attr):
     with h5py.File(FILE, mode="r") as file:
-        read_dict = bp.BaseClass.read_parameters_from_hdf_file(file[key], attr)
+        read_dict = bp.BaseClass.load_attributes(file[key], attr)
         old = read_dict[attr]
         new = TEST_ELEMENTS[key].__getattribute__(attr)
         if isinstance(new, np.ndarray) and (new.dtype == float):
