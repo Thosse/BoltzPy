@@ -107,44 +107,30 @@ class Simulation(bp.BaseClass):
         attrs = Simulation.parameters()
         return attrs
 
-    # todo add pressure
     @property
-    def results_shape(self):
-        shapes = np.empty(self.model.nspc, dtype=dict)
-        for s in self.model.species:
-            shapes[s] = {
-                'number_density': (
-                    self.timing.size,
-                    self.geometry.size),
-                'mean_velocity': (
-                    self.timing.size,
-                    self.geometry.size,
-                    self.model.ndim),
-                'momentum': (
-                    self.timing.size,
-                    self.geometry.size,
-                    self.model.ndim),
-                'momentum_flow': (
-                    self.timing.size,
-                    self.geometry.size,
-                    self.model.ndim),
-                'temperature': (
-                    self.timing.size,
-                    self.geometry.size),
-                'energy_density': (
-                    self.timing.size,
-                    self.geometry.size),
-                'energy_flow': (
-                    self.timing.size,
-                    self.geometry.size,
-                    self.model.ndim),
-                "state": (
-                    self.timing.size,
-                    self.geometry.size,
-                    self.model.subgrids(s).size)}
-            if not self.log_state:
-                del shapes[s]["state"]
-        return shapes
+    def shape_of_results(self):
+        """Returns a dictionary of the shape of each result."""
+        result = dict()
+        for mom in {'number_density',
+                    'temperature',
+                    'energy_density',
+                    'pressure'}:
+            result[mom] = (self.timing.size,
+                           self.geometry.size,
+                           self.model.nspc)
+        for mom in {'mean_velocity',
+                    'momentum',
+                    'momentum_flow',
+                    'energy_flow'}:
+            result[mom] = (self.timing.size,
+                           self.geometry.size,
+                           self.model.nspc,
+                           self.model.ndim)
+        if self.log_state:
+            result["state"] = (self.timing.size,
+                               self.geometry.size,
+                               self.model.nvels)
+        return result
 
     #####################################
     #            Computation            #
@@ -182,28 +168,27 @@ class Simulation(bp.BaseClass):
         for s in self.model.species:
             idx_range = self.model.idx_range(s)
             spc_state = self.state[..., idx_range]
-            spc_group = hdf_group[str(s)]
 
             number_density = self.model.cmp_number_density(spc_state, s)
-            spc_group["number_density"][tw_idx] = number_density
+            hdf_group["number_density"][tw_idx, :, s] = number_density
             momentum = self.model.cmp_momentum(spc_state, s)
-            spc_group["momentum"][tw_idx] = momentum
+            hdf_group["momentum"][tw_idx, :, s] = momentum
             mean_velocity = self.model.cmp_mean_velocity(
                 spc_state,
                 s,
                 momentum=momentum)
-            spc_group["mean_velocity"][tw_idx] = mean_velocity
-            spc_group["temperature"][tw_idx] = self.model.cmp_temperature(
+            hdf_group["mean_velocity"][tw_idx, :, s] = mean_velocity
+            hdf_group["temperature"][tw_idx, :, s] = self.model.cmp_temperature(
                 spc_state,
                 s,
                 number_density=number_density,
                 mean_velocity=mean_velocity)
-            spc_group["momentum_flow"][tw_idx] = self.model.cmp_momentum_flow(spc_state, s)
-            spc_group["energy_density"][tw_idx] = self.model.cmp_energy_density(spc_state, s)
-            spc_group["energy_flow"][tw_idx] = self.model.cmp_energy_flow(spc_state, s)
+            hdf_group["momentum_flow"][tw_idx, :, s] = self.model.cmp_momentum_flow(spc_state, s)
+            hdf_group["energy_density"][tw_idx, :, s] = self.model.cmp_energy_density(spc_state, s)
+            hdf_group["energy_flow"][tw_idx, :, s] = self.model.cmp_energy_flow(spc_state, s)
             # complete distribution
-            if self.log_state:
-                spc_group["state"][tw_idx] = spc_state
+        if self.log_state:
+            hdf_group["state"][tw_idx] = self.state
         # update index of current time step
         hdf_group.attrs["t"] = tw_idx + 1
         return
@@ -241,11 +226,10 @@ class Simulation(bp.BaseClass):
             ax = figure.add_subplot(shape + (1 + m,),
                                     title=moment)
             for s in self.model.species:
-                spc_group = hdf_group[str(s)]
-                if spc_group[moment].ndim == 2:
-                    ydata = spc_group[moment][time_frame, 1:-1]
-                elif spc_group[moment].ndim == 3:
-                    ydata = spc_group[moment][time_frame, 1:-1, 0]
+                if hdf_group[moment].ndim == 3:
+                    ydata = hdf_group[moment][time_frame, 1:-1, s]
+                elif hdf_group[moment].ndim == 4:
+                    ydata = hdf_group[moment][time_frame, 1:-1, s, 0]
                 else:
                     raise Exception
                 ax.plot(xdata, ydata)
@@ -258,26 +242,20 @@ class Simulation(bp.BaseClass):
     #####################################
     #           Serialization           #
     #####################################
-    def save(self, hdf_group=None, write_all=False):
-        if hdf_group is None:
-            hdf_group = self.file
-        bp.BaseClass.save(self, hdf_group, write_all)
+    def save(self, hdf5_group=None, write_all=False):
+        if hdf5_group is None:
+            hdf5_group = self.file
+        bp.BaseClass.save(self, hdf5_group, write_all)
 
         key = "results"
-        hdf_group.create_group(key)
+        hdf5_group.create_group(key)
         # store index of current time step
-        hdf_group[key].attrs["t"] = 0
-        # set up separate subgroup for each species
-        shapes = self.results_shape
-        for s in self.model.species:
-            hdf_group[key].create_group(str(s))
-            grp_spc = hdf_group[key][str(s)]
-            # set up separate dataset for each moment
-            for (name, shape) in shapes[s].items():
-                grp_spc.create_dataset(name, shape, dtype=float)
+        hdf5_group[key].attrs["t"] = 0
+        for (moment, shape) in self.shape_of_results.items():
+            hdf5_group[key].create_dataset(moment, shape, dtype=float)
 
         # assert that the instance can be reconstructed from the save
-        other = self.load(hdf_group)
+        other = self.load(hdf5_group)
         assert self.__eq__(other, ignore=["file"])
         return
 

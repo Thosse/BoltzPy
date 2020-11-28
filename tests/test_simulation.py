@@ -100,11 +100,10 @@ def test_old_and_new_states_are_equal(key):
             keys_old = file_old[key]["results"].keys()
             keys_new = file_new[key]["results"].keys()
             assert keys_old == keys_new
-            for s in file_old[key]["results"].keys():
-                state_old = file_old[key]["results"][s]["state"][()]
-                state_new = file_new[key]["results"][s]["state"][()]
-                assert np.allclose(state_old, state_new), (
-                    "\n{}\nis not equal to\n\n{}".format(state_old, state_new))
+            state_old = file_old[key]["results"]["state"][()]
+            state_new = file_new[key]["results"]["state"][()]
+            assert np.allclose(state_old, state_new), (
+                "\n{}\nis not equal to\n\n{}".format(state_old, state_new))
 
 
 @pytest.mark.parametrize("key", SIMULATIONS.keys())
@@ -115,25 +114,24 @@ def test_old_and_new_moments_are_equal(key, moment):
             keys_old = file_old[key]["results"].keys()
             keys_new = file_new[key]["results"].keys()
             assert keys_old == keys_new
-            for s in file_old[key]["results"].keys():
-                moment_old = file_old[key]["results"][s][moment][()]
-                moment_new = file_new[key]["results"][s][moment][()]
-                assert np.allclose(moment_old, moment_new), (
-                    "\n{}\nis not equal to\n\n{}".format(moment_old - moment_new, 0))
+            moment_old = file_old[key]["results"][moment][()]
+            moment_new = file_new[key]["results"][moment][()]
+            assert np.allclose(moment_old, moment_new), (
+                "\n{}\nis not equal to\n\n{}".format(moment_old - moment_new, 0))
 
 
 @pytest.mark.parametrize("key", SIMULATIONS.keys())
 @pytest.mark.parametrize("moment", SAVED_MOMENTS)
 def test_computing_moments_on_old_state_gives_old_results(key, moment):
+    sim = SIMULATIONS[key]
     with h5py.File(FILE, mode="r") as file:
         hdf_group = file[key]
-        sim = SIMULATIONS[key]
+        results = hdf_group["results"]
         model = sim.model
         compute_moment = model.__getattribute__("cmp_" + moment)
         for s in model.species:
-            spc_group = hdf_group["results"][str(s)]
-            state = spc_group["state"][()]
-            old_result = spc_group[moment][()]
+            state = results["state"][()]
+            old_result = results[moment][:, :, s]
             new_result = compute_moment(state, s)
             assert np.allclose(old_result, new_result)
 
