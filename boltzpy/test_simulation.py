@@ -18,13 +18,13 @@ FILE = test_helper.DIRECTORY + 'Simulations.hdf5'
 _open_file = h5py.File(FILE, mode="r")
 SIMULATIONS = dict()
 SIMULATIONS["2D_small/Simulation"] = bp.Simulation(
-    GRIDS["2D_small/timing"],
+    GRIDS["Grid/2D_small"],
     GEOMETRIES["2D_small/Geometry"],
     MODELS["2D_small/Model"],
     _open_file["2D_small/Simulation"],
     True)
 SIMULATIONS["equalMass/Simulation"] = bp.Simulation(
-    GRIDS["equalMass/timing"],
+    GRIDS["Grid/equalMass"],
     GEOMETRIES["equalMass/Geometry"],
     MODELS["equalMass/Model"],
     _open_file["equalMass/Simulation"],
