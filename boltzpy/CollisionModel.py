@@ -8,20 +8,6 @@ class CollisionModel(bp.BaseModel):
     r"""Manages the Velocity Grids of all
     :class:`~boltzpy.Species`.
 
-
-    Note
-    ----
-    Just as in the :class:`Grid` class,
-    the parameter :attr:`i_vels` describes the
-    position/physical values of all  Grid points.
-    All entries must be viewed as multiples of :attr:`delta:
-
-        :math:`pMG = i_vels \cdot d`.
-
-    Note that velocity grid points may occur in multiple
-    :class:`Velocity Grids <boltzpy.Grid>`.
-    Array of shape (:attr:`size`, :attr:`ndim`)
-
     Parameters
     ----------
     masses : :obj:`~numpy.array` [:obj:`int`]

@@ -4,22 +4,7 @@ import boltzpy as bp
 
 
 class BaseModel(bp.BaseClass):
-    r"""Manages the Velocity Grids of all
-    :class:`~boltzpy.Species`.
-
-
-    Note
-    ----
-    Just as in the :class:`Grid` class,
-    the parameter :attr:`iMG` describes the
-    position/physical values of all  Grid points.
-    All entries must be viewed as multiples of :attr:`delta:
-
-        :math:`pMG = iMG \cdot d`.
-
-    Note that velocity grid points may occur in multiple
-    :class:`Velocity Grids <boltzpy.Grid>`.
-    Array of shape (:attr:`size`, :attr:`ndim`)
+    r"""Manages the Velocity Grids of all specimen.
 
     Parameters
     ----------
@@ -41,6 +26,8 @@ class BaseModel(bp.BaseClass):
         The number of different specimen / velocity grids.
     nvels : :obj:`int` :
         The total number of velocity grid points over all grids.
+    dv: :obj:`float` :
+        The physical step size of the velocity grid for each specimen.
     i_vels : :obj:`~numpy.array` [:obj:`int`]
         The array of all integer velocities.
         These are the concatenated integer velocities of each specimen
@@ -50,6 +37,10 @@ class BaseModel(bp.BaseClass):
     _idx_offset : :obj:`~numpy.array` [:obj:`int`]
         Denotes the beginning of the respective velocity grid
         in the multi grid :attr:`iMG`.
+    spc_matrix : :obj:`~numpy.array` [:obj:`int`]
+        Alllows easy vectorization of species parameters
+        like reflection rated.
+        Multiply with this matrix to get an array of size nvels.
     """
 
     def __init__(self,
@@ -98,8 +89,10 @@ class BaseModel(bp.BaseClass):
     def attributes():
         attrs = BaseModel.parameters()
         attrs.update({"ndim",
-                      "nvels",
                       "nspc",
+                      "nvels",
+                      "dv",
+                      "i_vels",
                       "vels",
                       "_idx_offset",
                       "spc_matrix",
@@ -107,14 +100,36 @@ class BaseModel(bp.BaseClass):
                       "max_vel"})
         return attrs
 
+    @staticmethod
+    def shared_attributes():
+        """Set of class attributes that should share memory.
+
+        These attributes must point to the same object
+        as the attributes of the simulations CollisionModel
+        This saves memory"""
+        return {"i_vels", "vels", "_idx_offset", "spc_matrix"}
+
     #####################################
     #           Properties              #
     #####################################
     @property
     def species(self):
+        """:obj:`~numpy.array` [:obj:`int`]
+        The array of all specimen indices."""
         return np.arange(self.nspc)
 
     def subgrids(self, s=None):
+        """Generate the Velocity Grids of all given specimen
+
+        Parameters
+        ----------
+        s : :obj:`int`, optional
+
+        Returns
+        -------
+        grids : :class:`~boltzpy.Grid`] or :obj:`~numpy.array` [:class:`~boltzpy.Grid`]
+            Velocity Grids of the specimen
+        """
         if np.issubdtype(s, np.integer):
             return bp.Grid(self.shapes[s],
                            self.base_delta,
@@ -138,6 +153,24 @@ class BaseModel(bp.BaseClass):
         return np.max(np.abs(self.vels))
 
     def c_vels(self, mean_velocity, s=None):
+        """Returns the difference to the mean_velocity for each velocity
+
+
+        This is simply vels - mean_velocity.
+        However mean_velocity might be an array of arbitrary dimension.
+
+        Parameters
+        ----------
+        mean_velocity : :obj:`~numpy.array` [:obj:`float`]
+        s : :obj:`int`, optional
+            specimen index, chooses the velocity grid.
+            If None, the shared grid space is used.
+
+        Returns
+        -------
+        c_vels : :obj:`~numpy.array` [:obj:`float`]
+            Centered Velocities (around mean_velocity).
+        """
         mean_velocity = np.array(mean_velocity)
         assert mean_velocity.shape[-1] == self.ndim
         dim = self.ndim
@@ -151,6 +184,20 @@ class BaseModel(bp.BaseClass):
 
     @staticmethod
     def p_vels(velocities, direction):
+        """Project the velocities onto a direction
+
+        This is simply vels @ direction, but allows higher dimensions
+
+        Parameters
+        ----------
+        velocities : :obj:`~numpy.array` [:obj:`float`]
+        direction : :obj:`~numpy.array` [:obj:`float`]
+
+        Returns
+        -------
+        p_vels : :obj:`~numpy.array` [:obj:`float`]
+            Projected velocities. one dimension less (last) than velocities.
+        """
         direction = np.array(direction)
         assert direction.shape == (velocities.shape[-1],)
         assert np.linalg.norm(direction) > 1e-8
@@ -162,6 +209,16 @@ class BaseModel(bp.BaseClass):
         return result.reshape(shape)
 
     def get_array(self, parameter):
+        """Generate a (nvels,) shaped array
+        Parameters
+        ----------
+        parameter : :obj:`~numpy.array` [:obj:`float`]
+
+        Returns
+        -------
+        p_vels : :obj:`~numpy.array` [:obj:`float`]
+            Projected velocities. one dimension less (last) than velocities.
+        """
         assert parameter.shape[-1] == self.nspc
         shape = parameter.shape[:-1] + (self.nvels,)
         parameter = parameter.reshape((-1, 1, self.nspc))
@@ -169,6 +226,7 @@ class BaseModel(bp.BaseClass):
         result = np.sum(spc_matrix * parameter, axis=-1)
         return result.reshape(shape)
 
+    # Todo This is buggy, doesn't really work
     def temperature_range(self, mean_velocity=0):
         max_v = self.max_vel
         mean_v = np.max(np.abs(mean_velocity))
@@ -182,6 +240,17 @@ class BaseModel(bp.BaseClass):
     #               Indexing            #
     #####################################
     def idx_range(self, s=None):
+        """A slice to access the specimens part of the shared velocity grid
+         (vels, i_vels,...)
+
+        Parameters
+        ----------
+        s : :obj:`~numpy.array` [:obj:`float`]
+
+        Returns
+        -------
+        slice : :obj:`slice`
+        """
         if s is None:
             return np.s_[:]
         else:
@@ -250,11 +319,28 @@ class BaseModel(bp.BaseClass):
                    mass=1,
                    number_density=1,
                    mean_velocity=0):
+        """Computes the continuous maxwellian velocity distribution.
+
+        Parameters
+        ----------
+        velocities : :obj:`~numpy.array` [ :obj:`float` ]
+        temperature : :obj:`float`
+        mass : :obj:`int` or :obj:`~numpy.array` [ :obj:`int` ]
+        number_density : :obj:`float`
+        mean_velocity : :obj:`float`
+
+        Returns
+        -------
+        distribution : :obj:`~numpy.array` [ :obj:`float` ]
+        """
         dim = velocities.shape[-1]
         # compute exponential with matching mean velocity and temperature
-        exponential = np.exp(
-            -0.5 * mass / temperature
-            * np.sum((velocities - mean_velocity)**2, axis=-1))
+        if np.isclose(temperature, 0, atol=1e-3):
+            exponential = np.ones(velocities.shape)
+        else:
+            c_vels = velocities - mean_velocity
+            exponential = np.exp(-0.5 * mass / temperature
+                                 * np.sum(c_vels**2,  axis=-1))
         divisor = np.sqrt(2*np.pi * temperature / mass) ** (dim / 2)
         # multiply to get desired number density
         result = (number_density / divisor) * exponential
@@ -283,6 +369,23 @@ class BaseModel(bp.BaseClass):
                           number_densities,
                           mean_velocities,
                           temperatures):
+        """Computes a discrete velocity distribution.
+
+        If all mean_velocities and temperatures are equal, respectively,
+        then an equilibrium will be computed and the given moments
+        are used to set the moments of the mixture.
+        In this case the moments of each specimen itself may differ from that.
+
+        Parameters
+        ----------
+        number_densities : :obj:`float`
+        mean_velocities : :obj:`float`
+        temperatures : :obj:`float`
+
+        Returns
+        -------
+        distribution : :obj:`~numpy.array` [ :obj:`float` ]
+        """
         # number densities can be multiplied on the distribution at the end
         number_densities = np.array(number_densities)
         assert number_densities.shape == (self.nspc,)
@@ -343,6 +446,20 @@ class BaseModel(bp.BaseClass):
 
     # TODO if directions = None, return tensor, check if this is easy to do
     def mf_stress(self, mean_velocity, direction_1, direction_2, s=None):
+        """Compute the stress moment function for given directions
+        and either a single specimen or the mixture.
+
+        Parameters
+        ----------
+        mean_velocity : :obj:`~numpy.array` [ :obj:`float` ]
+        direction_1 : :obj:`~numpy.array` [ :obj:`float` ]
+        direction_2 : :obj:`~numpy.array` [ :obj:`float` ]
+        s : :obj:`int`, optional
+
+        Returns
+        -------
+        mf_Stress : :obj:`~numpy.array` [ :obj:`float` ]
+        """
         mean_velocity = np.array(mean_velocity)
         direction_1 = np.array(direction_1)
         direction_2 = np.array(direction_2)
@@ -358,6 +475,18 @@ class BaseModel(bp.BaseClass):
         return mass * p_vels_1 * p_vels_2
 
     def mf_pressure(self, mean_velocity, s=None):
+        """Compute the pressure moment function
+        for either a single specimen or the mixture.
+
+        Parameters
+        ----------
+        mean_velocity : :obj:`~numpy.array` [ :obj:`float` ]
+        s : :obj:`int`, optional
+
+        Returns
+        -------
+        mf_pressure : :obj:`~numpy.array` [ :obj:`float` ]
+        """
         mean_velocity = np.array(mean_velocity)
         dim = self.ndim
         mass = (self.get_array(self.masses)[np.newaxis, :]
@@ -374,6 +503,22 @@ class BaseModel(bp.BaseClass):
         return mf_pressure.reshape(shape + (velocities.shape[0],))
 
     def mf_orthogonal_stress(self, mean_velocity, direction_1, direction_2, s=None):
+        """Compute the orthogonalized stress moment function
+        for given directions and either a single specimen or the mixture.
+
+        This is necessary to compute the viscosity coefficient.
+
+        Parameters
+        ----------
+        mean_velocity : :obj:`~numpy.array` [ :obj:`float` ]
+        direction_1 : :obj:`~numpy.array` [ :obj:`float` ]
+        direction_2 : :obj:`~numpy.array` [ :obj:`float` ]
+        s : :obj:`int`, optional
+
+        Returns
+        -------
+        mf_pressure : :obj:`~numpy.array` [ :obj:`float` ]
+        """
         mean_velocity = np.array(mean_velocity)
         direction_1 = np.array(direction_1)
         direction_2 = np.array(direction_2)
@@ -386,6 +531,19 @@ class BaseModel(bp.BaseClass):
             raise ValueError
 
     def mf_heat_flow(self, mean_velocity, direction, s=None):
+        """Compute the heat flow moment function for a direction
+        and either a single specimen or the mixture.
+
+        Parameters
+        ----------
+        mean_velocity : :obj:`~numpy.array` [ :obj:`float` ]
+        direction : :obj:`~numpy.array` [ :obj:`float` ]
+        s : :obj:`int`, optional
+
+        Returns
+        -------
+        mf_pressure : :obj:`~numpy.array` [ :obj:`float` ]
+        """
         mean_velocity = np.array(mean_velocity)
         direction = np.array(direction)
         assert direction.shape == (self.ndim,)
@@ -396,6 +554,24 @@ class BaseModel(bp.BaseClass):
         return mass * p_vels * squared_sum
 
     def mf_orthogonal_heat_flow(self, state, direction, s=None):
+        """Compute the orthogonalized heat flow moment function
+        for a direction and either a single specimen or the mixture.
+
+
+        This is necessary to compute the heat transfer coefficient.
+        Note that the state is necessary here, as the theoretical
+        normalization factor is distorted due to discretization effects!
+
+        Parameters
+        ----------
+        state : :obj:`~numpy.array` [ :obj:`float` ]
+        direction : :obj:`~numpy.array` [ :obj:`float` ]
+        s : :obj:`int`, optional
+
+        Returns
+        -------
+        mf_pressure : :obj:`~numpy.array` [ :obj:`float` ]
+        """
         direction = np.array(direction)
         direction = direction / np.sum(direction**2)
         # compute mean velocity
@@ -417,11 +593,17 @@ class BaseModel(bp.BaseClass):
     #            Moments             #
     ##################################
     def _get_state_of_species(self, state, s):
-        r"""
+        r"""This reduces the state to the relevant parts, if necessary.
+        It also asserts that the shape is correct.
+
         Parameters
         ----------
         state : :obj:`~numpy.ndarray` [:obj:`float`]
         s : :obj:`float`, optional
+
+        Returns
+        -------
+        state : :obj:`~numpy.array` [ :obj:`float` ]
         """
         if state.shape[-1] == self.nvels:
             state = state[..., self.idx_range(s)]
@@ -433,6 +615,8 @@ class BaseModel(bp.BaseClass):
 
     def cmp_number_density(self, state, s=None, separately=False):
         r"""
+        If separately == True the number density of each specimen
+        is computed separately.
         Parameters
         ----------
         state : :obj:`~numpy.ndarray` [:obj:`float`]
@@ -701,6 +885,8 @@ class BaseModel(bp.BaseClass):
         assert self.i_vels.ndim == 2
         return
 
+    # Todo this is actually useful to have , to print the subgrids
+    #  but define a baseclass.__str__
     def __str__(self,
                 write_physical_grid=False):
         """:obj:`str` :

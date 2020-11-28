@@ -96,10 +96,12 @@ class BaseClass:
 
     @staticmethod
     def parameters():
+        """The set of initialization parameters, including optionals."""
         raise NotImplementedError
 
     @staticmethod
     def attributes():
+        """The set of all class attributes and propertes."""
         raise NotImplementedError
 
     @staticmethod

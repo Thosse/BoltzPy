@@ -24,10 +24,10 @@ class Simulation(bp.BaseClass):
     ----------
     timing : :class:`Grid`
         The Time Grid.
-    geometry: :class:`Geometry`
+    geometry : :class:`Geometry`
         Describes the behaviour for all position points.
         Contains the :class:`initialization rules <Rule>`
-    model : :class:`Model`
+    model : :class:`CollisionModel`
         Velocity-Space Grids of all Specimen.
     file : :obj:`h5py.Group <h5py:Group>`
     log_state : :obj:`numpy.bool`
@@ -35,7 +35,6 @@ class Simulation(bp.BaseClass):
     order_transport : :obj:`int`
     order_collisions : :obj:`int`
     """
-
     def __init__(self,
                  timing,
                  geometry,
@@ -45,9 +44,18 @@ class Simulation(bp.BaseClass):
                  order_operator_splitting=1,
                  order_transport=1,
                  order_collisions=1):
+        assert isinstance(timing, bp.Grid)
         self.timing = timing
+        assert isinstance(geometry, bp.Geometry)
         self.geometry = geometry
+        assert isinstance(model, bp.CollisionModel)
         self.model = model
+        # store large model attrributes (vels, i_vels, spc_matrix) only once
+        for (r, attr) in zip(geometry.rules, bp.BaseModel.shared_attributes()):
+            assert np.all(getattr(r, attr) == getattr(model, attr))
+            # all point to the same objects
+            setattr(r, attr, getattr(model, attr))
+
         self.log_state = np.bool(log_state)
         self.order_operator_splitting = int(order_operator_splitting)
         self.order_transport = int(order_transport)
@@ -65,6 +73,24 @@ class Simulation(bp.BaseClass):
         self.check_integrity()
         return
 
+    @staticmethod
+    def parameters():
+        params = {"timing",
+                  "geometry",
+                  "model",
+                  "file",
+                  "log_state",
+                  "order_operator_splitting",
+                  "order_transport",
+                  "order_collisions"}
+        return params
+
+    @staticmethod
+    def attributes():
+        attrs = Simulation.parameters()
+        return attrs
+
+    # todo add pressure
     @property
     def results_shape(self):
         shapes = np.empty(self.model.nspc, dtype=dict)
@@ -250,7 +276,7 @@ class Simulation(bp.BaseClass):
                           order_collisions)
         return self
 
-    def save(self, hdf_group=None):
+    def save(self, hdf_group=None, write_all=False):
         """Write all parameters of the :class:`Simulation` instance
         to a HDF5 file.
 
@@ -300,17 +326,27 @@ class Simulation(bp.BaseClass):
     #####################################
     def check_integrity(self):
         """Sanity Check."""
+        bp.BaseClass.check_integrity(self)
         assert isinstance(self.timing, bp.Grid)
         self.timing.check_integrity()
         assert self.timing.ndim == 1
+
         assert isinstance(self.geometry, bp.Geometry)
         self.geometry.check_integrity()
+        if self.geometry.ndim != 1:
+            raise NotImplementedError
+
         assert isinstance(self.model, bp.CollisionModel)
         self.model.check_integrity()
         assert self.model.ndim >= self.geometry.ndim
         assert self.geometry.model_size == self.model.nvels
-        for r in self.geometry.rules:
-            assert r.nspc >= self.model.nspc
+        # all rules must be based on the same model
+        for (r, attr) in zip(self.geometry.rules, bp.BaseModel.attributes()):
+            assert np.all(getattr(r, attr) == getattr(self.model, attr))
+        # all rules' shared_attributes must point towards the same object
+        for (r, attr) in zip(self.geometry.rules, bp.BaseModel.shared_attributes()):
+            assert getattr(r, attr) is getattr(self.model, attr)
+            np.shares_memory(getattr(r, attr), getattr(self.model, attr))
         assert isinstance(self.file, h5py.Group)
         assert isinstance(self.log_state, np.bool)
         assert isinstance(self.order_operator_splitting, int)
