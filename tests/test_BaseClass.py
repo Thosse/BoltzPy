@@ -5,12 +5,15 @@ import numpy as np
 
 import boltzpy.helpers.tests as test_helper
 import boltzpy as bp
-from boltzpy.test_grid import GRIDS
-from boltzpy.test_model import MODELS
-from boltzpy.test_geometry import GEOMETRIES
-from boltzpy.test_rule import RULES
+from tests.test_grid import GRIDS
+from tests.test_model import MODELS
+from tests.test_geometry import GEOMETRIES
+from tests.test_rule import RULES
 
-FILE = test_helper.DIRECTORY + 'TestResults.hdf5'
+DIRECTORY = __file__[:-23] + 'tests/'
+FILE = DIRECTORY + 'TestResults.hdf5'
+TMP_FILE = DIRECTORY + '_tmp_.hdf5'
+
 TEST_ELEMENTS = {**GRIDS, **GEOMETRIES, **MODELS, **RULES}
 
 TEST_ATTRIBUTES = list()
@@ -43,9 +46,9 @@ def test_file_exists():
 
 
 def test_setup_creates_same_file():
-    setup_file(test_helper.TMP_FILE)
-    test_helper.assert_files_are_equal([FILE, test_helper.TMP_FILE])
-    os.remove(test_helper.TMP_FILE)
+    setup_file(TMP_FILE)
+    test_helper.assert_files_are_equal([FILE, TMP_FILE])
+    os.remove(TMP_FILE)
     return
 
 
