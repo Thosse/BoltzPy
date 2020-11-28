@@ -230,11 +230,6 @@ class BaseClass:
         # save attributes to file
         for attr in attributes:
             self.save_attribute(hdf5_group, attr, self.__getattribute__(attr))
-
-        # Todo move into testcase
-        # check that the class can be reconstructed from the save
-        other = self.load(hdf5_group)
-        assert self == other
         return
 
     def check_integrity(self):

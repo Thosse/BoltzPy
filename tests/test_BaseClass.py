@@ -69,6 +69,15 @@ def test_load_from_file(key):
         assert old == new
 
 
+@pytest.mark.parametrize("_, self", TEST_ELEMENTS.items())
+def test_loading_saved_state_yields_equal_instance(_, self):
+    assert isinstance(self, bp.BaseClass)
+    file = h5py.File(TMP_FILE, mode="w")
+    self.save(h5py.File(TMP_FILE))
+    other = bp.BaseClass.load(file)
+    assert self == other
+
+
 @pytest.mark.parametrize("key, attr", TEST_ATTRIBUTES)
 def test_attributes(key, attr):
     with h5py.File(FILE, mode="r") as file:
