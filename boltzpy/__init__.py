@@ -30,10 +30,15 @@ Workflow
    <boltzpy.SVGrid>`
 """
 from boltzpy.BaseClass import BaseClass
+from boltzpy.BaseModel import BaseModel
 from boltzpy.grid import Grid
-from boltzpy.rule import *
+from boltzpy.CollisionModel import CollisionModel
+from boltzpy.rules import BaseRule
+from boltzpy.rules import InnerPointRule
+from boltzpy.rules import ConstantPointRule
+from boltzpy.rules import BoundaryPointRule
+from boltzpy.rules import HomogeneousRule
 from boltzpy.geometry import Geometry
 from boltzpy.simulation import Simulation
-from boltzpy.model import Model
 from boltzpy.data import Data
 import boltzpy.AnimatedFigure as Plot

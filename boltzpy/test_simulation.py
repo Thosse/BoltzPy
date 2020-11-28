@@ -30,6 +30,15 @@ SIMULATIONS["equalMass/Simulation"] = bp.Simulation(
     _open_file["equalMass/Simulation"],
     True)
 
+SAVED_MOMENTS = [
+    "number_density",
+    "momentum",
+    "mean_velocity",
+    "energy_density",
+    "temperature",
+    "momentum_flow",
+    "energy_flow"]
+
 
 def setup_file(file_address=FILE):
     if file_address == FILE:
@@ -83,7 +92,7 @@ def test_load_from_file(key):
 
 
 @pytest.mark.parametrize("key", SIMULATIONS.keys())
-def test_computed_state_is_equal(key):
+def test_old_and_new_states_are_equal(key):
     with h5py.File(FILE, mode="r") as file_old:
         with h5py.File(test_helper.TMP_FILE, mode="r") as file_new:
             keys_old = file_old[key]["results"].keys()
@@ -96,106 +105,37 @@ def test_computed_state_is_equal(key):
                     "\n{}\nis not equal to\n\n{}".format(state_old, state_new))
 
 
+@pytest.mark.parametrize("key", SIMULATIONS.keys())
+@pytest.mark.parametrize("moment", SAVED_MOMENTS)
+def test_old_and_new_moments_are_equal(key, moment):
+    with h5py.File(FILE, mode="r") as file_old:
+        with h5py.File(test_helper.TMP_FILE, mode="r") as file_new:
+            keys_old = file_old[key]["results"].keys()
+            keys_new = file_new[key]["results"].keys()
+            assert keys_old == keys_new
+            for s in file_old[key]["results"].keys():
+                moment_old = file_old[key]["results"][s][moment][()]
+                moment_new = file_new[key]["results"][s][moment][()]
+                assert np.allclose(moment_old, moment_new), (
+                    "\n{}\nis not equal to\n\n{}".format(moment_old - moment_new, 0))
+
+
+@pytest.mark.parametrize("key", SIMULATIONS.keys())
+@pytest.mark.parametrize("moment", SAVED_MOMENTS)
+def test_computing_moments_on_old_state_gives_old_results(key, moment):
+    with h5py.File(FILE, mode="r") as file:
+        hdf_group = file[key]
+        sim = SIMULATIONS[key]
+        model = sim.model
+        compute_moment = model.__getattribute__("cmp_" + moment)
+        for s in model.species:
+            spc_group = hdf_group["results"][str(s)]
+            state = spc_group["state"][()]
+            old_result = spc_group[moment][()]
+            new_result = compute_moment(state, s)
+            assert np.allclose(old_result, new_result)
+
+
 # the file is used in more tests, this is a simple hack to delete it after use
 def test_teardown_tmp_file():
     os.remove(test_helper.TMP_FILE)
-
-
-@pytest.mark.parametrize("key", SIMULATIONS.keys())
-def test_particle_number(key):
-    with h5py.File(FILE, mode="r") as file:
-        hdf_group = file[key]
-        sim = bp.Simulation.load(hdf_group)
-        model = sim.model
-        for s in model.species:
-            spc_group = hdf_group["results"][str(s)]
-            state = spc_group["state"][()]
-            old_result = spc_group["particle_number"][()]
-            new_result = model.number_density(state, s)
-            assert np.allclose(old_result, new_result)
-
-
-@pytest.mark.parametrize("key", SIMULATIONS.keys())
-def test_momentum(key):
-    with h5py.File(FILE, mode="r") as file:
-        hdf_group = file[key]
-        sim = bp.Simulation.load(hdf_group)
-        model = sim.model
-        for s in model.species:
-            spc_group = hdf_group["results"][str(s)]
-            state = spc_group["state"][()]
-            old_result = spc_group["momentum"][()]
-            new_result = model.momentum(state, s)
-            assert np.allclose(old_result, new_result)
-
-
-@pytest.mark.parametrize("key", SIMULATIONS.keys())
-def test_mean_velocity(key):
-    with h5py.File(FILE, mode="r") as file:
-        hdf_group = file[key]
-        sim = bp.Simulation.load(hdf_group)
-        model = sim.model
-        for s in model.species:
-            spc_group = hdf_group["results"][str(s)]
-            state = spc_group["state"][()]
-            old_result = spc_group["mean_velocity"][()]
-            new_result = model.mean_velocity(state, s)
-            assert np.allclose(old_result, new_result)
-
-
-@pytest.mark.parametrize("key", SIMULATIONS.keys())
-def test_energy_density(key):
-    with h5py.File(FILE, mode="r") as file:
-        hdf_group = file[key]
-        sim = bp.Simulation.load(hdf_group)
-        model = sim.model
-        for s in model.species:
-            spc_group = hdf_group["results"][str(s)]
-            state = spc_group["state"][()]
-            old_result = spc_group["energy"][()]
-            new_result = model.energy_density(state, s)
-            assert np.allclose(old_result, new_result)
-
-
-@pytest.mark.parametrize("key", SIMULATIONS.keys())
-def test_temperature(key):
-    with h5py.File(FILE, mode="r") as file:
-        hdf_group = file[key]
-        sim = bp.Simulation.load(hdf_group)
-        model = sim.model
-        for s in model.species:
-            spc_group = hdf_group["results"][str(s)]
-            state = spc_group["state"][()]
-            old_result = spc_group["temperature"][()]
-            new_result = model.temperature(state, s)
-            assert old_result.shape == new_result.shape
-            assert np.allclose(old_result, new_result)
-
-
-@pytest.mark.parametrize("key", SIMULATIONS.keys())
-def test_momentum_flow(key):
-    with h5py.File(FILE, mode="r") as file:
-        hdf_group = file[key]
-        sim = bp.Simulation.load(hdf_group)
-        model = sim.model
-        for s in model.species:
-            spc_group = hdf_group["results"][str(s)]
-            state = spc_group["state"][()]
-            old_result = spc_group["momentum_flow"][()]
-            new_result = model.momentum_flow(state, s)
-            assert np.allclose(old_result, new_result)
-
-
-@pytest.mark.parametrize("key", SIMULATIONS.keys())
-def test_energy_flow(key):
-    with h5py.File(FILE, mode="r") as file:
-        hdf_group = file[key]
-        sim = bp.Simulation.load(hdf_group)
-        model = sim.model
-        for s in model.species:
-            spc_group = hdf_group["results"][str(s)]
-            for t in range(sim.timing.size):
-                state = spc_group["state"][t]
-                old_result = spc_group["energy_flow"][t]
-                new_result = model.energy_flow(state, s)
-                assert np.allclose(old_result, new_result)

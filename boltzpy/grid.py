@@ -18,14 +18,6 @@ class Grid(bp.BaseClass):
         - Enable non-uniform/adaptive Grids
           (see :class:`~boltzpy.computation.Calculation`)
 
-        Note
-    ----
-    The parameter :attr:`iMG` describes the
-    position/physical values of all  Grid points.
-    All entries must be viewed as multiples of :attr:`delta:
-
-        :math:`pG = iG \cdot d`.
-
     Parameters
     ----------
     shape : :obj:`~numpy.array` [:obj:`int`]
@@ -307,6 +299,7 @@ class Grid(bp.BaseClass):
     #####################################
     def check_integrity(self):
         """Sanity Check"""
+        bp.BaseClass.check_integrity(self)
         assert isinstance(self.ndim, int)
         assert self.ndim >= 0
 

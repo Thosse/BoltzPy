@@ -24,10 +24,10 @@ class Simulation(bp.BaseClass):
     ----------
     timing : :class:`Grid`
         The Time Grid.
-    geometry: :class:`Geometry`
+    geometry : :class:`Geometry`
         Describes the behaviour for all position points.
         Contains the :class:`initialization rules <Rule>`
-    model : :class:`Model`
+    model : :class:`CollisionModel`
         Velocity-Space Grids of all Specimen.
     file : :obj:`h5py.Group <h5py:Group>`
     log_state : :obj:`numpy.bool`
@@ -35,7 +35,6 @@ class Simulation(bp.BaseClass):
     order_transport : :obj:`int`
     order_collisions : :obj:`int`
     """
-
     def __init__(self,
                  timing,
                  geometry,
@@ -45,9 +44,18 @@ class Simulation(bp.BaseClass):
                  order_operator_splitting=1,
                  order_transport=1,
                  order_collisions=1):
+        assert isinstance(timing, bp.Grid)
         self.timing = timing
+        assert isinstance(geometry, bp.Geometry)
         self.geometry = geometry
+        assert isinstance(model, bp.CollisionModel)
         self.model = model
+        # store large model attrributes (vels, i_vels, spc_matrix) only once
+        for (r, attr) in zip(geometry.rules, bp.BaseModel.shared_attributes()):
+            assert np.all(getattr(r, attr) == getattr(model, attr))
+            # all point to the same objects
+            setattr(r, attr, getattr(model, attr))
+
         self.log_state = np.bool(log_state)
         self.order_operator_splitting = int(order_operator_splitting)
         self.order_transport = int(order_transport)
@@ -65,12 +73,30 @@ class Simulation(bp.BaseClass):
         self.check_integrity()
         return
 
+    @staticmethod
+    def parameters():
+        params = {"timing",
+                  "geometry",
+                  "model",
+                  "file",
+                  "log_state",
+                  "order_operator_splitting",
+                  "order_transport",
+                  "order_collisions"}
+        return params
+
+    @staticmethod
+    def attributes():
+        attrs = Simulation.parameters()
+        return attrs
+
+    # todo add pressure
     @property
     def results_shape(self):
-        shapes = np.empty(self.model.specimen, dtype=dict)
+        shapes = np.empty(self.model.nspc, dtype=dict)
         for s in self.model.species:
             shapes[s] = {
-                'particle_number': (
+                'number_density': (
                     self.timing.size,
                     self.geometry.size),
                 'mean_velocity': (
@@ -88,7 +114,7 @@ class Simulation(bp.BaseClass):
                 'temperature': (
                     self.timing.size,
                     self.geometry.size),
-                'energy': (
+                'energy_density': (
                     self.timing.size,
                     self.geometry.size),
                 'energy_flow': (
@@ -98,7 +124,7 @@ class Simulation(bp.BaseClass):
                 "state": (
                     self.timing.size,
                     self.geometry.size,
-                    self.model.vGrids[s].size)}
+                    self.model.subgrids(s).size)}
             if not self.log_state:
                 del shapes[s]["state"]
         return shapes
@@ -141,30 +167,24 @@ class Simulation(bp.BaseClass):
             idx_range = self.model.idx_range(s)
             spc_state = data.state[..., idx_range]
             spc_group = hdf_group[str(s)]
-            # number_density
-            number_density = self.model.number_density(spc_state, s)
-            spc_group["particle_number"][tw_idx] = number_density
 
-            # momentum
-            momentum = self.model.momentum(spc_state, s)
+            number_density = self.model.cmp_number_density(spc_state, s)
+            spc_group["number_density"][tw_idx] = number_density
+            momentum = self.model.cmp_momentum(spc_state, s)
             spc_group["momentum"][tw_idx] = momentum
-
-            # mean velocity
-            mean_velocity = self.model.mean_velocity(spc_state, s,
-                                                     momentum=momentum)
+            mean_velocity = self.model.cmp_mean_velocity(
+                spc_state,
+                s,
+                momentum=momentum)
             spc_group["mean_velocity"][tw_idx] = mean_velocity
-
-            # temperature
-            temperature = self.model.temperature(spc_state, s,
-                                                 number_density=number_density)
-            spc_group["temperature"][tw_idx] = temperature
-
-            # momentum flow
-            spc_group["momentum_flow"][tw_idx] = self.model.momentum_flow(spc_state, s)
-            # energy
-            spc_group["energy"][tw_idx] = self.model.energy_density(spc_state, s)
-            # energy flow
-            spc_group["energy_flow"][tw_idx] = self.model.energy_flow(spc_state, s)
+            spc_group["temperature"][tw_idx] = self.model.cmp_temperature(
+                spc_state,
+                s,
+                number_density=number_density,
+                mean_velocity=mean_velocity)
+            spc_group["momentum_flow"][tw_idx] = self.model.cmp_momentum_flow(spc_state, s)
+            spc_group["energy_density"][tw_idx] = self.model.cmp_energy_density(spc_state, s)
+            spc_group["energy_flow"][tw_idx] = self.model.cmp_energy_flow(spc_state, s)
             # complete distribution
             if self.log_state:
                 spc_group["state"][tw_idx] = spc_state
@@ -190,12 +210,12 @@ class Simulation(bp.BaseClass):
         figure = bp_af.AnimatedFigure(tmax=n_frames,
                                       backend="agg")
         if moments is None:
-            moments = ['particle_number',
+            moments = ['number_density',
                        'mean_velocity',
                        'momentum',
                        'momentum_flow',
                        'temperature',
-                       'energy']
+                       'energy_density']
         else:
             assert len(moments) <= np.prod(shape)
         # xdata (geometry) is shared over all plots
@@ -240,7 +260,7 @@ class Simulation(bp.BaseClass):
 
         timing = bp.Grid.load(file["timing"])
         geometry = bp.Geometry.load(file["geometry"])
-        model = bp.Model.load(file["model"])
+        model = bp.CollisionModel.load(file["model"])
         log_state = np.bool(file.attrs["log_state"][()])
         order_operator_splitting = file.attrs["order_operator_splitting"][()]
         order_transport = file.attrs["order_transport"][()]
@@ -256,7 +276,7 @@ class Simulation(bp.BaseClass):
                           order_collisions)
         return self
 
-    def save(self, hdf_group=None):
+    def save(self, hdf_group=None, write_all=False):
         """Write all parameters of the :class:`Simulation` instance
         to a HDF5 file.
 
@@ -306,17 +326,27 @@ class Simulation(bp.BaseClass):
     #####################################
     def check_integrity(self):
         """Sanity Check."""
+        bp.BaseClass.check_integrity(self)
         assert isinstance(self.timing, bp.Grid)
         self.timing.check_integrity()
         assert self.timing.ndim == 1
+
         assert isinstance(self.geometry, bp.Geometry)
         self.geometry.check_integrity()
-        assert isinstance(self.model, bp.Model)
+        if self.geometry.ndim != 1:
+            raise NotImplementedError
+
+        assert isinstance(self.model, bp.CollisionModel)
         self.model.check_integrity()
         assert self.model.ndim >= self.geometry.ndim
-        assert self.geometry.model_size == self.model.size
-        for r in self.geometry.rules:
-            assert r.specimen >= self.model.specimen
+        assert self.geometry.model_size == self.model.nvels
+        # all rules must be based on the same model
+        for (r, attr) in zip(self.geometry.rules, bp.BaseModel.attributes()):
+            assert np.all(getattr(r, attr) == getattr(self.model, attr))
+        # all rules' shared_attributes must point towards the same object
+        for (r, attr) in zip(self.geometry.rules, bp.BaseModel.shared_attributes()):
+            assert getattr(r, attr) is getattr(self.model, attr)
+            np.shares_memory(getattr(r, attr), getattr(self.model, attr))
         assert isinstance(self.file, h5py.Group)
         assert isinstance(self.log_state, np.bool)
         assert isinstance(self.order_operator_splitting, int)

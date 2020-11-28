@@ -82,7 +82,7 @@ class BaseClass:
         # this distionary contains all possible subclasses
         subclasses = {
             'Grid': bp.Grid,
-            'Model': bp.Model,
+            'CollisionModel': bp.CollisionModel,
             'Geometry': bp.Geometry,
             'InnerPointRule': bp.InnerPointRule,
             'ConstantPointRule': bp.ConstantPointRule,
@@ -96,10 +96,12 @@ class BaseClass:
 
     @staticmethod
     def parameters():
+        """The set of initialization parameters, including optionals."""
         raise NotImplementedError
 
     @staticmethod
     def attributes():
+        """The set of all class attributes and propertes."""
         raise NotImplementedError
 
     @staticmethod
@@ -147,7 +149,7 @@ class BaseClass:
                     subclass = BaseClass.subclasses(cls)
                     result[p] = subclass.load(hdf5_group[p])
                 # group is an array of BaseClasses
-                if cls == "Array":
+                elif cls == "Array":
                     size = hdf5_group[p].attrs["size"]
                     result[p] = np.empty(size, dtype=object)
                     for idx in range(size):
@@ -211,8 +213,7 @@ class BaseClass:
                 hdf5_group.create_group(attr)
                 value.save(hdf5_group[attr])
             # save arrays of objects in sub-subgroups
-            is_array_of_objects = isinstance(value, np.ndarray) and value.dtype == 'object'
-            if is_array_of_objects:
+            elif isinstance(value, np.ndarray) and value.dtype == 'object':
                 # create subgroup
                 hdf5_group.create_group(attr)
                 hdf5_group[attr].attrs["class"] = "Array"
@@ -223,12 +224,14 @@ class BaseClass:
                     idx = str(idx)
                     hdf5_group[attr].create_group(idx)
                     element.save(hdf5_group[attr][idx])
+            # transform sparse matrices to normal np.arrays
+            elif isinstance(value, scipy.sparse.csr_matrix):
+                value = value.toarray()
+                hdf5_group[attr] = value
             else:
-                # transform sparse matrices to normal np.arrays
-                if isinstance(value, scipy.sparse.csr_matrix):
-                    value = value.toarray()
                 hdf5_group[attr] = value
 
+        # Todo move into testcase
         # check that the class can be reconstructed from the save
         other = self.load(hdf5_group)
         assert self == other
@@ -236,4 +239,7 @@ class BaseClass:
 
     def check_integrity(self):
         """Sanity Check."""
-        raise NotImplementedError
+        assert isinstance(self.parameters(), set)
+        assert isinstance(self.attributes(), set)
+        assert self.parameters().issubset(self.attributes())
+
