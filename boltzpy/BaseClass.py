@@ -108,27 +108,25 @@ class BaseClass:
     @staticmethod
     def load_attributes(hdf5_group, attributes):
         """Read a set of parameters from a given HDF5 group.
-        Returns a dictionary of the read values.
+        Returns a dictionary of the read values
+        or the value, if only a single attribute was given as a string.
 
         Parameters
         ----------
         hdf5_group : :obj:`h5py.Group <h5py:Group>`
         attributes : :obj:`str`, :obj:`list`, or  :obj:`set`
-
-        Returns
-        -------
-        self : :obj:`dict`
         """
-        assert isinstance(hdf5_group, h5py.Group)
-        # if only a single parameter is given, change into list for consistency
+        # return values directly, if a single attribute is given as a string
         if type(attributes) is str:
-            attributes = [attributes]
-        else:
-            assert type(attributes) in [list, set]
-            assert all(type(p) is str for p in attributes)
+            result = BaseClass.load_attributes(hdf5_group, [attributes])
+            return result[attributes]
+        # otherwise return a dictionary
+        assert isinstance(hdf5_group, h5py.Group)
+        assert type(attributes) in [list, set]
         # read parameters and store in dict
         result = dict()
         for p in attributes:
+            assert p in hdf5_group.keys()
             # Datasets are read directly
             if isinstance(hdf5_group[p], h5py.Dataset):
                 val = hdf5_group[p][()]
