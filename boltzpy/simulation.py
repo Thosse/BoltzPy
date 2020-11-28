@@ -78,15 +78,9 @@ class Simulation(bp.BaseClass):
         #  this is a parameter
 
         self.log_state = np.bool(log_state)
-        # todo this needs to be removed, as it creates empty files during tests
+        # todo self.file needs to be removed, as it creates empty files during tests
         if file is None:
-            idx = 0
-            while True:
-                idx += 1
-                file_path = __file__[:-21] + 'Simulations/' + str(idx) + ".hdf5"
-                if not os.path.exists(file_path):
-                    break
-            file = h5py.File(file_path, mode='w')
+            file = self.default_file()
         self.file = file
 
         self.check_integrity()
@@ -101,6 +95,18 @@ class Simulation(bp.BaseClass):
                   # "state",
                   "log_state"}
         return params
+
+    @staticmethod
+    def default_file(directory=None, mode="w"):
+        if directory is None:
+            directory = __file__[:-21] + 'Simulations/'
+        idx = 0
+        while True:
+            idx += 1
+            file_path = directory + str(idx) + ".hdf5"
+            if not os.path.exists(file_path):
+                break
+        return h5py.File(file_path, mode=mode)
 
     @staticmethod
     def attributes():
