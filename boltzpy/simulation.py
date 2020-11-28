@@ -31,19 +31,13 @@ class Simulation(bp.BaseClass):
         Velocity-Space Grids of all Specimen.
     file : :obj:`h5py.Group <h5py:Group>`
     log_state : :obj:`numpy.bool`
-    order_operator_splitting : :obj:`int`
-    order_transport : :obj:`int`
-    order_collisions : :obj:`int`
     """
     def __init__(self,
                  timing,
                  geometry,
                  model,
                  file=None,
-                 log_state=False,
-                 order_operator_splitting=1,
-                 order_transport=1,
-                 order_collisions=1):
+                 log_state=False):
         assert isinstance(timing, bp.Grid)
         self.timing = timing
         assert isinstance(geometry, bp.Geometry)
@@ -57,9 +51,6 @@ class Simulation(bp.BaseClass):
             setattr(r, attr, getattr(model, attr))
 
         self.log_state = np.bool(log_state)
-        self.order_operator_splitting = int(order_operator_splitting)
-        self.order_transport = int(order_transport)
-        self.order_collisions = int(order_collisions)
         if file is None:
             idx = 0
             while True:
@@ -79,10 +70,7 @@ class Simulation(bp.BaseClass):
                   "geometry",
                   "model",
                   "file",
-                  "log_state",
-                  "order_operator_splitting",
-                  "order_transport",
-                  "order_collisions"}
+                  "log_state"}
         return params
 
     @staticmethod
@@ -262,18 +250,12 @@ class Simulation(bp.BaseClass):
         geometry = bp.Geometry.load(file["geometry"])
         model = bp.CollisionModel.load(file["model"])
         log_state = np.bool(file.attrs["log_state"][()])
-        order_operator_splitting = file.attrs["order_operator_splitting"][()]
-        order_transport = file.attrs["order_transport"][()]
-        order_collisions = file.attrs["order_collisions"][()]
 
         self = Simulation(timing,
                           geometry,
                           model,
                           file,
-                          log_state,
-                          order_operator_splitting,
-                          order_transport,
-                          order_collisions)
+                          log_state)
         return self
 
     def save(self, hdf_group=None, write_all=False):
@@ -295,9 +277,6 @@ class Simulation(bp.BaseClass):
 
         hdf_group.attrs["class"] = "Simulation"
         hdf_group.attrs["log_state"] = self.log_state
-        hdf_group.attrs["order_operator_splitting"] = self.order_operator_splitting
-        hdf_group.attrs["order_transport"] = self.order_transport
-        hdf_group.attrs["order_collisions"] = self.order_collisions
 
         self.timing.save(hdf_group.create_group("timing"))
         self.geometry.save(hdf_group.create_group("geometry"))
@@ -349,12 +328,6 @@ class Simulation(bp.BaseClass):
             np.shares_memory(getattr(r, attr), getattr(self.model, attr))
         assert isinstance(self.file, h5py.Group)
         assert isinstance(self.log_state, np.bool)
-        assert isinstance(self.order_operator_splitting, int)
-        assert self.order_operator_splitting == 1
-        assert isinstance(self.order_collisions, int)
-        assert self.order_collisions == 1
-        assert isinstance(self.order_transport, int)
-        assert self.order_transport == 1
         return
 
     def __eq__(self, other, ignore=None, print_message=True):
