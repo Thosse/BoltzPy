@@ -180,6 +180,33 @@ class BaseClass:
                                                subclass.parameters())
         return subclass(**parameters)
 
+    @staticmethod
+    def save_attribute(hdf5_group, key, value):
+        # save Base class attributes in subgroup
+        if isinstance(value, BaseClass):
+            hdf5_group.create_group(key)
+            value.save(hdf5_group[key])
+        # save arrays of objects in sub-subgroups
+        elif isinstance(value, np.ndarray) and value.dtype == 'object':
+            # create subgroup
+            hdf5_group.create_group(key)
+            hdf5_group[key].attrs["class"] = "Array"
+            hdf5_group[key].attrs["size"] = value.size
+            # save elements iteratively
+            for (idx, element) in enumerate(value):
+                if isinstance(element, BaseClass):
+                    idx = str(idx)
+                    hdf5_group[key].create_group(idx)
+                    element.save(hdf5_group[key][idx])
+                else:
+                    raise NotImplementedError
+        # transform sparse matrices to normal np.arrays
+        elif isinstance(value, scipy.sparse.csr_matrix):
+            value = value.toarray()
+            hdf5_group[key] = value
+        else:
+            hdf5_group[key] = value
+
     def save(self, hdf5_group, write_all=False):
         """Write the parameters of the Class into the HDF5 group.
 
@@ -204,29 +231,7 @@ class BaseClass:
             attributes = self.parameters()
         # save attributes to file
         for attr in attributes:
-            value = self.__getattribute__(attr)
-            # save Base class attributes in subgroup
-            if isinstance(value, BaseClass):
-                hdf5_group.create_group(attr)
-                value.save(hdf5_group[attr])
-            # save arrays of objects in sub-subgroups
-            elif isinstance(value, np.ndarray) and value.dtype == 'object':
-                # create subgroup
-                hdf5_group.create_group(attr)
-                hdf5_group[attr].attrs["class"] = "Array"
-                hdf5_group[attr].attrs["size"] = value.size
-                # save elements iteratively
-                for (idx, element) in enumerate(value):
-                    assert isinstance(element, BaseClass)
-                    idx = str(idx)
-                    hdf5_group[attr].create_group(idx)
-                    element.save(hdf5_group[attr][idx])
-            # transform sparse matrices to normal np.arrays
-            elif isinstance(value, scipy.sparse.csr_matrix):
-                value = value.toarray()
-                hdf5_group[attr] = value
-            else:
-                hdf5_group[attr] = value
+            self.save_attribute(hdf5_group, attr, self.__getattribute__(attr))
 
         # Todo move into testcase
         # check that the class can be reconstructed from the save
