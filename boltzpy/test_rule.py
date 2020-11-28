@@ -1,9 +1,5 @@
 import pytest
-import os
-import h5py
 import numpy as np
-
-import boltzpy.helpers.tests as test_helper
 import boltzpy as bp
 from boltzpy.test_model import MODELS
 
@@ -11,21 +7,19 @@ from boltzpy.test_model import MODELS
 ###################################
 #           Setup Cases           #
 ###################################
-FILE = test_helper.DIRECTORY + 'Rules.hdf5'
-# setup dictionary of model parameters, for Rule initialization
 RULES = dict()
 RULES["2D_small/LeftConstant"] = bp.ConstantPointRule(
     number_densities=[2, 2],
     mean_velocities=[[0, 0], [0, 0]],
     temperatures=[1, 1],
     affected_points=[0],
-    **MODELS["2D_small/Model"].__dict__)
+    **MODELS["Model/2D_small"].__dict__)
 RULES["2D_small/Interior"] = bp.InnerPointRule(
     number_densities=[1, 1],
     mean_velocities=[[0, 0], [0, 0]],
     temperatures=[1, 1],
     affected_points=np.arange(1, 9),
-    **MODELS["2D_small/Model"].__dict__)
+    **MODELS["Model/2D_small"].__dict__)
 RULES["2D_small/RightBoundary"] = bp.BoundaryPointRule(
     number_densities=[1, 1],
     mean_velocities=[[0, 0], [0, 0]],
@@ -36,7 +30,7 @@ RULES["2D_small/RightBoundary"] = bp.BoundaryPointRule(
     refl_thermal=[0.25, 0.25],
     refl_absorbs=[0.25, 0.25],
     surface_normal=np.array([1, 0], dtype=int),
-    **MODELS["2D_small/Model"].__dict__)
+    **MODELS["Model/2D_small"].__dict__)
 RULES["equalMass/LeftBoundary"] = bp.BoundaryPointRule(
     number_densities=[2, 2],
     mean_velocities=[[0, 0], [0, 0]],
@@ -47,19 +41,19 @@ RULES["equalMass/LeftBoundary"] = bp.BoundaryPointRule(
     refl_thermal=[0.1, 0.1],
     refl_absorbs=[0, 0],
     surface_normal=np.array([-1, 0], dtype=int),
-    **MODELS["equalMass/Model"].__dict__)
+    **MODELS["Model/equalMass"].__dict__)
 RULES["equalMass/LeftInterior"] = bp.InnerPointRule(
     number_densities=[2, 2],
     mean_velocities=[[0, 0], [0, 0]],
     temperatures=[1, 1],
     affected_points=np.arange(1, 5),
-    **MODELS["equalMass/Model"].__dict__)
+    **MODELS["Model/equalMass"].__dict__)
 RULES["equalMass/RightInterior"] = bp.InnerPointRule(
     number_densities=[1, 1],
     mean_velocities=[[0, 0], [0, 0]],
     temperatures=[1, 1],
     affected_points=np.arange(5, 9),
-    **MODELS["equalMass/Model"].__dict__)
+    **MODELS["Model/equalMass"].__dict__)
 RULES["equalMass/RightBoundary"] = bp.BoundaryPointRule(
     number_densities=[1, 1],
     mean_velocities=[[0, 0], [0, 0]],
@@ -70,83 +64,12 @@ RULES["equalMass/RightBoundary"] = bp.BoundaryPointRule(
     refl_thermal=[0.15, 0.15],
     refl_absorbs=[0.55, 0.55],
     surface_normal=np.array([1, 0], dtype=int),
-    **MODELS["equalMass/Model"].__dict__)
-
-# Sub dictionaries for specific attribute tests
-POSSIBLE_ATTRIBUTES = set().union(*[rule.attributes() for rule in RULES.values()])
-
-
-def setup_file(file_address=FILE):
-    if file_address == FILE:
-        reply = input("You are about to reset the rules test file. "
-                      "Are you Sure? (yes, no)\n")
-        if reply != "yes":
-            print("ABORTED")
-            return
-
-    with h5py.File(file_address, mode="w") as file:
-        for (key, item) in RULES.items():
-            assert isinstance(item, bp.BaseRule)
-            file.create_group(key)
-            item.save(file[key], True)
-
-        # save models
-        for group in file.keys():
-            key_model = group + "/Model"
-            for rule in file[group].keys():
-                file[group][rule].attrs["Model"] = key_model
-    return
+    **MODELS["Model/equalMass"].__dict__)
 
 
 #############################
 #           Tests           #
 #############################
-def test_file_exists():
-    assert os.path.exists(FILE), (
-        "The test file {} is missing.".format(FILE))
-
-
-def test_setup_creates_same_file():
-    setup_file(test_helper.TMP_FILE)
-    test_helper.assert_files_are_equal([FILE, test_helper.TMP_FILE])
-    os.remove(test_helper.TMP_FILE)
-    return
-
-
-@pytest.mark.parametrize("key", RULES.keys())
-def test_hdf5_groups_exist(key):
-    with h5py.File(FILE, mode="r") as file:
-        assert key in file.keys(), (
-            "The group {} is missing in the test file-".format(key))
-
-
-@pytest.mark.parametrize("key", RULES.keys())
-def test_load_from_file(key):
-    with h5py.File(FILE, mode="r") as file:
-        hdf_group = file[key]
-        old = bp.BaseRule.load(hdf_group)
-        new = RULES[key]
-        assert isinstance(old, bp.BaseRule)
-        assert isinstance(new, bp.BaseRule)
-        assert old == new
-
-
-@pytest.mark.parametrize("parameter", POSSIBLE_ATTRIBUTES)
-@pytest.mark.parametrize("key", RULES.keys())
-def test_attributes_are_equal(key, parameter):
-    rule = RULES[key]
-    # skip parameters of other classes
-    if parameter not in rule.parameters():
-        return
-    with h5py.File(FILE, mode="r") as file:
-        old = file[key][parameter][()]
-        new = RULES[key].__getattribute__(parameter)
-        if isinstance(new, np.ndarray) and (new.dtype == float):
-            assert np.allclose(old, new)
-        else:
-            assert np.all(old == new)
-
-
 @pytest.mark.parametrize("key", RULES.keys())
 def test_reflected_indices_inverse(key):
     rule = RULES[key]

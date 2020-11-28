@@ -19,14 +19,14 @@ _open_file = h5py.File(FILE, mode="r")
 SIMULATIONS = dict()
 SIMULATIONS["2D_small/Simulation"] = bp.Simulation(
     GRIDS["Grid/2D_small"],
-    GEOMETRIES["2D_small/Geometry"],
-    MODELS["2D_small/Model"],
+    GEOMETRIES["Geometry/2D_small"],
+    MODELS["Model/2D_small"],
     _open_file["2D_small/Simulation"],
     True)
 SIMULATIONS["equalMass/Simulation"] = bp.Simulation(
     GRIDS["Grid/equalMass"],
-    GEOMETRIES["equalMass/Geometry"],
-    MODELS["equalMass/Model"],
+    GEOMETRIES["Geometry/equalMass"],
+    MODELS["Model/equalMass"],
     _open_file["equalMass/Simulation"],
     True)
 

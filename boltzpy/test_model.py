@@ -1,17 +1,13 @@
 import pytest
-import os
-import h5py
 import numpy as np
 
-import boltzpy.helpers.tests as test_helper
 import boltzpy as bp
 
 ###################################
 #           Setup Cases           #
 ###################################
-FILE = test_helper.DIRECTORY + 'Models.hdf5'
 MODELS = dict()
-MODELS["2D_small/Model"] = bp.CollisionModel(
+MODELS["Model/2D_small"] = bp.CollisionModel(
     masses=[2, 3],
     shapes=[[5, 5], [7, 7]],
     base_delta=1/8,
@@ -19,7 +15,7 @@ MODELS["2D_small/Model"] = bp.CollisionModel(
     collision_factors=[[50, 50], [50, 50]],
     algorithm_relations="all",
     algorithm_weights="uniform")
-MODELS["2D_small_convergent/Model"] = bp.CollisionModel(
+MODELS["Model/2D_small_convergent"] = bp.CollisionModel(
     masses=[2, 3],
     shapes=[[5, 5], [7, 7]],
     base_delta=1/8,
@@ -28,7 +24,7 @@ MODELS["2D_small_convergent/Model"] = bp.CollisionModel(
     algorithm_relations="convergent",
     algorithm_weights="uniform")
 # Todo This might lead to weird results! Check this!
-MODELS["equalSpacing/Model"] = bp.CollisionModel(
+MODELS["Model/equalSpacing"] = bp.CollisionModel(
     masses=[1, 2],
     shapes=[[7, 7], [7, 7]],
     base_delta=1/7,
@@ -36,7 +32,7 @@ MODELS["equalSpacing/Model"] = bp.CollisionModel(
     collision_factors=[[50, 50], [50, 50]],
     algorithm_relations="all",
     algorithm_weights="uniform")
-MODELS["equalMass/Model"] = bp.CollisionModel(
+MODELS["Model/equalMass"] = bp.CollisionModel(
     masses=[3, 3],
     shapes=[[5, 5], [5, 5]],
     base_delta=3/8,
@@ -53,7 +49,7 @@ MODELS["equalMass/Model"] = bp.CollisionModel(
 #     collision_factors=[[50, 50], [50, 50]],
 #     algorithm_relations="all",
 #     algorithm_weights="uniform")
-MODELS["mixed_spacing/Model"] = bp.CollisionModel(
+MODELS["Model/mixed_spacing"] = bp.CollisionModel(
     masses=[3, 4],
     shapes=[[6, 6], [7, 7]],
     base_delta=1/14,
@@ -61,7 +57,7 @@ MODELS["mixed_spacing/Model"] = bp.CollisionModel(
     collision_factors=[[50, 50], [50, 50]],
     algorithm_relations="all",
     algorithm_weights="uniform")
-MODELS["3D_small/Model"] = bp.CollisionModel(
+MODELS["Model/3D_small"] = bp.CollisionModel(
     masses=[2, 3],
     shapes=[[2, 2, 2], [2, 2, 2]],
     base_delta=1/8,
@@ -71,68 +67,9 @@ MODELS["3D_small/Model"] = bp.CollisionModel(
     algorithm_weights="uniform")
 
 
-def setup_file(file_address=FILE):
-    if file_address == FILE:
-        reply = input("You are about to reset the model test file. "
-                      "Are you Sure? (yes, no)\n")
-        if reply != "yes":
-            print("ABORTED")
-            return
-
-    with h5py.File(file_address, mode="w") as file:
-        for (key, item) in MODELS.items():
-            assert isinstance(item, bp.CollisionModel)
-            file.create_group(key)
-            item.save(file[key], True)
-    return
-
-
 #############################
 #           Tests           #
 #############################
-def test_file_exists():
-    assert os.path.exists(FILE), (
-        "The test file {} is missing.".format(FILE))
-
-
-def test_setup_creates_same_file():
-    setup_file(test_helper.TMP_FILE)
-    test_helper.assert_files_are_equal([FILE, test_helper.TMP_FILE])
-    os.remove(test_helper.TMP_FILE)
-    return
-
-
-@pytest.mark.parametrize("key", MODELS.keys())
-def test_hdf5_groups_exist(key):
-    with h5py.File(FILE, mode="r") as file:
-        assert key in file.keys(), (
-            "The group {} is missing in the test file-".format(key))
-
-
-@pytest.mark.parametrize("key", MODELS.keys())
-def test_load_from_file(key):
-    with h5py.File(FILE, mode="r") as file:
-        hdf_group = file[key]
-        old = bp.CollisionModel.load(hdf_group)
-        new = MODELS[key]
-        assert isinstance(old, bp.CollisionModel)
-        assert isinstance(new, bp.CollisionModel)
-        assert old == new
-
-
-@pytest.mark.parametrize("key", MODELS.keys())
-@pytest.mark.parametrize("attribute", bp.CollisionModel.attributes())
-def test_attributes(attribute, key):
-    with h5py.File(FILE, mode="r") as file:
-        read_dict = bp.BaseClass.read_parameters_from_hdf_file(file[key], attribute)
-        old = read_dict[attribute]
-        new = MODELS[key].__getattribute__(attribute)
-        if isinstance(new, np.ndarray) and (new.dtype == float):
-            assert np.allclose(old, new)
-        else:
-            assert np.all(old == new)
-
-
 @pytest.mark.parametrize("key", MODELS.keys())
 def test_get_spc_on_shuffled_grid(key):
     model = MODELS[key]
@@ -354,4 +291,4 @@ def test_mf_orthogonal_heat_flow_is_orthogonal(key):
 #  + Grid __get__ nach index -> arbeiten mit lokalen indices möglich
 #  + für (get_)idx(specimen, indices) hinzu -Y generiert globale indices
 
-# Todo add tests for initialization, moment functions and moments
+# Todo add tests for initialization
