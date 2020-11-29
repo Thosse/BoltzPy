@@ -28,10 +28,7 @@ class Simulation(bp.BaseClass):
         Contains the :class:`initialization rules <Rule>`
     model : :class:`CollisionModel`
         Velocity-Space Grids of all Specimen.
-    t : :obj:`numpy.int`
-        Current time step.
-    state : :obj:`~numpy.array` [:obj:`float`]
-        Denotes the current state of the simulation.
+
     file : :obj:`h5py.Group <h5py:Group>`
     log_state : :obj:`numpy.bool`
 
@@ -41,13 +38,17 @@ class Simulation(bp.BaseClass):
         Temporal step size.
     dp : :obj:`float`
         Positional step size.
+        t : :obj:`numpy.int`
+        Current time step.
+    state : :obj:`~numpy.array` [:obj:`float`]
+        The current state of the simulation.
+    state : :obj:`~numpy.array` [:obj:`float`]
+        Stores interim values during computation (transport step)
     """
     def __init__(self,
                  timing,
                  geometry,
                  model,
-                 t=None,
-                 state=None,
                  file=None,
                  log_state=False):
         assert isinstance(timing, bp.Grid)
@@ -67,11 +68,8 @@ class Simulation(bp.BaseClass):
         self.dt = self.timing.delta
         self.dp = self.geometry.delta
 
-        self.t = np.int(0 if t is None else t)
-        if state is None:
-            self.state = self.geometry.initial_state
-        else:
-            self.state = np.array(state, dtype=float)
+        self.t = np.int(0)
+        self.state = self.geometry.initial_state
         self.interim = np.copy(self.state)
         # todo add results = dict(), use method set_results(hdf_group=None)
         #  default return dict of np.arrays
@@ -91,8 +89,6 @@ class Simulation(bp.BaseClass):
         params = {"timing",
                   "geometry",
                   "model",
-                  #"t",
-                  # "state",
                   "log_state"}
         return params
 
@@ -305,7 +301,7 @@ class Simulation(bp.BaseClass):
 
     def __eq__(self, other, ignore=None, print_message=True):
         if ignore is None:
-            ignore = ["file"]
+            ignore = ["file", "t", "state", "interim"]
         return super().__eq__(other, ignore, print_message)
 
     def __str__(self,
