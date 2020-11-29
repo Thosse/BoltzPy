@@ -244,10 +244,10 @@ class Simulation(bp.BaseClass):
     #####################################
     #           Serialization           #
     #####################################
-    def save(self, hdf5_group=None, write_all=False):
+    def save(self, hdf5_group=None, attributes=None):
         if hdf5_group is None:
             hdf5_group = self.file
-        bp.BaseClass.save(self, hdf5_group, write_all)
+        bp.BaseClass.save(self, hdf5_group, attributes)
 
         key = "results"
         hdf5_group.create_group(key)
@@ -256,9 +256,10 @@ class Simulation(bp.BaseClass):
         for (moment, shape) in self.shape_of_results.items():
             hdf5_group[key].create_dataset(moment, shape, dtype=float)
 
+        # Todo move this into test_simulation (BaseClass is already moved)
         # assert that the instance can be reconstructed from the save
         other = self.load(hdf5_group)
-        assert self.__eq__(other, ignore=["file"])
+        assert self.__eq__(other)
         return
 
     #####################################
@@ -299,7 +300,7 @@ class Simulation(bp.BaseClass):
         assert max_vels_norm * (self.dt/self.dp) < 1/2
         return
 
-    def __eq__(self, other, ignore=None, print_message=True):
+    def __eq__(self, other, ignore=None, print_message=False):
         if ignore is None:
             ignore = ["file", "t", "state", "interim"]
         return super().__eq__(other, ignore, print_message)

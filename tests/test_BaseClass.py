@@ -33,7 +33,7 @@ def setup_file(file_address=FILE):
         for (key, item) in TEST_ELEMENTS.items():
             assert isinstance(item, bp.BaseClass)
             file.create_group(key)
-            item.save(file[key], True)
+            item.save(file[key], item.attributes())
     return
 
 

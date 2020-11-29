@@ -205,15 +205,15 @@ class BaseClass:
         else:
             hdf5_group[key] = value
 
-    def save(self, hdf5_group, write_all=False):
+    def save(self, hdf5_group, attributes=None):
         """Write the parameters of the Class into the HDF5 group.
 
         Parameters
         ----------
         hdf5_group : :obj:`h5py.Group <h5py:Group>`
-        write_all : :obj:`bool`
-            If True, write all attributes and properties to the file,
-            even the unnecessary ones. Useful for testing,
+        attributes : :obj:`set`
+            Set of attributes to be written.
+            IF None if given, then write the parameters().
         """
         assert isinstance(hdf5_group, h5py.Group)
         self.check_integrity()
@@ -223,9 +223,7 @@ class BaseClass:
         # save class name for automatic loading/initialization
         hdf5_group.attrs["class"] = self.__class__.__name__
         # choose attributes to save
-        if write_all:
-            attributes = self.attributes()
-        else:
+        if attributes is None:
             attributes = self.parameters()
         # save attributes to file
         for attr in attributes:
