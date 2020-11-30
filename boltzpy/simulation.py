@@ -42,9 +42,11 @@ class Simulation(bp.BaseClass):
                  log_state=False):
         assert isinstance(timing, bp.Grid)
         self.timing = timing
+        self.dt = self.timing.delta
 
         assert isinstance(geometry, bp.Geometry)
         self.geometry = geometry
+        self.dp = self.geometry.delta
 
         assert isinstance(model, bp.CollisionModel)
         self.model = model
@@ -54,19 +56,19 @@ class Simulation(bp.BaseClass):
             # all point to the same objects
             setattr(r, attr, getattr(model, attr))
 
-        self.dt = self.timing.delta
-        self.dp = self.geometry.delta
-
+        # state and interim are properly initialized in compute()
+        # to reduce unnecessary memory usage (very large arrays)
         self.t = np.int(0)
-        self.state = self.geometry.initial_state
+        self.state = np.empty(tuple())
         self.interim = np.copy(self.state)
+
+        # results are properly set up as h5py groups, in save() / compute()
+        # since currently no file to store the results is set
         if results is None:
             self.results = dict()
         else:
             self.results = results
-
         self.log_state = np.bool(log_state)
-
         self.check_integrity()
         return
 
@@ -136,7 +138,11 @@ class Simulation(bp.BaseClass):
         self.check_integrity()
         # Save current state to the file
         self.save(hdf_group)
-        file = self.results.file
+
+        # set initial state for computation
+        self.state = self.geometry.initial_state
+        self.interim = np.copy(self.state)
+        self.t = np.int(0)
 
         print('Start Computation:')
         self.results.attrs["t"] = 1
@@ -144,14 +150,11 @@ class Simulation(bp.BaseClass):
         for (tw_idx, tw) in enumerate(self.timing.iG[:, 0]):
             while self.t != tw:
                 self.geometry.compute(self)
+                self.t += 1
             self.write_results(tw_idx)
-            file.flush()
+            self.file.flush()
             # print time estimate
             time_tracker.print(tw, self.timing.iG[-1, 0])
-        # Todo this is only a temporary hack, do this properly!
-        self.t = np.int(0)
-        self.state = self.geometry.initial_state
-        self.interim = self.state
         return
 
     # Todo this needs an overhaul
@@ -238,41 +241,31 @@ class Simulation(bp.BaseClass):
         self.results = hdf5_group["results"]
         return self
 
-    def save(self, hdf5_group=None, attributes=None):
+    def save(self, hdf5_group=None, **kwargs):
         self.check_integrity()
         hdf5_group = self.default_file() if hdf5_group is None else hdf5_group
-        if attributes is None:
-            attributes = self.parameters()
-            attributes.add("results")
 
-        # results must be saved separately, don't pass them to BaseClass
-        save_results = "results" in attributes
-        if save_results:
-            attributes.remove("results")
-
-        has_results = isinstance(self.results, h5py.Group)
-        # load results temporarily, to avoid accidentally overwriting them
-        if has_results:
+        if isinstance(self.results, h5py.Group):
             max_t = self.results.attrs["t"]
+            # load results temporarily, to avoid accidentally overwriting them
             self.results = {key: val[()]
                             for (key, val) in self.results.items()}
-        # set default result values, for compute() to access
-        elif save_results:
+        else:
             max_t = 0
+            # set default result values, for compute() to access
             for (moment, shape) in self.shape_of_results.items():
                 self.results[moment] = np.zeros(shape, dtype=float)
 
         # save all attributes, except results
-        bp.BaseClass.save(self, hdf5_group, attributes)
+        bp.BaseClass.save(self, hdf5_group, self.parameters())
 
         # save results in group
-        if save_results or has_results:
-            hdf5_group.create_group("results")
-            # store index of current time step
-            hdf5_group["results"].attrs["t"] = max_t
-            for (moment, values) in self.results.items():
-                hdf5_group["results"][moment] = values
-            self.results = hdf5_group["results"]
+        hdf5_group.create_group("results")
+        # store index of current time step
+        hdf5_group["results"].attrs["t"] = max_t
+        for (moment, values) in self.results.items():
+            hdf5_group["results"][moment] = values
+        self.results = hdf5_group["results"]
         return
 
     #####################################
@@ -300,16 +293,10 @@ class Simulation(bp.BaseClass):
         # all rules' shared_attributes must point towards the same object
         for (r, attr) in zip(self.geometry.rules, bp.BaseModel.shared_attributes()):
             assert getattr(r, attr) is getattr(self.model, attr)
-            np.shares_memory(getattr(r, attr), getattr(self.model, attr))
+            assert np.shares_memory(getattr(r, attr), getattr(self.model, attr))
 
         # results should only be a dictionary, if freshly initialized
-        if isinstance(self.results, dict):
-            # todo assert len(self.results) == 0
-            #  this collides with BaseClass.save calling check_integrity
-            pass
-        else:
-            assert isinstance(self.results, h5py.Group)
-
+        assert type(self.results) in {h5py.Group, dict}
         assert isinstance(self.log_state, np.bool)
 
         # check Courant-Friedrichs-Levy-Condition

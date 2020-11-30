@@ -100,8 +100,6 @@ class Geometry(bp.Grid):
         # executie s single collision step
         for rule in self.rules:
             rule.collision(sim)
-        # increase current_timestep counter
-        sim.t += 1
         return
 
     #####################################
