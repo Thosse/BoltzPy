@@ -243,7 +243,12 @@ class Simulation(bp.BaseClass):
 
     def save(self, hdf5_group=None, **kwargs):
         self.check_integrity()
-        hdf5_group = self.default_file() if hdf5_group is None else hdf5_group
+        if hdf5_group is None and isinstance(self.results, dict):
+            hdf5_group = self.default_file()
+        elif hdf5_group is None and isinstance(self.results, h5py.Group):
+            hdf5_group = self.results.parent
+        else:
+            assert isinstance(hdf5_group, h5py.Group)
 
         if isinstance(self.results, h5py.Group):
             max_t = self.results.attrs["t"]
