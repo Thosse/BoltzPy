@@ -5,12 +5,12 @@ import numpy as np
 
 import boltzpy.helpers.tests as test_helper
 import boltzpy as bp
-from tests.test_grid import GRIDS
-from tests.test_model import MODELS
-from tests.test_geometry import GEOMETRIES
-from tests.test_rule import RULES
+from boltzpy.test_grid import GRIDS
+from boltzpy.test_model import MODELS
+from boltzpy.test_geometry import GEOMETRIES
+from boltzpy.test_rule import RULES
 
-DIRECTORY = __file__[:-23] + 'tests/'
+DIRECTORY = __file__[:-25] + 'tests/'
 FILE = DIRECTORY + 'TestResults.hdf5'
 TMP_FILE = DIRECTORY + '_tmp_.hdf5'
 
@@ -33,7 +33,7 @@ def setup_file(file_address=FILE):
         for (key, item) in TEST_ELEMENTS.items():
             assert isinstance(item, bp.BaseClass)
             file.create_group(key)
-            item.save(file[key], True)
+            item.save(file[key], item.attributes())
     return
 
 
@@ -47,7 +47,8 @@ def test_file_exists():
 
 def test_setup_creates_same_file():
     setup_file(TMP_FILE)
-    test_helper.assert_files_are_equal([FILE, TMP_FILE])
+    test_helper.assert_hdf_groups_are_equal(h5py.File(FILE, mode="r"),
+                                            h5py.File(TMP_FILE, mode="r"))
     os.remove(TMP_FILE)
     return
 
@@ -69,11 +70,19 @@ def test_load_from_file(key):
         assert old == new
 
 
+@pytest.mark.parametrize("_, self", TEST_ELEMENTS.items())
+def test_loading_saved_state_yields_equal_instance(_, self):
+    assert isinstance(self, bp.BaseClass)
+    file = h5py.File(TMP_FILE, mode="w")
+    self.save(h5py.File(TMP_FILE))
+    other = bp.BaseClass.load(file)
+    assert self == other
+
+
 @pytest.mark.parametrize("key, attr", TEST_ATTRIBUTES)
 def test_attributes(key, attr):
     with h5py.File(FILE, mode="r") as file:
-        read_dict = bp.BaseClass.read_parameters_from_hdf_file(file[key], attr)
-        old = read_dict[attr]
+        old = bp.BaseClass.load_attributes(file[key], attr)
         new = TEST_ELEMENTS[key].__getattribute__(attr)
         if isinstance(new, np.ndarray) and (new.dtype == float):
             assert np.allclose(old, new)

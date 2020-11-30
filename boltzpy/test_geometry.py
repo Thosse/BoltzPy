@@ -1,5 +1,5 @@
 import boltzpy as bp
-from tests.test_rule import RULES
+from boltzpy.test_rule import RULES
 
 
 ###################################

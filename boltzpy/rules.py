@@ -177,34 +177,33 @@ class InhomogeneousRule(BaseRule):
         attrs.update(InhomogeneousRule.parameters())
         return attrs
 
-    def collision(self, data):
+    def collision(self, sim):
         """Executes single collision step for the :attr:`affected_points`.
 
         The collision step is implemented as an euler scheme."""
-        coll = data.model.collision_operator(data.state[self.affected_points])
-        data.state[self.affected_points] += data.dt * coll
-        assert np.all(data.state[self.affected_points] >= 0)
+        coll = sim.model.collision_operator(sim.state[self.affected_points])
+        sim.state[self.affected_points] += sim.dt * coll
+        assert np.all(sim.state[self.affected_points] >= 0)
         return
 
-    def transport_outflow_remains(self, data):
-        # Todo make this an attribute of simulation (data, if it still exists)
-        outflow_percentage = (np.abs(data.vG[:, 0] + data.velocity_offset[0])
-                              * data.dt
-                              / data.dp)
-        result = ((1 - outflow_percentage) * data.state[self.affected_points])
+    def transport_outflow_remains(self, sim):
+        outflow_percentage = (np.abs(sim.model.vels[:, 0])
+                              * sim.dt
+                              / sim.dp)
+        result = ((1 - outflow_percentage) * sim.state[self.affected_points])
         return result
 
-    def transport_inflow(self, data):
+    def transport_inflow(self, sim):
         raise NotImplementedError
 
-    def transport(self, data):
+    def transport(self, sim):
         """Executes single transport step for the :attr:`affected_points`.
 
            This is a finite differences scheme.
            It computes the inflow and outflow and, if necessary,
            applies reflection or absorption.
-           Reads data.state
-           and writes the results in data.results"""
+           Reads sim.state
+           and writes the results into sim.interim"""
         raise NotImplementedError
 
     def check_integrity(self, check_affected_points=True):
@@ -225,48 +224,48 @@ class InhomogeneousRule(BaseRule):
 
 
 class InnerPointRule(InhomogeneousRule):
-    def transport_inflow(self, data):
-        pv = data.vG + data.velocity_offset
-        inflow_percentage = (data.dt / data.dp * np.abs(pv[:, 0]))
-        result = np.zeros((self.affected_points.size, data.vG.shape[0]),
+    def transport_inflow(self, sim):
+        vels = self.vels
+        inflow_percentage = (sim.dt / sim.dp * np.abs(vels[:, 0]))
+        result = np.zeros((self.affected_points.size, self.nvels),
                           dtype=float)
 
-        neg_vels = np.where(pv[:, 0] < 0)[0]
+        neg_vels = np.where(vels[:, 0] < 0)[0]
         result[:, neg_vels] = (inflow_percentage[neg_vels]
-                               * data.state[np.ix_(self.affected_points + 1,
-                                                   neg_vels)]
+                               * sim.state[np.ix_(self.affected_points + 1,
+                                                  neg_vels)]
                                )
 
-        pos_vels = np.where(pv[:, 0] > 0)[0]
+        pos_vels = np.where(vels[:, 0] > 0)[0]
         result[:, pos_vels] = (inflow_percentage[pos_vels]
-                               * data.state[np.ix_(self.affected_points - 1,
-                                                   pos_vels)]
+                               * sim.state[np.ix_(self.affected_points - 1,
+                                                  pos_vels)]
                                )
         return result
 
-    def transport(self, data):
-        if data.p_dim != 1:
+    def transport(self, sim):
+        if sim.geometry.ndim != 1:
             message = 'Transport is currently only implemented ' \
                       'for 1D Problems'
             raise NotImplementedError(message)
         # simulate outflow
-        data.result[self.affected_points, :] = self.transport_outflow_remains(data)
+        sim.interim[self.affected_points, :] = self.transport_outflow_remains(sim)
         # simulate inflow
-        data.result[self.affected_points, :] += self.transport_inflow(data)
+        sim.interim[self.affected_points, :] += self.transport_inflow(sim)
         return
 
 
 class ConstantPointRule(InhomogeneousRule):
-    def collision(self, data):
+    def collision(self, sim):
         pass
 
-    def transport_outflow_remains(self, data):
+    def transport_outflow_remains(self, sim):
         pass
 
-    def transport_inflow(self, data):
+    def transport_inflow(self, sim):
         pass
 
-    def transport(self, data):
+    def transport(self, sim):
         pass
 
 
@@ -368,40 +367,37 @@ class BoundaryPointRule(InhomogeneousRule):
         initial_state[outgoing_velocities] = full_initial_state[outgoing_velocities]
         return initial_state
 
-    def collision(self, data):
+    def collision(self, sim):
         pass
 
-    def transport_outflow_remains(self, data):
-        result = super().transport_outflow_remains(data)
+    def transport_outflow_remains(self, sim):
+        result = super().transport_outflow_remains(sim)
         return result
 
-    def transport_inflow(self, data):
-        pv = (data.vG + data.velocity_offset)[:, :]
-        inflow_percentage = (data.dt / data.dp * np.abs(pv[:, 0]))
-        result = np.zeros((self.affected_points.size, data.vG.shape[0]),
+    def transport_inflow(self, sim):
+        # todo replace vels with vels[vels_in]
+        vels = self.vels
+        inflow_percentage = (sim.dt / sim.dp * np.abs(vels[:, 0]))
+        result = np.zeros((self.affected_points.size, self.nvels),
                           dtype=float)
 
-        neg_incomings_vels = np.where(pv[self.vels_in, 0] < 0)[0]
+        neg_incomings_vels = np.where(vels[self.vels_in, 0] < 0)[0]
         neg_vels = self.vels_in[neg_incomings_vels]
         result[:, neg_vels] = (inflow_percentage[neg_vels]
-                               * data.state[np.ix_(self.affected_points + 1, neg_vels)])
+                               * sim.state[np.ix_(self.affected_points + 1, neg_vels)])
 
-        pos_incomings_vels = np.where(pv[self.vels_in, 0] > 0)[0]
+        pos_incomings_vels = np.where(vels[self.vels_in, 0] > 0)[0]
         pos_vels = self.vels_in[pos_incomings_vels]
         result[:, pos_vels] = (inflow_percentage[pos_vels]
-                               * data.state[np.ix_(self.affected_points - 1, pos_vels)])
+                               * sim.state[np.ix_(self.affected_points - 1, pos_vels)])
         return result
 
-    def transport(self, data):
-        if data.p_dim != 1:
-            message = 'Transport is currently only implemented ' \
-                      'for 1D Problems'
-            raise NotImplementedError(message)
+    def transport(self, sim):
         # Simulate Outflowing
-        data.result[self.affected_points, :] = self.transport_outflow_remains(data)
+        sim.interim[self.affected_points, :] = self.transport_outflow_remains(sim)
         # Simulate Inflow
-        inflow = self.transport_inflow(data)
-        data.result[self.affected_points, :] += self.reflection(inflow)
+        inflow = self.transport_inflow(sim)
+        sim.interim[self.affected_points, :] += self.reflection(inflow)
         return
 
     def reflection(self, inflow):
