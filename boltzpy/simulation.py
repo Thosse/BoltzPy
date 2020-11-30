@@ -9,16 +9,6 @@ import boltzpy as bp
 class Simulation(bp.BaseClass):
     r"""Handles all aspects of a single simulation.
 
-    Each instance correlates to a single file
-    in which all parameters and computation results are  stored.
-    An instance can be completely restored from its file.
-
-
-
-    .. todo::
-        - Add Knudsen Number Attribute or Property?
-            * Add method to get candidate for characteristic length
-
     Parameters
     ----------
     timing : :class:`Grid`
@@ -28,8 +18,7 @@ class Simulation(bp.BaseClass):
         Contains the :class:`initialization rules <Rule>`
     model : :class:`CollisionModel`
         Velocity-Space Grids of all Specimen.
-
-    file : :obj:`h5py.Group <h5py:Group>`
+    results : :obj:`h5py.Group`, optional
     log_state : :obj:`numpy.bool`
 
     Attributes
@@ -49,7 +38,7 @@ class Simulation(bp.BaseClass):
                  timing,
                  geometry,
                  model,
-                 file=None,
+                 results=None,
                  log_state=False):
         assert isinstance(timing, bp.Grid)
         self.timing = timing
@@ -71,15 +60,12 @@ class Simulation(bp.BaseClass):
         self.t = np.int(0)
         self.state = self.geometry.initial_state
         self.interim = np.copy(self.state)
-        # todo add results = dict(), use method set_results(hdf_group=None)
-        #  default return dict of np.arrays
-        #  this is a parameter
+        if results is None:
+            self.results = dict()
+        else:
+            self.results = results
 
         self.log_state = np.bool(log_state)
-        # todo self.file needs to be removed, as it creates empty files during tests
-        if file is None:
-            file = self.default_file()
-        self.file = file
 
         self.check_integrity()
         return
@@ -93,21 +79,16 @@ class Simulation(bp.BaseClass):
         return params
 
     @staticmethod
-    def default_file(directory=None, mode="w"):
-        if directory is None:
-            directory = __file__[:-21] + 'Simulations/'
-        idx = 0
-        while True:
-            idx += 1
-            file_path = directory + str(idx) + ".hdf5"
-            if not os.path.exists(file_path):
-                break
-        return h5py.File(file_path, mode=mode)
-
-    @staticmethod
     def attributes():
         attrs = Simulation.parameters()
         return attrs
+
+    @property
+    def file(self):
+        if isinstance(self.results, h5py.Group):
+            return self.results.file
+        else:
+            raise AttributeError
 
     @property
     def shape_of_results(self):
@@ -134,6 +115,18 @@ class Simulation(bp.BaseClass):
                                self.model.nvels)
         return result
 
+    @staticmethod
+    def default_file(directory=None, mode="w"):
+        if directory is None:
+            directory = __file__[:-21] + 'Simulations/'
+        idx = 0
+        while True:
+            idx += 1
+            file_path = directory + str(idx) + ".hdf5"
+            if not os.path.exists(file_path):
+                break
+        return h5py.File(file_path, mode=mode)
+
     #####################################
     #            Computation            #
     #####################################
@@ -141,21 +134,17 @@ class Simulation(bp.BaseClass):
                 hdf_group=None):
         """Compute the fully configured Simulation"""
         self.check_integrity()
-        if hdf_group is None:
-            hdf_group = self.file
-        assert isinstance(hdf_group, h5py.Group)
         # Save current state to the file
         self.save(hdf_group)
-        results = hdf_group["results"]
-        file = hdf_group.file
+        file = self.results.file
 
         print('Start Computation:')
-        results.attrs["t"] = 1
+        self.results.attrs["t"] = 1
         time_tracker = h_tt.TimeTracker()
         for (tw_idx, tw) in enumerate(self.timing.iG[:, 0]):
             while self.t != tw:
                 self.geometry.compute(self)
-            self.write_results(tw_idx, results)
+            self.write_results(tw_idx)
             file.flush()
             # print time estimate
             time_tracker.print(tw, self.timing.iG[-1, 0])
@@ -166,33 +155,33 @@ class Simulation(bp.BaseClass):
         return
 
     # Todo this needs an overhaul
-    def write_results(self, tw_idx, hdf_group):
+    def write_results(self, tw_idx):
         for s in self.model.species:
             idx_range = self.model.idx_range(s)
             spc_state = self.state[..., idx_range]
 
             number_density = self.model.cmp_number_density(spc_state, s)
-            hdf_group["number_density"][tw_idx, :, s] = number_density
+            self.results["number_density"][tw_idx, :, s] = number_density
             momentum = self.model.cmp_momentum(spc_state, s)
-            hdf_group["momentum"][tw_idx, :, s] = momentum
+            self.results["momentum"][tw_idx, :, s] = momentum
             mean_velocity = self.model.cmp_mean_velocity(
                 spc_state,
                 s,
                 momentum=momentum)
-            hdf_group["mean_velocity"][tw_idx, :, s] = mean_velocity
-            hdf_group["temperature"][tw_idx, :, s] = self.model.cmp_temperature(
+            self.results["mean_velocity"][tw_idx, :, s] = mean_velocity
+            self.results["temperature"][tw_idx, :, s] = self.model.cmp_temperature(
                 spc_state,
                 s,
                 number_density=number_density,
                 mean_velocity=mean_velocity)
-            hdf_group["momentum_flow"][tw_idx, :, s] = self.model.cmp_momentum_flow(spc_state, s)
-            hdf_group["energy_density"][tw_idx, :, s] = self.model.cmp_energy_density(spc_state, s)
-            hdf_group["energy_flow"][tw_idx, :, s] = self.model.cmp_energy_flow(spc_state, s)
+            self.results["momentum_flow"][tw_idx, :, s] = self.model.cmp_momentum_flow(spc_state, s)
+            self.results["energy_density"][tw_idx, :, s] = self.model.cmp_energy_density(spc_state, s)
+            self.results["energy_flow"][tw_idx, :, s] = self.model.cmp_energy_flow(spc_state, s)
             # complete distribution
         if self.log_state:
-            hdf_group["state"][tw_idx] = self.state
+            self.results["state"][tw_idx] = self.state
         # update index of current time step
-        hdf_group.attrs["t"] = tw_idx + 1
+        self.results.attrs["t"] = tw_idx + 1
         return
 
     #####################################
@@ -200,14 +189,12 @@ class Simulation(bp.BaseClass):
     #####################################
     # Todo give moments as tuple(arrays, ) (self.file...)
     def animate(self, tmin=None, tmax=None, shape=(3, 2), moments=None):
-        hdf_group = self.file["results"]
-
-        # chosse time frame
+        # choose time frame
         if tmax is None:
-            tmax = int(hdf_group.attrs["t"])
+            tmax = int(self.results.attrs["t"])
         if tmin is None:
             tmin = 0
-        assert tmax >= tmin >= 0
+        assert 0 <= tmin <= tmax <= int(self.results.attrs["t"])
         time_frame = np.s_[tmin: tmax]
         n_frames = tmax - tmin
         figure = bp.Plot.AnimatedFigure(tmax=n_frames,
@@ -228,38 +215,64 @@ class Simulation(bp.BaseClass):
             ax = figure.add_subplot(shape + (1 + m,),
                                     title=moment)
             for s in self.model.species:
-                if hdf_group[moment].ndim == 3:
-                    ydata = hdf_group[moment][time_frame, 1:-1, s]
-                elif hdf_group[moment].ndim == 4:
-                    ydata = hdf_group[moment][time_frame, 1:-1, s, 0]
+                if self.results[moment].ndim == 3:
+                    ydata = self.results[moment][time_frame, 1:-1, s]
+                elif self.results[moment].ndim == 4:
+                    ydata = self.results[moment][time_frame, 1:-1, s, 0]
                 else:
                     raise Exception
                 ax.plot(xdata, ydata)
         if n_frames == 1:
-            figure.save(self.file.file.filename[:-5] + '.jpeg')
+            figure.save(self.file.filename[:-5] + '.jpeg')
         else:
-            figure.save(self.file.file.filename[:-5] + '.mp4')
+            figure.save(self.file.filename[:-5] + '.mp4')
         return
 
     #####################################
     #           Serialization           #
     #####################################
+    @staticmethod
+    def load(hdf5_group):
+        # load all parameters
+        self = bp.BaseClass.load(hdf5_group)
+        self.results = hdf5_group["results"]
+        return self
+
     def save(self, hdf5_group=None, attributes=None):
-        if hdf5_group is None:
-            hdf5_group = self.file
+        self.check_integrity()
+        hdf5_group = self.default_file() if hdf5_group is None else hdf5_group
+        if attributes is None:
+            attributes = self.parameters()
+            attributes.add("results")
+
+        # results must be saved separately, don't pass them to BaseClass
+        save_results = "results" in attributes
+        if save_results:
+            attributes.remove("results")
+
+        has_results = isinstance(self.results, h5py.Group)
+        # load results temporarily, to avoid accidentally overwriting them
+        if has_results:
+            max_t = self.results.attrs["t"]
+            self.results = {key: val[()]
+                            for (key, val) in self.results.items()}
+        # set default result values, for compute() to access
+        elif save_results:
+            max_t = 0
+            for (moment, shape) in self.shape_of_results.items():
+                self.results[moment] = np.zeros(shape, dtype=float)
+
+        # save all attributes, except results
         bp.BaseClass.save(self, hdf5_group, attributes)
 
-        key = "results"
-        hdf5_group.create_group(key)
-        # store index of current time step
-        hdf5_group[key].attrs["t"] = 0
-        for (moment, shape) in self.shape_of_results.items():
-            hdf5_group[key].create_dataset(moment, shape, dtype=float)
-
-        # Todo move this into test_simulation (BaseClass is already moved)
-        # assert that the instance can be reconstructed from the save
-        other = self.load(hdf5_group)
-        assert self.__eq__(other)
+        # save results in group
+        if save_results or has_results:
+            hdf5_group.create_group("results")
+            # store index of current time step
+            hdf5_group["results"].attrs["t"] = max_t
+            for (moment, values) in self.results.items():
+                hdf5_group["results"][moment] = values
+            self.results = hdf5_group["results"]
         return
 
     #####################################
@@ -289,7 +302,13 @@ class Simulation(bp.BaseClass):
             assert getattr(r, attr) is getattr(self.model, attr)
             np.shares_memory(getattr(r, attr), getattr(self.model, attr))
 
-        assert isinstance(self.file, h5py.Group)
+        # results should only be a dictionary, if freshly initialized
+        if isinstance(self.results, dict):
+            # todo assert len(self.results) == 0
+            #  this collides with BaseClass.save calling check_integrity
+            pass
+        else:
+            assert isinstance(self.results, h5py.Group)
 
         assert isinstance(self.log_state, np.bool)
 
@@ -302,7 +321,7 @@ class Simulation(bp.BaseClass):
 
     def __eq__(self, other, ignore=None, print_message=False):
         if ignore is None:
-            ignore = ["file", "t", "state", "interim"]
+            ignore = ["t", "state", "interim"]
         return super().__eq__(other, ignore, print_message)
 
     def __str__(self,
@@ -311,7 +330,6 @@ class Simulation(bp.BaseClass):
         A human readable string which describes all attributes of the instance.
         """
         description = ''
-        description += 'Simulation File = ' + self.file.file.filename + '\n'
         description += 'Timing\n'
         description += '---------\n'
         time_str = self.timing.__str__(write_physical_grids)

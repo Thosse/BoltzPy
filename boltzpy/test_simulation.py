@@ -64,7 +64,7 @@ def simulation(request):
     assert os.path.exists(path)
     with h5py.File(path, mode="r") as old_file:
         with h5py.File(TMP_FILE, mode="w") as new_file:
-            sim = bp.Simulation(file=new_file, **params)
+            sim = bp.Simulation(**params)
             sim.compute(hdf_group=new_file)
             # inject class variables
             request.cls.sim = sim
