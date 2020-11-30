@@ -47,7 +47,8 @@ def test_file_exists():
 
 def test_setup_creates_same_file():
     setup_file(TMP_FILE)
-    test_helper.assert_files_are_equal([FILE, TMP_FILE])
+    test_helper.assert_hdf_groups_are_equal(h5py.File(FILE, mode="r"),
+                                            h5py.File(TMP_FILE, mode="r"))
     os.remove(TMP_FILE)
     return
 
