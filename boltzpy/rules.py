@@ -276,11 +276,10 @@ class BoundaryPointRule(InhomogeneousRule):
         self.refl_idx_inverse = self.cmp_refl_idx_inverse()
         self.refl_idx_elastic = self.cmp_refl_idx_elastic()
         self.initial_state = self.cmp_initial_state()
-        # Todo use separately for this
-        self.effective_number_densities = np.array([
-            self.cmp_number_density(
-                self.initial_state[np.newaxis, self.idx_range(s)], s)
-            for s in self.species])
+        # This is shaped (1, nspc), for simpler multiplication in transport
+        self.effective_number_densities = self.cmp_number_density(
+            self.initial_state[np.newaxis, :],
+            separately=True)
         self.check_integrity()
         return
 
@@ -390,7 +389,7 @@ class BoundaryPointRule(InhomogeneousRule):
         for s in self.species:
             idx_range = self.idx_range(s)
             refl_thermal = (self.cmp_number_density(inflow, s)
-                            / self.effective_number_densities[s]
+                            / self.effective_number_densities[:, s]
                             * self.refl_thermal[s]
                             * self.initial_state[..., idx_range])
             reflected_inflow[..., idx_range] += refl_thermal
