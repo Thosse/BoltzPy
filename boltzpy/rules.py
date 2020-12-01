@@ -187,10 +187,7 @@ class InhomogeneousRule(BaseRule):
         return
 
     def transport_outflow_remains(self, sim):
-        outflow_percentage = (np.abs(sim.model.vels[:, 0])
-                              * sim.dt
-                              / sim.dp)
-        result = ((1 - outflow_percentage) * sim.state[self.affected_points])
+        result = ((1 - sim.flow_quota) * sim.state[self.affected_points])
         return result
 
     def transport_inflow(self, sim):
@@ -225,29 +222,18 @@ class InhomogeneousRule(BaseRule):
 
 class InnerPointRule(InhomogeneousRule):
     def transport_inflow(self, sim):
-        vels = self.vels
-        inflow_percentage = (sim.dt / sim.dp * np.abs(vels[:, 0]))
         result = np.zeros((self.affected_points.size, self.nvels),
                           dtype=float)
-
-        neg_vels = np.where(vels[:, 0] < 0)[0]
-        result[:, neg_vels] = (inflow_percentage[neg_vels]
-                               * sim.state[np.ix_(self.affected_points + 1,
-                                                  neg_vels)]
-                               )
-
-        pos_vels = np.where(vels[:, 0] > 0)[0]
-        result[:, pos_vels] = (inflow_percentage[pos_vels]
-                               * sim.state[np.ix_(self.affected_points - 1,
-                                                  pos_vels)]
-                               )
+        neg_vels = np.where(self.vels[:, 0] < 0)[0]
+        result[:, neg_vels] = sim.state[np.ix_(self.affected_points + 1,
+                                               neg_vels)]
+        pos_vels = np.where(self.vels[:, 0] > 0)[0]
+        result[:, pos_vels] = (sim.state[np.ix_(self.affected_points - 1,
+                                                pos_vels)])
+        result *= sim.flow_quota[np.newaxis, :]
         return result
 
     def transport(self, sim):
-        if sim.geometry.ndim != 1:
-            message = 'Transport is currently only implemented ' \
-                      'for 1D Problems'
-            raise NotImplementedError(message)
         # simulate outflow
         sim.interim[self.affected_points, :] = self.transport_outflow_remains(sim)
         # simulate inflow
@@ -257,12 +243,6 @@ class InnerPointRule(InhomogeneousRule):
 
 class ConstantPointRule(InhomogeneousRule):
     def collision(self, sim):
-        pass
-
-    def transport_outflow_remains(self, sim):
-        pass
-
-    def transport_inflow(self, sim):
         pass
 
     def transport(self, sim):
@@ -342,9 +322,6 @@ class BoundaryPointRule(InhomogeneousRule):
 
     def cmp_refl_idx_elastic(self):
         refl_idx_elastic = np.zeros(self.nvels, dtype=int)
-        assert np.sum(np.abs(self.surface_normal)) == 1, (
-            "only works in 1D Geometries, "
-            "doesn't even use surface normal currently")
         for (idx_v, v) in enumerate(self.i_vels):
             spc = self.get_spc(idx_v)
             v_refl = np.copy(v)
@@ -376,20 +353,19 @@ class BoundaryPointRule(InhomogeneousRule):
 
     def transport_inflow(self, sim):
         # todo replace vels with vels[vels_in]
-        vels = self.vels
-        inflow_percentage = (sim.dt / sim.dp * np.abs(vels[:, 0]))
         result = np.zeros((self.affected_points.size, self.nvels),
                           dtype=float)
 
-        neg_incomings_vels = np.where(vels[self.vels_in, 0] < 0)[0]
+        neg_incomings_vels = np.where(self.vels[self.vels_in, 0] < 0)[0]
         neg_vels = self.vels_in[neg_incomings_vels]
-        result[:, neg_vels] = (inflow_percentage[neg_vels]
-                               * sim.state[np.ix_(self.affected_points + 1, neg_vels)])
+        result[:, neg_vels] = sim.state[np.ix_(self.affected_points + 1,
+                                               neg_vels)]
 
-        pos_incomings_vels = np.where(vels[self.vels_in, 0] > 0)[0]
+        pos_incomings_vels = np.where(self.vels[self.vels_in, 0] > 0)[0]
         pos_vels = self.vels_in[pos_incomings_vels]
-        result[:, pos_vels] = (inflow_percentage[pos_vels]
-                               * sim.state[np.ix_(self.affected_points - 1, pos_vels)])
+        result[:, pos_vels] = sim.state[np.ix_(self.affected_points - 1,
+                                               pos_vels)]
+        result *= sim.flow_quota
         return result
 
     def transport(self, sim):
@@ -429,6 +405,9 @@ class BoundaryPointRule(InhomogeneousRule):
         assert np.all(np.abs(self.surface_normal) <= 1), (
             "A surface normal must have entries from [-1, 0, 1]."
             "surface_normal = {}".format(self.surface_normal))
+
+        assert np.sum(np.abs(self.surface_normal)) == 1, (
+            "Reflections only work in 1D Geometries, so far")
 
         rates = [self.refl_inverse,
                  self.refl_elastic,

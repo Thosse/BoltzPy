@@ -27,12 +27,17 @@ class Simulation(bp.BaseClass):
         Temporal step size.
     dp : :obj:`float`
         Positional step size.
-        t : :obj:`numpy.int`
+    t : :obj:`numpy.int`
         Current time step.
     state : :obj:`~numpy.array` [:obj:`float`]
         The current state of the simulation.
-    state : :obj:`~numpy.array` [:obj:`float`]
+    interim : :obj:`~numpy.array` [:obj:`float`]
         Stores interim values during computation (transport step)
+    flow_quota: :obj:`~numpy.array` [:obj:`float`]
+        Describes the percentage of each velocity
+        that flows in/out per transport step.
+        Faster velocities flow in/out faster.
+        This is precomputed and used in each Rules transport().
     """
     def __init__(self,
                  timing,
@@ -55,6 +60,7 @@ class Simulation(bp.BaseClass):
             assert np.all(getattr(r, attr) == getattr(model, attr))
             # all point to the same objects
             setattr(r, attr, getattr(model, attr))
+        self.flow_quota = (np.abs(self.model.vels[:, 0]) * self.dt / self.dp)
 
         # state and interim are properly initialized in compute()
         # to reduce unnecessary memory usage (very large arrays)

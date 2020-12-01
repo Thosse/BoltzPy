@@ -110,6 +110,8 @@ class Geometry(bp.Grid):
         bp.Grid.check_integrity(self)
         assert self.spacing == 1
         assert not self.is_centered
+        assert self.ndim == 1, (
+            'Transport is currently only implemented for 1D Problems')
 
         assert isinstance(self.rules, np.ndarray)
         assert self.rules.dtype == bp.BaseRule
