@@ -89,6 +89,7 @@ class Simulation(bp.BaseClass):
     @staticmethod
     def attributes():
         attrs = Simulation.parameters()
+        attrs.update({"flow_quota"})
         return attrs
 
     @property

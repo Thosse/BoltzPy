@@ -222,8 +222,7 @@ class InhomogeneousRule(BaseRule):
 
 class InnerPointRule(InhomogeneousRule):
     def transport_inflow(self, sim):
-        result = np.zeros((self.affected_points.size, self.nvels),
-                          dtype=float)
+        result = np.zeros((self.affected_points.size, self.nvels), dtype=float)
         neg_vels = np.where(self.vels[:, 0] < 0)[0]
         result[:, neg_vels] = sim.state[np.ix_(self.affected_points + 1,
                                                neg_vels)]
@@ -245,11 +244,46 @@ class ConstantPointRule(InhomogeneousRule):
     def collision(self, sim):
         pass
 
+    def transport_outflow_remains(self, sim):
+        pass
+
+    def transport_inflow(self, sim):
+        pass
+
     def transport(self, sim):
         pass
 
 
 class BoundaryPointRule(InhomogeneousRule):
+    """Contains all data and computational methods rekated to boundary points.
+
+    Parameters
+    ----------
+    surface_normal : :obj:`~numpy.array` [:obj:`int`]
+        Describes the orientation of the boundary.
+        Points outwards.
+    refl_inverse : :obj:`~numpy.array` [:obj:`float`]
+        Percentage of particles being inversely reflected.
+    refl_elastic : :obj:`~numpy.array` [:obj:`float`]
+        Percentage of particles being elastically reflected.
+    refl_thermal : :obj:`list`[:obj:`int`]
+        Percentage of particles being thermally reflected.
+    refl_absorbs : :obj:`~numpy.array` [:obj:`float`], optional
+        Percentage of particles being absorbed.
+
+    Attributes
+    ----------
+    effective_number_densities : :obj:`~numpy.array` [:obj:`float`]
+        The number densities of the initial state.
+        Since the part of the distribution pointing inwardly is cut off,
+        the real number densities are lower than the given parameters.
+        This describes the numerically computed values.
+        Extensively used for normalizing the initial state, in thermal reflections.
+    _outflow_quota : :obj:`~numpy.array` [:obj:`float`]
+        This is a factor to compute the outflowing mass
+        from the thermal part of the state.
+        This is precomputed, as it is used every transport step.
+    """
     def __init__(self,
                  number_densities,
                  mean_velocities,
@@ -280,6 +314,12 @@ class BoundaryPointRule(InhomogeneousRule):
         self.effective_number_densities = self.cmp_number_density(
             self.initial_state[np.newaxis, :],
             separately=True)
+
+        # precomputed value for transport_outflow()
+        self._outflow_quota = (self.cmp_number_density(np.abs(self.vels[:, 0])
+                                                       * self.initial_state,
+                                                       separately=True)
+                               / self.effective_number_densities)
         self.check_integrity()
         return
 
@@ -300,7 +340,8 @@ class BoundaryPointRule(InhomogeneousRule):
         attrs.update({"vels_in",
                       "refl_idx_inverse",
                       "refl_idx_elastic",
-                      "effective_number_densities"})
+                      "effective_number_densities",
+                      "_outflow_quota"})
         return attrs
 
     def cmp_vels_in(self):
@@ -347,25 +388,38 @@ class BoundaryPointRule(InhomogeneousRule):
         pass
 
     def transport_outflow_remains(self, sim):
-        result = super().transport_outflow_remains(sim)
-        return result
+        state = sim.state[self.affected_points]
+        # split state into thermal and nonthermal state,
+        nd_total = self.cmp_number_density(state, separately=True)
+        nd_thermal = (nd_total / self.effective_number_densities
+                      * self.refl_thermal[np.newaxis, :])
+        state_thermal = (self.get_array(nd_thermal)
+                         * self.initial_state[np.newaxis, :])
+
+        # Add nonthermal remains,
+        # nonthermal state behaves normally, just as in InnerPointRules
+        remains = ((1 - sim.flow_quota) * (state - state_thermal))
+        # Add thermal remains,
+        # thermal state must keep the initial temperature
+        # faster velocities flow out faster thus the temperature lowers
+        # thus keep the relative distribution, but update the number density
+        nd_thermal_remains = nd_thermal * (1 - self._outflow_quota * sim.dt / sim.dp)
+        thermal_remains = (self.get_array(nd_thermal_remains)
+                           * self.initial_state[np.newaxis, :])
+        remains += thermal_remains
+        return remains
 
     def transport_inflow(self, sim):
-        # todo replace vels with vels[vels_in]
-        result = np.zeros((self.affected_points.size, self.nvels),
-                          dtype=float)
+        inflow = np.zeros((self.affected_points.size, self.nvels), dtype=float)
 
         neg_incomings_vels = np.where(self.vels[self.vels_in, 0] < 0)[0]
         neg_vels = self.vels_in[neg_incomings_vels]
-        result[:, neg_vels] = sim.state[np.ix_(self.affected_points + 1,
-                                               neg_vels)]
+        inflow[:, neg_vels] = sim.state[np.ix_(self.affected_points + 1, neg_vels)]
 
         pos_incomings_vels = np.where(self.vels[self.vels_in, 0] > 0)[0]
         pos_vels = self.vels_in[pos_incomings_vels]
-        result[:, pos_vels] = sim.state[np.ix_(self.affected_points - 1,
-                                               pos_vels)]
-        result *= sim.flow_quota
-        return result
+        inflow[:, pos_vels] = sim.state[np.ix_(self.affected_points - 1, pos_vels)]
+        return inflow * sim.flow_quota
 
     def transport(self, sim):
         # Simulate Outflowing
@@ -384,8 +438,7 @@ class BoundaryPointRule(InhomogeneousRule):
                              * inflow[:, self.refl_idx_elastic])
 
         # compute each reflection separately for every species
-        # Todo This is still wrong! faster velocities are depleted faster then slow vels
-        #  thus slow vels accumulate, fast vels are reduced over time thus temperatures is reduced
+        # todo use seperately 
         for s in self.species:
             idx_range = self.idx_range(s)
             refl_thermal = (self.cmp_number_density(inflow, s)
