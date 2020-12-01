@@ -84,6 +84,9 @@ def test_attributes(key, attr):
     with h5py.File(FILE, mode="r") as file:
         old = bp.BaseClass.load_attributes(file[key], attr)
         new = TEST_ELEMENTS[key].__getattribute__(attr)
+        if isinstance(new, np.ndarray):
+            assert old.shape == new.shape
+            assert old.dtype == new.dtype
         if isinstance(new, np.ndarray) and (new.dtype == float):
             assert np.allclose(old, new)
         else:
