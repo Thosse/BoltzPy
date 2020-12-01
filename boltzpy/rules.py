@@ -432,20 +432,18 @@ class BoundaryPointRule(InhomogeneousRule):
     def reflection(self, inflow):
         reflected_inflow = np.zeros(inflow.shape, dtype=float)
 
-        reflected_inflow += (np.dot(self.spc_matrix, self.refl_inverse)
+        reflected_inflow += (self.get_array(self.refl_inverse)
                              * inflow[:, self.refl_idx_inverse])
-        reflected_inflow += (np.dot(self.spc_matrix, self.refl_elastic)
+        reflected_inflow += (self.get_array(self.refl_elastic)
                              * inflow[:, self.refl_idx_elastic])
 
         # compute each reflection separately for every species
-        # todo use seperately 
-        for s in self.species:
-            idx_range = self.idx_range(s)
-            refl_thermal = (self.cmp_number_density(inflow, s)
-                            / self.effective_number_densities[:, s]
-                            * self.refl_thermal[s]
-                            * self.initial_state[..., idx_range])
-            reflected_inflow[..., idx_range] += refl_thermal
+        inflow_nd = self.cmp_number_density(inflow, separately=True)
+        thermal_refl_nd = self.get_array(inflow_nd
+                                         * self.refl_thermal
+                                         / self.effective_number_densities)
+        refl_thermal = thermal_refl_nd * self.initial_state[np.newaxis, :]
+        reflected_inflow += refl_thermal
         return reflected_inflow
 
     def check_integrity(self, complete_check=True, context=None):
