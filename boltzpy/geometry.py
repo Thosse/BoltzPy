@@ -18,7 +18,7 @@ class Geometry(bp.Grid):
         List of Initialization :obj:`Rules<Rule>`
     """
     def __init__(self,  shape, delta, rules):
-        rules = np.array(rules, dtype=bp.Rule)
+        rules = np.array(rules, dtype=bp.BaseRule)
         self.rules = rules
         super().__init__(shape,
                          delta,
@@ -90,18 +90,16 @@ class Geometry(bp.Grid):
     #####################################
     #            Computation            #
     #####################################
-    def compute(self, data):
+    def compute(self, sim):
         """Executes a single time step, by operator splitting"""
         # execute a single transport step
         for rule in self.rules:
-            rule.transport(data)
+            rule.transport(sim)
         # update data.state (transport writes into data.result)
-        (data.state, data.result) = (data.result, data.state)
+        (sim.state, sim.interim) = (sim.interim, sim.state)
         # executie s single collision step
         for rule in self.rules:
-            rule.collision(data)
-        # increase current_timestep counter
-        data.t += 1
+            rule.collision(sim)
         return
 
     #####################################
@@ -109,15 +107,17 @@ class Geometry(bp.Grid):
     #####################################
     def check_integrity(self):
         """Sanity Check"""
-        super().check_integrity()
+        bp.Grid.check_integrity(self)
         assert self.spacing == 1
         assert not self.is_centered
+        assert self.ndim == 1, (
+            'Transport is currently only implemented for 1D Problems')
 
         assert isinstance(self.rules, np.ndarray)
-        assert self.rules.dtype == bp.Rule
+        assert self.rules.dtype == bp.BaseRule
         assert self.rules.ndim == 1
         for rule in self.rules:
-            assert isinstance(rule, bp.Rule)
+            assert isinstance(rule, bp.BaseRule)
             rule.check_integrity()
         # all points are affected at most once
         assert self.affected_points.size == len(set(self.affected_points)), (

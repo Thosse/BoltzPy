@@ -14,14 +14,30 @@ Grid
 .. autoclass:: boltzpy.Grid
     :members:
 
-SVGrid
-------
-.. autoclass:: boltzpy.Model
+BaseModel
+--------------
+.. autoclass:: boltzpy.BaseModel
     :members:
 
-Rule
-----
-.. autoclass:: boltzpy.Rule
+
+CollisionModel
+--------------
+.. autoclass:: boltzpy.CollisionModel
+    :members:
+
+BaseRule
+--------------
+.. autoclass:: boltzpy.BaseRule
+    :members:
+
+InnerPointRule
+--------------
+.. autoclass:: boltzpy.InnerPointRule
+    :members:
+
+BoundaryPointRule
+-----------------
+.. autoclass:: boltzpy.BoundaryPointRule
     :members:
 
 Geometry

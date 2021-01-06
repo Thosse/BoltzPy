@@ -82,12 +82,13 @@ class BaseClass:
         # this distionary contains all possible subclasses
         subclasses = {
             'Grid': bp.Grid,
-            'Model': bp.Model,
+            'CollisionModel': bp.CollisionModel,
             'Geometry': bp.Geometry,
             'InnerPointRule': bp.InnerPointRule,
             'ConstantPointRule': bp.ConstantPointRule,
             'BoundaryPointRule': bp.BoundaryPointRule,
-            'HomogeneousRule': bp.HomogeneousRule}
+            'HomogeneousRule': bp.HomogeneousRule,
+            "Simulation": bp.Simulation}
         # this is mainly used for asserts
         if subclass is None:
             return subclasses
@@ -96,40 +97,36 @@ class BaseClass:
 
     @staticmethod
     def parameters():
+        """The set of initialization parameters, including optionals."""
         raise NotImplementedError
 
     @staticmethod
     def attributes():
+        """The set of all class attributes and propertes."""
         raise NotImplementedError
 
     @staticmethod
-    def read_parameters_from_hdf_file(hdf5_group, parameters=None):
+    def load_attributes(hdf5_group, attributes):
         """Read a set of parameters from a given HDF5 group.
-        Returns a dictionary of the read values.
+        Returns a dictionary of the read values
+        or the value, if only a single attribute was given as a string.
 
         Parameters
         ----------
         hdf5_group : :obj:`h5py.Group <h5py:Group>`
-        parameters : :obj:`str`, :obj:`list`, or  :obj:`set`
-
-        Returns
-        -------
-        self : :obj:`dict`
+        attributes : :obj:`str`, :obj:`list`, or  :obj:`set`
         """
+        # return values directly, if a single attribute is given as a string
+        if type(attributes) is str:
+            result = BaseClass.load_attributes(hdf5_group, [attributes])
+            return result[attributes]
+        # otherwise return a dictionary
         assert isinstance(hdf5_group, h5py.Group)
-        # if no parameters are given, then derive from hdf5 attribute "class"
-        if parameters is None:
-            subclass = BaseClass.subclasses(hdf5_group.attrs["class"])
-            parameters = subclass.parameters()
-        # if only a single parameter is given, change into list for consistency
-        if type(parameters) is str:
-            parameters = [parameters]
-        else:
-            assert type(parameters) in [list, set]
-            assert all(type(p) is str for p in parameters)
+        assert type(attributes) in [list, set]
         # read parameters and store in dict
         result = dict()
-        for p in parameters:
+        for p in attributes:
+            assert p in hdf5_group.keys()
             # Datasets are read directly
             if isinstance(hdf5_group[p], h5py.Dataset):
                 val = hdf5_group[p][()]
@@ -147,7 +144,7 @@ class BaseClass:
                     subclass = BaseClass.subclasses(cls)
                     result[p] = subclass.load(hdf5_group[p])
                 # group is an array of BaseClasses
-                if cls == "Array":
+                elif cls == "Array":
                     size = hdf5_group[p].attrs["size"]
                     result[p] = np.empty(size, dtype=object)
                     for idx in range(size):
@@ -177,19 +174,46 @@ class BaseClass:
         assert hdf5_group.attrs["class"] in BaseClass.subclasses().keys()
         subclass = BaseClass.subclasses(hdf5_group.attrs["class"])
         # read parameters from file
-        parameters = BaseClass.read_parameters_from_hdf_file(
-            hdf5_group)
+        parameters = BaseClass.load_attributes(hdf5_group,
+                                               subclass.parameters())
         return subclass(**parameters)
 
-    def save(self, hdf5_group, write_all=False):
+    @staticmethod
+    def save_attribute(hdf5_group, key, value):
+        # save Base class attributes in subgroup
+        if isinstance(value, BaseClass):
+            hdf5_group.create_group(key)
+            value.save(hdf5_group[key])
+        # save arrays of objects in sub-subgroups
+        elif isinstance(value, np.ndarray) and value.dtype == 'object':
+            # create subgroup
+            hdf5_group.create_group(key)
+            hdf5_group[key].attrs["class"] = "Array"
+            hdf5_group[key].attrs["size"] = value.size
+            # save elements iteratively
+            for (idx, element) in enumerate(value):
+                if isinstance(element, BaseClass):
+                    idx = str(idx)
+                    hdf5_group[key].create_group(idx)
+                    element.save(hdf5_group[key][idx])
+                else:
+                    raise NotImplementedError
+        # transform sparse matrices to normal np.arrays
+        elif isinstance(value, scipy.sparse.csr_matrix):
+            value = value.toarray()
+            hdf5_group[key] = value
+        else:
+            hdf5_group[key] = value
+
+    def save(self, hdf5_group, attributes=None):
         """Write the parameters of the Class into the HDF5 group.
 
         Parameters
         ----------
         hdf5_group : :obj:`h5py.Group <h5py:Group>`
-        write_all : :obj:`bool`
-            If True, write all attributes and properties to the file,
-            even the unnecessary ones. Useful for testing,
+        attributes : :obj:`set`
+            Set of attributes to be written.
+            IF None if given, then write the parameters().
         """
         assert isinstance(hdf5_group, h5py.Group)
         self.check_integrity()
@@ -199,41 +223,15 @@ class BaseClass:
         # save class name for automatic loading/initialization
         hdf5_group.attrs["class"] = self.__class__.__name__
         # choose attributes to save
-        if write_all:
-            attributes = self.attributes()
-        else:
+        if attributes is None:
             attributes = self.parameters()
         # save attributes to file
         for attr in attributes:
-            value = self.__getattribute__(attr)
-            # save Base class attributes in subgroup
-            if isinstance(value, BaseClass):
-                hdf5_group.create_group(attr)
-                value.save(hdf5_group[attr])
-            # save arrays of objects in sub-subgroups
-            is_array_of_objects = isinstance(value, np.ndarray) and value.dtype == 'object'
-            if is_array_of_objects:
-                # create subgroup
-                hdf5_group.create_group(attr)
-                hdf5_group[attr].attrs["class"] = "Array"
-                hdf5_group[attr].attrs["size"] = value.size
-                # save elements iteratively
-                for (idx, element) in enumerate(value):
-                    assert isinstance(element, BaseClass)
-                    idx = str(idx)
-                    hdf5_group[attr].create_group(idx)
-                    element.save(hdf5_group[attr][idx])
-            else:
-                # transform sparse matrices to normal np.arrays
-                if isinstance(value, scipy.sparse.csr_matrix):
-                    value = value.toarray()
-                hdf5_group[attr] = value
-
-        # check that the class can be reconstructed from the save
-        other = self.load(hdf5_group)
-        assert self == other
+            self.save_attribute(hdf5_group, attr, self.__getattribute__(attr))
         return
 
     def check_integrity(self):
         """Sanity Check."""
-        raise NotImplementedError
+        assert isinstance(self.parameters(), set)
+        assert isinstance(self.attributes(), set)
+        assert self.parameters().issubset(self.attributes())

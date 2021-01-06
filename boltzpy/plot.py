@@ -40,11 +40,11 @@ def plot_continuous_maxwellian(particle_number,
     X, Y = np.meshgrid(steps, steps)
     # Compute continuous maxwellian as Z axis
     velocities = np.vstack((X.flatten(), Y.flatten())).T
-    Z = bp.Model.maxwellian(velocities,
-                            mass,
-                            particle_number,
-                            mean_velocity,
-                            temperature).reshape((num, num))
+    Z = bp.CollisionModel.maxwellian(velocities,
+                                     mass,
+                                     particle_number,
+                                     mean_velocity,
+                                     temperature).reshape((num, num))
 
     # Create Surface plot
     ax.plot_surface(X, Y, Z, **plot_style)
