@@ -72,9 +72,6 @@ class BaseModel(bp.BaseClass):
         self.spc_matrix = np.zeros((self.nvels, self.nspc), dtype=int)
         for s in self.species:
             self.spc_matrix[self.idx_range(s), s] = 1
-
-        if type(self) == BaseModel:
-            raise NotImplementedError
         return
 
     @staticmethod

@@ -25,8 +25,8 @@ class CollisionModel(bp.BaseModel):
                  masses,
                  shapes,
                  base_delta,
-                 spacings,
-                 collision_factors,
+                 spacings=None,
+                 collision_factors=None,
                  collision_relations=None,
                  collision_weights=None,
                  algorithm_relations="all",
@@ -37,13 +37,11 @@ class CollisionModel(bp.BaseModel):
                               shapes,
                               base_delta,
                               spacings)
-        # todo rename spc_collision_probability, default = np.ones
-        #  must be in [0, 1]
-        #  adjust by setting number density
-        #  add epsilon method(state) for this
-        assert isinstance(collision_factors, (list, tuple, np.ndarray))
-        self.collision_factors = np.array(collision_factors,
-                                          dtype=float)
+        if collision_factors is None:
+            self.collision_factors = np.ones((self.nspc, self.nspc), dtype=float)
+        else:
+            assert isinstance(collision_factors, (list, tuple, np.ndarray))
+            self.collision_factors = np.array(collision_factors, dtype=float)
         assert self.collision_factors.ndim == 2
 
         self.algorithm_relations = str(algorithm_relations)
