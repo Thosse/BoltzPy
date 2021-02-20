@@ -127,7 +127,7 @@ class BaseModel(bp.BaseClass):
         grids : :class:`~boltzpy.Grid`] or :obj:`~numpy.array` [:class:`~boltzpy.Grid`]
             Velocity Grids of the specimen
         """
-        if np.issubdtype(s, np.integer):
+        if np.issubdtype(type(s), np.integer):
             return bp.Grid(self.shapes[s],
                            self.base_delta,
                            self.spacings[s],
