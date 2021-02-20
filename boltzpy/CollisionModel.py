@@ -462,31 +462,49 @@ class CollisionModel(bp.BaseModel):
     #####################################
     #: :obj:`list` [:obj:`dict`]:
     #: Default plot_styles for :meth::`plot`
-    plot_styles = [{"marker": 'o', "alpha": 0.5, "s": 9},
-                   {"marker": 'x', "s": 16},
-                   {"marker": 's', "alpha": 0.5, "s": 9},
-                   {"marker": 'D', "alpha": 0.5, "s": 9}]
+    plot_styles = [{"marker": 'o', "alpha": 0.5, "s": 50},
+                   {"marker": 'x', "alpha": 0.9, "s": 100},
+                   {"marker": 's', "alpha": 0.5, "s": 50},
+                   {"marker": 'D', "alpha": 0.5, "s": 50}]
 
     def plot(self, 
              relations=None,
-             species=None):
+             species=None,
+             save_as=None,
+             xticks=None,
+             yticks=None,
+             zticks=None):
         """Plot the Grid using matplotlib."""
         relations = [] if relations is None else np.array(relations, ndmin=2)
         species = self.species if species is None else np.array(species, ndmin=1)
+
         # setup ax for plot
         import matplotlib.pyplot as plt
         projection = "3d" if self.ndim == 3 else None
         ax = plt.figure().add_subplot(projection=projection)
+
         # Plot Grids as scatter plot
         for s in species:
             self.subgrids(s).plot(ax, **(self.plot_styles[s]))
+
         # plot collisions
         for r in relations:
             # repeat the collision to "close" the rectangle / trapezoid
             rels = np.tile(r, 2)
             # transpose the velocities, for easy unpacking
             vels = (self.vels[rels]).transpose()
-            ax.plot(*vels, color="gray", linewidth=1)
+            ax.plot(*vels, color="gray", linewidth=0.2)
+
+        # set tick values on axes, None = auto choice of matplotlib
+        if xticks is not None:
+            ax.set_xticks(xticks)
+        if yticks is not None:
+            ax.set_yticks(yticks)
+        if zticks is not None and self.ndim == 3:
+            ax.set_zticks(zticks)
+
+        if save_as is not None:
+            plt.savefig(save_as)
         plt.show()
         return
 
@@ -496,6 +514,9 @@ class CollisionModel(bp.BaseModel):
     def check_integrity(self):
         """Sanity Check."""
         bp.BaseModel.check_integrity(self)
+        assert np.all(self.spacings % 2 == 0), (
+            "The collision generation scheme assumes that the spacing is even. "
+            "It does not return the full set otherwise")
         assert self.algorithm_relations in {"all", "convergent", "naive"}
         assert self.algorithm_weights in {"uniform"}
         return
