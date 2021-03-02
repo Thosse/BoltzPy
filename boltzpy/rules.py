@@ -534,7 +534,7 @@ class HomogeneousRule(BaseRule, bp.CollisionModel):
 
     @staticmethod
     def attributes():
-        attrs = HomogeneousRule.attributes()
+        attrs = HomogeneousRule.parameters()
         attrs.update(bp.CollisionModel.attributes())
         return attrs
 
