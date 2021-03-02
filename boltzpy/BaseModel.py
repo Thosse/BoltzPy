@@ -46,7 +46,7 @@ class BaseModel(bp.BaseClass):
     def __init__(self,
                  masses,
                  shapes,
-                 base_delta,
+                 base_delta=1.0,
                  spacings=None,
                  **kwargs):
         self.masses = np.array(masses, dtype=int)

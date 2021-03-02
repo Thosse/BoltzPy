@@ -24,7 +24,7 @@ class CollisionModel(bp.BaseModel):
     def __init__(self,
                  masses,
                  shapes,
-                 base_delta,
+                 base_delta=1.0,
                  spacings=None,
                  collision_factors=None,
                  collision_relations=None,
@@ -97,7 +97,7 @@ class CollisionModel(bp.BaseModel):
     @property
     def collision_invariants(self):
         rank = np.linalg.matrix_rank(self.collision_matrix.toarray())
-        maximum_rank = np.min([self.nvels, self.collision_weights.size])
+        maximum_rank = np.min([self.nvels, self.ncols])
         return maximum_rank - rank
 
     ################################################
