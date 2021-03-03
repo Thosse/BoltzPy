@@ -549,11 +549,8 @@ class HomogeneousRule(BaseRule, bp.CollisionModel):
         attrs.update(bp.CollisionModel.attributes())
         return attrs
 
-    def compute(self, dt=None, maxiter=5000, _depth=0):
+    def compute(self, dt, maxiter=100000, animate=False, animate_filename=None):
         self.check_integrity()
-        if dt is None:
-            max_weight = np.max(self.collision_matrix)
-            dt = 1 / (20 * max_weight)
         state = self.initial_state
         # store state at each timestep here
         result = np.zeros((maxiter,) + state.shape)
@@ -562,30 +559,30 @@ class HomogeneousRule(BaseRule, bp.CollisionModel):
         # usually named k1,k2,k3,k4, only one is needed at the time
         rks_component = np.zeros(state.shape, float)
         # time offsets of the rks
-        rks_offset = np.array([0, 0.5, 0.5, 1])
+        rks_offsets = np.array([0, 0.5, 0.5, 1])
         # weights of each interim result / rks_component
-        rks_weight = np.array([1 / 6, 2 / 6, 2 / 6, 1 / 6])
+        rks_weights = np.array([1 / 6, 2 / 6, 2 / 6, 1 / 6])
         # execute simulation
         for i in range(1, maxiter):
             state = result[i-1]
             result[i] = state
             # Runge Kutta steps
-            for (offset, weight) in zip(rks_offset, rks_weight):
-                interim_state = state + offset * rks_component
+            for (rks_offset, rks_weight) in zip(rks_offsets, rks_weights):
+                interim_state = state + rks_offset * rks_component
                 coll = self.collision_operator(interim_state)
-                rks_component = dt * (coll - self.source_term)
-                result[i] = result[i] + weight * rks_component
+                # execute runge kutta substep
+                result[i] = result[i] + rks_weight * dt * (coll - self.source_term)
             # break loop when reaching equilibrium
             if np.allclose(result[i] - result[i-1], 0, atol=1e-8, rtol=1e-8):
+                if animate:
+                    self.plot(result[:i+1:100], animate_filename)
                 return result[:i+1]
-            # reduce dt, if NaN Values show up, at most 2 times!
-            elif np.isnan(result[i]).any():
-                if _depth < 3:
-                    print("NaN-Value at i={}, set dt/100 = {}"
-                          "".format(i, dt/100))
-                    return self.compute(dt/100, maxiter, _depth + 1)
-                else:
-                    raise ValueError("NaN-Value at i={}".format(i))
+            # check for instabilities or divergence
+            assert np.all(result[i] >= 0), ("Instability detected at t={}. "
+                                            "Reduce time step size or increase collision_factors, "
+                                            "to compensate the source term!".format(i))
+        if animate:
+            self.plot(result[::1000], animate_filename)
         raise ValueError("No equilibrium established")
 
     def check_integrity(self):
