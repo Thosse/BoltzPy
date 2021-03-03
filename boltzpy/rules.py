@@ -74,22 +74,26 @@ class BaseRule(bp.BaseModel):
                                                        temperatures)
         return initial_state
 
-    # Todo rework this, is probably obsolete
-    def plot(self,
-             model):
-        """Plot the initial state of a single specimen using matplotlib 3D."""
-        assert self.ndim == 2, (
-            "3D Plots are only implemented for 2D velocity spaces")
-
-        fig = bp.Plot.AnimatedFigure()
-        for s in model.species:
-            ax = fig.add_subplot((1, model.nspc, s + 1), 3)
-            idx_range = model.idx_range(s)
-            vels = model.vels[idx_range]
-            ax.plot(vels[..., 0],
-                    vels[..., 1],
-                    self.initial_state[idx_range])
-        fig.show()
+    def plot(self, state=None, file_name=None):
+        # use shape[0] to differ between animations and simple plots
+        state = np.array(self.initial_state if state is None else state,
+                         ndmin=2)
+        # basic asserts
+        assert state.ndim == 2
+        assert state.shape[-1] == self.nvels
+        # create animation/plot, depending on shape[0]
+        fig = bp.Plot.AnimatedFigure(state.shape[0])
+        for s in self.species:
+            ax = fig.add_subplot((1, self.nspc, s+1), 3)
+            idx_range = self.idx_range(s)
+            vels = self.vels[idx_range]
+            ax.plot(vels[..., 0], vels[..., 1], state[:, idx_range])
+        if file_name is None:
+            fig.show()
+        else:
+            assert type(file_name) is str
+            fig.save(file_name)
+        return
 
         # Todo add Wireframe3D plot to animated figure
         # plot continuous maxwellian as a surface plot
@@ -104,7 +108,6 @@ class BaseRule(bp.BaseModel):
         #     maximum_velocity,
         #     100,
         #     plot_object)
-        return
 
     def check_integrity(self):
         """Sanity Check."""
