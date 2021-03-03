@@ -25,7 +25,9 @@ class BaseRule(bp.BaseModel):
                  spacings=None,
                  initial_state=None,
                  **kwargs):
-        bp.BaseModel.__init__(**locals())
+        params = {**locals(), **kwargs}
+        del params["kwargs"]
+        bp.BaseModel.__init__(**params)
         self.number_densities = np.array(number_densities, dtype=float)
         self.mean_velocities = np.array(mean_velocities, dtype=float)
         self.temperatures = np.array(temperatures, dtype=float)
@@ -160,7 +162,9 @@ class InhomogeneousRule(BaseRule):
                  spacings=None,
                  initial_state=None,
                  **kwargs):
-        BaseRule.__init__(**locals())
+        params = {**locals(), **kwargs}
+        del params["kwargs"]
+        BaseRule.__init__(**params)
         self.affected_points = np.array(affected_points, dtype=int)
         InhomogeneousRule.check_integrity(self)
         return
@@ -300,7 +304,9 @@ class BoundaryPointRule(InhomogeneousRule):
                  spacings=None,
                  initial_state=None,
                  **kwargs):
-        InhomogeneousRule.__init__(**locals())
+        params = {**locals(), **kwargs}
+        del params["kwargs"]
+        InhomogeneousRule.__init__(**params)
         self.surface_normal = np.array(surface_normal, dtype=int)
         self.refl_inverse = np.array(refl_inverse, dtype=float)
         self.refl_elastic = np.array(refl_elastic, dtype=float)
@@ -518,8 +524,10 @@ class HomogeneousRule(BaseRule, bp.CollisionModel):
                  initial_state=None,
                  source_term=0.0,
                  **kwargs):
-        BaseRule.__init__(**locals())
-        bp.CollisionModel.__init__(**locals())
+        params = {**locals(), **kwargs}
+        del params["kwargs"]
+        BaseRule.__init__(**params)
+        bp.CollisionModel.__init__(**params)
         self.source_term = np.zeros(self.initial_state.shape, dtype=float)
         self.source_term[...] = source_term
         self.check_integrity()
