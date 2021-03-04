@@ -593,5 +593,5 @@ class HomogeneousRule(BaseRule, bp.CollisionModel):
         # otherwise no equilibrium can be established
         for s in self.species:
             assert np.isclose(self.cmp_number_density(self.source_term, s), 0)
-            assert np.allclose(self.cmp_momentum(self.source_term, s), 0)
-            assert np.isclose(self.cmp_energy_density(self.source_term, s), 0)
+        assert np.allclose(self.cmp_momentum(self.source_term), 0)
+        assert np.isclose(self.cmp_energy_density(self.source_term), 0)

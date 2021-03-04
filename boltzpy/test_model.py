@@ -291,7 +291,7 @@ def test_mf_orthogonal_heat_flow_is_orthogonal(key):
         for __ in range(10):
             direction1 = np.random.random(model.ndim)
             # test parallel stress mf
-            mf = model.mf_orthogonal_heat_flow(state, direction1)
+            mf = model.mf_heat_flow(mean_velocity, direction1, orthogonalize_state=state)
             assert_all_moments_are_zero(model, mf * state)
 
 

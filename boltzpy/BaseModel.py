@@ -510,7 +510,7 @@ class BaseModel(bp.BaseClass):
         mf_pressure = mass / dim * np.sum(c_vels**2, axis=-1)
         return mf_pressure.reshape(shape + (velocities.shape[0],))
 
-    def mf_heat_flow(self, mean_velocity, direction, s=None):
+    def mf_heat_flow(self, mean_velocity, direction, s=None, orthogonalize_state=None):
         """Compute the heat flow moment function for a direction
         and either a single specimen or the mixture.
 
@@ -519,10 +519,13 @@ class BaseModel(bp.BaseClass):
         mean_velocity : :obj:`~numpy.array` [ :obj:`float` ]
         direction : :obj:`~numpy.array` [ :obj:`float` ]
         s : :obj:`int`, optional
+        orthogonalize_state : :obj:`~numpy.array` [ :obj:`float` ], optional
+            If not None, the moment components of the moment function are subtracted.
+            For this an state/distribution must be given. It should be be a maxwellian.
 
         Returns
         -------
-        mf_pressure : :obj:`~numpy.array` [ :obj:`float` ]
+        mf_heaf_flow : :obj:`~numpy.array` [ :obj:`float` ]
         """
         mean_velocity = np.array(mean_velocity)
         direction = np.array(direction)
@@ -531,43 +534,20 @@ class BaseModel(bp.BaseClass):
         c_vels = self.c_vels(mean_velocity, s)
         p_vels = self.p_vels(c_vels, direction)
         squared_sum = np.sum(c_vels ** 2, axis=-1)
-        return mass * p_vels * squared_sum
-
-    def mf_orthogonal_heat_flow(self, state, direction, s=None):
-        """Compute the orthogonalized heat flow moment function
-        for a direction and either a single specimen or the mixture.
-
-
-        This is necessary to compute the heat transfer coefficient.
-        Note that the state is necessary here, as the theoretical
-        normalization factor is distorted due to discretization effects!
-
-        Parameters
-        ----------
-        state : :obj:`~numpy.array` [ :obj:`float` ]
-        direction : :obj:`~numpy.array` [ :obj:`float` ]
-        s : :obj:`int`, optional
-
-        Returns
-        -------
-        mf_pressure : :obj:`~numpy.array` [ :obj:`float` ]
-        """
-        direction = np.array(direction)
-        direction = direction / np.sum(direction**2)
-        # compute mean velocity
-        mean_velocity = self.cmp_mean_velocity(state, s)
-        # compute non-orthogonal moment function
-        mf = self.mf_heat_flow(mean_velocity, direction, s)
-        # subtract non-orthogonal part
-        # in continuum this is (d+2)*T * c_vels
-        # however this is not precise enough in grids
-        # thus subtract correction term based on state
-        p_vels = self.c_vels(mean_velocity) @ direction
-        ct = (self.cmp_momentum(mf * state) @ direction
-              / (self.cmp_momentum(p_vels*state) @ direction)
-              * p_vels)
-        result = mf - ct
-        return result
+        moment_function = mass * p_vels * squared_sum
+        # orthogonalize, if necessary
+        if orthogonalize_state is None:
+            return moment_function
+        else:
+            # Subtract non-orthogonal part to orthogonalize.
+            # In continuum this is (d+2)*T*c_vels,
+            # however this is not precise in grids
+            # thus subtract c"orrection term based on state
+            p_vels = self.c_vels(mean_velocity) @ direction
+            momentum = self.cmp_momentum(moment_function * orthogonalize_state) @ direction
+            norm = (self.cmp_momentum(p_vels * orthogonalize_state) @ direction)
+            correction_term = momentum / norm * p_vels
+            return moment_function - correction_term
 
     ##################################
     #            Moments             #
