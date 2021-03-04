@@ -441,35 +441,46 @@ class BaseModel(bp.BaseClass):
         norms = np.linalg.norm(direction_1) * np.linalg.norm(direction_2)
         return np.allclose(np.dot(direction_1, direction_2), norms)
 
-    # TODO if directions = None, return tensor, check if this is easy to do
-    def mf_stress(self, mean_velocity, direction_1, direction_2, s=None):
+    def mf_stress(self, mean_velocity, directions, s=None, orthogonalize=False):
         """Compute the stress moment function for given directions
         and either a single specimen or the mixture.
 
         Parameters
         ----------
         mean_velocity : :obj:`~numpy.array` [ :obj:`float` ]
-        direction_1 : :obj:`~numpy.array` [ :obj:`float` ]
-        direction_2 : :obj:`~numpy.array` [ :obj:`float` ]
+        directions : :obj:`~numpy.array` [ :obj:`float` ]
+            Must be of shape=(2,ndim).
         s : :obj:`int`, optional
+        orthogonalize : :obj:`bool`. optional
+            If True, the moment components of the moment function are subtracted.
 
         Returns
         -------
         mf_Stress : :obj:`~numpy.array` [ :obj:`float` ]
         """
+        # assertions
         mean_velocity = np.array(mean_velocity)
-        direction_1 = np.array(direction_1)
-        direction_2 = np.array(direction_2)
-        assert direction_1.shape == (self.ndim,)
-        assert direction_2.shape == (self.ndim,)
-        assert (self.is_parallel(direction_1, direction_2)
-                or self.is_orthogonal(direction_1, direction_2))
-
+        assert directions.shape == (2, self.ndim,)
+        is_parallel = self.is_parallel(directions[0], directions[1])
+        is_orthogonal = self.is_orthogonal(directions[0], directions[1])
+        assert is_parallel or is_orthogonal, (
+            "The directions the stress function, relate to the stress tensor. "
+            "They are assumed to be either orthogonal or parallel. "
+            "Other cases are not expected, and may lead to errors")
+        # normalize directions
+        norm = np.linalg.norm(directions, axis=1).reshape(2, 1)
+        directions /= norm
+        # compute stress
         mass = self.get_array(self.masses) if s is None else self.masses[s]
         c_vels = self.c_vels(mean_velocity, s)
-        p_vels_1 = self.p_vels(c_vels, direction_1)
-        p_vels_2 = self.p_vels(c_vels, direction_2)
-        return mass * p_vels_1 * p_vels_2
+        p_vels_1 = self.p_vels(c_vels, directions[0])
+        p_vels_2 = self.p_vels(c_vels, directions[1])
+        moment_function = mass * p_vels_1 * p_vels_2
+        # orthogonalize, if necessary
+        if orthogonalize and is_parallel:
+            return moment_function - self.mf_pressure(mean_velocity, s)
+        else:
+            return moment_function
 
     def mf_pressure(self, mean_velocity, s=None):
         """Compute the pressure moment function
@@ -498,34 +509,6 @@ class BaseModel(bp.BaseClass):
         # compute pressure moment function
         mf_pressure = mass / dim * np.sum(c_vels**2, axis=-1)
         return mf_pressure.reshape(shape + (velocities.shape[0],))
-
-    def mf_orthogonal_stress(self, mean_velocity, direction_1, direction_2, s=None):
-        """Compute the orthogonalized stress moment function
-        for given directions and either a single specimen or the mixture.
-
-        This is necessary to compute the viscosity coefficient.
-
-        Parameters
-        ----------
-        mean_velocity : :obj:`~numpy.array` [ :obj:`float` ]
-        direction_1 : :obj:`~numpy.array` [ :obj:`float` ]
-        direction_2 : :obj:`~numpy.array` [ :obj:`float` ]
-        s : :obj:`int`, optional
-
-        Returns
-        -------
-        mf_pressure : :obj:`~numpy.array` [ :obj:`float` ]
-        """
-        mean_velocity = np.array(mean_velocity)
-        direction_1 = np.array(direction_1)
-        direction_2 = np.array(direction_2)
-        result = self.mf_stress(mean_velocity, direction_1, direction_2, s)
-        if self.is_orthogonal(direction_1, direction_2):
-            return result
-        elif self.is_parallel(direction_1, direction_2):
-            return result - self.mf_pressure(mean_velocity, s)
-        else:
-            raise ValueError
 
     def mf_heat_flow(self, mean_velocity, direction, s=None):
         """Compute the heat flow moment function for a direction

@@ -148,6 +148,16 @@ def assert_all_moments_are_zero(model, state):
     assert np.isclose(energy, 0)
 
 
+def get_random_orthogonal_vectors(n_vectors, dimension):
+    assert n_vectors <= dimension
+    random_matrix = np.random.rand(n_vectors, dimension)
+    # singular value decomposition
+    # random_matrix = u @ diag @ vh
+    # with u and vh orthogonal
+    u, diag, vh = np.linalg.svd(random_matrix, full_matrices=False)
+    return vh
+
+
 @pytest.mark.parametrize("key", MODELS.keys())
 def test_invariance_of_moments_under_collision_operator(key):
     model = MODELS[key]
@@ -241,21 +251,22 @@ def test_mf_orthogonal_stress_is_orthogonal(key):
                                  temperature=temperature,
                                  mass=mass_array,
                                  mean_velocity=mean_velocity)
-        # choose random direction1
+        # choose random directions
         for __ in range(10):
-            direction1 = np.random.random(model.ndim)
+            directions = np.zeros((2, model.ndim))
             # test parallel stress mf
-            mf = model.mf_orthogonal_stress(mean_velocity,
-                                            direction1,
-                                            direction1)
+            directions[:] = np.random.random(model.ndim)
+            mf = model.mf_stress(mean_velocity,
+                                 directions,
+                                 orthogonalize=True)
             assert_all_moments_are_zero(model, mf)
             assert_all_moments_are_zero(model, mf * state)
-            # ro test nonparallel stress, choose simple orthogonal direction
-            direction2 = np.zeros(model.ndim)
-            direction2[:2] = (-direction1[1], direction1[0])
-            mf = model.mf_orthogonal_stress(mean_velocity,
-                                            direction1,
-                                            direction2)
+            # test orthogonal stress, choose simple orthogonal direction
+            directions = get_random_orthogonal_vectors(2, model.ndim)
+            assert model.is_orthogonal(directions[0], directions[1])
+            mf = model.mf_stress(mean_velocity,
+                                 directions,
+                                 orthogonalize=True)
             assert_all_moments_are_zero(model, mf)
             assert_all_moments_are_zero(model, mf * state)
 
