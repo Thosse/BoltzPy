@@ -445,17 +445,52 @@ class CollisionModel(bp.BaseModel):
     #####################################
     #           Coefficients            #
     #####################################
-    def viscosity(self,
-                  number_densities,
-                  temperature,
-                  direction_1=None,
-                  direction_2=None,
-                  plot=False):
-        # initialize homogeneous rule
-        # set up source term -> update rule
-        # run simulation for L^1f
+    def cmp_viscosity(self,
+                      number_densities,
+                      temperature,
+                      dt,
+                      maxiter=100000,
+                      directions=None,
+                      animate=False,
+                      animate_filename=None):
+        # Maxwellian must be centered in 0,
+        # since this computation relies heavily on symmetry,
+        mean_velocities = np.zeros((self.nspc, self.ndim))
+        # all species should have equal temperature, but not a must!
+        temperature = np.array(temperature, dtype=float)
+        if temperature.size == 1:
+            temperature = np.full((self.nspc,), temperature)
+        assert temperature.shape == (self.nspc,)
+        # initialize homogeneous rule, that handles the computation
+        rule = bp.HomogeneousRule(number_densities=number_densities,
+                                  mean_velocities=mean_velocities,
+                                  temperatures=temperature,
+                                  **self.__dict__)
+
+        # set up source moment function (stress)
+        if directions is None:
+            directions = np.eye(self.ndim)[0:2]
+        else:
+            directions = np.array(directions, dtype=float)
+            assert directions.shape == (2, self.ndim)
+            norm = np.linalg.norm(directions, axis=1, ndmin=2).reshape(2, 1)
+            directions /= norm
+        # use only the first mean_velocity, otherwise a (2, nvels) array is created
+        mom_func = self.mf_stress(mean_velocities[0], directions, orthogonalize=True)
+        # set up source term
+        rule.source_term = mom_func * rule.initial_state
+        # check, that source term is orthogonal on all moments
+        rule.check_integrity()
+
+        # compute viscosity
+        assert dt > 0 and maxiter > 0
+        result = rule.compute(dt,
+                              maxiter=maxiter,
+                              animate=animate,
+                              animate_filename=animate_filename)
         # compute viscosity as scalar product
-        pass
+        viscosity = np.sum(result[-1] * mom_func)
+        return viscosity
 
     #####################################
     #           Visualization           #
