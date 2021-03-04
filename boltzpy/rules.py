@@ -549,7 +549,7 @@ class HomogeneousRule(BaseRule, bp.CollisionModel):
         attrs.update(bp.CollisionModel.attributes())
         return attrs
 
-    def compute(self, dt, maxiter=100000, animate=False, animate_filename=None):
+    def compute(self, dt, maxiter, animate=False, animate_filename=None):
         self.check_integrity()
         state = self.initial_state
         # store state at each timestep here
@@ -592,7 +592,6 @@ class HomogeneousRule(BaseRule, bp.CollisionModel):
         # source term must be orthogonal to all moments
         # otherwise no equilibrium can be established
         for s in self.species:
-            number_density = self.cmp_number_density(self.source_term, s)
-            assert np.isclose(number_density, 0)
-        assert np.allclose(self.cmp_momentum(self.source_term), 0)
-        assert np.allclose(self.cmp_energy_density(self.source_term), 0)
+            assert np.isclose(self.cmp_number_density(self.source_term, s), 0)
+            assert np.allclose(self.cmp_momentum(self.source_term, s), 0)
+            assert np.isclose(self.cmp_energy_density(self.source_term, s), 0)
