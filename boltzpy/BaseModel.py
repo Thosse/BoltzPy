@@ -223,15 +223,32 @@ class BaseModel(bp.BaseClass):
         result = np.sum(spc_matrix * parameter, axis=-1)
         return result.reshape(shape)
 
-    # Todo This is buggy, doesn't really work
-    def temperature_range(self, mean_velocity=0):
-        max_v = self.max_vel
-        mean_v = np.max(np.abs(mean_velocity))
-        assert mean_v < max_v
-        min_mass = np.min(self.masses)
-        max_temp = (max_v - mean_v)**2 / min_mass
-        min_temp = 3 * np.max(self.spacings * self.base_delta)**2 / min_mass
-        return np.array([min_temp, max_temp], dtype=float)
+    def temperature_range(self, mean_velocity=0, s=None):
+        # Todo This is not tested for other mean_velocities
+        #  This can maybe be computed, assuming a smaller grid/shape
+        assert np.allclose(mean_velocity, 0)
+        if s is None:
+            # compute temperature ranges for each specimen, store in array
+            t_range = np.zeros((self.nspc, self.ndim))
+            for i in self.species:
+                t_range[i] = self.temperature_range(mean_velocity, s=i)
+            # return maxmin and minmax, thus each specimen can be initialized
+            return np.array([np.max(t_range[:, 0]),
+                             np.min(t_range[:, 1])])
+        else:
+            assert s in self.species
+            # set up array of manhattan distances to the center
+            idx = self.idx_range(s)
+            dist = np.sum(np.abs(self.i_vels[idx] / self.spacings[s]), axis=-1)
+            # use distances as exponent of a gaussian
+            # with a very small/large base to determine minimal maximal temperature
+            # These values were determined by try and error
+            base_min = 0.05
+            base_max = 0.99
+            # compute the respective temperatures
+            t_min = self.cmp_temperature(base_min ** dist, s=s)
+            t_max = self.cmp_temperature(base_max ** dist, s=s)
+            return np.array([t_min, t_max])
 
     #####################################
     #               Indexing            #
