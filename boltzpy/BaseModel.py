@@ -223,20 +223,57 @@ class BaseModel(bp.BaseClass):
         result = np.sum(spc_matrix * parameter, axis=-1)
         return result.reshape(shape)
 
-    def temperature_range(self, mean_velocity=0, s=None):
-        # Todo This is not tested for other mean_velocities
-        #  This can maybe be computed, assuming a smaller grid/shape
-        assert np.allclose(mean_velocity, 0)
+    def temperature_range(self, mean_velocity=None, s=None):
+        """Estimate a range of temperatures that can be initialized on this model.
+        Parameters
+        ----------
+        mean_velocity : :obj:`~numpy.array` [:obj:`float`]
+        s : :obj:`int`, optional
+            If None is given, a shared range for all specimen is given.
+
+        Returns
+        -------
+        t_range : :obj:`~numpy.array` [:obj:`float`]
+            The estimated minimum and maximum temperatures, that fit into this model.
+        """
+        # ascertain the proper shape of mean_velocities
+        if mean_velocity is None:
+            mean_velocity = np.zeros((self.nspc, self.ndim))
+        else:
+            mean_velocity = np.full((self.nspc, self.ndim), mean_velocity)
+
+        # if a mean_Velocity is given, compute for a reduced model
+        if not np.allclose(mean_velocity, 0):
+            # determine, how much the model must be reduced (integer_diff)
+            dv = np.array(self.dv).reshape(self.ndim, 1)
+            float_diff = np.abs(mean_velocity) / dv
+            integer_diff = np.array(float_diff, dtype=int)
+            # round up generously
+            integer_diff += np.abs(integer_diff - float_diff) > 0.1
+            shapes = self.shapes - integer_diff
+            assert np.all(shapes > 2), "The mean_velocities are too large!"
+            # don't use **self.__dict__ to initialize new model
+            # either 2 shapes parameters are given or
+            # selfs attributes may accidentally overwritten!
+            new_model = bp.BaseModel(self.masses,
+                                     shapes,
+                                     self.base_delta,
+                                     self.spacings)
+            return new_model.temperature_range(s=s)
+
+        # compute a shared range for possible temperatures for all specimen
         if s is None:
             # compute temperature ranges for each specimen, store in array
             t_range = np.zeros((self.nspc, self.ndim))
             for i in self.species:
                 t_range[i] = self.temperature_range(mean_velocity, s=i)
-            # return maxmin and minmax, thus each specimen can be initialized
+            # return max(min) and min(max), thus each specimen can be initialized
             return np.array([np.max(t_range[:, 0]),
                              np.min(t_range[:, 1])])
+        # compute temperature range for a single species
         else:
             assert s in self.species
+            assert np.all(self.shapes[s] > 1)
             # set up array of manhattan distances to the center
             idx = self.idx_range(s)
             dist = np.sum(np.abs(self.i_vels[idx] / self.spacings[s]), axis=-1)
