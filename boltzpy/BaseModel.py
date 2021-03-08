@@ -223,7 +223,7 @@ class BaseModel(bp.BaseClass):
         result = np.sum(spc_matrix * parameter, axis=-1)
         return result.reshape(shape)
 
-    def temperature_range(self, mean_velocity=None, s=None):
+    def temperature_range(self, mean_velocity=0.0, s=None):
         """Estimate a range of temperatures that can be initialized on this model.
         Parameters
         ----------
@@ -237,13 +237,46 @@ class BaseModel(bp.BaseClass):
             The estimated minimum and maximum temperatures, that fit into this model.
         """
         # ascertain the proper shape of mean_velocities
-        if mean_velocity is None:
-            mean_velocity = np.zeros((self.nspc, self.ndim))
-        else:
+        if not isinstance(mean_velocity, np.ndarray):
+            mean_velocity = np.array(mean_velocity, dtype=float)
+        if mean_velocity.shape != (self.nspc, self.ndim):
             mean_velocity = np.full((self.nspc, self.ndim), mean_velocity)
+        # set default value for s
+        if s is None:
+            s = self.species
 
-        # if a mean_Velocity is given, compute for a reduced model
-        if not np.allclose(mean_velocity, 0):
+        # compute a shared range for possible temperatures for all specimen
+        if isinstance(s, np.ndarray):
+            # ignore duplicates in s
+            list_s = list(s)
+            assert list_s <= list(self.species)
+            # compute temperature ranges for each specimen, store in spc_temp_range
+            spc_temp_range = np.zeros((len(list_s), 2))
+            for i, spc in enumerate(list_s):
+                spc_temp_range[i] = self.temperature_range(mean_velocity, s=spc)
+            # return max(min) and min(max), thus each specimen can be initialized
+            return np.array([np.max(spc_temp_range[:, 0]),
+                             np.min(spc_temp_range[:, 1])])
+
+        # compute temperature range for a single species
+        assert s in list(self.species)
+        assert np.all(self.shapes[s] > 1)
+        # compute directly, if mean_velocity is 0
+        if np.allclose(mean_velocity, 0):
+            # set up array of manhattan distances to the center
+            idx = self.idx_range(s)
+            dist = np.sum(np.abs(self.i_vels[idx] / self.spacings[s]), axis=-1)
+            # use distances as exponent of a gaussian
+            # with a very small/large base to determine minimal maximal temperature
+            # These values were determined by try and error
+            base_min = 0.05
+            base_max = 0.99
+            # compute the respective temperatures
+            t_min = self.cmp_temperature(base_min ** dist, s=s)
+            t_max = self.cmp_temperature(base_max ** dist, s=s)
+            return np.array([t_min, t_max])
+        # if a mean_Velocity is given, compute range for a reduced model
+        else:
             # determine, how much the model must be reduced (integer_diff)
             dv = np.array(self.dv).reshape(self.nspc, 1)
             float_diff = np.abs(mean_velocity) / dv
@@ -260,32 +293,6 @@ class BaseModel(bp.BaseClass):
                                      self.base_delta,
                                      self.spacings)
             return new_model.temperature_range(s=s)
-
-        # compute a shared range for possible temperatures for all specimen
-        if s is None:
-            # compute temperature ranges for each specimen, store in array
-            t_range = np.zeros((self.nspc, self.ndim))
-            for i in self.species:
-                t_range[i] = self.temperature_range(mean_velocity, s=i)
-            # return max(min) and min(max), thus each specimen can be initialized
-            return np.array([np.max(t_range[:, 0]),
-                             np.min(t_range[:, 1])])
-        # compute temperature range for a single species
-        else:
-            assert s in self.species
-            assert np.all(self.shapes[s] > 1)
-            # set up array of manhattan distances to the center
-            idx = self.idx_range(s)
-            dist = np.sum(np.abs(self.i_vels[idx] / self.spacings[s]), axis=-1)
-            # use distances as exponent of a gaussian
-            # with a very small/large base to determine minimal maximal temperature
-            # These values were determined by try and error
-            base_min = 0.05
-            base_max = 0.99
-            # compute the respective temperatures
-            t_min = self.cmp_temperature(base_min ** dist, s=s)
-            t_max = self.cmp_temperature(base_max ** dist, s=s)
-            return np.array([t_min, t_max])
 
     #####################################
     #               Indexing            #
