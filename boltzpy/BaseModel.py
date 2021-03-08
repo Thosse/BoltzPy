@@ -382,6 +382,7 @@ class BaseModel(bp.BaseClass):
     ##################################
     #      Initial Distribution      #
     ##################################
+    # todo undo staticmethod, use cmp_numberdensitiy for t=0?
     @staticmethod
     def maxwellian(velocities,
                    temperature,
@@ -404,15 +405,12 @@ class BaseModel(bp.BaseClass):
         """
         dim = velocities.shape[-1]
         # compute exponential with matching mean velocity and temperature
-        if np.isclose(temperature, 0, atol=1e-3):
-            exponential = np.ones(velocities.shape)
-        else:
-            c_vels = velocities - mean_velocity
-            exponential = np.exp(-0.5 * mass / temperature
-                                 * np.sum(c_vels**2,  axis=-1))
+        distance = np.sum((velocities - mean_velocity)**2,  axis=-1)
+        exponential = np.exp(-0.5 * mass / temperature * distance)
         divisor = np.sqrt(2*np.pi * temperature / mass) ** (dim / 2)
         # multiply to get desired number density
         result = (number_density / divisor) * exponential
+        assert not np.any(np.isnan(result))
         return result
 
     def _init_error(self, moment_parameters, wanted_moments, s=None):
@@ -499,6 +497,8 @@ class BaseModel(bp.BaseClass):
             # multiply to get the wanted number density
             state *= number_densities[s]
             initial_state[idx_range] = state
+
+        # Todo assert that the correct moments are computed
         return initial_state
 
     ##################################
