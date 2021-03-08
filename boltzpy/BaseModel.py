@@ -236,7 +236,7 @@ class BaseModel(bp.BaseClass):
         t_range : :obj:`~numpy.array` [:obj:`float`]
             The estimated minimum and maximum temperatures, that fit into this model.
         """
-        # ascertain the proper shape of mean_velocities
+        # assert the proper shape of mean_velocities
         if not isinstance(mean_velocity, np.ndarray):
             mean_velocity = np.array(mean_velocity, dtype=float)
         if mean_velocity.shape != (self.nspc, self.ndim):
@@ -249,6 +249,10 @@ class BaseModel(bp.BaseClass):
         if isinstance(s, np.ndarray):
             # ignore duplicates in s
             list_s = list(s)
+            if len(list_s) < self.nspc:
+                raise NotImplementedError(
+                    "This is not supported, "
+                    "the mean_velocities are ambiguous with a subset of species.")
             assert list_s <= list(self.species)
             # compute temperature ranges for each specimen, store in spc_temp_range
             spc_temp_range = np.zeros((len(list_s), 2))
@@ -275,24 +279,31 @@ class BaseModel(bp.BaseClass):
             t_min = self.cmp_temperature(base_min ** dist, s=s)
             t_max = self.cmp_temperature(base_max ** dist, s=s)
             return np.array([t_min, t_max])
-        # if a mean_Velocity is given, compute range for a reduced model
+        # if a mean_velocity is given, compute range for a reduced model
         else:
-            # determine, how much the model must be reduced (integer_diff)
-            dv = np.array(self.dv).reshape(self.nspc, 1)
-            float_diff = np.abs(mean_velocity) / dv
-            integer_diff = np.array(float_diff, dtype=int)
-            # round up generously
-            integer_diff += np.abs(integer_diff - float_diff) > 0.1
-            shapes = self.shapes - integer_diff
-            assert np.all(shapes > 2), "The mean_velocities are too large!"
-            # don't use **self.__dict__ to initialize new model
-            # either 2 shapes parameters are given or
-            # selfs attributes may accidentally overwritten!
-            new_model = bp.BaseModel(self.masses,
-                                     shapes,
+            # use relative difference, for model reduction
+            # the model MUST be reduced in all dimension
+            rel_diff = np.full(self.ndim, np.max(np.abs(mean_velocity[s]) / self.dv[s]))
+            lower_reduction = np.array(rel_diff, dtype=int)
+            upper_reduction = lower_reduction + 1
+            new_shapes = np.array([self.shapes[s] - lower_reduction,
+                                   self.shapes[s] - upper_reduction])
+            # compute interpolation weight, use distance along diagonal in velocity space
+            ip_weight = np.max(np.abs(rel_diff - lower_reduction))
+            ip_weight = np.array([1 - ip_weight, ip_weight])
+            interpolation = np.zeros(2)
+            # compute ranges for small/large reduced grids and interpolate
+            for weight, shape in zip(ip_weight, new_shapes):
+                # don't compute if not necessary, avoids assertion errors, for 3x3 models
+                if np.isclose(weight, 0):
+                    continue
+                assert np.all(shape >= 2), "The mean_velocities are too large!"
+                model = bp.BaseModel([self.masses[s]],
+                                     [shape],
                                      self.base_delta,
-                                     self.spacings)
-            return new_model.temperature_range(s=s)
+                                     [self.spacings[s]])
+                interpolation += weight * model.temperature_range(s=s)
+            return interpolation
 
     #####################################
     #               Indexing            #
