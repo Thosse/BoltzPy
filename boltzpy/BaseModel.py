@@ -245,7 +245,7 @@ class BaseModel(bp.BaseClass):
         # if a mean_Velocity is given, compute for a reduced model
         if not np.allclose(mean_velocity, 0):
             # determine, how much the model must be reduced (integer_diff)
-            dv = np.array(self.dv).reshape(self.ndim, 1)
+            dv = np.array(self.dv).reshape(self.nspc, 1)
             float_diff = np.abs(mean_velocity) / dv
             integer_diff = np.array(float_diff, dtype=int)
             # round up generously
