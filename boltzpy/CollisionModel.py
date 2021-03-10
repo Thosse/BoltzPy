@@ -551,13 +551,11 @@ class CollisionModel(bp.BaseModel):
                    {"marker": 's', "alpha": 0.5, "s": 50},
                    {"marker": 'D', "alpha": 0.5, "s": 50}]
 
-    def plot(self, 
-             relations=None,
-             species=None,
-             save_as=None,
-             xticks=None,
-             yticks=None,
-             zticks=None):
+    def plot_collisions(self,
+                        relations=None,
+                        species=None,
+                        save_as=None,
+                        **kwargs):
         """Plot the Grid using matplotlib."""
         relations = [] if relations is None else np.array(relations, ndmin=2)
         species = self.species if species is None else np.array(species, ndmin=1)
@@ -580,12 +578,17 @@ class CollisionModel(bp.BaseModel):
             ax.plot(*vels, color="gray", linewidth=0.2)
 
         # set tick values on axes, None = auto choice of matplotlib
-        if xticks is not None:
-            ax.set_xticks(xticks)
-        if yticks is not None:
-            ax.set_yticks(yticks)
-        if zticks is not None and self.ndim == 3:
-            ax.set_zticks(zticks)
+        if "xticks" in kwargs.keys():
+            ax.set_xticks(kwargs["xticks"])
+        if "yticks" in kwargs.keys():
+            ax.set_yticks(kwargs["yticks"])
+        if "zticks" in kwargs.keys() and self.ndim == 3:
+            ax.set_zticks(kwargs["zticks"])
+        # when plotting collisions, keep equal aspect ratio of the axes
+        if "aspect" in kwargs.keys():
+            ax.set_aspect(kwargs['aspect'])
+        else:
+            ax.set_aspect('equal')
 
         if save_as is not None:
             plt.savefig(save_as)
