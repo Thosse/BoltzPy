@@ -74,41 +74,6 @@ class BaseRule(bp.BaseModel):
                                                        temperatures)
         return initial_state
 
-    def plot(self, state=None, file_name=None):
-        # use shape[0] to differ between animations and simple plots
-        state = np.array(self.initial_state if state is None else state,
-                         ndmin=2)
-        # basic asserts
-        assert state.ndim == 2
-        assert state.shape[-1] == self.nvels
-        # create animation/plot, depending on shape[0]
-        fig = bp.Plot.AnimatedFigure(state.shape[0])
-        for s in self.species:
-            ax = fig.add_subplot((1, self.nspc, s+1), 3)
-            idx_range = self.idx_range(s)
-            vels = self.vels[idx_range]
-            ax.plot(vels[..., 0], vels[..., 1], state[:, idx_range])
-        if file_name is None:
-            fig.show()
-        else:
-            assert type(file_name) is str
-            fig.save(file_name)
-        return
-
-        # Todo add Wireframe3D plot to animated figure
-        # plot continuous maxwellian as a surface plot
-        # mass = model.masses[specimen]
-        # maximum_velocity = model.maximum_velocity
-        # plot_object = bp_p.plot_continuous_maxwellian(
-        #     self.number_densities[specimen],
-        #     self.mean_velocities[specimen],
-        #     self.temperatures[specimen],
-        #     mass,
-        #     -maximum_velocity,
-        #     maximum_velocity,
-        #     100,
-        #     plot_object)
-
     def check_integrity(self):
         """Sanity Check."""
         bp.BaseModel.check_integrity(self)
@@ -571,11 +536,11 @@ class HomogeneousRule(BaseRule, bp.CollisionModel):
                 interim_state = state + rks_offset * rks_component
                 coll = self.collision_operator(interim_state)
                 # execute runge kutta substep
-                result[i] = result[i] + rks_weight * dt * (coll - self.source_term)
+                result[i] = result[i] + rks_weight * dt * (coll + self.source_term)
             # break loop when reaching equilibrium
-            if np.allclose(result[i] - result[i-1], 0, atol=1e-8, rtol=1e-8):
+            if np.allclose(result[i] - result[i-1], 0, atol=1e-12, rtol=1e-12):
                 if animate:
-                    self.plot(result[:i+1:100], animate_filename)
+                    self.plot_state(result[:i+1:100], animate_filename)
                 return result[:i+1]
             # check for instabilities or divergence
             assert np.all(result[i] >= 0), ("Instability detected at t={}. "

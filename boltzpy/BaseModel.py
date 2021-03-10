@@ -868,6 +868,29 @@ class BaseModel(bp.BaseClass):
         return result.reshape(shape + (dim,))
 
     #####################################
+    #           Visualization           #
+    #####################################
+    def plot_state(self, state, file_name=None):
+        # use shape[0] to differ between animations and simple plots
+        state = state.reshape((-1, self.nvels))
+        # basic asserts
+        assert state.ndim == 2
+        assert state.shape[-1] == self.nvels
+        # create animation/plot, depending on shape[0]
+        fig = bp.Plot.AnimatedFigure(state.shape[0])
+        for s in self.species:
+            ax = fig.add_subplot((1, self.nspc, s+1), 3)
+            idx_range = self.idx_range(s)
+            vels = self.vels[idx_range]
+            ax.plot(vels[..., 0], vels[..., 1], state[:, idx_range])
+        if file_name is None:
+            fig.show()
+        else:
+            assert type(file_name) is str
+            fig.save(file_name)
+        return
+
+    #####################################
     #           Verification            #
     #####################################
     def check_integrity(self):
