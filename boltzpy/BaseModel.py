@@ -72,6 +72,7 @@ class BaseModel(bp.BaseClass):
         self.spc_matrix = np.zeros((self.nvels, self.nspc), dtype=int)
         for s in self.species:
             self.spc_matrix[self.idx_range(s), s] = 1
+        BaseModel.check_integrity(self)
         return
 
     @staticmethod
@@ -483,8 +484,9 @@ class BaseModel(bp.BaseClass):
                 init_params[s] = sp_newton(self._init_error,
                                            wanted_moments[s],
                                            args=(wanted_moments[s], s))
-
         # set up initial state, compute maxwellians with the init_params
+        # Todo assert np.all(np.abs(init_params[0:self.ndim]) < 1 * self.max_vel)
+        #  This gives more reasonable initial states, but requires another heuristic
         initial_state = np.zeros(self.nvels, dtype=float)
         for s in self.species:
             idx_range = self.idx_range(s)

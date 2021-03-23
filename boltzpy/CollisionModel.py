@@ -63,6 +63,7 @@ class CollisionModel(bp.BaseModel):
             weight = self.collision_weights[r]
             col_mat[rel, r] = weight * np.array([-1, 1, -1, 1])
         self.collision_matrix = csr_matrix(col_mat)
+        self.check_integrity()
         return
 
     @staticmethod
@@ -604,8 +605,9 @@ class CollisionModel(bp.BaseModel):
         """Sanity Check."""
         bp.BaseModel.check_integrity(self)
         assert np.all(self.spacings % 2 == 0), (
-            "The collision generation scheme assumes that the spacing is even. "
-            "It does not return the full set otherwise")
+            "For the vectorized collision generation scheme all spacings must even. "
+            "It does not return the full set otherwise.\n"
+            "Consider doubling the spacing and halving the base_delta.")
         assert self.algorithm_relations in {"all", "convergent", "naive"}
         assert self.algorithm_weights in {"uniform"}
         return
