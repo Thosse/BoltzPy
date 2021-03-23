@@ -490,7 +490,8 @@ class CollisionModel(bp.BaseModel):
                               animate_filename=animate_filename)
         # compute viscosity as scalar product
         viscosity = np.sum(result[-1] * mom_func)
-        return viscosity
+        normalize = np.sum(mom_func**2 * rule.initial_state)
+        return viscosity / normalize
 
     def cmp_heat_transfer(self,
                           number_densities,
@@ -539,7 +540,8 @@ class CollisionModel(bp.BaseModel):
                               animate_filename=animate_filename)
         # compute viscosity as scalar product
         heat_transfer = np.sum(result[-1] * mom_func)
-        return heat_transfer
+        normalize = np.sum(mom_func**2 * rule.initial_state)
+        return heat_transfer / normalize
 
     #####################################
     #           Visualization           #
