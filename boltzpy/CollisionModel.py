@@ -137,15 +137,12 @@ class CollisionModel(bp.BaseModel):
     def key_angle(self, relations):
         (v0, v1, w0, w1) = self.i_vels[relations.transpose()]
         dv = v1 - v0
-        gcd = np.gcd.reduce(dv.transpose())
-        if self.ndim == 2:
-            gcd = gcd[..., np.newaxis]
-        elif self.ndim == 2:
-            gcd = gcd[..., np.newaxis, np.newaxis]
-        else:
-            raise NotImplementedError
+        # compute gcd of each velocity difference
+        gcd = np.gcd.reduce(dv, axis=-1)
+        # normalize with gcd to get the direction
+        gcd = gcd[..., np.newaxis]
         angles = dv // gcd
-        #
+        # sort each directions, to merge symmetries
         angles = np.sort(np.abs(angles), axis=-1)
         return angles
 
