@@ -217,11 +217,21 @@ class CollisionModel(bp.BaseModel):
 
         # set up as lil_matrix, allows fast changes to sparse structure
         col_mat = lil_matrix((self.nvels, weights.size), dtype=float)
+        sign = np.array([-1, 1, -1, 1])
         for [r, rel] in enumerate(relations):
             weight = weights[r]
-            col_mat[rel, r] = weight * np.array([-1, 1, -1, 1])
+            col_mat[rel, r] = weight * sign
+
+        # adjust changes to different grid spacings
+        # this is necessary for invariance of moments
+        # multiply with min(dv) keep the order of magnitude of the weights
+        eq_factor = np.min(self.dv) / self.get_array(self.dv)**self.ndim
+        for v in range(self.nvels):
+            col_mat[v] *= eq_factor[v]
+
         # convert to csr_matrix, for fast arithmetics
         self.collision_matrix = col_mat.tocsr()
+        return
 
     def compute_weights(self, relations=None):
         """Generates and returns the :attr:`collision_weights`,
@@ -460,12 +470,6 @@ class CollisionModel(bp.BaseModel):
             u_c3 = state[p, self.collision_relations[:, 3]]
             col_factor = (np.multiply(u_c0, u_c2) - np.multiply(u_c1, u_c3))
             result[p] = self.collision_matrix.dot(col_factor)
-        # adjust changes to divverent velocity-grid deltas
-        # this is necessary for invariance of moments
-        # multiplicate with min(dv) keep the order of magnidute of the weights
-        dv_array = self.get_array(self.dv)[np.newaxis, :]
-        eq_factor = np.min(self.dv) / dv_array**self.ndim
-        result[:] *= eq_factor
         return result.reshape(shape)
 
     #####################################
