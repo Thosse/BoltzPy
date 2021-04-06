@@ -156,8 +156,8 @@ class CollisionModel(bp.BaseModel):
         keys = key_function(rels)
         unique_keys = np.unique(keys, axis=0)
         for key in unique_keys:
-            pos = np.where(np.all(keys == key, axis=-1))
-            grouped[tuple(key)] = rels[pos]
+            pos,  = np.where(np.all(keys == key, axis=-1))
+            grouped[tuple(key)] = pos
         return grouped
 
     def filter(self, relations=None, key_function=None):
@@ -185,13 +185,15 @@ class CollisionModel(bp.BaseModel):
         keys = key_function(rels)
         # lexsort sorts columns, thus we transpose first
         # flip keys, as the last key (row) has highest priority
-        positions = np.lexsort(np.flip(keys.transpose(), axis=0), axis=0)
+        positions = np.lexsort(np.flip(keys.transpose(), axis=0))
         if relations is None:
             self.collision_relations = self.collision_relations[positions]
             self.collision_weights = self.collision_weights[positions]
             return None
         else:
             return relations[positions]
+
+    # todo choose: given list of indices (of collision relations) or relations(what to do with the weights?) -> merge and filter redundants
 
     ##################################
     #           Collisions           #
