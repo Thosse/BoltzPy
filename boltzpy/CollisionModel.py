@@ -400,13 +400,14 @@ class CollisionModel(bp.BaseModel):
     @staticmethod
     def is_collision(colvels,
                      masses):
+        colvels = colvels.reshape((-1, 4, colvels.shape[-1]))
         v0 = colvels[:, 0]
         v1 = colvels[:, 1]
         w0 = colvels[:, 2]
         w1 = colvels[:, 3]
         cond = np.empty((3, colvels.shape[0]))
         # Ignore Collisions without changes in velocities
-        cond[0] = np.any(np.logical_or(v0 != v1, w0 != w1), axis=-1)
+        cond[0] = np.any(v0 != v1, axis=-1)
         # Invariance of momentum
         cond[1] = np.all(masses[0] * (v1 - v0) == masses[2] * (w0 - w1), axis=-1)
         # Invariance of energy
