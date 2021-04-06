@@ -63,7 +63,7 @@ class CollisionModel(bp.BaseModel):
             weight = self.collision_weights[r]
             col_mat[rel, r] = weight * np.array([-1, 1, -1, 1])
         self.collision_matrix = csr_matrix(col_mat)
-        self.check_integrity()
+        CollisionModel.check_integrity(self)
         return
 
     @staticmethod
