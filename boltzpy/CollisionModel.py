@@ -214,6 +214,10 @@ class CollisionModel(bp.BaseModel):
         # update attributes
         self.collision_relations = relations
         self.collision_weights = weights
+        # Filter out any duplicates, Weights are NOT added
+        # This might lead to unpredictable behaviour,
+        # if a relation is given twice with different weights
+        self.filter()
 
         # set up as lil_matrix, allows fast changes to sparse structure
         col_mat = lil_matrix((self.nvels, weights.size), dtype=float)
