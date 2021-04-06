@@ -49,11 +49,11 @@ class CollisionModel(bp.BaseModel):
 
         # setup collisions
         if collision_relations is None:
-            self.collision_relations = self.compute_relations()
+            self.collision_relations = self.cmp_relations()
         else:
             self.collision_relations = np.array(collision_relations)
         if collision_weights is None:
-            self.collision_weights = self.compute_weights()
+            self.collision_weights = self.cmp_weights()
         else:
             self.collision_weights = np.array(collision_weights)
 
@@ -233,7 +233,7 @@ class CollisionModel(bp.BaseModel):
         self.collision_matrix = col_mat.tocsr()
         return
 
-    def compute_weights(self, relations=None):
+    def cmp_weights(self, relations=None):
         """Generates and returns the :attr:`collision_weights`,
         based on the given relations and :attr:`algorithm_weights`
         """
@@ -242,14 +242,13 @@ class CollisionModel(bp.BaseModel):
         species = self.key_species(relations)[:, 1:3]
         coll_factors = self.collision_factors[species[..., 0], species[..., 1]]
         if self.algorithm_weights == "uniform":
-            weights = np.ones(coll_factors.size)
+            return coll_factors
         elif self.algorithm_weights == "area":
-            weights = self.key_area(relations)[..., 0]
+            return coll_factors * self.key_area(relations)[..., 0]
         else:
             raise NotImplementedError
-        return weights * coll_factors
 
-    def compute_relations(self):
+    def cmp_relations(self):
         """Generates and returns the :attr:`collision_relations`."""
         print('Generating Collision Array...')
         tic = process_time()
@@ -264,10 +263,6 @@ class CollisionModel(bp.BaseModel):
         # choose function for local collisions
         if self.algorithm_relations == 'all':
             coll_func = self.get_colvels
-        elif self.algorithm_relations == 'naive':
-            coll_func = self.get_colvels_naive
-        elif self.algorithm_relations == 'convergent':
-            coll_func = self.get_colvels_convergent
         else:
             raise NotImplementedError(
                 'Unsupported Selection Scheme: '
@@ -328,30 +323,6 @@ class CollisionModel(bp.BaseModel):
         return relations
 
     @staticmethod
-    def get_colvels_naive(grids, masses, v0):
-        # store results in list ov colliding velocities (colvels)
-        colvels = []
-        # iterate over all v1 (post collision of v0)
-        for v1 in grids[1].iG:
-            # ignore v=(a, a, * , *)
-            # calculate Velocity (index) difference
-            diff_v = v1 - v0
-            for w0 in grids[2].iG:
-                # Calculate w1, using the momentum invariance
-                assert all((diff_v * masses[0]) % masses[2] == 0)
-                diff_w = -diff_v * masses[0] // masses[2]
-                w1 = w0 + diff_w
-                if w1 not in grids[3]:
-                    continue
-                colvel = np.array([v0, v1, w0, w1], ndmin=3)
-                # check if its a proper Collision
-                if not CollisionModel.is_collision(colvel, masses):
-                    continue
-                # Collision is accepted -> Add to List
-                colvels.append(colvel)
-        return np.concatenate(colvels, axis=0)
-
-    @staticmethod
     def get_colvels(grids,
                     masses,
                     v0):
@@ -383,56 +354,6 @@ class CollisionModel(bp.BaseModel):
         return np.concatenate(colvels, axis=0)
 
     @staticmethod
-    def get_colvels_convergent(grids, masses, v0):
-        # angles = np.array([[1, 0], [1, 1], [0, 1], [-1, 1],
-        #                    [-1, 0], [-1, -1], [0, -1], [1, -1]])
-        # Todo This is sufficient, until real weights are used
-        angles = np.array([[1, -1], [1, 0], [1, 1], [0, 1]])
-        # store results in lists
-        colvels = []    # colliding velocities
-        # iterate over the given angles
-        for axis_x in angles:
-            # get y axis by rotating x axis 90°
-            axis_y = np.array([[0, -1], [1, 0]]) @ axis_x
-            assert np.dot(axis_x, axis_y) == 0, (
-                "axis_x and axis_y must be orthogonal"
-            )
-            # choose v1 from the grid points on the x-axis (through v0)
-            # just in positive direction because of symmetry and to avoid v1=v0
-            for v1 in grids[1].line(v0,
-                                    grids[1].spacing * axis_x,
-                                    range(1, grids[1].shape[0])):
-                diff_v = v1 - v0
-                diff_w = diff_v * masses[0] // masses[2]
-                # find starting point for w0,
-                w0_projected_on_axis_x = v0 + diff_v // 2 + diff_w // 2
-                w0_start = next(grids[2].line(w0_projected_on_axis_x,
-                                              axis_y,
-                                              range(- grids[2].spacing,
-                                                    grids[2].spacing)),
-                                None)
-                if w0_start is None:
-                    continue
-
-                # find all other collisions along axis_y
-                for w0 in grids[2].line(w0_start,
-                                        grids[2].spacing * axis_y,
-                                        range(-grids[2].shape[0],
-                                              grids[2].shape[0])):
-                    w1 = w0 - diff_w
-                    # skip, if w1 is not in the grid (can be out of bounds)
-                    if np.array(w1) not in grids[3]:
-                        continue
-                    colvel = np.array([v0, v1, w0, w1], ndmin=3)
-                    # check if its a proper Collision
-                    if not CollisionModel.is_collision(colvel, masses):
-                        continue
-                    # Collision is accepted -> Add to List
-                    colvels.append([v0, v1, w0, w1])
-        colvels = np.array(colvels)
-        return colvels
-
-    @staticmethod
     def is_collision(colvels,
                      masses):
         colvels = colvels.reshape((-1, 4, colvels.shape[-1]))
@@ -457,7 +378,7 @@ class CollisionModel(bp.BaseModel):
 
         Note that this is the collision of all species.
         Collisions of species i with species j are not implemented.
-        ."""
+        """
         shape = state.shape
         size = np.prod(shape[:-1], dtype=int)
         state = state.reshape((size, self.nvels))
@@ -637,6 +558,6 @@ class CollisionModel(bp.BaseModel):
             "For the vectorized collision generation scheme all spacings must even. "
             "It does not return the full set otherwise.\n"
             "Consider doubling the spacing and halving the base_delta.")
-        assert self.algorithm_relations in {"all", "convergent", "naive"}
-        assert self.algorithm_weights in {"uniform"}
+        assert self.algorithm_relations in {"all"}
+        assert self.algorithm_weights in {"uniform", "area"}
         return

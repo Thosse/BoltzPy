@@ -15,14 +15,6 @@ MODELS["Model/2D_small"] = bp.CollisionModel(
     collision_factors=[[50, 50], [50, 50]],
     algorithm_relations="all",
     algorithm_weights="uniform")
-MODELS["Model/2D_small_convergent"] = bp.CollisionModel(
-    masses=[2, 3],
-    shapes=[[5, 5], [7, 7]],
-    base_delta=1/8,
-    spacings=[6, 4],
-    collision_factors=[[50, 50], [50, 50]],
-    algorithm_relations="convergent",
-    algorithm_weights="uniform")
 # Todo This might lead to weird results! Check this!
 MODELS["Model/equalSpacing"] = bp.CollisionModel(
     masses=[1, 2],
