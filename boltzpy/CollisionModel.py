@@ -1,5 +1,5 @@
 import numpy as np
-from scipy.sparse import csr_matrix
+from scipy.sparse import csr_matrix, lil_matrix
 from time import process_time
 import boltzpy as bp
 
@@ -57,12 +57,9 @@ class CollisionModel(bp.BaseModel):
         else:
             self.collision_weights = np.array(collision_weights)
 
-        # create collision_matrix
-        col_mat = np.zeros((self.nvels, self.collision_weights.size), dtype=float)
-        for [r, rel] in enumerate(self.collision_relations):
-            weight = self.collision_weights[r]
-            col_mat[rel, r] = weight * np.array([-1, 1, -1, 1])
-        self.collision_matrix = csr_matrix(col_mat)
+        # set up sparse collision_matrix
+        self.collision_matrix = csr_matrix((self.nvels, self.collision_weights.size))
+        self.update_collisions(self.collision_relations, self.collision_weights)
         CollisionModel.check_integrity(self)
         return
 
@@ -198,6 +195,34 @@ class CollisionModel(bp.BaseModel):
     ##################################
     #           Collisions           #
     ##################################
+    def update_collisions(self, relations, weights):
+        """Updates the collision_relations, collision_weights
+        and computes a new sparse collision_matrix.
+
+        Parameters
+        ----------
+        relations : :obj:`~numpy.array` [:obj:`int`]
+            A 2d Array. Each relation (row) has 4 integers,
+            that point at velocities of the model.
+        weights : :obj:`~numpy.array` [:obj:`float`]
+            A 1d array, of numerical weights for each relation.
+        """
+        if relations.shape != (weights.size, 4) or weights.ndim != 1:
+            raise ValueError
+        if np.any(np.logical_or(relations < 0, relations >= self.nvels)):
+            raise ValueError
+        # update attributes
+        self.collision_relations = relations
+        self.collision_weights = weights
+
+        # set up as lil_matrix, allows fast changes to sparse structure
+        col_mat = lil_matrix((self.nvels, weights.size), dtype=float)
+        for [r, rel] in enumerate(relations):
+            weight = weights[r]
+            col_mat[rel, r] = weight * np.array([-1, 1, -1, 1])
+        # convert to csr_matrix, for fast arithmetics
+        self.collision_matrix = col_mat.tocsr()
+
     def compute_weights(self, relations=None):
         """Generates and returns the :attr:`collision_weights`,
         based on the given relations and :attr:`algorithm_weights`
