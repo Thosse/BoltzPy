@@ -196,7 +196,7 @@ class BaseModel(bp.BaseClass):
         p_vels : :obj:`~numpy.array` [:obj:`float`]
             Projected velocities. one dimension less (last) than velocities.
         """
-        direction = np.array(direction)
+        direction = np.array(direction, copy=False)
         assert direction.shape == (velocities.shape[-1],)
         assert np.linalg.norm(direction) > 1e-8
         shape = velocities.shape[:-1]
@@ -217,6 +217,7 @@ class BaseModel(bp.BaseClass):
         p_vels : :obj:`~numpy.array` [:obj:`float`]
             Projected velocities. one dimension less (last) than velocities.
         """
+        parameter = np.array(parameter, copy=False)
         assert parameter.shape[-1] == self.nspc
         shape = parameter.shape[:-1] + (self.nvels,)
         parameter = parameter.reshape((-1, 1, self.nspc))
@@ -237,14 +238,8 @@ class BaseModel(bp.BaseClass):
         t_range : :obj:`~numpy.array` [:obj:`float`]
             The estimated minimum and maximum temperatures, that fit into this model.
         """
-        # assert the proper shape of mean_velocities
-        if not isinstance(mean_velocity, np.ndarray):
-            mean_velocity = np.array(mean_velocity, dtype=float)
-        if mean_velocity.shape != (self.nspc, self.ndim):
-            mean_velocity = np.full((self.nspc, self.ndim), mean_velocity)
-        # set default value for s
-        if s is None:
-            s = self.species
+        mean_velocity = np.full((self.nspc, self.ndim), mean_velocity)
+        s = self.species if s is None else s
 
         # compute a shared range for possible temperatures for all specimen
         if isinstance(s, np.ndarray):
@@ -342,9 +337,7 @@ class BaseModel(bp.BaseClass):
         global_index : :obj:`int` of :obj:`None`
 
         """
-        assert integer_velocities.dtype == int
-        # turn species into array of ndim at least 1
-        species = np.array(species, ndmin=1)
+        species = np.array(species, ndmin=1, dtype=int, copy=False)
         assert integer_velocities.shape[-1] == self.ndim
         # reshape velocities for vectorization
         shape = integer_velocities.shape[:-1]
@@ -370,8 +363,7 @@ class BaseModel(bp.BaseClass):
         -------
         species : :obj:`~numpy.array` [ :obj:`int` ]
         """
-        if not isinstance(indices, np.ndarray):
-            indices = np.array(indices)
+        indices = np.array(indices, dtype=int, copy=False)
         species = np.full(indices.shape, -1, dtype=int)
         for s in self.species:
             offset = self._idx_offset[s]
@@ -532,15 +524,13 @@ class BaseModel(bp.BaseClass):
         -------
         mf_Stress : :obj:`~numpy.array` [ :obj:`float` ]
         """
-        # assertions
-        mean_velocity = np.array(mean_velocity)
+        directions = np.array(directions, dtype=float, copy=False)
+        mean_velocity = np.array(mean_velocity, dtype=float, copy=False)
         assert directions.shape == (2, self.ndim,)
         is_parallel = self.is_parallel(directions[0], directions[1])
         is_orthogonal = self.is_orthogonal(directions[0], directions[1])
-        assert is_parallel or is_orthogonal, (
-            "The directions the stress function, relate to the stress tensor. "
-            "They are assumed to be either orthogonal or parallel. "
-            "Other cases are not expected, and may lead to errors")
+        if not (is_parallel or is_orthogonal):
+            raise ValueError("directions must be either parallel or orthogonal")
         # normalize directions
         norm = np.linalg.norm(directions, axis=1).reshape(2, 1)
         directions /= norm
@@ -569,10 +559,12 @@ class BaseModel(bp.BaseClass):
         -------
         mf_pressure : :obj:`~numpy.array` [ :obj:`float` ]
         """
-        mean_velocity = np.array(mean_velocity)
+        mean_velocity = np.array(mean_velocity, dtype=float, copy=False)
+        if s is None:
+            mass = self.get_array(self.masses)[np.newaxis, :]
+        else:
+            mass = self.masses[s]
         dim = self.ndim
-        mass = (self.get_array(self.masses)[np.newaxis, :]
-                if s is None else self.masses[s])
         velocities = self.vels[self.idx_range(s), :]
         # reshape mean_velocity (may have higher dimension)
         shape = mean_velocity.shape[:-1]
@@ -601,8 +593,8 @@ class BaseModel(bp.BaseClass):
         -------
         mf_heaf_flow : :obj:`~numpy.array` [ :obj:`float` ]
         """
-        mean_velocity = np.array(mean_velocity)
-        direction = np.array(direction)
+        mean_velocity = np.array(mean_velocity, dtype=float, copy=False)
+        direction = np.array(direction, dtype=float, copy=False)
         assert direction.shape == (self.ndim,)
         mass = self.get_array(self.masses) if s is None else self.masses[s]
         c_vels = self.c_vels(mean_velocity, s)
@@ -615,8 +607,8 @@ class BaseModel(bp.BaseClass):
         else:
             # Subtract non-orthogonal part to orthogonalize.
             # In continuum this is (d+2)*T*c_vels,
-            # however this is not precise in grids
-            # thus subtract c"orrection term based on state
+            # this is not precise in grids!
+            # thus subtract correction term based on state
             p_vels = self.c_vels(mean_velocity) @ direction
             momentum = self.cmp_momentum(moment_function * orthogonalize_state) @ direction
             norm = (self.cmp_momentum(p_vels * orthogonalize_state) @ direction)
