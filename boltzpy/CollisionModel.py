@@ -143,19 +143,27 @@ class CollisionModel(bp.BaseModel):
         angles = np.sort(np.abs(angles), axis=-1)
         return angles
 
-    def group(self, relations=None, key_function=None):
-        rels = self.collision_relations if relations is None else relations
-        assert rels.ndim == 2
-        if key_function is None:
-            key_function = self.key_species
+    def group(self, relations, key_function):
+        relations = np.array(relations, ndmin=2, copy=False)
 
-        grouped = dict()
-        keys = key_function(rels)
-        unique_keys = np.unique(keys, axis=0)
-        for key in unique_keys:
-            pos,  = np.where(np.all(keys == key, axis=-1))
-            grouped[tuple(key)] = pos
-        return grouped
+        # get lexicographic order of keys
+        keys = key_function(relations)
+        positions = np.lexsort(np.flip(keys.transpose(), axis=0))
+
+        # find first occurrence of each key in sorted array
+        relations = relations[positions]
+        key, pos = np.unique(key_function(relations), axis=0, return_index=True)
+
+        # split relations into array with equal key
+        # [relations[0:pos[1]], relations[pos[2]: pos[3],...]
+        # pos[0]=0 must be removed for split() to work correctly
+        split_array = np.split(positions, pos[1:])
+        
+        # store arrays in dict
+        group_dict = dict()
+        for k, values in zip(key, split_array):
+            group_dict[tuple(k)] = values
+        return group_dict
 
     def filter(self, relations=None, key_function=None):
         rels = self.collision_relations if relations is None else relations

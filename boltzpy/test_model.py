@@ -58,6 +58,11 @@ MODELS["Model/3D_small"] = bp.CollisionModel(
     algorithm_relations="all",
     algorithm_weights="uniform")
 
+KEY_FUNCTIONS = ["key_species",
+                 "key_index",
+                 "key_angle",
+                 "key_area"]
+
 
 #############################
 #           Tests           #
@@ -121,6 +126,34 @@ def test_get_idx_on_random_integers(key):
     for i in pos_miss:
         s = spc_idx[i]
         assert i_vels[i] not in subgrids[s]
+
+
+@pytest.mark.parametrize("key_func", KEY_FUNCTIONS)
+@pytest.mark.parametrize("key", MODELS.keys())
+def test_grouping_reference_code(key, key_func):
+    model = MODELS[key]
+    key_func = model.__getattribute__(key_func)
+
+    # compute grouped, with fast method
+    grouped = model.group(model.collision_relations, key_func)
+
+    # compute reference solution with simple Code
+    reference = dict()
+    # compute key for each element
+    keys = key_func(model.collision_relations)
+    # create array of unique keys (a key may be a 1d array)
+    unique_keys = np.unique(keys, axis=0)
+    # fill dictionary
+    for key in unique_keys:
+        pos = np.where(np.all(keys == key, axis=-1))[0]
+        reference[tuple(key)] = pos
+
+    # compare grouped and reference
+    assert grouped.keys() == reference.keys()
+    for key in reference.keys():
+        assert reference[key].shape == grouped[key].shape
+        # maybe this must be sorted before
+        assert np.all(reference[key] == grouped[key])
 
 
 def assert_all_moments_are_zero(model, state):
