@@ -412,10 +412,8 @@ class CollisionModel(bp.BaseModel):
         # since this computation relies heavily on symmetry,
         mean_velocities = np.zeros((self.nspc, self.ndim))
         # all species should have equal temperature, but not a must!
-        temperature = np.array(temperature, dtype=float)
-        if temperature.size == 1:
-            temperature = np.full((self.nspc,), temperature)
-        assert temperature.shape == (self.nspc,)
+        temperature = np.full(self.nspc, temperature, dtype=float)
+
         # initialize homogeneous rule, that handles the computation
         rule = bp.HomogeneousRule(number_densities=number_densities,
                                   mean_velocities=mean_velocities,
@@ -426,10 +424,11 @@ class CollisionModel(bp.BaseModel):
         if directions is None:
             directions = np.eye(self.ndim)[0:2]
         else:
-            directions = np.array(directions, dtype=float)
+            directions = np.array(directions, dtype=float, copy=False)
             assert directions.shape == (2, self.ndim)
             norm = np.linalg.norm(directions, axis=1).reshape(2, 1)
             directions /= norm
+
         # use only the first mean_velocity, otherwise a (2, nvels) array is created
         mom_func = self.mf_stress(mean_velocities[0], directions, orthogonalize=True)
         # set up source term
