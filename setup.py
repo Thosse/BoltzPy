@@ -14,7 +14,10 @@ setup(
     version=release,
     description='Deterministic Solver for the Boltzmann Equation',
     author=author,
+    author_email='thomas.sasse@tu-ilmenau.de',
     url='https://github.com/Thosse/BoltzPy',
+    license='Apache Software License',	
+    packages=['boltzpy'],  
     cmdclass=cmdclass,
     # these are optional and override conf.py settings
     command_options={
@@ -22,11 +25,10 @@ setup(
             'project': ('setup.py', name),
             'version': ('setup.py', version),
             'release': ('setup.py', release),
-            'copyright': ('setup.py', '2017, ' + author),
+            'copyright': ('setup.py', '2021, ' + author),
             'fresh_env': ('', True),   
             'source_dir': ('', 'doc/source/'),
             'build_dir': ('', 'doc/build/'),
             'config_dir': ('','doc/source/')
-            }}#,
-#    ext_modules = cythonize("spt/cyth.pyx")
+            }}
 )

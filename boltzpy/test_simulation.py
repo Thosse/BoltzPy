@@ -8,7 +8,7 @@ import boltzpy as bp
 from boltzpy.test_grid import GRIDS
 from boltzpy.test_model import MODELS
 from boltzpy.test_geometry import GEOMETRIES
-from boltzpy.test_BaseClass import DIRECTORY, TMP_FILE
+from boltzpy.test_BaseClass import TMP_FILE
 
 
 ###################################
@@ -16,7 +16,7 @@ from boltzpy.test_BaseClass import DIRECTORY, TMP_FILE
 ###################################
 def file_path(name):
     assert isinstance(name, str)
-    return DIRECTORY + "Simulation/" + name + ".hdf5"
+    return bp.TEST_DIR + "/Simulation/" + name + ".hdf5"
 
 
 SIM_PARAMS = [

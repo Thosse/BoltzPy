@@ -10,9 +10,8 @@ from boltzpy.test_model import MODELS
 from boltzpy.test_geometry import GEOMETRIES
 from boltzpy.test_rule import RULES
 
-DIRECTORY = __file__[:-25] + 'tests/'
-FILE = DIRECTORY + 'TestResults.hdf5'
-TMP_FILE = DIRECTORY + '_tmp_.hdf5'
+FILE = bp.TEST_DIR + '/TestResults.hdf5'
+TMP_FILE = bp.TEST_DIR + '/_tmp_.hdf5'
 
 TEST_ELEMENTS = {**GRIDS, **GEOMETRIES, **MODELS, **RULES}
 
@@ -55,6 +54,7 @@ def test_setup_creates_same_file():
 
 @pytest.mark.parametrize("key", TEST_ELEMENTS.keys())
 def test_hdf5_groups_exist(key):
+    assert os.path.exists(FILE)
     with h5py.File(FILE, mode="r") as file:
         assert key in file.keys(), (
             "The group {} is missing in the test file-".format(key))

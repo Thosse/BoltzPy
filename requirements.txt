@@ -1,7 +1,7 @@
 numpy
 scipy
 matplotlib
-h5py
+h5py>=3.1.0
 pytest
 
 # ffmpeg must be installed on system
