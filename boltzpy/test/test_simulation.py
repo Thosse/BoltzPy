@@ -5,10 +5,10 @@ import numpy as np
 
 import boltzpy.helpers.tests as test_helper
 import boltzpy as bp
-from boltzpy.test_grid import GRIDS
-from boltzpy.test_model import MODELS
-from boltzpy.test_geometry import GEOMETRIES
-from boltzpy.test_BaseClass import TMP_FILE
+from boltzpy.test.test_grid import GRIDS
+from boltzpy.test.test_model import MODELS
+from boltzpy.test.test_geometry import GEOMETRIES
+from boltzpy.test.test_BaseClass import TMP_FILE
 
 
 ###################################

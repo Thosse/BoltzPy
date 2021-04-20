@@ -5,10 +5,10 @@ import numpy as np
 
 import boltzpy.helpers.tests as test_helper
 import boltzpy as bp
-from boltzpy.test_grid import GRIDS
-from boltzpy.test_model import MODELS
-from boltzpy.test_geometry import GEOMETRIES
-from boltzpy.test_rule import RULES
+from boltzpy.test.test_grid import GRIDS
+from boltzpy.test.test_model import MODELS
+from boltzpy.test.test_geometry import GEOMETRIES
+from boltzpy.test.test_rule import RULES
 
 FILE = bp.TEST_DIR + '/TestResults.hdf5'
 TMP_FILE = bp.TEST_DIR + '/_tmp_.hdf5'

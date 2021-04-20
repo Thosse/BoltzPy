@@ -1,7 +1,7 @@
 import pytest
 import numpy as np
 import boltzpy as bp
-from boltzpy.test_model import MODELS
+from boltzpy.test.test_model import MODELS
 
 
 ###################################
