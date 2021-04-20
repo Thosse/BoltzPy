@@ -37,32 +37,28 @@ print("maximal physical Collision Invariants = ",
             model.vels[model.idx_range(1)]))
 
 # group collisions by species
-grp_colls = model.group(key_function=model.key_species)
-model.plot(relations=grp_colls[(0,0,0,0)],
-           save_as="normal_25+25_dvm_C00.png",
-           xticks=ticks,
-           yticks=ticks
-           )
-model.plot(relations=grp_colls[(1,1,1,1)],
-           save_as="normal_25+25_dvm_C11.png",
-           xticks=ticks,
-           yticks=ticks
-           )
-model.plot(relations=grp_colls[(0,0,1,1)],
-           save_as="normal_25+25_dvm_C01.png",
-           xticks=ticks,
-           yticks=ticks
-           )
+grp = model.group(relations=model.collision_relations, key_function=model.key_species)
+grp_colls = {key: model.collision_relations[grp[key]]
+             for key in {(0, 0, 0, 0), (1, 1, 1, 1), (0, 0, 1, 1)}}
+model.plot_collisions(relations=grp_colls[(0,0,0,0)],
+                      save_as="normal_25+25_dvm_C00.png",
+                      )
+model.plot_collisions(relations=grp_colls[(1,1,1,1)],
+                      save_as="normal_25+25_dvm_C11.png",
+                      )
+model.plot_collisions(relations=grp_colls[(0,0,1,1)],
+                      save_as="normal_25+25_dvm_C01.png",
+                      )
 
 print("2d, normal only-intra-species-collisions model")
 new_model = bp.CollisionModel(masses=masses,
-                              shapes=((5, 5), (5, 5)),
-                              base_delta=1.0,
-                              spacings=(6, 4),
+                              shapes=shapes,
+                              base_delta=0.5,
+                              spacings=spacings,
                               collision_relations=grp_colls[(0, 0, 1, 1)])
 print("Interspecies Model:")
 print("number of collision invariants   = ",
-      model.collision_invariants)
+      new_model.collision_invariants)
 print("maximal physical Collision Invariants = ",
         n_collision_invariants(
             masses,

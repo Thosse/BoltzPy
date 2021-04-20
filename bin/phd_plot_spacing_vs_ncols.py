@@ -39,7 +39,7 @@ if compute_results:
     shape_range = hdf_group.create_dataset(
         "shape_range",
         max_shape - min_shape,
-        dtype=float)
+        dtype=int)
     shape_range[:] = np.arange(min_shape, max_shape)
     cols_mix = hdf_group.create_dataset(
         "cols_mix",
@@ -70,7 +70,7 @@ if compute_results:
 
 # plot results
 spacings = file[masses.__str__()]["spacings"][()]
-shape_range = file[masses.__str__()]["shape_range"][()]
+shape_range = np.array(file[masses.__str__()]["shape_range"][()], dtype=int)
 cols_mix = file[masses.__str__()]["cols_mix"][()]
 cols_single = file[masses.__str__()]["cols_single"][()]
 
@@ -82,12 +82,14 @@ y_axis = cols_mix
 # plt.loglog(x_axis, y_axis[:, 2], c="g", label=spacings[2].__str__())
 # print((np.log(cols_mix[-1]) - np.log(cols_mix[-17])) / (np.log(shape_range[-1]) - np.log(shape_range[-17])) )
 
+plt.title("Interspecies Collisions for Mass-Ratio "
+          + str(masses[0]) + " : " + str(masses[1]))
 plt.bar(x_axis - 0.15, y_axis[:, 0], 0.30, label=spacings[0].__str__())
 plt.bar(x_axis + 0.15, y_axis[:, 1], 0.30, label=spacings[1].__str__())
 plt.bar(x_axis , y_axis[:, 2], 0.30, label=spacings[2].__str__())
-plt.xticks(x_axis[2::5], [(s, s) for s in x_axis[2::5]])
-plt.xlabel("Shape of both Grids")
+plt.xticks(x_axis[1::5], [(s, s) for s in x_axis[1::5]])
+plt.xlabel("Shape of each Grid")
 plt.ylabel("Number of Interspecies Collisions")
-plt.legend()
-plt.savefig(file_name + ".svg")
+plt.legend(title="Integer Spacings")
+# plt.savefig(file_name + "_{}_{}".format(masses[0], masses[1]) + ".eps")
 plt.show()

@@ -127,7 +127,7 @@ class Simulation(bp.BaseClass):
     @staticmethod
     def default_file(directory=None, mode="w"):
         if directory is None:
-            directory = __file__[:-21] + 'Simulations/'
+            directory = bp.SIMULATION_DIR + "/"
         idx = 0
         while True:
             idx += 1
