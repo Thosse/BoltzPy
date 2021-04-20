@@ -1,8 +1,12 @@
 # ignore all __pycache__ folders
 *__pycache__/
 
-# ignore all build folders
+# build stuff
 *build/
+dist/*
+*egg-info
+MANIFEST
+
 
 # ignore .idea folder
 .idea/
