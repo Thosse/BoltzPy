@@ -862,6 +862,70 @@ class BaseModel(bp.BaseClass):
         result = np.dot(dv**dim * state, energies * velocities)
         return result.reshape(shape + (dim,))
 
+
+    def cmp_stress(self, state, s=None, mean_velocity=None, directions=None):
+        state = self._get_state_of_species(state, s)
+        # Reshape state into 2d
+        shape = state.shape[:-1]
+        size = np.prod(shape, dtype=int)
+        state = state.reshape((size, state.shape[-1]))
+
+        # compute default mean_velocity, from state
+        if mean_velocity is None:
+            mean_velocity = self.cmp_mean_velocity(state, s)
+
+        # choose default directions as unit vectors e1, e2
+        if directions is None:
+            directions = np.eye(self.ndim, dtype=float)[0:2]
+
+        # prepare integration paramters
+        dim = self.ndim
+        dv = (self.get_array(self.dv)[np.newaxis, :]
+              if s is None else self.dv[s])
+
+        # get stress moment function
+        mf_stress = self.mf_stress(mean_velocity, directions, s)
+        # moment function must be 2d array
+        mf_stress = mf_stress.reshape((-1, state.shape[-1]))
+
+        # numerical integration
+        result = np.sum(dv**dim * mf_stress * state, axis=-1)
+        # reshape result into intitial shape
+        result.reshape(shape)
+        return result
+
+    def cmp_heat_flow(self, state, s=None, mean_velocity=None, direction=None):
+        state = self._get_state_of_species(state, s)
+        # Reshape state into 2d
+        shape = state.shape[:-1]
+        size = np.prod(shape, dtype=int)
+        state = state.reshape((size, state.shape[-1]))
+
+        # compute default mean_velocity, from state
+        if mean_velocity is None:
+            mean_velocity = self.cmp_mean_velocity(state, s)
+
+        # choose default directions as unit vector e1
+        if direction is None:
+            direction = np.eye(self.ndim, dtype=float)[0]
+
+        # prepare integration paramters
+        dim = self.ndim
+        dv = (self.get_array(self.dv)[np.newaxis, :]
+              if s is None else self.dv[s])
+
+        # get stress moment function
+        mf_heat_flow = self.mf_heat_flow(mean_velocity, direction, s)
+        # moment function must be 2d array
+        mf_heat_flow = mf_heat_flow.reshape((-1, state.shape[-1]))
+
+        # numerical integration
+        result = np.sum(dv**dim * mf_heat_flow * state, axis=-1)
+        # reshape result into intitial shape
+        result.reshape(shape)
+        return result
+
+
     #####################################
     #           Visualization           #
     #####################################
