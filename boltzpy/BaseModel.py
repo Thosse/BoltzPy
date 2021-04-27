@@ -153,6 +153,13 @@ class BaseModel(bp.BaseClass):
         return np.max(np.abs(self.vels))
 
     @property
+    def is_cubic_grid(self):
+        """:obj:`bool`
+        Returns True, iff all grids are square/cubic,
+        i.e. invariant under permutations"""
+        return np.all(self.shapes - self.shapes[..., 0][..., np.newaxis] == 0)
+
+    @property
     def permutation_matrices(self):
         """:obj:`~numpy.array` [:obj:`int`]
         Array of all permutation matrices for the velocities"""

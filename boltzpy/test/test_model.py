@@ -320,6 +320,14 @@ def test_mf_orthogonal_heat_flow_is_orthogonal(key):
             assert_all_moments_are_zero(model, mf * state)
 
 
+@pytest.mark.parametrize("key", MODELS.keys())
+def test_collisionmodel_must_be_invariant(key):
+    model = MODELS[key]
+    if model.is_cubic_grid:
+        assert model.is_invariant()
+    else:
+        assert not model.is_invariant()
+
 # Todo/Idea: Implement collisions only for specimen tuples
 #  -> no need for get_idx  with its warnings
 
