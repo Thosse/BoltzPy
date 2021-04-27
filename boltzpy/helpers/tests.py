@@ -12,7 +12,7 @@ def assert_hdf_groups_are_equal(*hdf5_groups):
         group_2 = hdf5_groups[idx + 1]
         keys_2 = group_2.keys()
         # Keys must be equal!
-        assert keys_1 == keys_2
+        assert keys_1 == keys_2, (keys_1, keys_2)
         # Todo compare attributes as well?
 
         for key in keys_1:

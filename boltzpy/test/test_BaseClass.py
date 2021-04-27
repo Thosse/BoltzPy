@@ -21,18 +21,24 @@ for (key_elem, elem) in TEST_ELEMENTS.items():
 
 
 def setup_file(file_address=FILE):
-    if file_address == FILE:
-        reply = input("You are about to reset stored test results. "
-                      "Are you Sure? (yes, no)\n")
-        if reply != "yes":
-            print("ABORTED")
-            return
-
-    with h5py.File(file_address, mode="w") as file:
-        for (key, item) in TEST_ELEMENTS.items():
-            assert isinstance(item, bp.BaseClass)
-            file.create_group(key)
-            item.save(file[key], item.attributes())
+    with h5py.File(file_address, mode="a") as file:
+        # overwrite different classes separately
+        for name, elements in zip(["Grids", "Geometries", "Rules", "Models"],
+                                  [GRIDS, GEOMETRIES, RULES, MODELS]):
+            # ask before overwriting any of Test Data
+            if file_address == FILE:
+                reply = input("Reset stored {} (yes/no)? ".format(name))
+                overwrite = reply == "yes"
+            else:
+                overwrite = True
+            # overwrite all test data of this class
+            if overwrite:
+                for (key, item) in elements.items():
+                    assert isinstance(item, bp.BaseClass)
+                    file.require_group(key)
+                    item.save(file[key], item.attributes())
+            else:
+                print("Skipped")
     return
 
 
