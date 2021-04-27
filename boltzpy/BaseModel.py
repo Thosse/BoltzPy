@@ -230,6 +230,7 @@ class BaseModel(bp.BaseClass):
         Parameters
         ----------
         mean_velocity : :obj:`~numpy.array` [:obj:`float`]
+
         s : :obj:`int`, optional
             If None is given, a shared range for all specimen is given.
 
@@ -400,7 +401,7 @@ class BaseModel(bp.BaseClass):
         # compute exponential with matching mean velocity and temperature
         distance = np.sum((velocities - mean_velocity)**2,  axis=-1)
         exponential = np.exp(-0.5 * mass / temperature * distance)
-        divisor = np.sqrt(2*np.pi * temperature / mass) ** (dim / 2)
+        divisor = np.sqrt(2*np.pi * temperature / mass) ** dim
         # multiply to get desired number density
         result = (number_density / divisor) * exponential
         assert not np.any(np.isnan(result))

@@ -53,8 +53,6 @@ def setup_files():
         sim = bp.Simulation(**params)
         assert isinstance(sim, bp.Simulation)
         sim.compute(file)
-    print("Sucessfully set up all Test files")
-    input("Press any key to continue!")
     return
 
 
