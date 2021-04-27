@@ -27,8 +27,6 @@ class Simulation(bp.BaseClass):
         Temporal step size.
     dp : :obj:`float`
         Positional step size.
-    t : :obj:`numpy.int`
-        Current time step.
     state : :obj:`~numpy.array` [:obj:`float`]
         The current state of the simulation.
     interim : :obj:`~numpy.array` [:obj:`float`]
@@ -55,16 +53,10 @@ class Simulation(bp.BaseClass):
 
         assert isinstance(model, bp.CollisionModel)
         self.model = model
-        # store large model attrributes (vels, i_vels, spc_matrix) only once
-        for (r, attr) in zip(geometry.rules, bp.BaseModel.shared_attributes()):
-            assert np.all(getattr(r, attr) == getattr(model, attr))
-            # all point to the same objects
-            setattr(r, attr, getattr(model, attr))
         self.flow_quota = (np.abs(self.model.vels[:, 0]) * self.dt / self.dp)
 
         # state and interim are properly initialized in compute()
         # to reduce unnecessary memory usage (very large arrays)
-        self.t = np.int(0)
         self.state = np.empty(tuple())
         self.interim = np.copy(self.state)
 
@@ -74,8 +66,16 @@ class Simulation(bp.BaseClass):
             self.results = dict()
         else:
             self.results = results
-        self.log_state = np.bool(log_state)
-        self.check_integrity()
+        self.log_state = bool(log_state)
+
+        Simulation.check_integrity(self)
+
+        # reduce memory usage
+        for (r, attr) in zip(geometry.rules, bp.BaseModel.shared_attributes()):
+            # store large model attrributes only once
+            setattr(r, attr, getattr(model, attr))
+        # Test again, just in Case
+        Simulation.check_integrity(self)
         return
 
     @staticmethod
@@ -149,15 +149,15 @@ class Simulation(bp.BaseClass):
         # set initial state for computation
         self.state = self.geometry.initial_state
         self.interim = np.copy(self.state)
-        self.t = np.int(0)
+        cur_t = 0                           # current time_step
 
         print('Start Computation:')
         self.results.attrs["t"] = 1
         time_tracker = h_tt.TimeTracker()
         for (tw_idx, tw) in enumerate(self.timing.iG[:, 0]):
-            while self.t != tw:
+            while cur_t != tw:
                 self.geometry.compute(self)
-                self.t += 1
+                cur_t += 1
             self.write_results(tw_idx)
             self.file.flush()
             # print time estimate
@@ -299,17 +299,16 @@ class Simulation(bp.BaseClass):
         self.model.check_integrity()
         assert self.model.ndim >= self.geometry.ndim
         assert self.geometry.model_size == self.model.nvels
+
         # all rules must be based on the same model
         for (r, attr) in zip(self.geometry.rules, bp.BaseModel.attributes()):
-            assert np.all(getattr(r, attr) == getattr(self.model, attr))
-        # all rules' shared_attributes must point towards the same object
-        for (r, attr) in zip(self.geometry.rules, bp.BaseModel.shared_attributes()):
-            assert getattr(r, attr) is getattr(self.model, attr)
-            assert np.shares_memory(getattr(r, attr), getattr(self.model, attr))
+            assert np.all(getattr(r, attr) == getattr(self.model, attr)), (
+                "BaseModel of Rules and CollisionModel differ in Attribute {}\n"
+                "".format(attr))
 
         # results should only be a dictionary, if freshly initialized
         assert type(self.results) in {h5py.Group, dict}
-        assert isinstance(self.log_state, np.bool)
+        assert isinstance(self.log_state, bool)
 
         # check Courant-Friedrichs-Levy-Condition
         vels_norm = np.linalg.norm(self.model.vels)
