@@ -14,4 +14,4 @@ import boltzpy.AnimatedFigure as Plot
 
 # Define module constants
 TEST_DIR = __file__[:-12] + "/test"
-SIMULATION_DIR = __file__[:-21] + "/Simulations"
+SIMULATION_DIR = __file__[:-20] + "/Simulations"
