@@ -11,7 +11,7 @@ import boltzpy.helpers.TimeTracker as h_tt
 class AnimatedFigure:
     def __init__(self,
                  tmax=1,
-                 backend="TkAgg",
+                 backend="Qt5Agg",
                  figsize=(16, 9),
                  dpi=300,
                  writer='ffmpeg',
