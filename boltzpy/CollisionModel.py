@@ -1,6 +1,5 @@
 import numpy as np
 from scipy.sparse import csr_matrix, lil_matrix
-from time import process_time
 import boltzpy as bp
 
 
@@ -262,8 +261,6 @@ class CollisionModel(bp.BaseModel):
 
     def cmp_relations(self):
         """Generates and returns the :attr:`collision_relations`."""
-        print('Generating Collision Array...')
-        tic = process_time()
         # collect collisions in the following lists
         relations = []
 
@@ -327,11 +324,6 @@ class CollisionModel(bp.BaseModel):
         relations = self.filter(relations, self.key_index)
         # sort collisions for better comparability
         relations = self.sort(relations, self.key_index)
-        toc = process_time()
-        print('Time taken =  {t} seconds\n'
-              'Total Number of Collisions = {n}\n'
-              ''.format(t=round(toc - tic, 3),
-                        n=relations.shape[0]))
         return relations
 
     @staticmethod
