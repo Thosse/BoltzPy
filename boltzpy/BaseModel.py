@@ -1,5 +1,7 @@
 import numpy as np
 from scipy.optimize import newton as sp_newton
+from itertools import product as iter_prod
+from itertools import permutations as iter_perm
 import boltzpy as bp
 
 
@@ -51,7 +53,7 @@ class BaseModel(bp.BaseClass):
                  **kwargs):
         self.masses = np.array(masses, dtype=int)
         self.shapes = np.array(shapes, dtype=int)
-        self.base_delta = np.float(base_delta)
+        self.base_delta = float(base_delta)
         # give default value = default_spacing
         if spacings is None:
             self.spacings = 2 * np.lcm.reduce(self.masses) // self.masses
@@ -149,6 +151,37 @@ class BaseModel(bp.BaseClass):
         """:obj:`float`
         Maximum physical velocity of all sub grids."""
         return np.max(np.abs(self.vels))
+
+    @property
+    def permutation_matrices(self):
+        """:obj:`~numpy.array` [:obj:`int`]
+        Array of all permutation matrices for the velocities"""
+        perm_list = list(iter_perm(range(self.ndim)))
+        perm_array = np.array(perm_list, dtype=int)
+        eye = np.eye(self.ndim, dtype=int)
+        perm_matrices = eye[perm_array]
+        return perm_matrices
+
+    @property
+    def reflection_matrices(self):
+        """:obj:`~numpy.array` [:obj:`int`]
+        Array of all reflection matrices for the velocities"""
+        refl_list = list(iter_prod(*([[1, -1]] * self.ndim)))
+        refl_array = np.array(refl_list, dtype=int)[..., np.newaxis]
+        eye = np.eye(self.ndim, dtype=int)[np.newaxis, ...]
+        refl_matrices = eye * refl_array
+        return refl_matrices
+
+    @property
+    def symmetry_matrices(self):
+        """:obj:`~numpy.array` [:obj:`int`]
+        Array of all symmetry operators / matrices,
+        that are a homeomorphism."""
+        sym_list = [r.dot(p)
+                    for r in self.reflection_matrices
+                    for p in self.permutation_matrices]
+        sym_matrices = np.array(sym_list)
+        return sym_matrices
 
     def c_vels(self, mean_velocity, s=None):
         """Returns the difference to the mean_velocity for each velocity
@@ -862,7 +895,6 @@ class BaseModel(bp.BaseClass):
         result = np.dot(dv**dim * state, energies * velocities)
         return result.reshape(shape + (dim,))
 
-
     def cmp_stress(self, state, s=None, mean_velocity=None, directions=None):
         state = self._get_state_of_species(state, s)
         # Reshape state into 2d
@@ -924,7 +956,6 @@ class BaseModel(bp.BaseClass):
         # reshape result into intitial shape
         result.reshape(shape)
         return result
-
 
     #####################################
     #           Visualization           #

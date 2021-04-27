@@ -93,9 +93,52 @@ class CollisionModel(bp.BaseModel):
 
     @property
     def collision_invariants(self):
+        """:obj:`int` :
+        The number of collision invariants of this model."""
         rank = np.linalg.matrix_rank(self.collision_matrix.toarray())
         maximum_rank = np.min([self.nvels, self.ncols])
         return maximum_rank - rank
+
+    def is_invariant(self, relations=None, operations=None):
+        """:obj:`bool` :
+        Returns True if the collisions, more precisely i_vels[relations],
+        are invariant under the given operations."""
+        # set default parameters
+        if relations is None:
+            relations = self.collision_relations
+        relations = np.array(relations, copy=False, ndmin=2, dtype=int)
+        assert relations.shape[1:] == (4,)
+
+        if operations is None:
+            # by default check both reflections and permutations
+            operations = np.concatenate((self.reflection_matrices,
+                                         self.permutation_matrices),
+                                        axis=0)
+        operations = np.array(operations, copy=False, ndmin=3)
+        assert operations.shape[1:] == (self.ndim, self.ndim)
+        assert operations.dtype == int
+
+        # group by species, necessary to call get_idx
+        grp_spc = self.group(relations, self.key_species)
+        for spc, i_r in grp_spc.items():
+            spc = np.array(spc)
+            rels = relations[i_r]
+            cols = self.i_vels[rels]
+            # apply operations, all simultaneously
+            op_cols = np.einsum("abc,dec->adeb", operations, cols)
+            # reshape into (N, 4, ndim) shape
+            op_cols = op_cols.reshape((-1, 4, self.ndim))
+            # get indices
+            op_rels = self.get_idx(spc, op_cols)
+            # all op_rels must be grid points
+            if np.any(op_rels == -1):
+                return False
+            # filter out redundant collisions
+            op_rels = self.filter(op_rels)
+            # number of relations should not have changed (if invariant)
+            if op_rels.shape[0] != rels.shape[0]:
+                return False
+        return True
 
     ################################################
     #        Sorting and Ordering Collisions       #
