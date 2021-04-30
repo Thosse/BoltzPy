@@ -130,17 +130,16 @@ def test_get_idx_on_random_integers(key):
 
 @pytest.mark.parametrize("key_func", KEY_FUNCTIONS)
 @pytest.mark.parametrize("key", MODELS.keys())
-def test_grouping_reference_code(key, key_func):
+def test_compare_grouping__with_reference_code(key, key_func):
     model = MODELS[key]
     key_func = model.__getattribute__(key_func)
+    keys = key_func(model.collision_relations)
 
     # compute grouped, with fast method
-    grouped = model.group(model.collision_relations, key_func)
+    grouped = model.group(keys)
 
     # compute reference solution with simple Code
     reference = dict()
-    # compute key for each element
-    keys = key_func(model.collision_relations)
     # create array of unique keys (a key may be a 1d array)
     unique_keys = np.unique(keys, axis=0)
     # fill dictionary
@@ -154,6 +153,24 @@ def test_grouping_reference_code(key, key_func):
         assert reference[key].shape == grouped[key].shape
         # maybe this must be sorted before
         assert np.all(reference[key] == grouped[key])
+
+
+@pytest.mark.parametrize("key_func", KEY_FUNCTIONS)
+@pytest.mark.parametrize("key", MODELS.keys())
+def test_grouping_with_and_without_relations(key, key_func):
+    model = MODELS[key]
+    key_func = model.__getattribute__(key_func)
+    keys = key_func(model.collision_relations)
+
+    # group with and without relations
+    grp_rel = model.group(keys, model.collision_relations)
+    grp_idx = model.group(keys)
+
+    # keys must be equal
+    assert grp_rel.keys() == grp_idx.keys()
+    for key, positions in grp_idx.items():
+        # grp_rel must group the relations, at the correct positions
+        assert np.array_equal(grp_rel[key], model.collision_relations[positions])
 
 
 def assert_all_moments_are_zero(model, state):

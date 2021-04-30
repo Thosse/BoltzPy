@@ -119,7 +119,8 @@ class CollisionModel(bp.BaseModel):
         assert operations.dtype == int
 
         # group by species, necessary to call get_idx
-        grp_spc = self.group(relations, self.key_species)
+        key_spc = self.key_species(relations)
+        grp_spc = self.group(key_spc)
         for spc, i_r in grp_spc.items():
             spc = np.array(spc)
             rels = relations[i_r]
@@ -185,27 +186,43 @@ class CollisionModel(bp.BaseModel):
         angles = np.sort(np.abs(angles), axis=-1)
         return angles
 
-    def group(self, relations, key_function):
-        relations = np.array(relations, ndmin=2, copy=False)
+    def group(self, keys, relations=None, as_array=False):
+        """Create Partitions of positions (indices) with equal keys.
 
+        Parameters
+        ----------
+        keys : :obj:`~numpy.array` [:obj:`int`]
+        relations : :obj:`~numpy.array` [:obj:`int`], optional
+            If not None, then the actual relations at the indeices are returned.
+            relations.shape[0] must match keys.shape[0]
+        as_array : :obj:`bool`, optional
+            If True, returns an array of arrays, instead of a dictionary.
+        """
+        assert keys.ndim == 2
         # get lexicographic order of keys
-        keys = key_function(relations)
         positions = np.lexsort(np.flip(keys.transpose(), axis=0))
+        # sort keys
+        keys = keys[positions]
 
         # find first occurrence of each key in sorted array
-        relations = relations[positions]
-        key, pos = np.unique(key_function(relations), axis=0, return_index=True)
+        key, pos = np.unique(keys, axis=0, return_index=True)
+
+        # if relations are give, then split the (sorted) relations instead
+        # This returns grouped relations instead of positions
+        if relations is not None:
+            positions = relations[positions]
 
         # split relations into array with equal key
         # [relations[0:pos[1]], relations[pos[2]: pos[3],...]
         # pos[0]=0 must be removed for split() to work correctly
         split_array = np.split(positions, pos[1:])
-        
-        # store arrays in dict
-        group_dict = dict()
-        for k, values in zip(key, split_array):
-            group_dict[tuple(k)] = values
-        return group_dict
+
+        # return split array
+        if as_array:
+            return split_array
+        # return as dictionary
+        else:
+            return {tuple(k): values for k, values in zip(key, split_array)}
 
     def filter(self, relations=None, key_function=None):
         rels = self.collision_relations if relations is None else relations
@@ -328,8 +345,8 @@ class CollisionModel(bp.BaseModel):
             # todo add as_array option in split() -> simpler NONE-mode
             if groupy_by == "distance":
                 # partition based on distance to next grid point
-                # grp_keys = grids[s1].key_distance(grids[s0].iG)
-                grp = bp.Grid.group(grids[s0].iG, grids[s1].key_distance)
+                grp_keys = grids[s1].key_distance(grids[s0].iG)
+                grp = bp.Grid.group(grids[s0].iG, grp_keys)
                 extended_grids = [grids[s0].extension(2),
                                   grids[s1].extension(2)]
                 # todo determine a reflection/permutation index for shifting and rotation

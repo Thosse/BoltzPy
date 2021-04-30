@@ -230,10 +230,9 @@ class Grid(bp.BaseClass):
         return norm
 
     @staticmethod
-    def group(values, key_function):
+    def group(values, keys):
         assert values.ndim == 2
         grouped = dict()
-        keys = key_function(values)
         unique_keys = np.unique(keys, axis=0)
         for key in unique_keys:
             pos = np.where(np.all(keys == key, axis=-1))
@@ -251,9 +250,6 @@ class Grid(bp.BaseClass):
         assert item.shape[-1] == self.ndim
         return np.all(self.get_idx(item) != -1)
 
-    def line(self, start, direction, steps):
-        return (start + step * direction for step in steps
-                if start + step * direction in self)
 
     def hyperplane(self, start, normal):
         shifted_vels = self.iG - start
