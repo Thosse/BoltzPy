@@ -302,66 +302,66 @@ class CollisionModel(bp.BaseModel):
         else:
             raise NotImplementedError
 
-    def cmp_relations(self):
-        """Generates and returns the :attr:`collision_relations`."""
-        # collect collisions in the following lists
-        relations = []
+    def cmp_relations(self, groupy_by="distance"):
+        """Computes the :attr:`collision_relations`.
 
-        """The velocities are named in the following way:
-        1. v* and w* are velocities of the first/second specimen, respectively
-        2. v0 or w0 denotes the velocity before the collision
-           v1 or w1 denotes the velocity after the collision
+         Parameters
+        ----------
+        groupy_by : :obj:`str`
+            Switches between algorithms.
+            Determines if and how the grids are partitioned into equivalence classes.
         """
-        # choose function for local collisions
-        if self.algorithm_relations == 'all':
-            coll_func = self.get_colvels
-        else:
-            raise NotImplementedError(
-                'Unsupported Selection Scheme: '
-                '{}'.format(self.algorithm_relations)
-            )
+        assert groupy_by in {"distance",
+                             "symmetry_and_distance",
+                             "None"}
+        # collect collisions in a lists
+        relations = []
+        # Collisions are computed for every pair of specimen
+        species_pairs = np.array([(s0, s1) for s0 in self.species
+                                  for s1 in range(s0, self.nspc)])
+        # pre initialize each species' velocity grid
+        grids = self.subgrids()
 
-        subgrids = self.subgrids()
-        # Iterate over Specimen pairs
-        for s0 in self.species:
-            for s1 in np.arange(s0, self.nspc):
+        # Compute collisions iteratively, for each pair
+        for s0, s1 in species_pairs:
+            # partition grids[s0]
+            # todo add as_array option in split() -> simpler NONE-mode
+            if groupy_by == "distance":
+                # partition based on distance to next grid point
+                # grp_keys = grids[s1].key_distance(grids[s0].iG)
+                grp = bp.Grid.group(grids[s0].iG, grids[s1].key_distance)
+                extended_grids = [grids[s0].extension(2),
+                                  grids[s1].extension(2)]
+                # todo determine a reflection/permutation index for shifting and rotation
 
-                # group grid[0] points by distance to grid[2]
-                group = bp.Grid.group(subgrids[s0].iG,
-                                      subgrids[s1].key_distance)
-                # generate relations for a representative of each group
-                repr = {key: group[key][0] for key in group.keys()}
-                repr_rels = dict()
-                for key in group.keys():
-                    # generate collisions in extended grids
-                    # allows transferring the results without losing collisions
-                    repr_rels[key] = coll_func(
-                        [subgrids[i].extension(2) for i in [s0, s0, s1, s1]],
-                        self.masses[[s0, s0, s1, s1]],
-                        repr[key])
-                for key, velocities in group.items():
-                    # Get relations for other class elements by shifting
-                    for v0 in velocities:
-                        # shift extended colvels
-                        new_colvels = repr_rels[key] + (v0 - repr[key])
-                        # get indices
-                        new_rels = self.get_idx([s0, s0, s1, s1], new_colvels)
-
-                        # remove out-of-bounds or useless collisions
-                        choice = np.where(
-                            # must be in the grid
-                            np.all(new_rels >= 0, axis=1)
-                            # must be effective
-                            & (new_rels[..., 0] != new_rels[..., 3])
-                            & (new_rels[..., 0] != new_rels[..., 1])
-                        )
-                        # Add chosen Relations/Weights to the list
-                        assert np.array_equal(
-                                new_colvels[choice],
-                                self.i_vels[new_rels[choice]])
-                        relations.extend(new_rels[choice])
-                    # relations += new_rels
-                    # weights += new_weights
+            else:
+                raise NotImplementedError
+            # compute collision relations for each partition
+            for partition in grp.values():
+                # choose representative velocity
+                repr_vel = partition[0]
+                # generate collision velocities for representative
+                repr_colvels = self.get_colvels(extended_grids,
+                                                self.masses[[s0, s1]],
+                                                repr_vel)
+                # compute partitions collision relations, based on repr_colvels
+                for v0 in partition:
+                    # shift and rotate repr_colvels onto v0
+                    # todo move this into a method, with groupy_by parameter
+                    new_colvels = repr_colvels + (v0 - partition[0])
+                    # get indices
+                    new_rels = self.get_idx([s0, s0, s1, s1], new_colvels)
+                    # remove out-of-bounds or useless collisions
+                    choice = np.where(
+                        # must be in the grid
+                        np.all(new_rels >= 0, axis=1)
+                        # must be effective
+                        & (new_rels[..., 0] != new_rels[..., 3])
+                        & (new_rels[..., 0] != new_rels[..., 1])
+                    )
+                    # add relations to list
+                    relations.extend(new_rels[choice])
+        # convert list into array
         relations = np.array(relations, dtype=int)
         # remove redundant collisions
         relations = self.filter(relations, self.key_index)
@@ -375,18 +375,18 @@ class CollisionModel(bp.BaseModel):
                     v0):
         # store results in list ov colliding velocities (colvels)
         colvels = []
-        for v1 in grids[1].iG:
+        for v1 in grids[0].iG:
             dv = v1 - v0
-            if np.any((dv * masses[0]) % masses[2] != 0):
+            if np.any((dv * masses[0]) % masses[1] != 0):
                 continue
-            dw = -(dv * masses[0]) // masses[2]
+            dw = -(dv * masses[0]) // masses[1]
             # find starting point for w0, projected on axis( v0 -> v1 )
             w0_proj = v0 + dv // 2 - dw // 2
-            w0 = grids[2].hyperplane(w0_proj, dv)
+            w0 = grids[1].hyperplane(w0_proj, dv)
             # Calculate w1, using the momentum invariance
             w1 = w0 + dw
             # remove w0/w1 if w1 is out of the grid
-            pos = np.where(grids[3].get_idx(w1) >= 0)
+            pos = np.where(grids[1].get_idx(w1) >= 0)
             w0 = w0[pos]
             w1 = w1[pos]
             # construct colliding velocities array (colvels)
@@ -396,7 +396,7 @@ class CollisionModel(bp.BaseModel):
             local_colvels[:, 2] = w0
             local_colvels[:, 3] = w1
             # remove collisions that don't fulfill all conditions
-            choice = np.where(CollisionModel.is_collision(local_colvels, masses))
+            choice = np.where(CollisionModel.is_collision(local_colvels, masses[[0,0, 1,1]]))
             colvels.append(local_colvels[choice])
         return np.concatenate(colvels, axis=0)
 
