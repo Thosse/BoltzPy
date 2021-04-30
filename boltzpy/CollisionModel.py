@@ -120,10 +120,9 @@ class CollisionModel(bp.BaseModel):
 
         # group by species, necessary to call get_idx
         key_spc = self.key_species(relations)
-        grp_spc = self.group(key_spc)
-        for spc, i_r in grp_spc.items():
+        grp_spc = self.group(key_spc, relations)
+        for spc, rels in grp_spc.items():
             spc = np.array(spc)
-            rels = relations[i_r]
             cols = self.i_vels[rels]
             # apply operations, all simultaneously
             op_cols = np.einsum("abc,dec->adeb", operations, cols)
@@ -186,7 +185,8 @@ class CollisionModel(bp.BaseModel):
         angles = np.sort(np.abs(angles), axis=-1)
         return angles
 
-    def group(self, keys, relations=None, as_array=False):
+    @staticmethod
+    def group(keys, relations=None, as_array=False):
         """Create Partitions of positions (indices) with equal keys.
 
         Parameters
@@ -207,14 +207,15 @@ class CollisionModel(bp.BaseModel):
         # find first occurrence of each key in sorted array
         key, pos = np.unique(keys, axis=0, return_index=True)
 
-        # if relations are give, then split the (sorted) relations instead
-        # This returns grouped relations instead of positions
+        # if relations are give, then return relations, instead of positions
         if relations is not None:
+            assert relations.shape == (keys.shape[0], 4)
             positions = relations[positions]
 
-        # split relations into array with equal key
-        # [relations[0:pos[1]], relations[pos[2]: pos[3],...]
-        # pos[0]=0 must be removed for split() to work correctly
+        # split positions into array slices
+        # all segments point to the elements with the same key
+        # pos determines the separation points
+        # pos[0]==0 must be removed for split() to work correctly
         split_array = np.split(positions, pos[1:])
 
         # return split array

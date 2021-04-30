@@ -130,7 +130,7 @@ def test_get_idx_on_random_integers(key):
 
 @pytest.mark.parametrize("key_func", KEY_FUNCTIONS)
 @pytest.mark.parametrize("key", MODELS.keys())
-def test_compare_grouping__with_reference_code(key, key_func):
+def test_compare_group_with_reference_code(key, key_func):
     model = MODELS[key]
     key_func = model.__getattribute__(key_func)
     keys = key_func(model.collision_relations)
@@ -157,7 +157,7 @@ def test_compare_grouping__with_reference_code(key, key_func):
 
 @pytest.mark.parametrize("key_func", KEY_FUNCTIONS)
 @pytest.mark.parametrize("key", MODELS.keys())
-def test_grouping_with_and_without_relations(key, key_func):
+def test_group_with_and_without_relations(key, key_func):
     model = MODELS[key]
     key_func = model.__getattribute__(key_func)
     keys = key_func(model.collision_relations)
