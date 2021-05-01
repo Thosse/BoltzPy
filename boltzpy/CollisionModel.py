@@ -343,19 +343,21 @@ class CollisionModel(bp.BaseModel):
         # Compute collisions iteratively, for each pair
         for s0, s1 in species_pairs:
             # partition grids[s0]
-            # todo add as_array option in split() -> simpler NONE-mode
             if groupy_by == "distance":
                 # partition based on distance to next grid point
                 grp_keys = grids[s1].key_distance(grids[s0].iG)
-                grp = bp.Grid.group(grp_keys, grids[s0].iG, as_array=False)
+                grp = bp.Grid.group(grp_keys, grids[s0].iG, as_array=True)
                 extended_grids = [grids[s0].extension(2),
                                   grids[s1].extension(2)]
                 # todo determine a reflection/permutation index for shifting and rotation
-
+            elif groupy_by == "None":
+                grp = grids[s0].iG[:, np.newaxis]
+                extended_grids = [grids[s0], grids[s1]]
             else:
                 raise NotImplementedError
+            
             # compute collision relations for each partition
-            for partition in grp.values():
+            for partition in grp:
                 # choose representative velocity
                 repr_vel = partition[0]
                 # generate collision velocities for representative
