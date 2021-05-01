@@ -209,7 +209,7 @@ class CollisionModel(bp.BaseModel):
 
         # if relations are give, then return relations, instead of positions
         if relations is not None:
-            assert relations.shape == (keys.shape[0], 4)
+            assert relations.shape[0] == keys.shape[0]
             positions = relations[positions]
 
         # split positions into array slices
@@ -347,7 +347,7 @@ class CollisionModel(bp.BaseModel):
             if groupy_by == "distance":
                 # partition based on distance to next grid point
                 grp_keys = grids[s1].key_distance(grids[s0].iG)
-                grp = bp.Grid.group(grids[s0].iG, grp_keys)
+                grp = bp.Grid.group(grp_keys, grids[s0].iG, as_array=False)
                 extended_grids = [grids[s0].extension(2),
                                   grids[s1].extension(2)]
                 # todo determine a reflection/permutation index for shifting and rotation

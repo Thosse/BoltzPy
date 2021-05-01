@@ -230,17 +230,17 @@ class Grid(bp.BaseClass):
         return norm
 
     @staticmethod
-    def group(values, keys):
-        assert values.ndim == 2
-        grouped = dict()
-        unique_keys = np.unique(keys, axis=0)
-        for key in unique_keys:
-            pos = np.where(np.all(keys == key, axis=-1))
-            vals = values[pos]
-            # sort vals, first element must have smallest norm for collisions
-            order = np.argsort(Grid.key_norm(vals), kind="stable")
-            grouped[tuple(key)] = vals[order]
-        return grouped
+    def group(keys, values, as_array=True, sort_values=True):
+        # Reuse implementation in CollisionModel
+        grp = bp.CollisionModel.group(keys, values, as_array)
+        if sort_values:
+            # unpack dict values, for consistent access
+            arrays = grp if as_array else grp.values()
+            # sort arrays by norm
+            for arr in arrays:
+                order = np.argsort(Grid.key_norm(arr), kind="stable")
+                arr[...] = arr[order]
+        return grp
 
     #####################################
     #              Utility              #
@@ -249,7 +249,6 @@ class Grid(bp.BaseClass):
         assert isinstance(item, np.ndarray)
         assert item.shape[-1] == self.ndim
         return np.all(self.get_idx(item) != -1)
-
 
     def hyperplane(self, start, normal):
         shifted_vels = self.iG - start
