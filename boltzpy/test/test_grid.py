@@ -51,11 +51,9 @@ def test_get_index_on_shuffled_grid(key):
 @pytest.mark.parametrize("key", GRIDS.keys())
 def test_get_index_on_shifted_grid(key):
     grid = GRIDS[key]
-    for factor in [2, 3]:
-        ext_grid = grid.extension(factor)
-        for shift in range(1, grid.spacing):
-            shifted_vals = ext_grid.iG + shift
-            assert np.all(grid.get_idx(shifted_vals) == - 1)
+    for shift in range(1, grid.spacing):
+        shifted_vals = grid.iG + shift
+        assert np.all(grid.get_idx(shifted_vals) == - 1)
 
 
 @pytest.mark.parametrize("key", GRIDS.keys())

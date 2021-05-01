@@ -320,6 +320,46 @@ class CollisionModel(bp.BaseModel):
         else:
             raise NotImplementedError
 
+    def _get_extended_grids(self, *species):
+        """Generate Grids with extended shapes for faster collision generation.
+
+        These Grids must be larger than their "bases",
+        to cover all possible shifts of collisions.
+        The first Grids shape must double,
+        the second grids shape must be large enough to
+        cover the largest possible distance between the two grids.
+
+         Parameters
+        ----------
+        species : :obj:`int`
+            Must be 2 specimen.
+        """
+        species = np.array(species, copy=False, dtype=int)
+        assert species.shape == (2,)
+        assert np.all(species < self.nspc)
+
+        # get maximum velocity (last velocities of each subgrid) without creating them
+        max_vels = self.i_vels[self._idx_offset[species + 1] - 1]
+        spacings = self.spacings[species]
+
+        # compute (minimal) shapes for extended grids
+        ext_shapes = np.zeros((2, self.ndim), dtype=int)
+        # first shape must be doubled
+        ext_shapes[0] = 2 * self.shapes[species[0]]
+        # second shape must cover the maximal distance between grid points
+        max_distance = np.sum(max_vels, axis=0)
+        ext_shapes[1] = np.ceil(2 * max_distance / spacings[1] + 1)
+
+        # retain even/odd shapes
+        old_shapes = self.shapes[species]
+        ext_shapes += (np.array(old_shapes) % 2) != (ext_shapes % 2)
+        assert np.array_equal(old_shapes % 2, ext_shapes % 2)
+
+        # generate extended grid, with same parameters but new shape
+        ext_grids = [bp.Grid(shape, self.base_delta, spacing, True)
+                     for shape, spacing in zip(ext_shapes, spacings)]
+        return ext_grids
+
     def cmp_relations(self, groupy_by="distance"):
         """Computes the :attr:`collision_relations`.
 
@@ -347,15 +387,14 @@ class CollisionModel(bp.BaseModel):
                 # partition based on distance to next grid point
                 grp_keys = grids[s1].key_distance(grids[s0].iG)
                 grp = bp.Grid.group(grp_keys, grids[s0].iG, as_array=True)
-                extended_grids = [grids[s0].extension(2),
-                                  grids[s1].extension(2)]
+                extended_grids = self._get_extended_grids(s0, s1)
                 # todo determine a reflection/permutation index for shifting and rotation
             elif groupy_by == "None":
                 grp = grids[s0].iG[:, np.newaxis]
                 extended_grids = [grids[s0], grids[s1]]
             else:
                 raise NotImplementedError
-            
+
             # compute collision relations for each partition
             for partition in grp:
                 # choose representative velocity
