@@ -65,11 +65,11 @@ class Grid(bp.BaseClass):
                  spacing,
                  is_centered=False):
         self.shape = np.array(shape, dtype=int)
-        self.delta = np.float(delta)
-        self.spacing = np.int(spacing)
+        self.delta = float(delta)
+        self.spacing = int(spacing)
         self.is_centered = bool(is_centered)
         self.ndim = self.shape.size
-        self.size = np.int(np.prod(self.shape))
+        self.size = int(np.prod(self.shape))
         # if the grid is centered, all values are shifted by +offset
         # Note that True/False == 1/0
         # todo rename into shift
@@ -299,13 +299,13 @@ class Grid(bp.BaseClass):
         assert self.size >= 0
         assert np.prod(self.shape) == self.size
 
-        assert isinstance(self.delta, np.float)
+        assert isinstance(self.delta, float)
         assert self.delta > 0
 
         assert isinstance(self.spacing, int)
         assert self.spacing > 0
 
-        assert isinstance(self.physical_spacing, np.float)
+        assert isinstance(self.physical_spacing, float)
         assert self.physical_spacing > 0
 
         assert isinstance(self.is_centered, bool)
