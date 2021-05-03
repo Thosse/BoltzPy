@@ -246,22 +246,30 @@ class CollisionModel(bp.BaseModel):
         else:
             return positions
 
-    def sort(self, relations=None, key_function=None):
-        rels = self.collision_relations if relations is None else relations
-        assert rels.ndim == 2
-        if key_function is None:
-            key_function = self.key_index
+    @staticmethod
+    def sort(keys, relations=None):
+        """Sort keys (or relations) lexicographically.
+        Returns a sorting permutation (if no relations are given)
+        or the permuted/sorted relations (if relations are given).
 
-        keys = key_function(rels)
+        Parameters
+        ----------
+        keys : :obj:`~numpy.array` [:obj:`int`]
+        relations : :obj:`~numpy.array` [:obj:`int`], optional
+            If not None, then the sorted relations at are returned.
+            relations.shape[0] must match keys.shape[0]
+        """
+        assert keys.ndim == 2
+
         # lexsort sorts columns, thus we transpose first
         # flip keys, as the last key (row) has highest priority
         positions = np.lexsort(np.flip(keys.transpose(), axis=0))
-        if relations is None:
-            self.collision_relations = self.collision_relations[positions]
-            self.collision_weights = self.collision_weights[positions]
-            return None
-        else:
+        # return sorted relations, if given
+        if relations is not None:
             return relations[positions]
+        # otherwise return ordering positions (technically a permutation)
+        else:
+            return positions
 
     # todo choose: given list of indices (of collision relations) or relations(what to do with the weights?) -> merge and filter redundants
 
@@ -433,7 +441,7 @@ class CollisionModel(bp.BaseModel):
         # remove redundant collisions
         relations = self.filter(self.key_index(relations), relations)
         # sort collisions for better comparability
-        relations = self.sort(relations, self.key_index)
+        relations = self.sort(self.key_index(relations), relations)
         return relations
 
     @staticmethod
