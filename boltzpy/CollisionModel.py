@@ -134,7 +134,7 @@ class CollisionModel(bp.BaseModel):
             if np.any(op_rels == -1):
                 return False
             # filter out redundant collisions
-            op_rels = self.filter(op_rels)
+            op_rels = self.filter(self.key_index(op_rels), op_rels)
             # number of relations should not have changed (if invariant)
             if op_rels.shape[0] != rels.shape[0]:
                 return False
@@ -193,7 +193,7 @@ class CollisionModel(bp.BaseModel):
         ----------
         keys : :obj:`~numpy.array` [:obj:`int`]
         relations : :obj:`~numpy.array` [:obj:`int`], optional
-            If not None, then the actual relations at the indeices are returned.
+            If not None, then the actual relations at the indices are returned.
             relations.shape[0] must match keys.shape[0]
         as_array : :obj:`bool`, optional
             If True, returns an array of arrays, instead of a dictionary.
@@ -225,21 +225,26 @@ class CollisionModel(bp.BaseModel):
         else:
             return {tuple(k): values for k, values in zip(key, split_array)}
 
-    def filter(self, relations=None, key_function=None):
-        rels = self.collision_relations if relations is None else relations
-        assert rels.ndim == 2
-        if key_function is None:
-            key_function = self.key_index
+    @staticmethod
+    def filter(keys, relations=None):
+        """Filter out elements with redundant keys.
 
-        keys = key_function(rels)
-        # unique values _ are not needed
-        _, positions = np.unique(keys, return_index=True, axis=0)
-        if relations is None:
-            self.collision_relations = self.collision_relations[positions]
-            self.collision_weights = self.collision_weights[positions]
-            return
-        else:
+        Parameters
+        ----------
+        keys : :obj:`~numpy.array` [:obj:`int`]
+        relations : :obj:`~numpy.array` [:obj:`int`], optional
+            If not None, then the actual relations at the indices are returned.
+            relations.shape[0] must match keys.shape[0]
+        """
+        assert keys.ndim == 2
+        # ignore unique values ([0]), only take first positions ([1]=
+        positions = np.unique(keys, return_index=True, axis=0)[1]
+        # return filtered relations, if given
+        if relations is not None:
             return relations[positions]
+        # otherwise return positions of first occurrence
+        else:
+            return positions
 
     def sort(self, relations=None, key_function=None):
         rels = self.collision_relations if relations is None else relations
@@ -282,10 +287,13 @@ class CollisionModel(bp.BaseModel):
         # update attributes
         self.collision_relations = relations
         self.collision_weights = weights
+
         # Filter out any duplicates, Weights are NOT added
         # This might lead to unpredictable behaviour,
         # if a relation is given twice with different weights
-        self.filter()
+        filtered_pos = self.filter(self.key_index(self.collision_relations))
+        self.collision_relations = self.collision_relations[filtered_pos]
+        self.collision_weights = self.collision_weights[filtered_pos]
 
         # set up as lil_matrix, allows fast changes to sparse structure
         col_mat = lil_matrix((self.nvels, weights.size), dtype=float)
@@ -423,7 +431,7 @@ class CollisionModel(bp.BaseModel):
         # convert list into array
         relations = np.array(relations, dtype=int)
         # remove redundant collisions
-        relations = self.filter(relations, self.key_index)
+        relations = self.filter(self.key_index(relations), relations)
         # sort collisions for better comparability
         relations = self.sort(relations, self.key_index)
         return relations
