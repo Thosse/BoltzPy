@@ -63,3 +63,34 @@ def test_key_distance(key):
     distances = grid.key_distance(vals)
     shifted_vals = vals - distances - grid.offset
     assert np.all(shifted_vals % grid.spacing == 0)
+
+
+@pytest.mark.parametrize("key", [key for key, grid in GRIDS.items()
+                                 if grid.ndim in [2, 3]])
+def test_recreate_distance_from_partitioned_distance(key):
+    grid = GRIDS[key]
+    # array of matrices (the order is important!)
+    sym_matrices = bp.BaseModel(masses=[1], shapes=[grid.shape]).symmetry_matrices
+    # get random values, to compute distances for
+    vals = np.random.randint(5000, size=(100, grid.ndim))
+    # compute distances
+    distances = grid.key_distance(vals)
+    # compute partitioned distance for same values
+    key_partitioned_distance = grid.key_partitioned_distance(vals)
+    # first part [0:ndim] are sorted and absolutes of the distances
+    partitioned_distances = key_partitioned_distance[..., :-1]
+    # matrices that SHOULD restore distances from partitioned_distances
+    restoring_matrices = sym_matrices[key_partitioned_distance[..., -1]]
+    # restore distances
+    restored_distances = np.einsum("ijk,ik->ij",
+                                   restoring_matrices,
+                                   partitioned_distances)
+    assert np.all(restored_distances == distances)
+
+
+@pytest.mark.parametrize("key", [key for key, grid in GRIDS.items()
+                                 if grid.ndim not in [2, 3]])
+def test_recreate_distance_fails_for_different_dimensions(key):
+    # AssertionError is raised when setting up the BaseModel
+    with pytest.raises(AssertionError):
+        test_recreate_distance_from_partitioned_distance(key)

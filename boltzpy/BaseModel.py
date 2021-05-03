@@ -162,17 +162,42 @@ class BaseModel(bp.BaseClass):
     @property
     def permutation_matrices(self):
         """:obj:`~numpy.array` [:obj:`int`]
-        Array of all permutation matrices for the velocities"""
+        Array of all permutation matrices for the velocities.
+
+        .. note::
+            1. The matrices are in a specific order,
+               used in :func:`~boltzpy.Grid.key_partitioned_distance`.
+            2. The matrices are orthogonal.
+               The transpose is the inverse matrix.
+        """
+        # DO NOT CHANGE THIS ORDER!
+        # These matrices are used for the fast collision generation.
+        # This order is specially chosen for this!
+        # when reshaping perm_matrices to a (3,2,3,3) array (in 3d)
+        #   first index  : determines first column (int)
+        #   second index : determines if remaining values are switched (bool)
         perm_list = list(iter_perm(range(self.ndim)))
         perm_array = np.array(perm_list, dtype=int)
         eye = np.eye(self.ndim, dtype=int)
         perm_matrices = eye[perm_array]
+        # transpose/invert matrices. They are used most of the time.
+        perm_matrices = perm_matrices.transpose((0, 2, 1))
         return perm_matrices
 
     @property
     def reflection_matrices(self):
         """:obj:`~numpy.array` [:obj:`int`]
-        Array of all reflection matrices for the velocities"""
+        Array of all reflection matrices for the velocities.
+
+         .. note::
+            1. The matrices are in a specific order,
+               used in :func:`~boltzpy.Grid.key_partitioned_distance`.
+            2. The matrices are orthogonal.
+               The transpose is the inverse matrix.
+        """
+        # DO NOT CHANGE THIS ORDER!
+        # These matrices are used for the fast collision generation.
+        # This order is specially chosen for this!
         refl_list = list(iter_prod(*([[1, -1]] * self.ndim)))
         refl_array = np.array(refl_list, dtype=int)[..., np.newaxis]
         eye = np.eye(self.ndim, dtype=int)[np.newaxis, ...]
@@ -183,7 +208,17 @@ class BaseModel(bp.BaseClass):
     def symmetry_matrices(self):
         """:obj:`~numpy.array` [:obj:`int`]
         Array of all symmetry operators / matrices,
-        that are a homeomorphism."""
+        that are a homeomorphism.
+
+         .. note::
+            1. The matrices are in a specific order,
+               used in :func:`~boltzpy.Grid.key_partitioned_distance`.
+            2. The matrices are orthogonal.
+               The transpose is the inverse matrix.
+        """
+        # DO NOT CHANGE THIS ORDER!
+        # These matrices are used for the fast collision generation.
+        # This order is specially chosen for this!
         sym_list = [r.dot(p)
                     for r in self.reflection_matrices
                     for p in self.permutation_matrices]

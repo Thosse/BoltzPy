@@ -210,10 +210,22 @@ class Grid(bp.BaseClass):
     #        Sorting and Ordering       #
     #####################################
     def key_distance(self, values):
-        # NOTE: this acts as if the grid was infinite.
-        # This is desired for the partitioning
-        assert isinstance(values, np.ndarray)
-        # Even or centered grids  mav have an offset % spacing != 0
+        """Returns the distance to the next grid point for each value.
+
+        .. Note::
+            This assumes an infinite grid. It is purely based on the spacing!
+
+        Parameters
+        ----------
+        values : :obj:`~numpy.array` [:obj:`int`]
+
+        Returns
+        -------
+        key : :obj:`~numpy.array` [:obj:`int`]
+            integer distance to next (integer) grid point
+        """
+        values = np.array(values, copy=False, dtype=int)
+        # Even or centered grids  may have an offset % spacing != 0
         # thus the grid points are not multiples of the spacing
         # values must be shifted to reverse that offset
         values = values - self.offset
@@ -221,8 +233,81 @@ class Grid(bp.BaseClass):
         distance = np.where(distance > self.spacing // 2,
                             distance - self.spacing,
                             distance)
-        # Now values - distance is in the (infinite) Grid
+        # Now (values - distance) is in the (infinite) Grid
         return distance
+
+    def key_partitioned_distance(self, values):
+        """Partitions the distance to the next grid point into symmetry regions.
+        Returns the partitioned distances and the index of the restoring matrix.
+
+        .. note::
+            This assumes an infinite grid. It is purely based on the spacing!
+
+        Parameters
+        ----------
+        values : :obj:`~numpy.array` [:obj:`int`]
+
+        Returns
+        -------
+        key : :obj:`~numpy.array` [:obj:`int`]
+            partitioned integer distance (x,y,z) to next (integer) grid point,
+            such that 0 <= x <= y <= z.
+            Last component is an index i, that determines the symmetry matrix,
+            that restores the original distance.
+        """
+        values = np.array(values, copy=False, dtype=int)
+        assert values.shape[-1] == self.ndim
+
+        # key : array with 2 parts,
+        #   (1) the sorted (positive) key_distance
+        #   (2) an index of the symmetry matrix,
+        #       that restores the original key_distance from (1)
+        key = np.empty(values.shape[:-1] + (self.ndim + 1,),
+                       dtype=int)
+
+        # key(1) :  rotate and permutate all elements
+        #           into the symmetry group (0 <= x <= y <= z)
+        key_distance = self.key_distance(values)
+        key[..., :-1] = np.sort(np.abs(key_distance), axis=-1)
+
+        # key(2) :  Index is generated from components (sym_dix)
+        # sym_cmp : describes ech component of the inverse matrix
+        #           [0:ndim] : reflection for each dimension (True/False)
+        #           [ndim: ] : describes the permutation
+        # max_val : maximum value of entry at this position
+        # factor  : weight to merge sym_cmp into the index of symmetric matrix
+        #           factor is determined by max_val
+        if self.ndim == 2:
+            # 2 reflection dimensions, 2 permutations
+            sym_cmp = np.empty(values.shape[:-1] + (3,), dtype=int)
+            max_val = np.array([2, 2, 2], dtype=int)
+            factor = np.array([4, 2, 1], dtype=int)
+        elif self.ndim == 3:
+            # 3 reflection dimension, 3*2 permutations
+            sym_cmp = np.empty(values.shape[:-1] + (5,), dtype=int)
+            max_val = np.array([2, 2, 2, 3, 2], dtype=int)
+            factor = np.array([24, 12, 6, 2, 1], dtype=int)
+        else:
+            # permutation components are too complicated in higher dimensions
+            raise NotImplementedError
+
+        # Apply Reflections to these components
+        sym_cmp[..., :self.ndim] = key_distance < 0
+        # determine permutations from order/sequence
+        order = np.argsort(np.abs(key_distance), axis=-1)
+        # position of first/smallest value == first row of permutation
+        sym_cmp[..., self.ndim] = order[..., 0]
+        # permutation of remaining values:
+        #   1 : [[0,1],[1,0]], were originally out of order
+        #   0 : [[1,0],[0,1]], were originally in order
+        sym_cmp[..., -1] = order[..., -2] > order[..., -1]
+
+        # all components are booleans / cases
+        assert np.all(0 <= sym_cmp)
+        assert np.all(sym_cmp < max_val)
+        # compute index of inverse matrix, by multiplying with factor
+        key[..., -1] = np.einsum("...i,i->...", sym_cmp, factor)
+        return key
 
     @staticmethod
     def key_norm(values):
