@@ -81,11 +81,16 @@ def test_recreate_distance_from_partitioned_distance(key):
     partitioned_distances = key_partitioned_distance[..., :-1]
     # matrices that SHOULD restore distances from partitioned_distances
     restoring_matrices = sym_matrices[key_partitioned_distance[..., -1]]
-    # restore distances
+    # restore distances by reversing the sorting and absolute
     restored_distances = np.einsum("ijk,ik->ij",
                                    restoring_matrices,
                                    partitioned_distances)
     assert np.all(restored_distances == distances)
+    # transposed matrices implement the sorting and absolute
+    sorted_distances = np.einsum("ikj,ik->ij",
+                                 restoring_matrices,
+                                 distances)
+    assert np.all(sorted_distances == partitioned_distances)
 
 
 @pytest.mark.parametrize("key", [key for key, grid in GRIDS.items()
