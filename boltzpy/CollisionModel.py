@@ -250,31 +250,45 @@ class CollisionModel(bp.BaseModel):
             if as_dict:
                 results[v] = {tuple(k): val for k, val in zip(key, results[v])}
 
+        # return result or tuple of results
         if len(results) == 1:
             return results[0]
         else:
             return tuple(results)
 
     @staticmethod
-    def filter(keys, relations=None):
+    def filter(keys, values=None):
         """Filter out elements with redundant keys.
 
         Parameters
         ----------
         keys : :obj:`~numpy.array` [:obj:`int`]
-        relations : :obj:`~numpy.array` [:obj:`int`], optional
-            If not None, then the actual relations at the indices are returned.
+        values : :obj:`~numpy.array` [:obj:`int`] or :obj:`tuple’, optional
+            If None, then the filtered positions are returned.
+            If not None, the filtered valuesand returned.
             relations.shape[0] must match keys.shape[0]
         """
         assert keys.ndim == 2
         # ignore unique values ([0]), only take first positions ([1]=
         positions = np.unique(keys, return_index=True, axis=0)[1]
-        # return filtered relations, if given
-        if relations is not None:
-            return relations[positions]
-        # otherwise return positions of first occurrence
+
+        # define results as a list, for any given values
+        if values is None:
+            # if no values are given, then return the groupes positions
+            results = [positions]
+        elif isinstance(values, np.ndarray):
+            results = [values[positions]]
+        elif type(values) in {tuple, list}:
+            results = [val[positions] for val in values]
         else:
-            return positions
+            raise TypeError
+
+        # return result or tuple of results
+        if len(results) == 1:
+            return results[0]
+        else:
+            return tuple(results)
+
 
     @staticmethod
     def sort(keys, relations=None):
@@ -329,9 +343,10 @@ class CollisionModel(bp.BaseModel):
         # Filter out any duplicates, Weights are NOT added
         # This might lead to unpredictable behaviour,
         # if a relation is given twice with different weights
-        filtered_pos = self.filter(self.key_index(self.collision_relations))
-        self.collision_relations = self.collision_relations[filtered_pos]
-        self.collision_weights = self.collision_weights[filtered_pos]
+        relations, weights = self.filter(self.key_index(self.collision_relations),
+                                         (relations, weights))
+        self.collision_relations = relations
+        self.collision_weights = weights
 
         # set up as lil_matrix, allows fast changes to sparse structure
         col_mat = lil_matrix((self.nvels, weights.size), dtype=float)
