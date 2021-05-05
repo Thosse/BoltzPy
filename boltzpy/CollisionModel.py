@@ -426,9 +426,8 @@ class CollisionModel(bp.BaseModel):
                 grp_keys = grids[s1].key_partitioned_distance(grids[s0].iG)
                 # both velocities and matrix index MUST be grouped together
                 # merge them into single array for this
-                grp_vals = np.empty((grp_keys.shape[0], self.ndim + 1), dtype=int)
-                grp_vals[:, :-1] = grids[s0].iG
-                grp_vals[:, -1] = grp_keys[:, -1]
+                grp_vals = np.concatenate((grids[s0].iG, grp_keys[:, -1:]), axis=1)
+
                 # group merged array
                 grp_both = bp.Grid.group(grp_keys[..., :-1],
                                          grp_vals,
