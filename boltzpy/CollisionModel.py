@@ -376,7 +376,8 @@ class CollisionModel(bp.BaseModel):
                      for shape, spacing in zip(ext_shapes, spacings)]
         return ext_grids
 
-    def cmp_relations(self, groupy_by="distance"):
+    # todo speedup idea: just compute largest intraspecies collisions -> reuse for others
+    def cmp_relations(self, group_by="partitioned_distance"):
         """Computes the :attr:`collision_relations`.
 
          Parameters
@@ -385,9 +386,9 @@ class CollisionModel(bp.BaseModel):
             Switches between algorithms.
             Determines if and how the grids are partitioned into equivalence classes.
         """
-        assert groupy_by in {"distance",
-                             "symmetry_and_distance",
-                             "None"}
+        assert group_by in {"distance",
+                                "partitioned_distance",
+                                "None"}
         # collect collisions in a lists
         relations = []
         # Collisions are computed for every pair of specimen
@@ -395,35 +396,76 @@ class CollisionModel(bp.BaseModel):
                                   for s1 in range(s0, self.nspc)])
         # pre initialize each species' velocity grid
         grids = self.subgrids()
+        # generate symmetry matrices, for partitioned_distances
+        sym_mat = self.symmetry_matrices
 
         # Compute collisions iteratively, for each pair
         for s0, s1 in species_pairs:
-            # partition grids[s0]
-            if groupy_by == "distance":
+            masses = self.masses[[s0, s1]]
+
+            # No partitioning at all
+            if group_by == "None":
+                # imitate grouping, to fit into the remaining algorithm
+                grp = grids[s0].iG[:, np.newaxis]
+                extended_grids = np.array([grids[s0], grids[s1]], dtype=object)
+                # no symmetries are used
+                grp_sym = None
+            # partition grids[s0] by distance
+            # if s0 == s1, this is equivalent to partitioned distance (but faster)
+            elif group_by == "distance" or s0 == s1:
                 # partition based on distance to next grid point
                 grp_keys = grids[s1].key_distance(grids[s0].iG)
                 grp = bp.Grid.group(grp_keys, grids[s0].iG, as_array=True)
+                # no symmetries are used
+                grp_sym = None
+                # compute representative colliding velocities in extended grids
                 extended_grids = self._get_extended_grids(s0, s1)
-                # todo determine a reflection/permutation index for shifting and rotation
-            elif groupy_by == "None":
-                grp = grids[s0].iG[:, np.newaxis]
-                extended_grids = [grids[s0], grids[s1]]
+            # partition grids[s0] by distance and rotation
             else:
-                raise NotImplementedError
+                # group based on distances, rotated into 0 <= x <= y <= z
+                grp_keys = grids[s1].key_partitioned_distance(grids[s0].iG)
+                # both velocities and matrix index MUST be grouped together
+                # merge them into single array for this
+                grp_vals = np.empty((grp_keys.shape[0], self.ndim + 1), dtype=int)
+                grp_vals[:, :-1] = grids[s0].iG
+                grp_vals[:, -1] = grp_keys[:, -1]
+                # group merged array
+                grp_both = bp.Grid.group(grp_keys[..., :-1],
+                                         grp_vals,
+                                         as_array=True)
+                # split array into velocity (grp) and index (grp_sym) partitions
+                grp = [val[:, :-1] for val in grp_both]
+                grp_sym = [val[:, -1] for val in grp_both]
+                # compute representative colliding velocities in extended grids
+                extended_grids = self._get_extended_grids(s0, s1)
 
             # compute collision relations for each partition
-            for partition in grp:
+            for p, partition in enumerate(grp):
                 # choose representative velocity
                 repr_vel = partition[0]
                 # generate collision velocities for representative
-                repr_colvels = self.get_colvels(extended_grids,
-                                                self.masses[[s0, s1]],
-                                                repr_vel)
+                repr_colvels = self.get_colvels(extended_grids, masses, repr_vel)
+
+                # to reflect / rotate repr_colvels into default symmetry region
+                # multiply with transposed matrix
+                if grp_sym is not None:
+                    repr_colvels = np.einsum("ji, nkj->nki",
+                                             sym_mat[grp_sym[p][0]],
+                                             repr_colvels - repr_vel)
+                # shift to zero for other partition elements
+                else:
+                    repr_colvels -= repr_vel
                 # compute partitions collision relations, based on repr_colvels
-                for v0 in partition:
-                    # shift and rotate repr_colvels onto v0
-                    # todo move this into a method, with groupy_by parameter
-                    new_colvels = repr_colvels + (v0 - partition[0])
+                for pos, v0 in enumerate(partition):
+                    # shift repr_colvels onto v0
+                    if grp_sym is None:
+                        new_colvels = repr_colvels + v0
+                    # rotate and shift repr_colvels onto v0
+                    else:
+                        new_colvels = np.einsum("ij, nkj->nki",
+                                                sym_mat[grp_sym[p][pos]],
+                                                repr_colvels)
+                        new_colvels += v0
                     # get indices
                     new_rels = self.get_idx([s0, s0, s1, s1], new_colvels)
                     # remove out-of-bounds or useless collisions
