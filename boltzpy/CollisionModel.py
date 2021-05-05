@@ -289,7 +289,6 @@ class CollisionModel(bp.BaseModel):
         else:
             return tuple(results)
 
-
     @staticmethod
     def sort(keys, relations=None):
         """Sort keys (or relations) lexicographically.
@@ -350,10 +349,10 @@ class CollisionModel(bp.BaseModel):
 
         # set up as lil_matrix, allows fast changes to sparse structure
         col_mat = lil_matrix((self.nvels, weights.size), dtype=float)
-        sign = np.array([-1, 1, -1, 1])
-        for [r, rel] in enumerate(relations):
-            weight = weights[r]
-            col_mat[rel, r] = weight * sign
+        _range = np.arange(relations.shape[0])
+        for s, sign in enumerate([-1, 1, -1, 1]):
+            col_mat[relations[:, s], _range] = weights * sign
+        del _range
 
         # adjust changes to different grid spacings
         # this is necessary for invariance of moments
