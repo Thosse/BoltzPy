@@ -186,44 +186,74 @@ class CollisionModel(bp.BaseModel):
         return angles
 
     @staticmethod
-    def group(keys, relations=None, as_array=False):
+    def group(group_keys, values=None, as_dict=True, sort_key=None):
         """Create Partitions of positions (indices) with equal keys.
 
         Parameters
         ----------
-        keys : :obj:`~numpy.array` [:obj:`int`]
-        relations : :obj:`~numpy.array` [:obj:`int`], optional
-            If not None, then the actual relations at the indices are returned.
+        group_keys : :obj:`~numpy.array` [:obj:`int`] or :obj:`tuple’
+            If a tuple is given, then the keys are merged (concatenated).
+        values : :obj:`~numpy.array` [:obj:`int`] or :obj:`tuple’, optional
+            If None, then the grouped positions are returned.
+            If not None, the values are grouped and returned.
             relations.shape[0] must match keys.shape[0]
-        as_array : :obj:`bool`, optional
-            If True, returns an array of arrays, instead of a dictionary.
+        as_dict : :obj:`bool`, optional
+            If False, returns an array of arrays, instead of a dictionary.
+        sort_key : :obj:`~numpy.array` [:obj:`int`], optional
+            If not None, then equal group_keys are sorted by the sort_key.
+            If None, equal group_keys are sorted randomly.
         """
-        assert keys.ndim == 2
-        # get lexicographic order of keys
-        positions = np.lexsort(np.flip(keys.transpose(), axis=0))
-        # sort keys
-        keys = keys[positions]
+        # merge group_keys
+        if type(group_keys) in {tuple, list}:
+            # allow 1D keys for concatenation
+            group_keys = [key if key.ndim == 2 else key[:, np.newaxis]
+                          for key in group_keys]
+            group_keys = np.concatenate(group_keys, axis=1)
+        assert isinstance(group_keys, np.ndarray)
+        assert group_keys.ndim == 2
 
-        # find first occurrence of each key in sorted array
-        key, pos = np.unique(keys, axis=0, return_index=True)
-
-        # if relations are give, then return relations, instead of positions
-        if relations is not None:
-            assert relations.shape[0] == keys.shape[0]
-            positions = relations[positions]
-
-        # split positions into array slices
-        # all segments point to the elements with the same key
-        # pos determines the separation points
-        # pos[0]==0 must be removed for split() to work correctly
-        split_array = np.split(positions, pos[1:])
-
-        # return split array
-        if as_array:
-            return split_array
-        # return as dictionary
+        # construct sort_key
+        if sort_key is None:
+            sort_key = group_keys
         else:
-            return {tuple(k): values for k, values in zip(key, split_array)}
+            # allow 1D keys for concatenation
+            sort_key = sort_key if sort_key.ndim == 2 else sort_key[:, np.newaxis]
+            sort_key = np.concatenate((group_keys, sort_key), axis=1)
+
+        # get lexicographic order of sort_key
+        positions = np.lexsort(np.flip(sort_key.transpose(), axis=0))
+        del sort_key
+        # sort group_keys by this order
+        group_keys = group_keys[positions]
+        # find first occurrence of each key in sorted array
+        # pos determines the splitting points below
+        key, pos = np.unique(group_keys, axis=0, return_index=True)
+        del group_keys
+
+        # define results as a list, for any given values
+        if values is None:
+            # if no values are given, then return the groupes positions
+            results = [positions]
+        elif isinstance(values, np.ndarray):
+            results = [values[positions]]
+        elif type(values) in {tuple, list}:
+            results = [val[positions] for val in values]
+        else:
+            raise TypeError
+
+        # split each result into array slices
+        # all segments point to the elements with the same key
+        for v, val in enumerate(results):
+            # pos[0]==0 must be removed for split() to work correctly
+            results[v] = np.split(val, pos[1:])
+            # convert to a dictionary, if wanted
+            if as_dict:
+                results[v] = {tuple(k): val for k, val in zip(key, results[v])}
+
+        if len(results) == 1:
+            return results[0]
+        else:
+            return tuple(results)
 
     @staticmethod
     def filter(keys, relations=None):
@@ -271,8 +301,8 @@ class CollisionModel(bp.BaseModel):
         else:
             return positions
 
-    # todo choose: given list of indices (of collision relations) or relations(what to do with the weights?) -> merge and filter redundants
-
+    # todo choose: given list of indices (of collision relations)
+    #  or relations(what to do with the weights?) -> merge and filter redundants
     ##################################
     #           Collisions           #
     ##################################
@@ -387,8 +417,8 @@ class CollisionModel(bp.BaseModel):
             Determines if and how the grids are partitioned into equivalence classes.
         """
         assert group_by in {"distance",
-                                "partitioned_distance",
-                                "None"}
+                            "partitioned_distance",
+                            "None"}
         # collect collisions in a lists
         relations = []
         # Collisions are computed for every pair of specimen
@@ -415,7 +445,9 @@ class CollisionModel(bp.BaseModel):
             elif group_by == "distance" or s0 == s1:
                 # partition based on distance to next grid point
                 grp_keys = grids[s1].key_distance(grids[s0].iG)
-                grp = bp.Grid.group(grp_keys, grids[s0].iG, as_array=True)
+                norm = bp.Grid.key_norm(grids[s0].iG)
+                grp = self.group(grp_keys, grids[s0].iG, as_dict=False, sort_key=norm)
+                del norm, grp_keys
                 # no symmetries are used
                 grp_sym = None
                 # compute representative colliding velocities in extended grids
@@ -424,17 +456,12 @@ class CollisionModel(bp.BaseModel):
             else:
                 # group based on distances, rotated into 0 <= x <= y <= z
                 grp_keys = grids[s1].key_partitioned_distance(grids[s0].iG)
-                # both velocities and matrix index MUST be grouped together
-                # merge them into single array for this
-                grp_vals = np.concatenate((grids[s0].iG, grp_keys[:, -1:]), axis=1)
-
-                # group merged array
-                grp_both = bp.Grid.group(grp_keys[..., :-1],
-                                         grp_vals,
-                                         as_array=True)
-                # split array into velocity (grp) and index (grp_sym) partitions
-                grp = [val[:, :-1] for val in grp_both]
-                grp_sym = [val[:, -1] for val in grp_both]
+                norm = bp.Grid.key_norm(grids[s0].iG)
+                # group both grp and grp_sym in one go (and with same order)
+                grp, grp_sym = self.group(grp_keys[..., :-1],
+                                          (grids[s0].iG, grp_keys[:, -1]),
+                                          as_dict=False,
+                                          sort_key=norm)
                 # compute representative colliding velocities in extended grids
                 extended_grids = self._get_extended_grids(s0, s1)
 

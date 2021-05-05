@@ -314,19 +314,6 @@ class Grid(bp.BaseClass):
         norm = (values**2).sum(axis=-1)
         return norm
 
-    @staticmethod
-    def group(keys, values, as_array=True, sort_values=True):
-        # Reuse implementation in CollisionModel
-        grp = bp.CollisionModel.group(keys, values, as_array)
-        if sort_values:
-            # unpack dict values, for consistent access
-            arrays = grp if as_array else grp.values()
-            # sort arrays by norm
-            for arr in arrays:
-                order = np.argsort(Grid.key_norm(arr), kind="stable")
-                arr[...] = arr[order]
-        return grp
-
     #####################################
     #              Utility              #
     #####################################
