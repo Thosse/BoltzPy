@@ -28,8 +28,7 @@ class CollisionModel(bp.BaseModel):
                  collision_factors=None,
                  collision_relations=None,
                  collision_weights=None,
-                 algorithm_relations="all",
-                 algorithm_weights="uniform",
+                 setup_collision_matrix=True,
                  **kwargs):
         bp.BaseModel.__init__(self,
                               masses,
@@ -43,9 +42,6 @@ class CollisionModel(bp.BaseModel):
             self.collision_factors = np.array(collision_factors, dtype=float)
         assert self.collision_factors.ndim == 2
 
-        self.algorithm_relations = str(algorithm_relations)
-        self.algorithm_weights = str(algorithm_weights)
-
         # setup collisions
         if collision_relations is None:
             self.collision_relations = self.cmp_relations()
@@ -58,7 +54,8 @@ class CollisionModel(bp.BaseModel):
 
         # set up sparse collision_matrix
         self.collision_matrix = csr_matrix((self.nvels, self.collision_weights.size))
-        self.update_collisions(self.collision_relations, self.collision_weights)
+        if setup_collision_matrix:
+            self.update_collisions(self.collision_relations, self.collision_weights)
         CollisionModel.check_integrity(self)
         return
 
@@ -67,9 +64,7 @@ class CollisionModel(bp.BaseModel):
         params = bp.BaseModel.parameters()
         params.update({"collision_factors",
                        "collision_relations",
-                       "collision_weights",
-                       "algorithm_relations",
-                       "algorithm_weights"})
+                       "collision_weights"})
         return params
 
     @staticmethod
@@ -77,7 +72,6 @@ class CollisionModel(bp.BaseModel):
         attrs = CollisionModel.parameters()
         attrs.update(bp.BaseModel.attributes())
         attrs.update({"ncols",
-                      "collision_matrix",
                       "collision_invariants"})
         return attrs
 
@@ -365,7 +359,7 @@ class CollisionModel(bp.BaseModel):
         self.collision_matrix = col_mat.tocsr()
         return
 
-    def cmp_weights(self, relations=None):
+    def cmp_weights(self, relations=None, scheme="uniform"):
         """Generates and returns the :attr:`collision_weights`,
         based on the given relations and :attr:`algorithm_weights`
         """
@@ -373,9 +367,9 @@ class CollisionModel(bp.BaseModel):
             relations = self.collision_relations
         species = self.key_species(relations)[:, 1:3]
         coll_factors = self.collision_factors[species[..., 0], species[..., 1]]
-        if self.algorithm_weights == "uniform":
+        if scheme == "uniform":
             return coll_factors
-        elif self.algorithm_weights == "area":
+        elif scheme == "area":
             return coll_factors * self.key_area(relations)[..., 0]
         else:
             raise NotImplementedError
@@ -447,6 +441,11 @@ class CollisionModel(bp.BaseModel):
         for s0, s1 in species_pairs:
             masses = self.masses[[s0, s1]]
 
+            # partition grid of first specimen into partitions
+            # collisions can be shifted (and rotated) in each partition
+            # this saves computation time.
+            # The collisions must be found in larger grids
+            # to find all possible collisions
             # No partitioning at all
             if group_by == "None":
                 # imitate grouping, to fit into the remaining algorithm
@@ -761,6 +760,4 @@ class CollisionModel(bp.BaseModel):
             "For the vectorized collision generation scheme all spacings must even. "
             "It does not return the full set otherwise.\n"
             "Consider doubling the spacing and halving the base_delta.")
-        assert self.algorithm_relations in {"all"}
-        assert self.algorithm_weights in {"uniform", "area"}
         return

@@ -50,6 +50,21 @@ def test_file_exists():
         "The test file {} is missing.".format(FILE))
 
 
+def test_setup_files_keys_did_not_change():
+    setup_file(TMP_FILE)
+    # gather all keys in sets
+    with h5py.File(FILE, mode="r") as file:
+        keys_old = set()
+        file.visit(keys_old.add)
+    with h5py.File(TMP_FILE, mode="r") as file:
+        keys_new = set()
+        file.visit(keys_new.add)
+    # assert keys are equal
+    assert keys_old == keys_new
+    os.remove(TMP_FILE)
+    return
+
+
 def test_setup_creates_same_file():
     setup_file(TMP_FILE)
     test_helper.assert_hdf_groups_are_equal(h5py.File(FILE, mode="r"),
