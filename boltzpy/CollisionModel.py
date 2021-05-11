@@ -709,16 +709,19 @@ class CollisionModel(bp.BaseModel):
     def plot_collisions(self,
                         relations=None,
                         species=None,
-                        save_as=None,
+                        plot_object=None,
                         **kwargs):
         """Plot the Grid using matplotlib."""
         relations = [] if relations is None else np.array(relations, ndmin=2)
         species = self.species if species is None else np.array(species, ndmin=1)
 
         # setup ax for plot
-        import matplotlib.pyplot as plt
-        projection = "3d" if self.ndim == 3 else None
-        ax = plt.figure().add_subplot(projection=projection)
+        if plot_object is None:
+            import matplotlib.pyplot as plt
+            projection = "3d" if self.ndim == 3 else None
+            ax = plt.figure().add_subplot(projection=projection)
+        else:
+            ax = plot_object
 
         # Plot Grids as scatter plot
         for s in species:
@@ -745,10 +748,11 @@ class CollisionModel(bp.BaseModel):
         else:
             ax.set_aspect('equal')
 
-        if save_as is not None:
-            plt.savefig(save_as)
-        plt.show()
-        return
+        if plot_object is None:
+            # noinspection PyUnboundLocalVariable
+            plt.show()
+        else:
+            return plot_object
 
     #####################################
     #           Verification            #

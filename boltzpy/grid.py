@@ -183,6 +183,7 @@ class Grid(bp.BaseClass):
             "values must be an np.array, not {}".format(type(values)))
         assert values.dtype == int, (
             "values must be an integer array, not {}".format(values.dtype))
+        # assign BAD_VALUE, to any value that is not in the grid
         BAD_VALUE = -2 * self.size ** self.ndim
         # shift Grid to start (left bottom ) at 0
         values = values - self.iG[0]
