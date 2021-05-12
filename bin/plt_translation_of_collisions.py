@@ -40,8 +40,12 @@ ax2.plot(base_mix[:, 0], base_mix[:, 1], color="black")
 
 
 # Right Plot
-model_2.subgrids(1).plot(plot_object=ax3,
-                         **{"marker": 'x', "alpha": 0.9, "s": 100, "c": "orange"})
+# model_2.subgrids(1).plot(plot_object=ax3,
+#                          **{"marker": 'x', "alpha": 0.9, "s": 100, "c": "orange"})
+for point in model_2.subgrids(1).iG:
+    ax3.text(point[0], point[1], "1",
+             bbox={"boxstyle": "circle", "color": "orange"})
+
 key_distance = model_2.subgrids(1).key_distance(model_2.subgrids(0).iG)
 partitions = model_2.group(key_distance,
                            model_2.subgrids(0).iG,
@@ -50,7 +54,7 @@ partitions = model_2.group(key_distance,
 for p, prt in enumerate(partitions):
     for point in prt:
         ax3.text(point[0], point[1], str(p + 1),
-                 bbox={"boxstyle" : "circle", "color":"lightsteelblue"})
+                 bbox={"boxstyle": "circle", "color": "lightsteelblue"})
 #
 #     ax3.scatter(*p.transpose(), marker='o', alpha=0.5, s=50, c=colors[i])
 ax3.set_aspect('equal')
