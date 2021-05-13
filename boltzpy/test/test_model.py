@@ -57,6 +57,27 @@ KEY_FUNCTIONS = ["key_species",
 #############################
 #           Tests           #
 #############################
+@pytest.mark.parametrize("masses_and_shapes", np.random.randint(3, 10, size=(20, 3, 2)))
+def test_collision_generation_algorithms(masses_and_shapes):
+    masses = masses_and_shapes[0]
+    shapes = masses_and_shapes[1:]
+    model = bp.CollisionModel(masses, shapes,
+                              collision_relations=[],
+                              collision_weights=[],
+                              setup_collision_matrix=False)
+    results = {"None": 0,
+               "distance": 0,
+               # "partitioned_distance": 0
+               }
+    for key in results.keys():
+        rels = model.cmp_relations(group_by=key)
+        results[key] = model.key_index(rels)
+
+    for key in [key for key in results.keys() if key != "None"]:
+        assert np.all(results[key].shape == results["None"].shape)
+        assert np.all(results[key] == results["None"])
+
+
 @pytest.mark.parametrize("key", MODELS.keys())
 def test_get_spc_on_shuffled_grid(key):
     model = MODELS[key]

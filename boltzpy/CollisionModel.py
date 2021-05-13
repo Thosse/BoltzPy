@@ -374,7 +374,7 @@ class CollisionModel(bp.BaseModel):
         else:
             raise NotImplementedError
 
-    def _get_extended_grids(self, *species):
+    def _get_extended_grids(self, species, groups=None):
         """Generate Grids with extended shapes for faster collision generation.
 
         These Grids must be larger than their "bases",
@@ -387,22 +387,31 @@ class CollisionModel(bp.BaseModel):
         ----------
         species : :obj:`int`
             Must be 2 specimen.
+        groups : :obj:`list`
+            The partitions of the first velocity grid.
         """
         species = np.array(species, copy=False, dtype=int)
         assert species.shape == (2,)
         assert np.all(species < self.nspc)
 
-        # get maximum velocity (last velocities of each subgrid) without creating them
+        # get maximum velocity (last velocities of each subgrid) without calling subgrids
         max_vels = self.i_vels[self._idx_offset[species + 1] - 1]
         spacings = self.spacings[species]
 
-        # compute (minimal) shapes for extended grids
-        ext_shapes = np.zeros((2, self.ndim), dtype=int)
-        # first shape must be doubled
-        ext_shapes[0] = 2 * self.shapes[species[0]]
-        # second shape must cover the maximal distance between grid points
-        max_distance = np.sum(max_vels, axis=0)
-        ext_shapes[1] = np.ceil(2 * max_distance / spacings[1] + 1)
+        # to find all possible collisions with this scheme,
+        # the extended  grids must cover the maximum range of the original grids,
+        # starting from each representative.
+        # Find max values of representants, otherwise assume the worst (max_vel)
+        if groups is not None:
+            max_grp = np.max(np.abs([g[0] for g in groups]))
+        else:
+            max_grp = max_vels[0]
+        # necessary max velocities of extended grids
+        ext_max_vel = max_grp[None] + max_vels[None, 0] + max_vels
+        # compute (minimal) shapes for extended grids (might need a +1)
+        ext_shapes = np.ceil((2 * ext_max_vel) / spacings[:, None])
+        # np.ceil returns integer valued floats
+        ext_shapes = np.array(ext_shapes, dtype=int)
 
         # retain even/odd shapes
         old_shapes = self.shapes[species]
@@ -464,7 +473,7 @@ class CollisionModel(bp.BaseModel):
                 # no symmetries are used
                 grp_sym = None
                 # compute representative colliding velocities in extended grids
-                extended_grids = self._get_extended_grids(s0, s1)
+                extended_grids = self._get_extended_grids((s0, s1), grp)
             # partition grids[s0] by distance and rotation
             else:
                 # group based on distances, rotated into 0 <= x <= y <= z
@@ -476,7 +485,7 @@ class CollisionModel(bp.BaseModel):
                                           as_dict=False,
                                           sort_key=norm)
                 # compute representative colliding velocities in extended grids
-                extended_grids = self._get_extended_grids(s0, s1)
+                extended_grids = self._get_extended_grids((s0, s1), grp)
 
             # compute collision relations for each partition
             for p, partition in enumerate(grp):
