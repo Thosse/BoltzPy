@@ -395,7 +395,7 @@ class CollisionModel(bp.BaseModel):
         assert np.all(species < self.nspc)
 
         # get maximum velocity (last velocities of each subgrid) without calling subgrids
-        max_vels = self.i_vels[self._idx_offset[species + 1] - 1]
+        max_vels = self.max_i_vels[species]
         spacings = self.spacings[species]
 
         # to find all possible collisions with this scheme,
@@ -492,7 +492,8 @@ class CollisionModel(bp.BaseModel):
                 # choose representative velocity
                 repr_vel = partition[0]
                 # generate collision velocities for representative
-                repr_colvels = self.get_colvels(extended_grids, masses, repr_vel)
+                max_dist = 2 * self.max_i_vels[s0]
+                repr_colvels = self.get_colvels(extended_grids, masses, repr_vel, max_dist)
 
                 # to reflect / rotate repr_colvels into default symmetry region
                 # multiply with transposed matrix
@@ -537,17 +538,25 @@ class CollisionModel(bp.BaseModel):
     @staticmethod
     def get_colvels(grids,
                     masses,
-                    v0):
+                    v0,
+                    max_dist=None):
+        if max_dist is None:
+            values = [G.iG for G in grids]
+        else:
+            values = []
+            for i in [0, 1]:
+                pos = np.where(np.all(np.abs(grids[i].iG - v0) <= max_dist, axis=-1))
+                values.append(grids[i].iG[pos])
         # store results in list ov colliding velocities (colvels)
         colvels = []
-        for v1 in grids[0].iG:
+        for v1 in values[0]:
             dv = v1 - v0
             if np.any((dv * masses[0]) % masses[1] != 0):
                 continue
             dw = -(dv * masses[0]) // masses[1]
             # find starting point for w0, projected on axis( v0 -> v1 )
             w0_proj = v0 + dv // 2 - dw // 2
-            w0 = grids[1].hyperplane(w0_proj, dv)
+            w0 = grids[1].hyperplane(w0_proj, dv, values[1])
             # Calculate w1, using the momentum invariance
             w1 = w0 + dw
             # remove w0/w1 if w1 is out of the grid

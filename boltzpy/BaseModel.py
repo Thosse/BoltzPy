@@ -147,10 +147,16 @@ class BaseModel(bp.BaseClass):
             return grids[s]
 
     @property
+    def max_i_vels(self):
+        """:obj:`~numpy.array` [:obj:`float`]
+        Array of maximum physical velocities of each subgrid."""
+        return self.i_vels[self._idx_offset[1:] - 1]
+
+    @property
     def max_vel(self):
         """:obj:`float`
         Maximum physical velocity of all sub grids."""
-        return np.max(np.abs(self.vels))
+        return np.max(self.max_i_vels) * self.base_delta
 
     @property
     def is_cubic_grid(self):

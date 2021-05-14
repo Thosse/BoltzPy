@@ -323,10 +323,12 @@ class Grid(bp.BaseClass):
         assert item.shape[-1] == self.ndim
         return np.all(self.get_idx(item) != -1)
 
-    def hyperplane(self, start, normal):
-        shifted_vels = self.iG - start
+    def hyperplane(self, start, normal, values=None):
+        if values is None:
+            values = self.iG
+        shifted_vels = values - start
         pos = np.where(shifted_vels @ normal == 0)
-        return self.iG[pos]
+        return values[pos]
 
     #####################################
     #           Visualization           #
