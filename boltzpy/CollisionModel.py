@@ -412,7 +412,6 @@ class CollisionModel(bp.BaseModel):
         ext_shapes = np.ceil((2 * ext_max_vel) / spacings[:, None])
         # np.ceil returns integer valued floats
         ext_shapes = np.array(ext_shapes, dtype=int)
-
         # retain even/odd shapes
         old_shapes = self.shapes[species]
         ext_shapes += (np.array(old_shapes) % 2) != (ext_shapes % 2)
@@ -459,42 +458,50 @@ class CollisionModel(bp.BaseModel):
             if group_by == "None":
                 # imitate grouping, to fit into the remaining algorithm
                 grp = grids[s0].iG[:, np.newaxis]
+                # no symmetries are used
+                grp_sym = None
+                # no extended grids necessary
                 extended_grids = np.array([grids[s0], grids[s1]], dtype=object)
-                # no symmetries are used
-                grp_sym = None
-            # partition grids[s0] by distance
-            # if s0 == s1, this is equivalent to partitioned distance (but faster)
-            elif group_by == "distance" or s0 == s1:
-                # partition based on distance to next grid point
-                grp_keys = grids[s1].key_distance(grids[s0].iG)
-                norm = bp.Grid.key_norm(grids[s0].iG)
-                grp = self.group(grp_keys, grids[s0].iG, as_dict=False, sort_key=norm)
-                del norm, grp_keys
-                # no symmetries are used
-                grp_sym = None
-                # compute representative colliding velocities in extended grids
-                extended_grids = self._get_extended_grids((s0, s1), grp)
-            # partition grids[s0] by distance and rotation
+                # no cutoff with max_distances necessary
+                max_distance = None
             else:
-                # group based on distances, rotated into 0 <= x <= y <= z
-                grp_keys = grids[s1].key_partitioned_distance(grids[s0].iG)
-                norm = bp.Grid.key_norm(grids[s0].iG)
-                # group both grp and grp_sym in one go (and with same order)
-                grp, grp_sym = self.group(grp_keys[..., :-1],
-                                          (grids[s0].iG, grp_keys[:, -1]),
-                                          as_dict=False,
-                                          sort_key=norm)
+                # partition grids[s0] by distance
+                # if s0 == s1, this is equivalent to partitioned distance (but faster)
+                if group_by == "distance" or s0 == s1:
+                    # partition based on distance to next grid point
+                    grp_keys = grids[s1].key_distance(grids[s0].iG)
+                    norm = bp.Grid.key_norm(grids[s0].iG)
+                    grp = self.group(grp_keys, grids[s0].iG, as_dict=False, sort_key=norm)
+                    del norm, grp_keys
+                    # no symmetries are used
+                    grp_sym = None
+                # partition grids[s0] by distance and rotation
+                elif group_by == "partitioned_distance":
+                    # group based on distances, rotated into 0 <= x <= y <= z
+                    grp_keys = grids[s1].key_partitioned_distance(grids[s0].iG)
+                    norm = bp.Grid.key_norm(grids[s0].iG)
+                    # group both grp and grp_sym in one go (and with same order)
+                    grp, grp_sym = self.group(grp_keys[..., :-1],
+                                              (grids[s0].iG, grp_keys[:, -1]),
+                                              as_dict=False, sort_key=norm)
+                    del norm, grp_keys
+                else:
+                    raise ValueError
                 # compute representative colliding velocities in extended grids
                 extended_grids = self._get_extended_grids((s0, s1), grp)
+                # cutoff unnecessary velocity with max_distances,
+                # when computing the reference colvels
+                max_distance = self.max_i_vels[None, s0] + self.max_i_vels[[s0, s1]]
 
             # compute collision relations for each partition
             for p, partition in enumerate(grp):
                 # choose representative velocity
                 repr_vel = partition[0]
                 # generate collision velocities for representative
-                max_dist = 2 * self.max_i_vels[s0]
-                repr_colvels = self.get_colvels(extended_grids, masses, repr_vel, max_dist)
-
+                repr_colvels = self.get_colvels(extended_grids,
+                                                masses,
+                                                repr_vel,
+                                                max_distance)
                 # to reflect / rotate repr_colvels into default symmetry region
                 # multiply with transposed matrix
                 if grp_sym is not None:
@@ -545,7 +552,7 @@ class CollisionModel(bp.BaseModel):
         else:
             values = []
             for i in [0, 1]:
-                pos = np.where(np.all(np.abs(grids[i].iG - v0) <= max_dist, axis=-1))
+                pos = np.where(np.all(np.abs(grids[i].iG - v0) <= max_dist[i], axis=-1))
                 values.append(grids[i].iG[pos])
         # store results in list ov colliding velocities (colvels)
         colvels = []
@@ -720,7 +727,7 @@ class CollisionModel(bp.BaseModel):
     #: :obj:`list` [:obj:`dict`]:
     #: Default plot_styles for :meth::`plot`
     plot_styles = [{"marker": 'o', "alpha": 0.5, "s": 50},
-                   {"marker": 'x', "alpha": 0.9, "s": 100},
+                   {"marker": 'x', "alpha": 0.9, "s": 50},
                    {"marker": 's', "alpha": 0.5, "s": 50},
                    {"marker": 'D', "alpha": 0.5, "s": 50}]
 
