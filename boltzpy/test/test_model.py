@@ -54,11 +54,11 @@ KEY_FUNCTIONS = ["key_species",
                  "key_area"]
 
 # Random Test parameters for collision generation
-_n_samples = 200
+_n_samples = 20
 _masses = np.random.randint(1, 100, size=(_n_samples, 2))
 _shapes = np.random.randint(3, 10, size=(_n_samples, 2, 2))
-_group_by = [["None", "distance"] if i < _n_samples // 2
-             else ["None", "distance", "partitioned_distance"]
+_group_by = [["None", "distance", "partitioned_distance"]
+             if i < _n_samples // 2 else ["None", "distance"]
              for i in range(_n_samples)]
 for i in range(_n_samples // 2):
     _shapes[i, :, 1] = _shapes[i, :, 0]
