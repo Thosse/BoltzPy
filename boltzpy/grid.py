@@ -238,7 +238,8 @@ class Grid(bp.BaseClass):
         return distance
 
     def key_sorted_distance(self, values):
-        """Returns the sorted, absolute distances.
+        """Returns the sorted, absolute distances
+        and the index of the symmetry group of the distances (not the values).
 
         .. note::
             This assumes an infinite grid. It is purely based on the spacing!
@@ -252,22 +253,25 @@ class Grid(bp.BaseClass):
         key : :obj:`~numpy.array` [:obj:`int`]
             Sorted integer distance (x,y,z) to next (integer) grid point,
             such that 0 <= x <= y <= z.
+            The last component is the index of the symmetry group.
         """
         values = np.array(values, copy=False, dtype=int)
         assert values.shape[-1] == self.ndim
 
         # key : array with 2 parts,
         #   (1) the sorted (positive) key_distance
-        #   (2) an index of the symmetry matrix,
-        #       that restores the original key_distance from (1)
+        #   (2) an index of the symmetry grop
         key = np.empty(values.shape[:-1] + (self.ndim + 1,),
                        dtype=int)
 
-        # key(1) :  rotate and permutate all elements
+        # key(1) :  reflect and permutate all elements
         #           into the symmetry group (0 <= x <= y <= z)
         key_distance = self.key_distance(values)
         key[..., :-1] = np.sort(np.abs(key_distance), axis=-1)
 
+        # key(2) :  index of the symmetry matrix,
+        #           that reverses the reflections and permutations
+        #           of the distance (not the values)
         key[..., -1] = self.key_symmetry_group(key_distance)
         return key
 

@@ -57,7 +57,7 @@ KEY_FUNCTIONS = ["key_species",
 _n_samples = 20
 _masses = np.random.randint(1, 100, size=(_n_samples, 2))
 _shapes = np.random.randint(3, 10, size=(_n_samples, 2, 2))
-_group_by = [["None", "distance", "sorted_distance"] #, "norm_and_sorted_distance"]
+_group_by = [["None", "distance", "sorted_distance", "norm_and_sorted_distance"]
              if i < _n_samples // 2 else ["None", "distance"]
              for i in range(_n_samples)]
 for i in range(_n_samples // 2):
