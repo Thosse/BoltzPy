@@ -237,9 +237,8 @@ class Grid(bp.BaseClass):
         # Now (values - distance) is in the (infinite) Grid
         return distance
 
-    def key_partitioned_distance(self, values):
-        """Partitions the distance to the next grid point into symmetry regions.
-        Returns the partitioned distances and the index of the restoring matrix.
+    def key_sorted_distance(self, values):
+        """Returns the sorted, absolute distances.
 
         .. note::
             This assumes an infinite grid. It is purely based on the spacing!
@@ -251,10 +250,8 @@ class Grid(bp.BaseClass):
         Returns
         -------
         key : :obj:`~numpy.array` [:obj:`int`]
-            partitioned integer distance (x,y,z) to next (integer) grid point,
+            Sorted integer distance (x,y,z) to next (integer) grid point,
             such that 0 <= x <= y <= z.
-            Last component is an index i, that determines the symmetry matrix,
-            that restores the original distance.
         """
         values = np.array(values, copy=False, dtype=int)
         assert values.shape[-1] == self.ndim
@@ -271,7 +268,30 @@ class Grid(bp.BaseClass):
         key_distance = self.key_distance(values)
         key[..., :-1] = np.sort(np.abs(key_distance), axis=-1)
 
-        # key(2) :  Index is generated from components (sym_dix)
+        key[..., -1] = self.key_symmetry_group(key_distance)
+        return key
+
+    def key_symmetry_group(self, values):
+        """ Returns the index of the symmetry group of the given values.
+        This index is also the index of the "restoring matrix",
+        that restores the original value
+        from their representative value, sorted(abs(value), axis=0).
+
+        Parameters
+        ----------
+        values : :obj:`~numpy.array` [:obj:`int`]
+
+        Returns
+        -------
+        key : :obj:`~numpy.array` [:obj:`int`]
+            Index i, of a the symmetry matrix,
+            that restores its respective value,
+            from its representative.
+        """
+        values = np.array(values, copy=False, dtype=int)
+        assert values.shape[-1] == self.ndim
+
+        # generate key from components of sym_dix
         # sym_cmp : describes ech component of the inverse matrix
         #           [0:ndim] : reflection for each dimension (True/False)
         #           [ndim: ] : describes the permutation
@@ -289,13 +309,14 @@ class Grid(bp.BaseClass):
             max_val = np.array([2, 2, 2, 3, 2], dtype=int)
             factor = np.array([24, 12, 6, 2, 1], dtype=int)
         else:
-            # permutation components are too complicated in higher dimensions
+            # higher dimensions are not implemented
+            # they can be done by repeating the "order"-step dim-1 times
             raise NotImplementedError
 
         # Apply Reflections to these components
-        sym_cmp[..., :self.ndim] = key_distance < 0
+        sym_cmp[..., :self.ndim] = values < 0
         # determine permutations from order/sequence
-        order = np.argsort(np.abs(key_distance), axis=-1)
+        order = np.argsort(np.abs(values), axis=-1)
         # position of first/smallest value == first row of permutation
         sym_cmp[..., self.ndim] = order[..., 0]
         # permutation of remaining values:
@@ -307,7 +328,7 @@ class Grid(bp.BaseClass):
         assert np.all(0 <= sym_cmp)
         assert np.all(sym_cmp < max_val)
         # compute index of inverse matrix, by multiplying with factor
-        key[..., -1] = np.einsum("...i,i->...", sym_cmp, factor)
+        key = np.einsum("...i,i->...", sym_cmp, factor)
         return key
 
     @staticmethod

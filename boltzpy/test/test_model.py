@@ -57,7 +57,7 @@ KEY_FUNCTIONS = ["key_species",
 _n_samples = 20
 _masses = np.random.randint(1, 100, size=(_n_samples, 2))
 _shapes = np.random.randint(3, 10, size=(_n_samples, 2, 2))
-_group_by = [["None", "distance", "partitioned_distance"]
+_group_by = [["None", "distance", "sorted_distance"] #, "norm_and_sorted_distance"]
              if i < _n_samples // 2 else ["None", "distance"]
              for i in range(_n_samples)]
 for i in range(_n_samples // 2):
@@ -79,8 +79,8 @@ def test_collision_generation_randomized(masses, shapes, group_by):
         results[key] = model.key_index(rels)
 
     for key in [key for key in group_by if key != "None"]:
-        assert np.all(results[key].shape == results["None"].shape)
-        assert np.all(results[key] == results["None"])
+        assert np.all(results[key].shape == results["None"].shape), "Algorithm = " + key
+        assert np.all(results[key] == results["None"]), "Algorithm = " + key
 
 
 @pytest.mark.parametrize("key", MODELS.keys())

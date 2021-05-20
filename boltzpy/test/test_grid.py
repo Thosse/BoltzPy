@@ -76,7 +76,7 @@ def test_recreate_distance_from_partitioned_distance(key):
     # compute distances
     distances = grid.key_distance(vals)
     # compute partitioned distance for same values
-    key_partitioned_distance = grid.key_partitioned_distance(vals)
+    key_partitioned_distance = grid.key_sorted_distance(vals)
     # first part [0:ndim] are sorted and absolutes of the distances
     partitioned_distances = key_partitioned_distance[..., :-1]
     # matrices that SHOULD restore distances from partitioned_distances
