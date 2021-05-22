@@ -179,6 +179,15 @@ class CollisionModel(bp.BaseModel):
         angles = np.sort(np.abs(angles), axis=-1)
         return angles
 
+    def key_energy_transfer(self, relations, as_bool=True):
+        assert relations.ndim == 2
+        (v0, v1) = self.i_vels[relations[:, :2].transpose()]
+        energy_transfer = np.abs(np.sum(v0**2 - v1**2, axis=-1))
+        if as_bool:
+            return energy_transfer > 0
+        else:
+            return energy_transfer
+
     @staticmethod
     def group(group_keys, values=None, as_dict=True, sort_key=None):
         """Create Partitions of positions (indices) with equal keys.
