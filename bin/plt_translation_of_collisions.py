@@ -30,9 +30,10 @@ cols_bad = [base_mix + c for c in [[0,  2], [2,  2], [4,  2], [2, 4],
                                    [0, -2], [2, -2], [4, -2], [2, 0]]]
 for c in cols_bad:
     ax2.plot(c[:, 0], c[:, 1],
-             color="tomato",
-             linewidth=0.7,
-             linestyle="dashed")
+             color="red",
+             linewidth=1,
+             linestyle="dashed",
+             dashes=(20, 15))
 for c in cols_mix:
     ax2.plot(c[:, 0], c[:, 1],
              color="darkgray",)
@@ -40,19 +41,24 @@ ax2.plot(base_mix[:, 0], base_mix[:, 1], color="black")
 
 
 # Right Plot
-# model_2.subgrids(1).plot(plot_object=ax3,
-#                          **{"marker": 'x', "alpha": 0.9, "s": 100, "c": "orange"})
-for point in model_2.subgrids(1).iG:
-    ax3.text(point[0], point[1], "1",
-             bbox={"boxstyle": "circle", "color": "orange"})
-
+offset = np.full(2, .1)
 key_distance = model_2.subgrids(1).key_distance(model_2.subgrids(0).iG)
 partitions = model_2.group(key_distance,
                            model_2.subgrids(0).iG,
                            as_dict=False)
 
+for point, dist in zip(model_2.subgrids(0).iG, key_distance):
+    ax3.annotate(s='', xy=point - 0.15*dist, xytext=point - 0.85*dist,
+                 arrowprops=dict(arrowstyle='<->', linewidth=0.5, color="gray"))
+
+for point in model_2.subgrids(1).iG:
+    point = point - offset
+    ax3.text(point[0], point[1], "1",
+             bbox={"boxstyle": "circle", "color": "orange"})
+
 for p, prt in enumerate(partitions):
     for point in prt:
+        point = point - offset
         ax3.text(point[0], point[1], str(p + 1),
                  bbox={"boxstyle": "circle", "color": "lightsteelblue"})
 #

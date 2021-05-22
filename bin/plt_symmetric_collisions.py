@@ -79,7 +79,7 @@ ax2.scatter(grid[1].iG[:, 0], grid[1].iG[:, 1],
             **{"marker": 'x', "alpha": 0.9, "s": 300, "c": "tab:orange"})
 
 # compute equivalence classes by distance
-key_pd = grid[1].key_partitioned_distance(grid[0].iG)
+key_pd = grid[1].key_sorted_distance(grid[0].iG)
 partitions, rotations = model.group(key_pd[:, :-1],
                                     (grid[0].iG, key_pd[:, -1]),
                                     as_dict=False)
@@ -104,7 +104,7 @@ assert repr_grp is not None
 
 # normalize repr_cols
 sym_mat = model.symmetry_matrices
-repr_rot = grid[1].key_partitioned_distance([repr])[0, -1]
+repr_rot = grid[1].key_sorted_distance([repr])[0, -1]
 repr_cols = np.einsum("ji, nkj->nki",
                       sym_mat[repr_rot],
                       cols - repr[None])
