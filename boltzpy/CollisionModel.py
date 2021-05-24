@@ -585,12 +585,19 @@ class CollisionModel(bp.BaseModel):
         spacings = self.spacings[species]
         # store results in list ov colliding velocities (colvels)
         colvels = []
+
+        # pre filter useless elements of values[0]
+        dv = values[0] - v0
+        dw = -(dv * masses[0]) // masses[1]
+        useful = np.where(np.all((dv * masses[0]) % (2 * masses[1]) == 0, axis=-1)
+                          & np.all(dw % spacings[1] == 0, axis=-1))
+        values[0] = values[0][useful]
+        del dv, dw
+
+        # find colvels in prefiltered values
         for v1 in values[0]:
             dv = v1 - v0
             dw = -(dv * masses[0]) // masses[1]
-            if (np.any((dv * masses[0]) % (2*masses[1]) != 0)
-                    or np.any(dw % spacings[1] != 0)):
-                continue
             # find starting point for w0, projected on axis( v0 -> v1 )
             w0_proj = v0 + dv // 2 - dw // 2
             w0 = grids[1].hyperplane(w0_proj, dv, values[1])
