@@ -589,7 +589,7 @@ class CollisionModel(bp.BaseModel):
         colvels = []
         for v1 in values[0]:
             dv = v1 - v0
-            if np.any((dv * masses[0]) % masses[1] != 0):
+            if np.any((dv * masses[0]) % (2*masses[1]) != 0):
                 continue
             dw = -(dv * masses[0]) // masses[1]
             # find starting point for w0, projected on axis( v0 -> v1 )
