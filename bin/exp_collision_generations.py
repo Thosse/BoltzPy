@@ -9,13 +9,12 @@ from time import process_time
 #   Generation Parameters    #
 ##############################
 FILENAME = "/exp_collision_generation.hdf5"
-FILE = h5py.File(bp.SIMULATION_DIR + FILENAME, mode="a")
-masses = [5, 7]
+masses = [25, 30]
 mass_str = "({},{})".format(*masses)
 SHAPES = {dim: np.array([np.full((2, dim), i, dtype=int)
                          for i in range(3, 51)])
           for dim in [2, 3]}
-MAX_TIME = 6
+MAX_TIME = 3600
 ALGORITHMS = ["four_loop", "three_loop", "vectorized",
               "group_distance", "group_sorted_distance",
               "group_norm_and_sorted_distance",
@@ -209,9 +208,9 @@ def cmp_relations(self, group_by, cufoff=True, group=None, idx=None):
             repr_vel = partition[0]
             # generate collision velocities for representative
             t0_get_colvels = process_time()
-            repr_colvels = self.get_colvels(extended_grids,
-                                            masses,
+            repr_colvels = self.get_colvels([s0, s1],
                                             repr_vel,
+                                            extended_grids,
                                             max_distance)
             # to reflect / rotate repr_colvels into default symmetry region
             # multiply with transposed matrix
@@ -299,6 +298,7 @@ def group_norm_and_sorted_distance(self, group=None, idx=None):
 #   Generate Collision Times    #
 #################################
 if __name__ == "__main__":
+    FILE = h5py.File(bp.SIMULATION_DIR + FILENAME, mode="a")
     if mass_str in FILE.keys():
         compute = (input("Precomputed Solution detected for '{}' in"
                          "\n'{}'.\n"
@@ -366,25 +366,37 @@ if __name__ == "__main__":
     # ################
     # # create plots #
     # ################
-    COLORS = {"four_loop": "tab:red",
+    COLORS = {"four_loop": "tab:brown",
               "three_loop": "tab:pink",
               "vectorized": "tab:orange",
-              "group_distance": "tab:purple",
+              "group_distance": "tab:red",
+              "group_distance_no_cutoff": "gold",
               "group_sorted_distance": "tab:green",
               "group_sorted_distance_no_cutoff": "tab:olive",
               "group_norm_and_sorted_distance": "tab:blue"}
-    # plot speedup from 4-loot to 3-loop
+
     ALL_ALGS = [["four_loop"],
                 ["four_loop", "three_loop"],
                 ["three_loop", "vectorized"],
                 ["vectorized", "group_distance"],
-                ["group_distance", "group_sorted_distance"],
-                ["group_sorted_distance", "group_sorted_distance_no_cutoff"],
-                ["group_sorted_distance", "group_norm_and_sorted_distance"],
+                ["vectorized", "group_distance", "group_sorted_distance"],
+                ["vectorized", "group_sorted_distance", "group_norm_and_sorted_distance"],
+                ["group_distance", "group_distance_no_cutoff"]
                 ]
+    plt_beg = [[0, 0],
+               [0, 0],
+               [2, 0],
+               [2, 0],
+               [2, 0],
+               [2, 0]]
+    plt_spacing = [[1, 1],
+                   [2, 1],
+                   [10, 2],
+                   [10, 2],
+                   [10, 2],
+                   [10, 2]]
 
-
-    for CUR_ALGS in ALL_ALGS:
+    for c, CUR_ALGS in enumerate(ALL_ALGS):
         # setup plot
         fig, ax = plt.subplots(1, 2, constrained_layout=True)
         print("Algorithms = ", CUR_ALGS)
@@ -404,24 +416,26 @@ if __name__ == "__main__":
             for a, alg in enumerate(CUR_ALGS):
                 label = alg
                 res = FILE[mass_str][dim][alg]["total_time"][:max_idx[d]]
-                widths = np.linspace(-0.5, 0.5, len(CUR_ALGS) + 2)
-                ax[d].bar(x_vals[d] + widths[a+1], res, color=COLORS[alg],
-                          width=widths[1] - widths[0], label=label,)
-                ax[d].set_ylabel("Computation Time In Seconds")
+                # widths = np.linspace(-0.5, 0.5, len(CUR_ALGS) + 2)
+                # ax[d].bar(x_vals[d] + widths[a+1], res, color=COLORS[alg],
+                #           width=widths[1] - widths[0], label=label,)
+                ax[d].plot(x_vals[d], res, "-o",
+                           color=COLORS[alg], label=label)
 
-            ax[d].set_ylabel("Computation Time In Seconds")
             ax[d].set_xlabel("Grid Shapes".format(dim))
             ax[d].set_axisbelow(True)
             ax[d].yaxis.grid(color='darkgray', linestyle='dashed')
-            plt_beg = 0
-            plt_spacing = 1
-            ax[d].set_xticks(x_vals[d][plt_beg::plt_spacing])
-            ax[d].set_xticklabels(SHAPES[d + 2][:max_idx[d], 0][plt_beg::plt_spacing])
+            ax[d].xaxis.grid(color='darkgray', linestyle='dashed')
 
+            ax[d].set_ylim(ymin=0)
+            ax[d].set_xticks(x_vals[d][plt_beg[c][d]::plt_spacing[c][d]])
+            ax[d].set_xticklabels(SHAPES[d + 2][:max_idx[d], 0][plt_beg[c][d]::plt_spacing[c][d]])
 
         fig.suptitle("Collision Generation Time "
-                        "for Masses = {} and Different Grid Shapes".format(masses))
+                     "for Masses = {} and Different Grid Shapes".format(masses))
         ax[0].legend(title="Algorithms:", loc="upper left")
-        plt.tight_layout()
+        ax[0].set_ylabel("Computation Time In Seconds")
+        ax[0].set_ylim(ymax=300)
+        # plt.tight_layout()
         plt.show()
         del fig, ax
