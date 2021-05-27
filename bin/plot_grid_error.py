@@ -99,7 +99,7 @@ if __name__ == "__main__":
                            sharex="all", sharey="all",
                            figsize=(12.75, 6.25))
     # PARAMS
-    T_cont = np.linspace(0.1, 6, N)
+    T_cont = np.linspace(0.1, 7, N)
     # store results in dict
     res_T = {m: {key: np.full(T_cont.size, np.nan)
                  for key in MOMENTS}
@@ -166,7 +166,7 @@ if __name__ == "__main__":
         fontsize=20
     )
 
-    ax[0].set_title("Grid Error")
+    ax[0].set_title("Total Error")
     ax[1].set_title("Discretization Error")
     ax[2].set_title("Domain Error")
     fig.suptitle("Isolated Temperature Errors for Different Grid Shapes and $\overline{v} = 0$")
@@ -177,7 +177,7 @@ if __name__ == "__main__":
         This shows the discretisation and cutoff error"""
     #################################################################################
     fig, ax = plt.subplots(1, 3, constrained_layout=True,
-                           sharex="all",
+                           sharex="all", sharey="all",
                            figsize=(12.75, 6.25))
     # use a fixed model, and several temperatures instead
     model = MODELS[77]
@@ -222,12 +222,12 @@ if __name__ == "__main__":
             else:
                 raise NotImplementedError
 
-            ax[a].plot(T_cont,
+            ax[a].plot(MEAN_VELS[:, 0],
                        error,
                        label=t,
                        linestyle=line_style[i_t],
                        linewidth=4)
-            ax[a].set_xlabel(r"Mean Velocity $\overline{v}$", fontsize=18)
+            ax[a].set_xlabel(r"Mean Velocity $\overline{v}_x$", fontsize=18)
             ax[a].set_axisbelow(True)
             ax[a].yaxis.grid(color='darkgray', linestyle='dashed', which="both",
                              linewidth=0.4)
@@ -245,7 +245,7 @@ if __name__ == "__main__":
         fontsize=20
     )
 
-    ax[0].set_title("Grid Error")
+    ax[0].set_title("Total Error")
     ax[1].set_title("Discretization Error")
     ax[2].set_title("Domain Error")
     fig.suptitle("Isolated Temperature Errors of a $(7, 7)$ Grid for Different Temperatures T")
@@ -264,7 +264,7 @@ if __name__ == "__main__":
             ax[row, i].xaxis.grid(color='darkgray', linestyle='dashed', which="both",
                                   linewidth=0.4)
         ax[row, 0].set_ylabel(
-            moment,
+            moment + " $" + SYMBOL[row] + "$",
             # + r"\\$\displaystyle\mathcal{E}_{"
             # + SYMBOL[row]
             # + r"}^{\mathfrak{V}^s}(\overline{v}, T)$",
@@ -300,7 +300,7 @@ if __name__ == "__main__":
             if row == 0:
                 ax[row, 0].legend(title="Grid Shapes", loc="upper left", ncol=2,
                                   fontsize=8)
-                ax[row, 0].set_title("Grid Errors for Different Grid Shapes and $\overline{v} = 0$")
+                ax[row, 0].set_title("Total Errors for Different Grid Shapes and $\overline{v} = 0$")
             if row == len(MOMENTS) - 1:
                 ax[row, 0].set_xlabel(r"Temperature $T$", fontsize=18)
 
@@ -322,7 +322,7 @@ if __name__ == "__main__":
             else:
                 raise NotImplementedError
             error = expected - value
-            ax[row, 1].plot(T_cont,
+            ax[row, 1].plot(MEAN_VELS[:, 0],
                             error,
                             label=t,
                             linestyle=line_style[i_t],
@@ -331,7 +331,7 @@ if __name__ == "__main__":
             if row == 0:
                 ax[row, 1].legend(title="Temperatures", loc="upper left",
                                   fontsize=8)
-                ax[row, 1].set_title("Grid Errors of a $(7, 7)$ Grid for Different Temperatures T")
+                ax[row, 1].set_title("Total Errors of a $(7, 7)$ Grid for Different Temperatures T")
             if row == len(MOMENTS) - 1:
                 ax[row, 1].set_xlabel(r"Mean Velocity $\overline{v}$", fontsize=18)
 
