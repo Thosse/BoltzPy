@@ -80,12 +80,17 @@ def maxwellian(velocities,
                number_density,
                mean_velocity,
                temperature,
-               mass):
+               mass,
+               force_number_density=True):
     dim = velocities.shape[-1]
     # compute exponential with matching mean velocity and temperature
     distance = np.sum((velocities - mean_velocity) ** 2, axis=-1)
     exponential = np.exp(-0.5 * mass / temperature * distance)
-    divisor = (2 * np.pi * temperature / mass) ** (dim / 2)
+    if force_number_density:
+        dv = np.max(np.abs(velocities[0] - velocities[1]))
+        divisor = np.sum(exponential * dv**dim)
+    else:
+        divisor = (2 * np.pi * temperature / mass) ** (dim / 2)
     result = number_density * exponential / divisor
     return result
 
