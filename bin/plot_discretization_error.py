@@ -1,6 +1,7 @@
 import boltzpy as bp
 import numpy as np
 import matplotlib
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 matplotlib.rcParams['text.usetex'] = True
 matplotlib.rcParams['text.latex.preamble'] = [
     r'\usepackage{amsmath}',
@@ -32,7 +33,7 @@ DIRECTIONS = ORIGINAL_DIRECTIONS / np.max(ORIGINAL_DIRECTIONS, axis=-1)[:, None]
 
 STYLE = ["-", "--", ":", "-.", ":"]
 if __name__ == "__main__":
-    fig, ax = plt.subplots(1, 3, constrained_layout=True,
+    fig, ax = plt.subplots(1, 2, constrained_layout=True,
                            figsize=(12.75, 6.25))
 
     ##############################################################
@@ -62,52 +63,57 @@ if __name__ == "__main__":
                       extent=(0, MAX_VEL, 0, MAX_VEL)
                       )
     # add colorbar (requires a separate ax, that is added by relative positions)
-    cax = fig.add_axes([0.04, 0.1, 0.27, 0.025])
-    plt.colorbar(hm, cax=cax, orientation='horizontal')
+    # cax = fig.add_axes([0.04, 0.1, 0.27, 0.025])
+    divider = make_axes_locatable(ax[0])
+    cax = divider.append_axes("right", size="5%", pad=0.1)
+    plt.colorbar(hm, cax=cax, orientation='vertical')
+    # plt.colorbar(hm, ax=ax[0], orientation='vertical')
 
     # plot grid points
     choice = np.where(np.all((MODEL.vels <= MAX_VEL) & (MODEL.vels >= 0),
                              axis=-1))
     points = MODEL.vels[choice]
     ax[0].scatter(points[:, 0], points[:, 1], c="tab:orange", marker="x", s=100)
-    ax[0].set_title(r"Discretization Error for all $\mathfrak{v} \in \mathfrak{V}^s$ and fixed T")
+    ax[0].set_title(r"Discretization error for all $\mathfrak{v} \in \mathfrak{V}^s$ and arbitrary T")
 
-    ax[0].set_xlabel(r"Mean Velocity $\overline{v}_x$", fontsize=18)
-    ax[0].set_ylabel(r"Mean Velocity $\overline{v}_y$", fontsize=18)
-    ##############################################################
-    # MIDDLE PLOT: Discretization Error for different directions #
-    ##############################################################
-    T = 1
-    res2 = np.full((len(DIRECTIONS), N), np.nan)
-    for d, direction in enumerate(DIRECTIONS):
-        for f, factor in enumerate(np.linspace(0, MAX_VEL, N)):
-            mean_v = factor * direction
-            distr = maxwellian(MODEL.vels,
-                               NUMBER_DENSITY,
-                               mean_v,
-                               T,
-                               MASS)
-            res2[d, f] = T - MODEL.cmp_temperature(distr)
+    ax[0].set_xlabel(r"Mean velocity $\overline{v}_x$", fontsize=18)
+    ax[0].set_ylabel(r"Mean velocity $\overline{v}_y$", fontsize=18)
 
-    # plot errors
-    for d, dir in enumerate(DIRECTIONS):
-        ax[1].plot(np.linspace(0, MAX_VEL, N),
-                   res2[d],
-                   label=tuple(ORIGINAL_DIRECTIONS[d]),
-                   linewidth=2,
-                   linestyle=STYLE[d])
 
-    ax[1].set_axisbelow(True)
-    ax[1].yaxis.grid(color='darkgray', linestyle='dashed', which="both",
-                     linewidth=0.4)
-    ax[1].set_xlabel(r"Mean Velocity $\overline{v}_x$", fontsize=18)
-
-    ax[1].legend(title="Directions", loc="lower left")
-    ax[1].set_ylabel(
-        r"$\mathcal{E}_{\mathfrak{V}^s_\infty}(\overline{v}, T)$",
-        fontsize=20
-    )
-    ax[1].set_title("Discretization Error Along Different Directions")
+    # ##############################################################
+    # # MIDDLE PLOT: Discretization Error for different directions #
+    # ##############################################################
+    # T = 1
+    # res2 = np.full((len(DIRECTIONS), N), np.nan)
+    # for d, direction in enumerate(DIRECTIONS):
+    #     for f, factor in enumerate(np.linspace(0, MAX_VEL, N)):
+    #         mean_v = factor * direction
+    #         distr = maxwellian(MODEL.vels,
+    #                            NUMBER_DENSITY,
+    #                            mean_v,
+    #                            T,
+    #                            MASS)
+    #         res2[d, f] = T - MODEL.cmp_temperature(distr)
+    #
+    # # plot errors
+    # for d, dir in enumerate(DIRECTIONS):
+    #     ax[1].plot(np.linspace(0, MAX_VEL, N),
+    #                res2[d],
+    #                label=tuple(ORIGINAL_DIRECTIONS[d]),
+    #                linewidth=2,
+    #                linestyle=STYLE[d])
+    #
+    # ax[1].set_axisbelow(True)
+    # ax[1].yaxis.grid(color='darkgray', linestyle='dashed', which="both",
+    #                  linewidth=0.4)
+    # ax[1].set_xlabel(r"Mean velocity $\overline{v}_x$", fontsize=18)
+    #
+    # ax[1].legend(title="Directions", loc="lower left")
+    # ax[1].set_ylabel(
+    #     r"$\mathcal{E}_{\mathfrak{V}^s_\infty}(\overline{v}, T)$",
+    #     fontsize=20
+    # )
+    # ax[1].set_title("Discretization error along different directions")
 
     ##############################################################
     # RIGHT PLOT: Discretization Error Amplitude vs. Temperature #
@@ -134,22 +140,23 @@ if __name__ == "__main__":
 
     # plot discretization error
     for v, vel in enumerate(VELS):
-        ax[2].plot(TEMPERATURES,
+        ax[1].plot(TEMPERATURES,
                    res3[v],
                    label=tuple(vel),
                    linestyle=STYLE[v],
                    linewidth=2)
-    ax[2].set_axisbelow(True)
-    ax[2].yaxis.grid(color='darkgray', linestyle='dashed', which="both",
+    ax[1].set_axisbelow(True)
+    ax[1].yaxis.grid(color='darkgray', linestyle='dashed', which="both",
                      linewidth=0.4)
-    ax[2].xaxis.grid(color='darkgray', linestyle='dashed', which="both",
+    ax[1].xaxis.grid(color='darkgray', linestyle='dashed', which="both",
                      linewidth=0.4)
-    ax[2].set_yscale("log")
-    ax[2].set_xlabel(r" Temperature $T$", fontsize=18)
-    ax[2].set_ylabel(
+    ax[1].set_yscale("log")
+    ax[1].set_xlabel(r" Temperature $T$", fontsize=18)
+    ax[1].set_ylabel(
         r"$\left\lvert\mathcal{E}_{\mathfrak{V}^s_\infty}(\overline{v}, T) \right\rvert$",
         fontsize=20)
 
-    ax[2].legend(title="Mean Velocity $\overline{v}$", loc="lower left")
-    ax[2].set_title("Amplitude of Discretization Error")
+    ax[1].legend(title="Mean velocity $\overline{v}$", loc="lower left")
+    ax[1].set_title("Amplitude of discretization error")
+    fig.tight_layout()
     plt.show()
