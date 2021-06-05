@@ -21,32 +21,37 @@ the discretization error and cutoff error.
 """
 
 # number of discretization points
-N = 201
+N = 401
 # plot line styles
 line_style = ["-", "--", ":", "-.", "-", "--", "-.", ":"]
 STYLE = {55: "-",
          77: "-.",
          66: "--",
          88: ":"}
-COLOR = {55: "tab:blue",
-         77: "tab:orange",
-         66: "tab:green",
-         88: "tab:red"}
+MODEL_COLOR = {55: "tab:pink",
+         77: "tab:brown",
+         66: "tab:cyan",
+         88: "tab:orange"}
+TEMP_COLOR = ["tab:blue",
+              "tab:green",
+              "tab:red", "tab:purple"]
 MOMENTS = ["Temperature",
            "Number Density",
-           "Momentum",
            "Mean Velocity",
-           "Stress",
-           "Heat Flow"]
+           "Momentum",
+           "Heat Flow",
+           "Stress"]
 SYMBOL = [r"T",
           r"\nu",
-          r"M_x",
           r"\overline{v}_x",
-          r"P_{xy}",
-          r"q_x"]
+          r"M_x",
+          r"q_x",
+          r"P_{xy}"]
 #  Used Velocity Model
 MASS = 1
 NUMBER_DENSITY = 1.0
+MAX_T = 8
+FORCE_NUMBER_DENSITY = False
 # setup velocity models
 MODELS = dict()
 MODELS[55] = bp.BaseModel([MASS],
@@ -95,6 +100,86 @@ def maxwellian(velocities,
     return result
 
 
+def cmp_temp_dependent_errors(models, temperatures, velocities, moments,
+                              force_number_density=False, mass=1, number_density=1):
+    # store results in dict
+    res_T = {m: {key: np.full(temperatures.size, np.nan)
+                 for key in moments}
+             for m in models.keys()}
+
+    for m, model in models.items():
+        res = res_T[m]
+        for i_t, t in enumerate(temperatures):
+            for moment in moments:
+                mean_v = velocities[m][moment].reshape((1, model.ndim))
+                distr = maxwellian(model.vels,
+                                   number_density,
+                                   mean_v,
+                                   t,
+                                   mass,
+                                   force_number_density=force_number_density)
+                if moment == "Number Density":
+                    res[moment][i_t] = model.cmp_number_density(distr)
+                elif moment == "Temperature":
+                    res[moment][i_t] = model.cmp_temperature(distr)
+                elif moment == "Momentum":
+                    res[moment][i_t] = model.cmp_momentum(distr)[0]
+                elif moment == "Mean Velocity":
+                    res[moment][i_t] = model.cmp_mean_velocity(distr)[0]
+                elif moment == "Stress":
+                    res[moment][i_t] = model.cmp_stress(distr,
+                                                        mean_velocity=mean_v)
+                elif moment == "Heat Flow":
+                    res[moment][i_t] = model.cmp_heat_flow(distr)[0]
+                else:
+                    raise NotImplementedError
+    return res_T
+
+
+def cmp_vel_dependent_errors(model_dict, temperatures, velocities, moments,
+                             force_number_density, mass=1, number_density=1):
+    # store results in dict
+    res_v = {m: {t: {key: np.full(velocities.shape[0], np.nan)
+                     for key in MOMENTS}
+                 for t in temperatures}
+             for m in model_dict.keys()}
+    for m, model in model_dict.items():
+        for t in temperatures:
+            res = res_v[m][t]
+            for i_v, v in enumerate(velocities):
+                distr = maxwellian(model.vels,
+                                   number_density,
+                                   v,
+                                   t,
+                                   mass,
+                                   force_number_density=force_number_density)
+                for moment in moments:
+                    if moment == "Number Density":
+                        res[moment][i_v] = model.cmp_number_density(distr)
+                    elif moment == "Temperature":
+                        res[moment][i_v] = model.cmp_temperature(distr)
+                    elif moment == "Momentum":
+                        res[moment][i_v] = model.cmp_momentum(distr)[0]
+                    elif moment == "Mean Velocity":
+                        res[moment][i_v] = model.cmp_mean_velocity(distr)[0]
+                    elif moment == "Stress":
+                        res[moment][i_v] = model.cmp_stress(distr,
+                                                            mean_velocity=v)
+                    elif moment == "Heat Flow":
+                        res[moment][i_v] = model.cmp_heat_flow(distr)[0]
+                    else:
+                        raise NotImplementedError
+    return res_v
+
+
+# mean_v[0] = 0.25 * model.spacings[0] * model.base_delta
+# distr = maxwellian(model.vels,
+#                    NUMBER_DENSITY,
+#                    mean_v,
+#                    t,
+#                    mass,
+#                    force_number_density=force_number_density)
+
 if __name__ == "__main__":
     # #################################################################################
     """ PLOT: Errors vs Temperature, for fixed shapes and mean velocity = 0
@@ -103,30 +188,25 @@ if __name__ == "__main__":
     fig, ax = plt.subplots(1, 3, constrained_layout=True,
                            sharex="all", sharey="all",
                            figsize=(12.75, 6.25))
-    # PARAMS
-    T_cont = np.linspace(0.1, 7, N)
-    # store results in dict
-    res_T = {m: {key: np.full(T_cont.size, np.nan)
-                 for key in MOMENTS}
-             for m in MODELS.keys()}
+    T_TEMPS = np.linspace(0.1, MAX_T, N)
 
+    T_VELS = dict()
     for m, model in MODELS.items():
-        assert isinstance(model, bp.BaseModel)
-        mean_v = np.zeros((1, model.ndim))
-        res = res_T[m]
-        for i_t, t in enumerate(T_cont):
-            distr = maxwellian(model.vels,
-                               NUMBER_DENSITY,
-                               mean_v,
-                               t,
-                               MASS)
-            res["Number Density"][i_t] = model.cmp_number_density(distr)
-            res["Momentum"][i_t] = model.cmp_momentum(distr)[0]
-            res["Mean Velocity"][i_t] = model.cmp_mean_velocity(distr)[0]
-            res["Temperature"][i_t] = model.cmp_temperature(distr)
-            res["Stress"][i_t] = model.cmp_stress(distr)
-            res["Heat Flow"][i_t] = model.cmp_heat_flow(distr)[0]
-
+        T_VELS[m] = dict()
+        for mom in MOMENTS:
+            if mom in ["Temperature", "Number Density"]:
+                T_VELS[m][mom] = np.zeros(model.ndim)
+            elif mom in ["Mean Velocity", "Momentum",  "Heat Flow"]:
+                T_VELS[m][mom] = np.zeros(model.ndim)
+                T_VELS[m][mom][0] = 0.25 * model.spacings[0] * model.base_delta
+            elif mom in ["Stress"]:
+                T_VELS[m][mom] = np.full(model.ndim,
+                                         0.25 * model.spacings[0] * model.base_delta)
+            else:
+                raise NotImplementedError
+    res_T = cmp_temp_dependent_errors(MODELS, T_TEMPS, T_VELS, MOMENTS,
+                                      force_number_density=False,
+                                      mass=1, number_density=1)
     # plot errors (normal and split up)
     for a in [0, 1, 2]:
         ax[a].set_axisbelow(True)
@@ -137,24 +217,24 @@ if __name__ == "__main__":
             if m in [3131, 3030]:
                 continue
             if m % 2 == 1:
-                offset = (T_cont - res_T[3131]["Temperature"])
+                offset = (T_TEMPS - res_T[3131]["Temperature"])
             else:
-                offset = (T_cont - res_T[3030]["Temperature"])
+                offset = (T_TEMPS - res_T[3030]["Temperature"])
 
             if a == 0:
-                error = (T_cont - res_T[m]["Temperature"])
+                error = (T_TEMPS - res_T[m]["Temperature"])
             elif a == 1:
                 error = offset
             elif a == 2:
-                error = (T_cont - res_T[m]["Temperature"]) - offset
+                error = (T_TEMPS - res_T[m]["Temperature"]) - offset
             else:
                 raise NotImplementedError
-            ax[a].plot(T_cont,
+            ax[a].plot(T_TEMPS,
                        error,
                        label=model.shapes[0],
                        linestyle=STYLE[m],
-                       color=COLOR[m],
-                       linewidth=4)
+                       color=MODEL_COLOR[m],
+                       linewidth=3)
 
     ax[0].legend(title="Grid Shapes", loc="upper left",
                  ncol=2)
@@ -171,10 +251,12 @@ if __name__ == "__main__":
         fontsize=20
     )
 
-    ax[0].set_title("Total Error")
-    ax[1].set_title("Discretization Error")
-    ax[2].set_title("Domain Error")
-    fig.suptitle("Isolated Temperature Errors for Different Grid Shapes and $\overline{v} = 0$")
+    ax[0].set_title("Total Error", fontsize=18)
+    ax[1].set_title("Discretization Error", fontsize=18)
+    ax[2].set_title("Domain Error", fontsize=18)
+    # fig.suptitle("Isolated Temperature Based Errors "
+    #              "for Different Grid Shapes and $\overline{v} = 0$", fontsize=18)
+    plt.savefig(bp.SIMULATION_DIR + "/grid_err_T.eps")
     plt.show()
 
     ##################################################################################
@@ -186,36 +268,16 @@ if __name__ == "__main__":
                            figsize=(12.75, 6.25))
     # use a fixed model, and several temperatures instead
     model = MODELS[77]
-    # PARAMS
-    TEMPERATURES = np.array([1.0, 2.0, 4.0])
-    MEAN_VELS = np.zeros((N, 2))
-    MEAN_VELS[:, 0] = np.linspace(0, model.max_vel, N)
-    # store results in dict
-    res_v = {m: {t: {key: np.full(T_cont.size, np.nan)
-                     for key in MOMENTS}
-                 for t in TEMPERATURES}
-             for m in [77, 3131]}
-    for m in [77, 3131]:
-        model = MODELS[m]
-        for t in TEMPERATURES:
-            res = res_v[m][t]
-            for i_v, v in enumerate(MEAN_VELS):
-                distr = maxwellian(model.vels,
-                                   NUMBER_DENSITY,
-                                   v,
-                                   t,
-                                   MASS)
-                res["Number Density"][i_v] = model.cmp_number_density(distr)
-                res["Momentum"][i_v] = model.cmp_momentum(distr)[0]
-                res["Mean Velocity"][i_v] = model.cmp_mean_velocity(distr)[0]
-                res["Temperature"][i_v] = model.cmp_temperature(distr)
-                res["Stress"][i_v] = model.cmp_stress(distr)
-                res["Heat Flow"][i_v] = model.cmp_heat_flow(distr)[0]
-
+    V_TEMPS = np.array([1.0, 2.0, 4.0])
+    V_VELS = np.zeros((N, 2))
+    V_VELS[:, 0] = np.linspace(0, model.max_vel, N)
+    V_VELS[:, 1] = np.linspace(0, model.max_vel, N)
+    V_MODELS = {m: MODELS[m] for m in [77, 3131]}
+    res_v = cmp_vel_dependent_errors(V_MODELS, V_TEMPS, V_VELS, MOMENTS,
+                                     False, mass=1, number_density=1)
     # plot errors (normal and split up)
-
     for a in [0, 1, 2]:
-        for i_t, t in enumerate(TEMPERATURES):
+        for i_t, t in enumerate(V_TEMPS):
             offset = t - res_v[3131][t]["Temperature"]
             error = t - res_v[77][t]["Temperature"]
             if a == 0:
@@ -227,11 +289,12 @@ if __name__ == "__main__":
             else:
                 raise NotImplementedError
 
-            ax[a].plot(MEAN_VELS[:, 0],
+            ax[a].plot(V_VELS[:, 0],
                        error,
                        label=t,
+                       color=TEMP_COLOR[i_t],
                        linestyle=line_style[i_t],
-                       linewidth=4)
+                       linewidth=3)
             ax[a].set_xlabel(r"Mean Velocity $\overline{v}_x$", fontsize=18)
             ax[a].set_axisbelow(True)
             ax[a].yaxis.grid(color='darkgray', linestyle='dashed', which="both",
@@ -250,30 +313,22 @@ if __name__ == "__main__":
         fontsize=20
     )
 
-    ax[0].set_title("Total Error")
-    ax[1].set_title("Discretization Error")
-    ax[2].set_title("Domain Error")
-    fig.suptitle("Isolated Temperature Errors of a $(7, 7)$ Grid for Different Temperatures T")
+    ax[0].set_title("Total Error", fontsize=18)
+    ax[1].set_title("Discretization Error", fontsize=18)
+    ax[2].set_title("Domain Error", fontsize=18)
+    # fig.suptitle("Isolated Temperature Based Errors of a $(7, 7)$ "
+    #              "Grid for Different Temperatures T", fontsize=18)
+    plt.savefig(bp.SIMULATION_DIR + "/grid_err_v.eps")
     plt.show()
 
     ##################################################################################
-    """ PLOT: both previous versions in a large, multirow, 2 column plot
-    each row for another moment"""
+    """ PLOT: both previous versions moment by moment in a 3 column plot"""
     #################################################################################
-    fig, ax = plt.subplots(len(MOMENTS), 2, constrained_layout=True, sharex="col",
-                           figsize=(8.27, 11.69))
-    for row, moment in enumerate(MOMENTS):
-        for i in [0, 1]:
-            ax[row, i].yaxis.grid(color='darkgray', linestyle='dashed', which="both",
-                                  linewidth=0.4)
-            ax[row, i].xaxis.grid(color='darkgray', linestyle='dashed', which="both",
-                                  linewidth=0.4)
-        ax[row, 0].set_ylabel(
-            moment + " $" + SYMBOL[row] + "$",
-            # + r"\\$\displaystyle\mathcal{E}_{"
-            # + SYMBOL[row]
-            # + r"}^{\mathfrak{V}^s}(\overline{v}, T)$",
-            fontsize=16)
+    for moment in MOMENTS:
+        fig, ax = plt.subplots(1, 3, constrained_layout=True, sharex="col",
+                               figsize=(12.75, 6.25))
+        ax = ax.reshape((1, 3))
+        row = 0
         # plot left side: variable temperature, set of different shapes, fixed v=0
         for m, model in MODELS.items():
             if m in [3131, 3030]:
@@ -282,42 +337,35 @@ if __name__ == "__main__":
             if moment == "Number Density":
                 expected = NUMBER_DENSITY
             elif moment == "Momentum":
-                expected = 0
+                # Todo just using the x component of velocities
+                expected = NUMBER_DENSITY * MASS * T_VELS[m][moment][..., 0]
             elif moment == "Mean Velocity":
-                expected = 0
+                expected = T_VELS[m][moment][..., 0]
             elif moment == "Temperature":
-                expected = T_cont
+                expected = T_TEMPS
             elif moment == "Stress":
                 expected = 0
             elif moment == "Heat Flow":
                 expected = 0
             else:
                 raise NotImplementedError
-            error = expected - value
-
-            ax[row, 0].plot(T_cont,
-                            error,
+            total_error = expected - value
+            ax[row, 0].plot(T_TEMPS,
+                            total_error,
                             label=model.shapes[0],
                             linestyle=STYLE[m],
-                            color=COLOR[m],
-                            linewidth=4)
-
-            if row == 0:
-                ax[row, 0].legend(title="Grid Shapes", loc="upper left", ncol=2,
-                                  fontsize=8)
-                ax[row, 0].set_title("Total Errors for Different Grid Shapes and $\overline{v} = 0$")
-            if row == len(MOMENTS) - 1:
-                ax[row, 0].set_xlabel(r"Temperature $T$", fontsize=18)
+                            color=MODEL_COLOR[m],
+                            linewidth=3)
 
         # plot right side: variable velocites, set of temperatures, fixed shape
-        for i_t, t in enumerate(TEMPERATURES):
+        for i_t, t in enumerate(V_TEMPS):
             value = res_v[77][t][moment]
             if moment == "Number Density":
                 expected = NUMBER_DENSITY
             elif moment == "Momentum":
-                expected = NUMBER_DENSITY * MASS * MEAN_VELS[..., 0]
+                expected = NUMBER_DENSITY * MASS * V_VELS[..., 0]
             elif moment == "Mean Velocity":
-                expected = MEAN_VELS[..., 0]
+                expected = V_VELS[..., 0]
             elif moment == "Temperature":
                 expected = t
             elif moment == "Stress":
@@ -326,18 +374,186 @@ if __name__ == "__main__":
                 expected = 0
             else:
                 raise NotImplementedError
-            error = expected - value
-            ax[row, 1].plot(MEAN_VELS[:, 0],
-                            error,
+            total_error = expected - value
+            discr_error = expected - res_v[3131][t][moment]
+            dom_error = total_error - discr_error
+            ax[row, 1].plot(V_VELS[:, 0],
+                            discr_error,
+                            label=t,
+                            color=TEMP_COLOR[i_t],
+                            linestyle=line_style[i_t],
+                            linewidth=3)
+            ax[row, 2].plot(V_VELS[:, 0],
+                            dom_error,
+                            label=t,
+                            color=TEMP_COLOR[i_t],
+                            linestyle=line_style[i_t],
+                            linewidth=3)
+
+        # add grids
+        for i in [0, 1, 2]:
+            ax[row, i].yaxis.grid(color='darkgray', linestyle='dashed', which="both",
+                                  linewidth=0.4)
+            ax[row, i].xaxis.grid(color='darkgray', linestyle='dashed', which="both",
+                                  linewidth=0.4)
+
+        # add moment on the left
+        ax[row, 0].set_ylabel(
+            moment + " Based Errors",
+            #" $" + SYMBOL[row] + "$",
+            # + r"\\$\displaystyle\mathcal{E}_{"
+            # + SYMBOL[row]
+            # + r"}^{\mathfrak{V}^s}(\overline{v}, T)$",
+            fontsize=16)
+
+        # set legends and title
+        # fig.suptitle("Isolated " + moment + " Based Errors"
+        #              + r" for different $T$ and $\overline{v}_x$" ,
+        #              fontsize=18)
+        if moment == "Stress":
+            loc = "lower center"
+        else:
+            loc = "upper center"
+        ax[row, 0].legend(title="Grid Shapes", loc=loc, ncol=2,
+                          fontsize=8)
+        ax[row, 0].set_title("Total Errors", fontsize=18
+                             # "for Different Grid Shapes and $\overline{v} = 0$"
+                             )
+        # ax[row, 1].legend(title="Temperatures", loc="upper left",
+        #                   fontsize=8)
+        ax[row, 1].set_title("Discretization Errors", fontsize=18
+                             # " of a $(7, 7)$ Grid for Different Temperatures T"
+                             )
+        ax[row, 2].legend(title="Temperatures", loc=loc,
+                          fontsize=8)
+        ax[row, 2].set_title("Domain Errors", fontsize=18
+                             # " of a $(7, 7)$ Grid for Different Temperatures T"
+                             )
+
+        # add parameter at bottom
+        ax[row, 0].set_xlabel(r"Temperature $T$", fontsize=18)
+        ax[row, 1].set_xlabel(r"Mean Velocity $\overline{v}$", fontsize=18)
+        ax[row, 2].set_xlabel(r"Mean Velocity $\overline{v}$", fontsize=18)
+
+        plt.savefig(bp.SIMULATION_DIR + "/mom_err_" + moment + ".eps")
+        plt.show()
+
+
+   ##################################################################################
+    """ PLOT: both previous versions in a large, multirow, 3 column plot
+    each row for another moment"""
+    #################################################################################
+    # compute all again, but force number density
+    res_T_normed = cmp_temp_dependent_errors(MODELS, T_TEMPS, T_VELS, MOMENTS,
+                                             force_number_density=True,
+                                             mass=1, number_density=1)
+    res_v_normed = cmp_vel_dependent_errors(V_MODELS, V_TEMPS, V_VELS, MOMENTS,
+                                            force_number_density=True,
+                                            mass=1, number_density=1)
+
+    # create plot
+    fig, ax = plt.subplots(len(MOMENTS), 3, constrained_layout=True, sharex="col",
+                           figsize=(8.27, 11.69))
+    for row, moment in enumerate(MOMENTS):
+        # plot left side: variable temperature, set of different shapes, fixed v=0
+        for m, model in MODELS.items():
+            if m in [3131, 3030]:
+                continue
+            value = res_T_normed[m][moment]
+            if moment == "Number Density":
+                expected = NUMBER_DENSITY
+            elif moment == "Momentum":
+                expected = NUMBER_DENSITY * MASS * T_VELS[m][moment][..., 0]
+            elif moment == "Mean Velocity":
+                expected = T_VELS[m][moment][..., 0]
+            elif moment == "Temperature":
+                expected = T_TEMPS
+            elif moment == "Stress":
+                expected = 0
+            elif moment == "Heat Flow":
+                expected = 0
+            else:
+                raise NotImplementedError
+            total_error = expected - value
+            ax[row, 0].plot(T_TEMPS,
+                            total_error,
+                            label=model.shapes[0],
+                            linestyle=STYLE[m],
+                            color=MODEL_COLOR[m],
+                            linewidth=3)
+
+        # plot right side: variable velocites, set of temperatures, fixed shape
+        for i_t, t in enumerate(V_TEMPS):
+            value = res_v_normed[77][t][moment]
+            if moment == "Number Density":
+                expected = NUMBER_DENSITY
+            elif moment == "Momentum":
+                expected = NUMBER_DENSITY * MASS * V_VELS[..., 0]
+            elif moment == "Mean Velocity":
+                expected = V_VELS[..., 0]
+            elif moment == "Temperature":
+                expected = t
+            elif moment == "Stress":
+                expected = 0
+            elif moment == "Heat Flow":
+                expected = 0
+            else:
+                raise NotImplementedError
+            total_error = expected - value
+            discr_error = expected - res_v_normed[3131][t][moment]
+            dom_error = total_error - discr_error
+            ax[row, 1].plot(V_VELS[..., 0],
+                            discr_error,
+                            color=TEMP_COLOR[i_t],
                             label=t,
                             linestyle=line_style[i_t],
-                            linewidth=4)
+                            linewidth=3)
+            ax[row, 2].plot(V_VELS[..., 0],
+                            dom_error,
+                            color=TEMP_COLOR[i_t],
+                            label=t,
+                            linestyle=line_style[i_t],
+                            linewidth=3)
 
-            if row == 0:
-                ax[row, 1].legend(title="Temperatures", loc="upper left",
-                                  fontsize=8)
-                ax[row, 1].set_title("Total Errors of a $(7, 7)$ Grid for Different Temperatures T")
-            if row == len(MOMENTS) - 1:
-                ax[row, 1].set_xlabel(r"Mean Velocity $\overline{v}$", fontsize=18)
+        # add grids
+        for i in [0, 1, 2]:
+            ax[row, i].yaxis.grid(color='darkgray', linestyle='dashed', which="both",
+                                  linewidth=0.4)
+            ax[row, i].xaxis.grid(color='darkgray', linestyle='dashed', which="both",
+                                  linewidth=0.4)
 
+        # add moment on the left
+        ax[row, 0].set_ylabel(
+            moment + " $" + SYMBOL[row] + "$",
+            # + r"\\$\displaystyle\mathcal{E}_{"
+            # + SYMBOL[row]
+            # + r"}^{\mathfrak{V}^s}(\overline{v}, T)$",
+            fontsize=16)
+
+        # set legends and title
+        if row == 0:
+            loc = "upper left"
+            ax[row, 0].legend(title="Grid Shapes", loc=loc, ncol=2,
+                              fontsize=8)
+            ax[row, 0].set_title("Total Errors"
+                                 # "for Different Grid Shapes and $\overline{v} = 0$"
+                                 )
+            # ax[row, 1].legend(title="Temperatures", loc=loc,
+            #                   fontsize=8)
+            ax[row, 1].set_title("Discretization Errors"
+                                 # " of a $(7, 7)$ Grid for Different Temperatures T"
+                                 )
+            ax[row, 2].legend(title="Temperatures", loc=loc,
+                              fontsize=8)
+            ax[row, 2].set_title("Domain Errors"
+                                 # " of a $(7, 7)$ Grid for Different Temperatures T"
+                                 )
+
+        # add parameter at bottom
+        if row == len(MOMENTS) - 1:
+            ax[row, 0].set_xlabel(r"Temperature $T$", fontsize=18)
+            ax[row, 1].set_xlabel(r"Mean Velocity $\overline{v}$", fontsize=18)
+            ax[row, 2].set_xlabel(r"Mean Velocity $\overline{v}$", fontsize=18)
+
+    plt.savefig(bp.SIMULATION_DIR + "/grid_err_all.eps")
     plt.show()
