@@ -5,6 +5,7 @@ matplotlib.rcParams['text.usetex'] = True
 matplotlib.rcParams['text.latex.preamble'] = [
     r'\usepackage{amsmath}',
     r'\usepackage{amssymb}']
+matplotlib.rcParams['legend.title_fontsize'] = 14
 import matplotlib.pyplot as plt
 
 """
@@ -237,7 +238,8 @@ if __name__ == "__main__":
                        linewidth=3)
 
     ax[0].legend(title="Grid Shapes", loc="upper left",
-                 ncol=2)
+                 ncol=2,
+                 fontsize=12)
     ax[0].set_ylabel(
         r"$\mathcal{E}_T^{\mathfrak{V}^s}(\overline{v}, T)$",
         fontsize=20
@@ -295,11 +297,12 @@ if __name__ == "__main__":
                        color=TEMP_COLOR[i_t],
                        linestyle=line_style[i_t],
                        linewidth=3)
-            ax[a].set_xlabel(r"Mean Velocity $\overline{v}_x$", fontsize=18)
+            ax[a].set_xlabel(r"Mean Velocity $\overline{v}_x = \overline{v}_y$", fontsize=18)
             ax[a].set_axisbelow(True)
             ax[a].yaxis.grid(color='darkgray', linestyle='dashed', which="both",
                              linewidth=0.4)
-    ax[0].legend(title="Temperatures", loc="upper left")
+    ax[0].legend(title="Temperatures", loc="upper left",
+                 fontsize=12)
     ax[0].set_ylabel(
         r"$\mathcal{E}_T^{\mathfrak{V}^s}(\overline{v}, T)$",
         fontsize=20
@@ -415,7 +418,7 @@ if __name__ == "__main__":
         else:
             loc = "upper center"
         ax[row, 0].legend(title="Grid Shapes", loc=loc, ncol=2,
-                          fontsize=8)
+                 fontsize=12)
         ax[row, 0].set_title("Total Errors", fontsize=18
                              # "for Different Grid Shapes and $\overline{v} = 0$"
                              )
@@ -425,15 +428,15 @@ if __name__ == "__main__":
                              # " of a $(7, 7)$ Grid for Different Temperatures T"
                              )
         ax[row, 2].legend(title="Temperatures", loc=loc,
-                          fontsize=8)
+                 fontsize=12)
         ax[row, 2].set_title("Domain Errors", fontsize=18
                              # " of a $(7, 7)$ Grid for Different Temperatures T"
                              )
 
         # add parameter at bottom
         ax[row, 0].set_xlabel(r"Temperature $T$", fontsize=18)
-        ax[row, 1].set_xlabel(r"Mean Velocity $\overline{v}$", fontsize=18)
-        ax[row, 2].set_xlabel(r"Mean Velocity $\overline{v}$", fontsize=18)
+        ax[row, 1].set_xlabel(r"Mean Velocity $\overline{v}_x = \overline{v}_y$", fontsize=18)
+        ax[row, 2].set_xlabel(r"Mean Velocity $\overline{v}_x = \overline{v}_y$", fontsize=18)
 
         plt.savefig(bp.SIMULATION_DIR + "/mom_err_" + moment + ".eps")
         plt.show()
@@ -534,7 +537,7 @@ if __name__ == "__main__":
         if row == 0:
             loc = "upper left"
             ax[row, 0].legend(title="Grid Shapes", loc=loc, ncol=2,
-                              fontsize=8)
+                 fontsize=10)
             ax[row, 0].set_title("Total Errors"
                                  # "for Different Grid Shapes and $\overline{v} = 0$"
                                  )
@@ -544,7 +547,7 @@ if __name__ == "__main__":
                                  # " of a $(7, 7)$ Grid for Different Temperatures T"
                                  )
             ax[row, 2].legend(title="Temperatures", loc=loc,
-                              fontsize=8)
+                 fontsize=10)
             ax[row, 2].set_title("Domain Errors"
                                  # " of a $(7, 7)$ Grid for Different Temperatures T"
                                  )
@@ -552,8 +555,8 @@ if __name__ == "__main__":
         # add parameter at bottom
         if row == len(MOMENTS) - 1:
             ax[row, 0].set_xlabel(r"Temperature $T$", fontsize=18)
-            ax[row, 1].set_xlabel(r"Mean Velocity $\overline{v}$", fontsize=18)
-            ax[row, 2].set_xlabel(r"Mean Velocity $\overline{v}$", fontsize=18)
+            ax[row, 1].set_xlabel(r"Mean Velocity $\overline{v}_x = \overline{v}_y$", fontsize=18)
+            ax[row, 2].set_xlabel(r"Mean Velocity $\overline{v}_x = \overline{v}_y$", fontsize=18)
 
     plt.savefig(bp.SIMULATION_DIR + "/grid_err_all.eps")
     plt.show()
