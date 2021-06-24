@@ -275,7 +275,8 @@ class Grid(bp.BaseClass):
         key[..., -1] = self.key_symmetry_group(key_distance)
         return key
 
-    def key_symmetry_group(self, values):
+    @staticmethod
+    def key_symmetry_group(values):
         """ Returns the index of the symmetry group of the given values.
         This index is also the index of the "restoring matrix",
         that restores the original value
@@ -293,7 +294,8 @@ class Grid(bp.BaseClass):
             from its representative.
         """
         values = np.array(values, copy=False, dtype=int)
-        assert values.shape[-1] == self.ndim
+        ndim = values.shape[-1]
+        assert ndim in [2, 3]
 
         # generate key from components of sym_dix
         # sym_cmp : describes ech component of the inverse matrix
@@ -302,12 +304,12 @@ class Grid(bp.BaseClass):
         # max_val : maximum value of entry at this position
         # factor  : weight to merge sym_cmp into the index of symmetric matrix
         #           factor is determined by max_val
-        if self.ndim == 2:
+        if ndim == 2:
             # 2 reflection dimensions, 2 permutations
             sym_cmp = np.empty(values.shape[:-1] + (3,), dtype=int)
             max_val = np.array([2, 2, 2], dtype=int)
             factor = np.array([4, 2, 1], dtype=int)
-        elif self.ndim == 3:
+        elif ndim == 3:
             # 3 reflection dimension, 3*2 permutations
             sym_cmp = np.empty(values.shape[:-1] + (5,), dtype=int)
             max_val = np.array([2, 2, 2, 3, 2], dtype=int)
@@ -318,11 +320,11 @@ class Grid(bp.BaseClass):
             raise NotImplementedError
 
         # Apply Reflections to these components
-        sym_cmp[..., :self.ndim] = values < 0
+        sym_cmp[..., :ndim] = values < 0
         # determine permutations from order/sequence
         order = np.argsort(np.abs(values), axis=-1)
         # position of first/smallest value == first row of permutation
-        sym_cmp[..., self.ndim] = order[..., 0]
+        sym_cmp[..., ndim] = order[..., 0]
         # permutation of remaining values:
         #   1 : [[0,1],[1,0]], were originally out of order
         #   0 : [[1,0],[0,1]], were originally in order
