@@ -163,7 +163,7 @@ class BaseModel(bp.BaseClass):
         """:obj:`bool`
         Returns True, iff all grids are square/cubic,
         i.e. invariant under permutations"""
-        return np.all(self.shapes - self.shapes[..., 0][..., np.newaxis] == 0)
+        return np.all(self.shapes - self.shapes[..., [0] == 0)
 
     @property
     def permutation_matrices(self):
