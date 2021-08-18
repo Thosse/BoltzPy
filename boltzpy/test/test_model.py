@@ -53,30 +53,48 @@ KEY_FUNCTIONS = ["key_species",
                  "key_angle",
                  "key_area"]
 
+#########################################
+#           Randomized Models           #
+#########################################
 # Random Test parameters for collision generation
-_n_samples = 20
-_masses = np.random.randint(1, 100, size=(_n_samples, 2))
-_shapes = np.random.randint(3, 10, size=(_n_samples, 2, 2))
-_group_by = [["None", "distance", "sorted_distance", "norm_and_sorted_distance"]
-             if i < _n_samples // 2 else ["None", "distance"]
-             for i in range(_n_samples)]
-for i in range(_n_samples // 2):
-    _shapes[i, :, 1] = _shapes[i, :, 0]
+N_SAMPLES = 20
+MAX_MASS = 100
+MAX_SHAPE = {2: 13, 3: 7}
+
+
+@pytest.fixture(scope="module", params=range(N_SAMPLES))
+def rand_model():
+    nspc = np.random.randint(1, 3)
+    ndim = 2 #np.random.randint(2, 4)
+    masses = np.random.randint(1, MAX_MASS, size=nspc)
+    spacings = 2 * np.random.randint(1, 13, size=nspc)
+    shapes = np.random.randint(3, MAX_SHAPE[ndim], size=(nspc, ndim))
+    use_cubic_grids = True #bool(np.random.randint(0, 2))
+    if use_cubic_grids:
+        shapes[...] = shapes[:, 0, None]
+
+    model = bp.CollisionModel(masses, shapes,
+                              spacings=spacings,
+                              setup_collision_matrix=False)
+    return model
 
 
 #############################
 #           Tests           #
 #############################
-@pytest.mark.parametrize("masses, shapes, group_by", zip(_masses, _shapes, _group_by))
-def test_collision_generation_randomized(masses, shapes, group_by):
-    model = bp.CollisionModel(masses, shapes,
-                              collision_relations=[],
-                              collision_weights=[],
-                              setup_collision_matrix=False)
+def test_collision_generation_algorithms(rand_model):
+    assert isinstance(rand_model, bp.CollisionModel)
+    # choose tested algorithms
+    # some algorithms only work in cubic grids (other cases require additional work)
+    if rand_model.is_cubic_grid:
+        group_by = ["None", "distance", "sorted_distance", "norm_and_sorted_distance"]
+    else:
+        group_by = ["None", "distance"]
+
     results = dict()
     for key in group_by:
-        rels = model.cmp_relations(group_by=key)
-        results[key] = model.key_index(rels)
+        rels = rand_model.cmp_relations(group_by=key)
+        results[key] = rand_model.key_index(rels)
 
     for key in [key for key in group_by if key != "None"]:
         assert np.all(results[key].shape == results["None"].shape), "Algorithm = " + key
@@ -146,7 +164,7 @@ def test_get_idx_on_random_integers(key):
 
 @pytest.mark.parametrize("key_func", KEY_FUNCTIONS)
 @pytest.mark.parametrize("key", MODELS.keys())
-def test_compare_group_with_reference_code(key, key_func):
+def test_group(key, key_func):
     model = MODELS[key]
     key_func = model.__getattribute__(key_func)
     keys = key_func(model.collision_relations)
