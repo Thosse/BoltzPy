@@ -144,8 +144,93 @@ class CollisionModel(bp.BaseModel):
         return np.sort(relations, axis=-1)
 
     def key_species(self, relations):
+        """"Determines the species involved in each collision.
+        Returns the sorted species."""
         species = self.get_spc(relations)
         return np.sort(species, axis=-1)
+
+    def key_shape(self, relations):
+        """"Returns the sorted tuple of width and height of each collision as key.
+        In fact, the squares of width an height are used, as the root is slow."""
+        colvels = self.i_vels[relations]
+        keys = np.empty((relations.shape[0], 4), dtype=int)
+        # get width, as squared norm of v_i - v_j or v_k - v_l
+        # only use the longer one, for permutation invariance
+        keys[:, 2] = np.sum((colvels[:, 1] - colvels[:, 0]) ** 2, axis=1)
+        keys[:, 3] = np.sum((colvels[:, 3] - colvels[:, 2]) ** 2, axis=1)
+        # after sorting, keys[:, 3] describes the widths
+        keys[:, 2:].sort(axis=1)
+        # compute height vector by adding vector segments
+        height_weights = np.array([-0.5, -0.5, 0.5, 0.5])[None, :, None]
+        height_vec = np.sum(height_weights * colvels, axis=1)
+        # store the computed height in width[:, 2] (overwrites unused smaller width)
+        keys[:, 2] = np.sum(height_vec ** 2, axis=-1)
+        # sort width in place to get sorted(width, height)
+        keys[:, 2:].sort(axis=-1)
+        # add species to key, this is necessary, if equal mass ratios occur
+        keys[:, :2] = self.get_spc(relations[:, 1:3])
+        return keys
+
+    def key_center_of_gravity(self, relations, use_norm=False):
+        """"Determines an unique id for the collisons orbit.
+        The id consists of 2 parts:
+            - sorted indices of reflected and permuted velocities, 4 integers
+            - shape, 2 integers
+        """
+        # get colvels for center of gravity
+        colvels = self.i_vels[relations[:, ::2]]
+        # get masses for center of gravity
+        masses = self.get_array(self.masses)[relations[:, ::2]]
+        # compute center of gravity
+        cog = np.sum(masses[..., None] * colvels,
+                     axis=1)
+        if use_norm:
+            return np.sum(cog**2, axis=1)
+        else:
+            return np.sort(np.abs(cog), axis=1)
+
+    def key_orbit(self, relations, reduce=True):
+        """"Determines an unique id for the collisions orbit.
+
+        The algorithm
+            1. compute the orbits of all collisions as colliding velocities
+            2. get indices of the colliding velocities, specieswise
+            3. sort orbit relations, for permutation invariance
+        """
+        # 1. compute the orbits of all collisions as colliding velocities
+        # get colliding velocities from indices
+        colvels = self.i_vels[relations]
+        # get all elements of the orbit
+        orbvels = np.einsum("sij, ckj -> cski",
+                            self.symmetry_matrices,
+                            colvels)
+        del colvels
+
+        # 2. get indices of all orbit collisions, specieswise
+        # group colvels by species, entries are indices of relations
+        grp = self.group(self.key_species(relations))
+        # get relations from colliding velocities
+        keys = np.empty(orbvels.shape[:3], dtype=int)
+        for spc, idx in grp.items():
+            keys[idx] = self.get_idx(spc, orbvels[idx])
+        del orbvels
+
+        # 3. sort orbkeys, for permutation invariance
+        # sort indices in each relation of every orbit
+        keys.sort(axis=2)
+        # sort/partition the orbit elements (axis=1)
+        # create a view as a structured array, to use argsort
+        # lexsort does not really work in 3d
+        struc_keys = keys.view("i8, i8, i8, i8")
+
+        # if reduce, then return only the lexicographically smallest collision
+        if reduce:
+            struc_keys.partition(0, order=("f0", "f1", "f2", "f3"), axis=1)
+            return keys[:, 0]
+        # if not reduce, then return the lexicographically sorted collisions
+        else:
+            struc_keys.sort(order=("f0", "f1", "f2", "f3"), axis=1)
+            return keys.reshape((keys.shape[0], -1))
 
     def key_area(self, relations):
         (v0, v1, w0, w1) = self.i_vels[relations.transpose()]
@@ -808,6 +893,8 @@ class CollisionModel(bp.BaseModel):
         # when plotting collisions, keep equal aspect ratio of the axes
         if "aspect" in kwargs.keys():
             ax.set_aspect(kwargs['aspect'])
+        elif self.ndim == 3:    # Axed3D does not support equal aspect ratio
+            ax.set_aspect('auto')
         else:
             ax.set_aspect('equal')
 
