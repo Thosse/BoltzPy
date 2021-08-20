@@ -514,7 +514,21 @@ class HomogeneousRule(BaseRule, bp.CollisionModel):
         attrs.update(bp.CollisionModel.attributes())
         return attrs
 
-    def compute(self, dt, maxiter, animate=False, animate_filename=None):
+    def gain_term(self, relation_set=None):
+        if relation_set is None:    # use all collision
+            relation_set = slice(None)
+        relations = self.collision_relations[relation_set]
+        colvels = self.initial_state[relations]
+        gain_term = np.prod(colvels[:, [0, 2]], axis=-1)
+        loss_term = np.prod(colvels[:, [1, 3]], axis=-1)
+        # We must use the absolute matrix!
+        # negative signs switch gain and loss terms
+        collision_matrix = np.abs(self.collision_matrix[:, relation_set])
+        gains = collision_matrix.dot(gain_term + loss_term)
+        return gains
+
+    def compute(self, dt, maxiter, animate=False, animate_filename=None,
+                atol=1e-12, rtol=1e-12):
         self.check_integrity()
         state = self.initial_state
         # store state at each timestep here
@@ -538,7 +552,7 @@ class HomogeneousRule(BaseRule, bp.CollisionModel):
                 # execute runge kutta substep
                 result[i] = result[i] + rks_weight * dt * (coll + self.source_term)
             # break loop when reaching equilibrium
-            if np.allclose(result[i] - result[i-1], 0, atol=1e-12, rtol=1e-12):
+            if np.allclose(result[i] - result[i-1], 0, atol=atol, rtol=rtol):
                 if animate:
                     self.plot_state(result[:i+1:100], animate_filename)
                 return result[:i+1]
