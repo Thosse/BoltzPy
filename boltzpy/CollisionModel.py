@@ -520,7 +520,7 @@ class CollisionModel(bp.BaseModel):
         return ext_grids
 
     # todo speedup idea: just compute largest intraspecies collisions -> reuse for others
-    def cmp_relations(self, group_by="sorted_distance"):
+    def cmp_relations(self, group_by=None):
         """Computes the :attr:`collision_relations`.
 
          Parameters
@@ -529,10 +529,16 @@ class CollisionModel(bp.BaseModel):
             Switches between algorithms.
             Determines if and how the grids are partitioned into equivalence classes.
         """
-        assert group_by in {"distance",
-                            "sorted_distance",
-                            "None",
-                            "norm_and_sorted_distance"}
+        if group_by is not None:
+            assert group_by in {"distance",
+                                "sorted_distance",
+                                "None",
+                                "norm_and_sorted_distance"}
+        elif self.is_cubic_grid:
+            group_by = "norm_and_sorted_distance"
+        else:   # faster algorithms, require additional work for non-cubic grids
+            group_by = "distance"
+
         # collect collisions in a lists
         relations = []
         # Collisions are computed for every pair of specimen
