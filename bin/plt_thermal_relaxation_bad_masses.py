@@ -7,14 +7,13 @@ matplotlib.use('Qt5Agg')
 matplotlib.rcParams['text.usetex'] = True
 matplotlib.rcParams['text.latex.preamble'] = r'\usepackage{amsmath, amssymb}'
 import matplotlib.pyplot as plt
-import copy
 import h5py
 
 ###########################
 #   Control Parameters    #
 ###########################
-EXP_NAME = "/thermal_relaxation"
-FILE_ADDRESS = bp.SIMULATION_DIR + EXP_NAME + ".hdf5"
+EXP_NAME = bp.SIMULATION_DIR + "/thermal_relaxation"
+FILE_ADDRESS = EXP_NAME + ".hdf5"
 FILE = h5py.File(FILE_ADDRESS, mode="a")
 
 COMPUTE = {"unedited": False,
@@ -23,12 +22,13 @@ COMPUTE = {"unedited": False,
            "gain": False,
            "gain + ET": False,
            "shape": False,
-           "shape + gain + ET": False,
+           "shape + gain + ET": True,
            "masses": False,
            "masses + gain": False
            }
 
 dt = 0.05
+max_steps = int(100000 / dt)
 linestyles = ["-", ":", "--"]
 lw = {"lw": 3}
 # setup collision model
@@ -56,9 +56,9 @@ models = [
                           col_factors[1:, 1:])
           ]
 
-##################################################
-#       plot energy transferring collisions      #
-##################################################
+print("##################################################")
+print("#       plot energy transferring collisions      #")
+print("##################################################")
 plot_models = [models[0],
                bp.CollisionModel(masses,
                                  shapes + 2,
@@ -67,7 +67,6 @@ plot_models = [models[0],
                                  col_factors)
                ]
 
-print("Create Plot of Collisions")
 fig, ax = plt.subplots(1, 2, constrained_layout=True,
                        sharey=True,sharex=True,
                        figsize=(12.75, 6.25))
@@ -93,14 +92,13 @@ for i, m in enumerate(plot_models):
     ax[i].set_aspect('equal')
     ax[i].set_xticks([])
     # ax[i].set_yticks([])
-plt.savefig(bp.SIMULATION_DIR + "/thermal_relaxation_bad_masses_grids.pdf")
+plt.savefig(EXP_NAME + "_grids.pdf")
 plt.cla()
 print("Done!\n")
 
-
-#######################################
-#       Set up Simulation Cases       #
-#######################################
+print("######################################################\n",
+      "#       Compute Relaxation with uniform weights      #\n",
+      "######################################################")
 v0 = np.array([0, 0], dtype=float)
 v1 = np.array([0, 0], dtype=float)
 T0 = 30
@@ -120,10 +118,12 @@ rules = [bp.HomogeneousRule([1, 1],
                             [T0],
                             **models[2].__dict__),
          ]
+del models
+
 # set superposition of maxwellians for monospecies cases
 # Note: this gives a very rough comparison, results should NOT match precisely
 for i in [1, 2]:
-    rules[i].initial_state += models[i].cmp_initial_state([1], np.array([v1]), [T1])
+    rules[i].initial_state += rules[i].cmp_initial_state([1], np.array([v1]), [T1])
 del i
 
 print("Compute Relaxation with uniform weights")
@@ -134,24 +134,70 @@ if COMPUTE[key] or (key not in FILE):
         del FILE[key]
     # create new results
     FILE.create_group(key)
-    for i, r in enumerate(rules):
-        FILE[key][str(i)] = r.compute(dt, 1000000, atol=1e-10, rtol=1e-10)
+    for i_r, r in enumerate(rules):
+        r.compute(dt, max_steps, atol=1e-10, rtol=1e-10,
+                  hdf5_group=FILE[key], dataset_name=str(i_r))
+        print("Time Steps = ", FILE[key][str(i_r)].shape[0])
+    FILE.flush()
     print("Done!\n")
+    del i_r
 else:
     print("Skipped\n")
 del key
 
-##########################################################
-#       Edit Collision Weights of Energy Collisions      #
-##########################################################
+
+print("############################################\n",
+      "#       Compute First Relaxation Plot      #\n",
+      "############################################")
+# determine maximum time range
+n_time_steps = [res.shape[0] for res in FILE["unedited"].values()]
+max_t = max(n_time_steps) * 2
+# multiply by 2, for a little margin in log scale plot
+longest_relaxation_time = max_t * dt
+time = (np.arange(max_t) + 1) * dt
+
+print("setup figure and axes")
+fig, ax1 = plt.subplots(1, 1, constrained_layout=True,
+                        figsize=(6.375, 6.25))
+
+fig.suptitle("Relaxation of Perturbed Temperatures for a Mixture",
+             fontsize=14)
+ax1.set_ylabel(r"$\mathcal{L}^2$-Distance to Equilibrium", fontsize=14)
+ax1.set_xlabel("Time", fontsize=14)
+ax1.set_xscale("log")
+ax1.set_xlim(right=longest_relaxation_time)
+
+# plot left figure (original weights, with references
+labels = [r"Mixture $\mathfrak{S} = \{1,2\}$",
+          r"$\mathfrak{S}=\{1\}$, $n^1= (7, 7)$",
+          r"$\mathfrak{S}=\{2\}$, $n^2= (11, 11)$"]
+print("Create Plot")
+for i_r in range(len(rules)):
+    raw = FILE["unedited"][str(i_r)][()]
+    res = np.sum((raw - raw[-1])**2, axis=-1)
+    del raw
+    ax1.plot(time[:len(res)],
+             res,
+             linestyle=linestyles[i_r],
+             label=labels[i_r],
+             **lw)
+ax1.legend(fontsize=12, loc="upper right")
+
+plt.savefig(EXP_NAME + "_1.pdf")
+print("Done!\n")
+plt.cla()
+del i_r, labels, res, fig, ax1
+
+
+print("############################################################\n",
+      "#       Edit Collision Weights, to show Bottleneck      #\n",
+      "############################################################")
+ENERGY_FACTORS = [1, 10, 100, 1000]
 # so far all models should have equal weights 1.0
 for r in rules:
     assert np.allclose(r.collision_weights, 1)
-# copy model/rule for mixture, do adjust weights
-r = copy.deepcopy(rules[0])
-assert isinstance(r, bp.HomogeneousRule)
-ENERGY_FACTORS = [1, 10, 100, 1000]
-print("Computing different weights for Energy Transferring Collisions")
+
+print("Computing Relaxation for increased Energy Transferring Collisions")
 key = "ET"
 if COMPUTE[key] or (key not in FILE):
     # remove old results
@@ -159,63 +205,106 @@ if COMPUTE[key] or (key not in FILE):
         del FILE[key]
     # create new results
     FILE.create_group(key)
+    # find energy transferring collisions
+    r = rules[0]
+    grp = r.group((r.key_species(r.collision_relations)[:, 1:3],
+                   r.key_energy_transfer(r.collision_relations)))
+    et_rels = grp[(0, 1, 1)]
+    # set weights and compute
     for ENERGY_FACTOR in ENERGY_FACTORS:
         key_ef = str(ENERGY_FACTOR)
         # no change to previous result, thus reuse it
         if ENERGY_FACTOR == 1:
             FILE[key][key_ef] = FILE["unedited"]["0"]
         else:
-            print("Weight factor: ", ENERGY_FACTOR)
-            grp = r.group((r.key_species(r.collision_relations)[:, 1:3],
-                           r.key_energy_transfer(r.collision_relations)))
-            rels = grp[(0, 1, 1)]
-            r.collision_weights[rels] = ENERGY_FACTOR
+            print("Energy factor: ", ENERGY_FACTOR)
+            r.collision_weights[et_rels] = ENERGY_FACTOR
             r.update_collisions(r.collision_relations, r.collision_weights)
-            FILE[key][key_ef] = r.compute(dt, 1000000, atol=1e-10, rtol=1e-10)
-            print("Time Steps = ", FILE["edit_ET"][key_ef].shape[0])
+            r.compute(dt, max_steps, atol=1e-10, rtol=1e-10,
+                      hdf5_group=FILE[key], dataset_name=key_ef)
+            print("Time Steps = ", FILE[key][key_ef].shape[0])
+    FILE.flush()
     print("Done!\n")
-    del ENERGY_FACTOR, key_ef
+    del ENERGY_FACTOR, key_ef, grp, et_rels
 else:
     print("Skipped\n")
-del r, key
+del key
+
+print("Computing Relaxation for increased weights "
+      "EXCEPT Energy Transferring Collisions")
+key = "All but ET"
+if COMPUTE[key] or (key not in FILE):
+    # remove old results
+    if key in FILE:
+        del FILE[key]
+    # create new results
+    FILE.create_group(key)
+    # set weights and compute
+    for i_r, r in enumerate(rules):
+        # increase all weights
+        r.collision_weights[:] = 10
+        # undo increase for ET Collisions
+        if i_r == 0:
+            grp = r.group((r.key_species(r.collision_relations)[:, 1:3],
+                           r.key_energy_transfer(r.collision_relations)))
+            et_rels = grp[(0, 1, 1)]
+            r.collision_weights[et_rels] = 1
+        r.update_collisions(r.collision_relations, r.collision_weights)
+        # compute
+        r.compute(dt, max_steps, atol=1e-10, rtol=1e-10,
+                  hdf5_group=FILE[key], dataset_name=str(i_r))
+        print("Time Steps = ", FILE[key][str(i_r)].shape[0])
+    FILE.flush()
+    print("Done!\n")
+    del r, i_r, grp, et_rels
+else:
+    print("Skipped\n")
+# reset collision weights
+for r in rules:
+    r.collision_weights[:] = 1
+    r.update_collisions(r.collision_relations, r.collision_weights)
+del key, r
 
 
-############################################
-#       Create First Relaxation Plot       #
-############################################
-# determine maximum time range
-n_time_steps = [res.shape[0] for res in FILE["unedited"].values()]
-print("Number of time steps:\n", n_time_steps, "\n")
-max_t = max(n_time_steps) * 2
-# multiply by 2, for a little margin in log scale plot
-longest_relaxation_time = max_t * dt
-time = (np.arange(max_t) + 1) * dt
-
-print("create relaxation plots")
+print("############################################\n"
+      "#       Create Second Relaxation Plot       #\n"
+      "############################################\n")
+print("setup figure and axes")
 fig, (ax1, ax2) = plt.subplots(1, 2, constrained_layout=True,
                                figsize=(12.75, 6.25), sharey=True, sharex=True)
-axes = [ax1, ax2]
 
-fig.suptitle("Relaxation of Perturbed Temperatures "
-             "for a Mixture with Few Energy Transferring Collisions",
-             fontsize=14)
-ax1.set_title("Uniform Collision Weights", fontsize=16)
-ax2.set_title(r"Increased Weights $\gamma_E$ for Energy Transferring Collisions", fontsize=14)
+fig.suptitle("Weight Adjustment Effects on the Relaxation Curves",
+             fontsize=16)
+ax1.set_title(r"Increased Weights $\gamma$ for Non Energy Transferring Collisions",
+              fontsize=14)
+ax2.set_title(r"Increased Weights $\gamma_E$ for Energy Transferring Collisions",
+              fontsize=14)
 ax1.set_ylabel(r"$\mathcal{L}^2$-Distance to Equilibrium", fontsize=14)
 
 for ax in [ax1, ax2]:
     ax.set_xlabel("Time", fontsize=14)
     ax.set_xscale("log")
     ax.set_xlim(right=longest_relaxation_time)
-    # ax.set_ylim(bottom=0, top=0.03)
+    # add greyed out reference plots
+    for i_r in range(len(rules)):
+        raw = FILE["unedited"][str(i_r)][()]
+        res = np.sum((raw - raw[-1]) ** 2, axis=-1)
+        del raw
+        ax.plot(time[:len(res)],
+                res,
+                linestyle=linestyles[i_r],
+                color="darkgray",
+                label="_nolegend_",
+                **lw)
 
-# plot left figure (original weights, with references
+# plot left figure (original weights for ET, all others * 10)
 label_left = [r"Mixture $\mathfrak{S} = \{1,2\}$",
               r"$\mathfrak{S}=\{1\}$, $n^1= (7, 7)$",
               r"$\mathfrak{S}=\{2\}$, $n^2= (11, 11)$"]
 for i_r in range(len(rules)):
-    raw = FILE["unedited"][str(i_r)][()]
+    raw = FILE["All but ET"][str(i_r)][()]
     res = np.sum((raw - raw[-1])**2, axis=-1)
+    del raw
     ax1.plot(time[:len(res)],
              res,
              linestyle=linestyles[i_r],
@@ -223,13 +312,14 @@ for i_r in range(len(rules)):
              **lw)
 ax1.legend(fontsize=12, loc="upper right")
 
-# plot right plot (increased energy transfer rates)
+# plot right figure (increased energy transfer rates)
 label_right = [r"$\gamma_{E} = $" + str(etf)
                for etf in ENERGY_FACTORS]
 colors = ["tab:blue", "gold", "tab:purple", "tab:red"]
 for i_ef, ef in enumerate(ENERGY_FACTORS):
-    raw = FILE["edit_ET"][str(ef)][()]
+    raw = FILE["ET"][str(ef)][()]
     res = np.sum((raw - raw[-1])**2, axis=-1)
+    del raw
     ax2.plot(time[:len(res)],
              res,
              color=colors[i_ef],
@@ -237,39 +327,28 @@ for i_ef, ef in enumerate(ENERGY_FACTORS):
              **lw)
 ax2.legend(fontsize=12, loc="upper right")
 
-# add greyed out reference plots
-for i_r in range(len(rules)):
-    raw = FILE["unedited"][str(i_r)][()]
-    res = np.sum((raw - raw[-1])**2, axis=-1)
-    ax1.plot(time[:len(res)],
-             res,
-             linestyle=linestyles[i_r],
-             color="darkgray",
-             label="_nolegend_",
-             **lw)
-plt.savefig(bp.SIMULATION_DIR
-            + "/thermal_relaxation_bad_masses_1.pdf")
+plt.savefig(EXP_NAME + "_2.pdf")
 print("Done!")
 plt.cla()
-del i_r, i_ef, raw, res
+del i_r, i_ef, res
 
 
-######################################################
-#      Next Plot: Adjusting All Weights, but ET      #
-######################################################
-# Edit Collision Weights for left model
+print("#############################################\n"
+      "#       Gain Based Weight Adjustments       #\n"
+      "#############################################\n")
 # all initial weights must be 1, as in the first relaxation
 assert all(np.allclose(r.collision_weights, 1)
            for r in rules)
-print("Balance weights by gain terms, based on number density.....")
-# use energy gains for weight adjustments
-# mom_func = [r.cmp_energy_density for r in rules]
+
+print("Balance weights by number density gains of interspecies collisions")
+# use nd-gains for weight adjustments
 mom_func = [r.cmp_number_density for r in rules]
 # base weight is set to gains of Interspecies Collisions
 r = rules[0]
 grp = r.group(r.key_species(r.collision_relations)[:, 1:3])
 is_rels = grp[(0, 1)]
 BASE_WEIGHT = mom_func[0](r.gain_term(is_rels))
+
 print("Compute new gain based weights by species")
 for i_r, r in enumerate(rules):
     print("Rule ", i_r, ":")
@@ -293,26 +372,26 @@ if COMPUTE[key] or (key not in FILE):
     # create new results
     FILE.create_group(key)
     for i_r, r in enumerate(rules):
-        FILE[key][str(i_r)] = r.compute(dt, 1000000, atol=1e-10, rtol=1e-10)
+        r.compute(dt, max_steps, atol=1e-10, rtol=1e-10,
+                  hdf5_group=FILE[key], dataset_name=str(i_r))
+        print("Time Steps = ", FILE[key][str(i_r)].shape[0])
+    FILE.flush()
     print("Done!\n")
+    del i_r
 else:
     print("Skipped\n")
 
-print("Increase Collision weights for all Collisions, except ET")
-for r in rules:
-    r.collision_weights *= 10
-    r.update_collisions(r.collision_relations, r.collision_weights)
-# do not increase ET weights
+print("Increase Collision weights for  ET")
 r = rules[0]
 grp = r.group((r.key_species(r.collision_relations)[:, 1:3],
                r.key_energy_transfer(r.collision_relations)))
 et_rels = grp[(0, 1, 1)]
-r.collision_weights[et_rels] = 1
+r.collision_weights[et_rels] *= 10
 r.update_collisions(r.collision_relations, r.collision_weights)
 print("Done!\n")
 
 
-print("Compute Relaxation with increased weights")
+print("Compute gain adjusted Relaxation with increased weights for ET")
 key = "gain + ET"
 if COMPUTE[key] or (key not in FILE):
     # remove old results
@@ -321,31 +400,43 @@ if COMPUTE[key] or (key not in FILE):
     # create new results
     FILE.create_group(key)
     for i_r, r in enumerate(rules):
-        FILE[key][str(i_r)] = r.compute(dt, 1000000, atol=1e-10, rtol=1e-10)
-    del i_r
+        r.compute(dt, max_steps, atol=1e-10, rtol=1e-10,
+                  hdf5_group=FILE[key], dataset_name=str(i_r))
+        print("Time Steps = ", FILE[key][str(i_r)].shape[0])
+    FILE.flush()
     print("Done!\n")
+    del i_r
 else:
     print("Skipped\n")
 del r, key, grp
 
-#############################################
-#       Create second Relaxation Plot       #
-#############################################
+print("#############################################\n"
+      "#       Create Third Relaxation Plot       #\n"
+      "#############################################")
+print("setup figure and axes")
 # create relaxation plots
 fig, (ax1, ax2) = plt.subplots(1, 2, constrained_layout=True,
                                figsize=(12.75, 6.25), sharey=True, sharex=True)
-axes = [ax1, ax2]
 
 ax1.set_title("Gain-Adjusted Collision Weights", fontsize=14)
-ax2.set_title("Increased Weights For All Non-Energy-Transferring Collisions", fontsize=14)
+ax2.set_title("Additionally Increased Energy-Transferring Collisions", fontsize=14)
 ax1.set_ylabel(r"$\mathcal{L}^2$-Distance to Equilibrium", fontsize=14)
 
 for ax in [ax1, ax2]:
     ax.set_xlabel("Time", fontsize=14)
     ax.set_xscale("log")
     ax.set_xlim(right=longest_relaxation_time)
-    # ax.set_ylim(bottom=0, top=0.03)
-
+    # add greyed out reference plots
+    for i_r in range(len(rules)):
+        raw = FILE["unedited"][str(i_r)][()]
+        res = np.sum((raw - raw[-1]) ** 2, axis=-1)
+        del raw
+        ax.plot(time[:len(res)],
+                res,
+                linestyle=linestyles[i_r],
+                color="darkgray",
+                label="_nolegend_",
+                **lw)
 
 # plot left figure (gain adjusted weights)
 label_left = [r"Mixture $\mathfrak{S} = \{1,2\}$",
@@ -354,6 +445,7 @@ label_left = [r"Mixture $\mathfrak{S} = \{1,2\}$",
 for i_r in range(len(rules)):
     raw = FILE["gain"][str(i_r)][()]
     res = np.sum((raw - raw[-1])**2, axis=-1)
+    del raw
     ax1.plot(time[:len(res)],
              res,
              linestyle=linestyles[i_r],
@@ -365,25 +457,25 @@ ax1.legend(fontsize=12, loc="upper right")
 for i_r in range(len(rules)):
     raw = FILE["gain + ET"][str(i_r)][()]
     res = np.sum((raw - raw[-1])**2, axis=-1)
+    del raw
     ax2.plot(time[:len(res)],
              res,
              linestyle=linestyles[i_r],
              **lw)
 
-plt.savefig(bp.SIMULATION_DIR
-            + "/thermal_relaxation_bad_masses_2.pdf")
+plt.savefig(EXP_NAME + "_3.pdf")
 print("Done!\n")
 plt.cla()
-del i_r, raw, res
+del i_r, res
 
 
-#################################
-#       Use larger models       #
-#################################
+print("#################################\n"
+      "#       Use larger models       #\n"
+      "#################################")
 print("Generate new models, with larger shaped grids")
 # compute key_center_of_gravity old ecols
 # remove new ET Collisions in rules[3]
-m = models[0]
+m = rules[0]
 grp = m.group((m.key_species(m.collision_relations)[:, 1:3],
                m.key_energy_transfer(m.collision_relations)),
               as_dict=True)
@@ -446,6 +538,7 @@ rules = [bp.HomogeneousRule([1, 1],
                             [T0],
                             **models[3].__dict__),
          ]
+del models
 
 # set superposition of maxwellians for monospecies cases
 # Note: this gives a very rough comparison, results should NOT match precisely
@@ -454,8 +547,8 @@ for r in rules[-2:]:
 del r
 print("Done!\n")
 
-print("Remove new ET COllisions in Rules[3]")
-# find old ET Collisions in rules[3]
+print("Remove new ET COllisions in Rules[2]")
+# find old ET Collisions
 r = rules[2]
 grp = r.group((r.key_species(r.collision_relations)[:, 1:3],
                r.key_energy_transfer(r.collision_relations),
@@ -477,14 +570,148 @@ del r, grp, old_et_pos, new_et_pos
 print("Done!\n")
 
 print("Compute Relaxation with larger models")
-results_3 = [[], []]
-results_3[0] = [r.compute(dt, 1000000, atol=1e-10, rtol=1e-10)
-                for r in rules]
+key = "shape"
+if COMPUTE[key] or (key not in FILE):
+    # remove old results
+    if key in FILE:
+        del FILE[key]
+    # create new results
+    FILE.create_group(key)
+    for i_r, r in enumerate(rules):
+        r.compute(dt, max_steps, atol=1e-10, rtol=1e-10,
+                  hdf5_group=FILE[key], dataset_name=str(i_r))
+        print("Time Steps = ", FILE[key][str(i_r)].shape[0])
+    FILE.flush()
+    print("Done!\n")
+    del i_r
+else:
+    print("Skipped\n")
+
+print("Adjust Collision Weights by Gain")
+# use nd-gains for weight adjustments
+mom_func = [r.cmp_number_density for r in rules]
+# base weight is set to gains of Interspecies Collisions
+r = rules[1]
+grp = r.group(r.key_species(r.collision_relations)[:, 1:3])
+is_rels = grp[(0, 1)]
+BASE_WEIGHT = mom_func[1](r.gain_term(is_rels))
+
+print("Compute new gain based weights by species and increase ET weights * 10")
+for i_r, r in enumerate(rules):
+    print("Rule ", i_r, ":")
+    grp = r.group(r.key_species(r.collision_relations)[:, 1:3])
+    for g, rels in grp.items():
+        # compute gain term
+        gains = mom_func[i_r](r.gain_term(rels))
+        new_weight = BASE_WEIGHT / gains
+        print(g, new_weight)
+        r.collision_weights[rels] *= new_weight
+        # find et_rels
+        if r.nspc > 1:
+            grp = r.group((r.key_species(r.collision_relations)[:, 1:3],
+                           r.key_energy_transfer(r.collision_relations)))
+            et_rels = grp[(0, 1, 1)]
+            r.collision_weights[et_rels] *= 10
+    r.update_collisions(r.collision_relations, r.collision_weights)
 print("Done!\n")
 
-#####################################
-#       Use better mass ratio       #
-#####################################
+print("Compute Relaxation with larger, adjusted models")
+key = "shape + gain + ET"
+if COMPUTE[key] or (key not in FILE):
+    # remove old results
+    if key in FILE:
+        del FILE[key]
+    # create new results
+    FILE.create_group(key)
+    # Note: Some models are unstable due to the higher weights,
+    # thus we use a lower dt here and plot only every tenth value
+    for i_r, r in enumerate(rules):
+        r.compute(dt / 10, max_steps, atol=1e-10, rtol=1e-10,
+                  hdf5_group=FILE[key], dataset_name=str(i_r))
+        print("Time Steps = ", FILE[key][str(i_r)].shape[0])
+    FILE.flush()
+    print("Done!\n")
+else:
+    print("Skipped\n")
+
+
+print("#############################################################\n"
+      "#       Create Fourth Relaxation Plot (larger shapes)       #\n"
+      "#############################################################")
+print("setup figure and axes")
+# create relaxation plots
+fig, (ax1, ax2) = plt.subplots(1, 2, constrained_layout=True,
+                               figsize=(12.75, 6.25), sharey=True, sharex=True)
+axes = [ax1, ax2]
+
+fig.suptitle("DVM With Increased Grid Shapes $(9,9)$ and $(13,13)$", fontsize=16)
+ax1.set_title(r"Uniform Collision Weights $\gamma = 1$", fontsize=14)
+ax2.set_title("Gain Adjusted Collision Weights $\gamma$ and Increased "
+              r"$\gamma_E = 10 \gamma$",
+              fontsize=14)
+ax1.set_ylabel(r"$\mathcal{L}^2$-Distance to Equilibrium", fontsize=14)
+
+for ax in [ax1, ax2]:
+    ax.set_xlabel("Time", fontsize=14)
+    ax.set_xscale("log")
+    ax.set_xlim(right=longest_relaxation_time)
+    # add greyed out reference plots
+    for i_r in range(3):
+        raw = FILE["unedited"][str(i_r)][()]
+        res = np.sum((raw - raw[-1]) ** 2, axis=-1)
+        del raw
+        ax.plot(time[:len(res)],
+                res,
+                linestyle=linestyles[i_r],
+                color="darkgray",
+                label="_nolegend_",
+                **lw)
+
+
+# plot left figure (uniform weights)
+label_left = [r"Mixture $\mathfrak{S} = \{1,2\}$"
+              + "\nwith original spacings",
+              r"Mixture, reduced $\Delta_\mathbb{R}$",
+              r"Mixture, reduced $\Delta_\mathbb{R}$,"
+              + "\nonly old ET collisions",
+              r"$\mathfrak{S}=\{1\}$, $n^1= (9, 9)$"
+              + "\nwith reduced " + r"$\Delta_\mathbb{R}$",
+              r"$\mathfrak{S}=\{2\}$, $n^2= (13, 13)$"
+              + "\nwith reduced " + r"$\Delta_\mathbb{R}$"]
+# keep linestyle for both mixtures
+new_linestyles = 2*linestyles[:1] + linestyles
+colors = ["tab:blue", "tab:red", "tab:purple", "tab:orange", "tab:green"]
+for i_r in range(len(rules)):
+    raw = FILE["shape"][str(i_r)]
+    res = np.sum((raw - raw[-1])**2, axis=-1)
+    del raw
+    ax1.plot(time[:len(res)],
+             res,
+             linestyle=new_linestyles[i_r],
+             color=colors[i_r],
+             label=label_left[i_r],
+             **lw)
+ax1.legend(fontsize=12, loc="upper right")
+
+# plot left figure (gain adjusted weights)
+for i_r in range(len(rules)):
+    raw = FILE["shape + gain + ET"][str(i_r)]
+    res = np.sum((raw - raw[-1])**2, axis=-1)[9::10]
+    del raw
+    ax2.plot(time[:len(res)],
+             res,
+             linestyle=new_linestyles[i_r],
+             color=colors[i_r],
+             **lw)
+
+plt.savefig(EXP_NAME + "_4.pdf")
+print("Done!\n")
+plt.cla()
+del rules
+
+print("#####################################\n"
+      "#       Use better mass ratio       #\n"
+      "#####################################")
 masses = [6, 12]
 spacings = [24, 12]
 print("Generate new models, with better mass ratio m = ", masses)
@@ -543,76 +770,120 @@ print("Number of orbits = ", np.unique(key_orb, axis=0).shape[0])
 print("Done!\n")
 
 print("Compute Relaxation with adjusted masses")
-results_3[1] = [r.compute(dt, 1000000, atol=1e-10, rtol=1e-10)
-                for r in rules]
+key = "masses"
+if COMPUTE[key] or (key not in FILE):
+    # remove old results
+    if key in FILE:
+        del FILE[key]
+    # create new results
+    FILE.create_group(key)
+    for i_r, r in enumerate(rules):
+        r.compute(dt, max_steps, atol=1e-10, rtol=1e-10,
+                  hdf5_group=FILE[key], dataset_name=str(i_r))
+    print("Done!\n")
+    del i_r
+else:
+    print("Skipped\n")
+
+
+print("Adjust Collision Weights by Gain")
+# use nd-gains for weight adjustments
+mom_func = [r.cmp_number_density for r in rules]
+# base weight is set to gains of Interspecies Collisions
+r = rules[0]
+grp = r.group(r.key_species(r.collision_relations)[:, 1:3])
+is_rels = grp[(0, 1)]
+BASE_WEIGHT = mom_func[0](r.gain_term(is_rels))
+print("Compute new gain based weights by species")
+for i_r, r in enumerate(rules):
+    print("Rule ", i_r, ":")
+    grp = r.group(r.key_species(r.collision_relations)[:, 1:3])
+    for g, rels in grp.items():
+        # compute gain term
+        gains = mom_func[i_r](r.gain_term(rels))
+        new_weight = BASE_WEIGHT / gains
+        print(g, new_weight)
+        r.collision_weights[rels] *= new_weight
+    r.update_collisions(r.collision_relations, r.collision_weights)
 print("Done!\n")
 
+print("Compute Relaxation with mass-djusted models")
+key = "masses + gain"
+if COMPUTE[key] or (key not in FILE):
+    # remove old results
+    if key in FILE:
+        del FILE[key]
+    # create new results
+    FILE.create_group(key)
+    for i_r, r in enumerate(rules):
+        r.compute(dt, max_steps, atol=1e-10, rtol=1e-10,
+                  hdf5_group=FILE[key], dataset_name=str(i_r))
+        print("Time Steps = ", FILE[key][str(i_r)].shape[0])
+    FILE.flush()
+    print("Done!\n")
+    del i_r
+else:
+    print("Skipped\n")
 
-############################################
-#       Create third Relaxation Plot       #
-############################################
-# determine maximum time range
-n_time_steps = [res.shape[0]
-                for run in results_3
-                for res in run]
-print("Number of time steps:\n", n_time_steps)
-max_t = max(n_time_steps)
-time = (np.arange(max_t) + 1)
 
+print("############################################\n"
+      "#       Create Firth Relaxation Plot       #\n"
+      "############################################")
+print("setup figure and axes")
 # create relaxation plots
 fig, (ax1, ax2) = plt.subplots(1, 2, constrained_layout=True,
                                figsize=(12.75, 6.25), sharey=True, sharex=True)
-axes = [ax1, ax2]
 
-ax1.set_title("DVM With Increased Grid Shapes $(9,9)$ and $(13,13)$", fontsize=16)
-ax2.set_title(r"DVM With Adjusted Masses $m=[6, 12]$", fontsize=14)
+fig.suptitle(r"DVM With Adjusted Masses $m=[6, 12]$", fontsize=16)
+ax1.set_title(r"Uniform Collision Weights $\gamma = 1$", fontsize=14)
+ax2.set_title("Gain Adjusted Collision Weights $\gamma$",
+              fontsize=14)
 ax1.set_ylabel(r"$\mathcal{L}^2$-Distance to Equilibrium", fontsize=14)
 
 for ax in [ax1, ax2]:
     ax.set_xlabel("Time", fontsize=14)
     ax.set_xscale("log")
     ax.set_xlim(right=longest_relaxation_time)
-    # ax.set_ylim(bottom=0, top=0.03)
+    # add greyed out reference plots
+    for i_r in range(3):
+        raw = FILE["unedited"][str(i_r)][()]
+        res = np.sum((raw - raw[-1]) ** 2, axis=-1)
+        del raw
+        ax.plot(time[:len(res)],
+                res,
+                linestyle=linestyles[i_r],
+                color="darkgray",
+                label="_nolegend_",
+                **lw)
 
 
 # plot left figure (gain adjusted weights)
-label_left = [r"Mixture $\mathfrak{S} = \{1,2\}$"
-              + "\nwith original spacings",
-              r"Mixture, reduced $\Delta_\mathbb{R}$",
-              r"Mixture, reduced $\Delta_\mathbb{R}$,"
-              + "\nonly old ET collisions",
-              r"$\mathfrak{S}=\{1\}$, $n^1= (9, 9)$"
-              + "\nwith reduced " + r"$\Delta_\mathbb{R}$",
-              r"$\mathfrak{S}=\{2\}$, $n^2= (13, 13)$"
-              + "\nwith reduced " + r"$\Delta_\mathbb{R}$"]
-# keep linestyle for both mixtures
-new_linestyle = 2*linestyles[:1] + linestyles
-colors = ["tab:blue", "tab:red", "tab:purple", "tab:orange", "tab:green"]
-for i, res in enumerate(results_3[0]):
-    res = np.sum((res - res[-1])**2, axis=-1)
-    ax1.plot(time[:len(res)] * dt,
+label_left = [r"Mixture $\mathfrak{S} = \{1,2\}$",
+              r"$\mathfrak{S}=\{1\}$, $n^1= (7, 7)$",
+              r"$\mathfrak{S}=\{2\}$, $n^2= (11, 11)$"]
+
+for i_r in range(len(rules)):
+    raw = FILE["masses"][str(i_r)]
+    res = np.sum((raw - raw[-1])**2, axis=-1)
+    del raw
+    ax1.plot(time[:len(res)],
              res,
-             linestyle=new_linestyle[i],
-             color=colors[i],
-             label=label_left[i],
+             linestyle=linestyles[i_r],
+             label=label_left[i_r],
              **lw)
 ax1.legend(fontsize=12, loc="upper right")
 
-label_right = [r"Mixture $\mathfrak{S} = \{1,2\}$",
-              r"$\mathfrak{S}=\{1\}$, $n^1= (7, 7)$",
-              r"$\mathfrak{S}=\{2\}$, $n^2= (11, 11)$"]
 # plot right plot (all weights but ET increased)
-for i, res in enumerate(results_3[1]):
-    res = np.sum((res - res[-1])**2, axis=-1)
-    ax2.plot(time[:len(res)] * dt,
+for i_r in range(len(rules)):
+    raw = FILE["masses + gain"][str(i_r)]
+    res = np.sum((raw - raw[-1])**2, axis=-1)
+    del raw
+    ax2.plot(time[:len(res)],
              res,
-             linestyle=linestyles[i],
-             label=label_right[i],
+             linestyle=linestyles[i_r],
              **lw)
-ax2.legend(fontsize=12, loc="upper right")
 
-plt.savefig(bp.SIMULATION_DIR
-            + "/thermal_relaxation_bad_masses_3.pdf")
+plt.savefig(EXP_NAME + "_5.pdf")
 print("Done!\n")
 plt.cla()
-del results_3
+

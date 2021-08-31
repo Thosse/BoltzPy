@@ -1,4 +1,4 @@
-
+import h5py
 import numpy as np
 import boltzpy as bp
 
@@ -527,41 +527,52 @@ class HomogeneousRule(BaseRule, bp.CollisionModel):
         gains = collision_matrix.dot(gain_term + loss_term)
         return gains
 
-    def compute(self, dt, maxiter, animate=False, animate_filename=None,
-                atol=1e-12, rtol=1e-12):
+    def compute(self, dt, maxiter, hdf5_group=None,
+                dataset_name="result", atol=1e-12, rtol=1e-12):
         self.check_integrity()
-        state = self.initial_state
+        # set up default hdf5 group, if none is given
+        if hdf5_group is None:
+            hdf5_group = h5py.File(bp.SIMULATION_DIR + "/tmp_data.hdf5", mode="w")
+        assert dataset_name not in hdf5_group.keys()
+        # create data set of variable length, increases in 10000 steps
+        result = hdf5_group.create_dataset(
+            dataset_name,
+            (10000, self.nvels),
+            maxshape=(maxiter, self.nvels))
         # store state at each timestep here
-        result = np.zeros((maxiter,) + state.shape)
-        result[0] = state
+        new_state = self.initial_state
+        result[0] = new_state
+
         # store the interim results of the runge-kutta scheme here
         # usually named k1,k2,k3,k4, only one is needed at the time
-        rks_component = np.zeros(state.shape, float)
+        rks_component = np.zeros(new_state.shape, float)
         # time offsets of the rks
         rks_offsets = np.array([0, 0.5, 0.5, 1])
         # weights of each interim result / rks_component
         rks_weights = np.array([1 / 6, 2 / 6, 2 / 6, 1 / 6])
         # execute simulation
         for i in range(1, maxiter):
-            state = result[i-1]
-            result[i] = state
+            if i >= result.shape[0]:
+                result.resize((result.shape[0] + 10000, self.nvels))
+            old_state = new_state
+            new_state = np.copy(old_state)
             # Runge Kutta steps
             for (rks_offset, rks_weight) in zip(rks_offsets, rks_weights):
-                interim_state = state + rks_offset * rks_component
+                interim_state = old_state + rks_offset * rks_component
                 coll = self.collision_operator(interim_state)
                 # execute runge kutta substep
-                result[i] = result[i] + rks_weight * dt * (coll + self.source_term)
+                new_state = new_state + rks_weight * dt * (coll + self.source_term)
+            result[i] = new_state
             # break loop when reaching equilibrium
             if np.allclose(result[i] - result[i-1], 0, atol=atol, rtol=rtol):
-                if animate:
-                    self.plot_state(result[:i+1:100], animate_filename)
-                return result[:i+1]
+                result.resize((i, self.nvels))
+                result.flush()
+                return result
             # check for instabilities or divergence
-            assert np.all(result[i] >= 0), ("Instability detected at t={}. "
-                                            "Reduce time step size or increase collision_factors, "
-                                            "to compensate the source term!".format(i))
-        if animate:
-            self.plot(result[::1000], animate_filename)
+            assert np.all(result[i] >= 0), (
+                "Instability detected at t={}. "
+                "Reduce time step size or increase collision_factors, "
+                "to compensate the source term!".format(i))
         raise ValueError("No equilibrium established")
 
     def check_integrity(self):
