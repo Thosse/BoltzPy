@@ -58,25 +58,29 @@ KEY_FUNCTIONS = ["key_species",
 #########################################
 # Random Test parameters for collision generation
 N_SAMPLES = 20
-MAX_MASS = 100
+MAX_MASS = 20
 MAX_SHAPE = {2: 13, 3: 7}
 
 
 @pytest.fixture(scope="module", params=range(N_SAMPLES))
 def rand_model():
-    nspc = np.random.randint(1, 3)
-    ndim = 2 #np.random.randint(2, 4)
+    nspc = 2
+    ndim = np.random.randint(2, 4)
     masses = np.random.randint(1, MAX_MASS, size=nspc)
-    spacings = 2 * np.random.randint(1, 13, size=nspc)
+    if bool(np.random.randint(0, 2)):
+        spacings = 2 * np.random.randint(1, 13, size=nspc)
+    else:
+        spacings = None
     shapes = np.random.randint(3, MAX_SHAPE[ndim], size=(nspc, ndim))
-    use_cubic_grids = True #bool(np.random.randint(0, 2))
+    use_cubic_grids = bool(np.random.randint(0, 2))
     if use_cubic_grids:
         shapes[...] = shapes[:, 0, None]
-
     model = bp.CollisionModel(masses, shapes,
                               spacings=spacings,
                               setup_collision_matrix=False)
-    return model
+    yield model
+    del model
+    return
 
 
 #############################
@@ -99,6 +103,38 @@ def test_collision_generation_algorithms(rand_model):
     for key in [key for key in group_by if key != "None"]:
         assert np.all(results[key].shape == results["None"].shape), "Algorithm = " + key
         assert np.all(results[key] == results["None"]), "Algorithm = " + key
+
+
+@pytest.mark.parametrize("key_name", ["shape", "angle",
+                                      "center_of_gravity",
+                                      "area", "energy_transfer"])
+def test_orbits_have_single_keys(rand_model, key_name):
+    # key_orbit only works for cubic grids!
+    if not rand_model.is_cubic_grid:
+        return
+
+    # croup collisions by orbit
+    cols = rand_model.collision_relations
+    grp = rand_model.group(rand_model.key_orbit(cols),
+                           cols,
+                           as_dict=True)
+    # determine key function
+    key_func = getattr(rand_model, "key_" + key_name)
+    assert callable(key_func)
+
+    # each orbit should have only a single unique key
+    for orb in grp.values():
+        unique_keys = np.unique(key_func(orb), axis=0)
+        if not (unique_keys.shape[0] == 1):
+            print("Error detected at ", key_name)
+            print(unique_keys)
+            print(rand_model.masses, rand_model.shapes, rand_model.spacings)
+            rand_model.plot_collisions(orb)
+            for i, o in enumerate(orb):
+                print(o, key_func(orb)[i])
+                rand_model.plot_collisions(o[None, ...])
+            rand_model.plot_collisions(orb)
+            assert False
 
 
 @pytest.mark.parametrize("key", MODELS.keys())
