@@ -172,10 +172,8 @@ class CollisionModel(bp.BaseModel):
         return keys
 
     def key_center_of_gravity(self, relations, use_norm=False):
-        """"Determines an unique id for the collisons orbit.
-        The id consists of 2 parts:
-            - sorted indices of reflected and permuted velocities, 4 integers
-            - shape, 2 integers
+        """"Computes the center of gravity, except for the division by the masses.
+        For a key function and fix masses it is equivalent to the center of gravity.
         """
         # get colvels for center of gravity
         colvels = self.i_vels[relations[:, ::2]]
@@ -197,6 +195,9 @@ class CollisionModel(bp.BaseModel):
             2. get indices of the colliding velocities, specieswise
             3. sort orbit relations, for permutation invariance
         """
+        # currently, this algorithm only works in square/cubic grids
+        assert self.is_cubic_grid
+
         # 1. compute the orbits of all collisions as colliding velocities
         # get colliding velocities from indices
         colvels = self.i_vels[relations]
@@ -253,24 +254,67 @@ class CollisionModel(bp.BaseModel):
         return result
 
     def key_angle(self, relations):
-        (v0, v1, w0, w1) = self.i_vels[relations.transpose()]
-        dv = v1 - v0
-        # compute gcd of each velocity difference
-        gcd = np.gcd.reduce(dv, axis=-1)
+        # 3D models require two angles: length and height
+        # in 2D model the height is inherently determined, by the orthogonality
+        angles = np.empty((relations.shape[0], self.ndim - 1, self.ndim),
+                          dtype=int)
+        # determine the length of the trapezoid
+        colvels = self.i_vels[relations]
+        angles[:, 0, :] = colvels[:, 1] - colvels[:, 0]     # length
+
+        # 3D models additionally require the height vector
+        if self.ndim ==3:
+            # compute height vector by adding vector segments
+            height_weights = np.array([-0.5, -0.5, 0.5, 0.5])[None, :, None]
+            angles[:, 1, :] = np.sum(height_weights * colvels, axis=1)  # height
+
+        # compute gcd of length and height
+        gcd = np.gcd.reduce(angles, axis=-1)
+        # gcd can be zero, in this case divide by 1
+        gcd[gcd == 0] = 1
         # normalize with gcd to get the direction
-        gcd = gcd[..., np.newaxis]
-        angles = dv // gcd
-        # sort each directions, to merge symmetries
+        angles = angles // gcd[..., np.newaxis]
+
+        # sort entries of length and height, to merge symmetries
         angles = np.sort(np.abs(angles), axis=-1)
+
+        # lexicographically sort length and height for intraspecies collisions
+        # structured arrays of views are dangerous,
+        # thus we copy all intraspecies collisions and sort only them
+        key_spc = self.key_species(relations)[:, 1:3]
+        is_intra = key_spc[:, 0] == key_spc[:, 1]
+        inter_angles = angles[is_intra]
+        del key_spc
+
+        # create a view as a structured array, to use argsort
+        # lexsort does not really work in 3d
+        # Note: directly taking the view of angles[is_intra] does NOT work!
+        struc_array = inter_angles.view("i8, i8, i8")
+        struc_array.sort(order=("f0", "f1", "f2"), axis=1)
+        angles[is_intra] = inter_angles
+
+        # concatenate sorted length and height
+        angles.resize((relations.shape[0], np.prod(angles.shape[1:])))
         return angles
 
     def key_energy_transfer(self, relations, as_bool=True):
         assert relations.ndim == 2
-        (v0, v1) = self.i_vels[relations[:, :2].transpose()]
-        energy_transfer = np.abs(np.sum(v0**2 - v1**2, axis=-1))
+        # find interspecies collisions
+        key_spc = self.key_species(relations)[:, 1:3]
+        is_inter_col = key_spc[:, 0] != key_spc[:, 1]
+        inter_rels = relations[is_inter_col]
+        # define energy transfer as zero for intraspecies collisions
+        energy_transfer = np.zeros(relations.shape[0], dtype=float)
+        # compute transfer for interspecies collisions
+        (v0, v1) = self.i_vels[inter_rels[:, :2].transpose()]
+        energy_transfer[is_inter_col] = np.abs(np.sum(v0**2 - v1**2, axis=-1))
         if as_bool:
             return energy_transfer > 0
         else:
+            energy_transfer[is_inter_col] = (
+                self.masses[key_spc[is_inter_col, 0]]
+                * np.sqrt(energy_transfer[is_inter_col])
+            )
             return energy_transfer
 
     @staticmethod
@@ -758,9 +802,7 @@ class CollisionModel(bp.BaseModel):
                       temperature,
                       dt,
                       maxiter=100000,
-                      directions=None,
-                      animate=False,
-                      animate_filename=None):
+                      directions=None):
         # Maxwellian must be centered in 0,
         # since this computation relies heavily on symmetry,
         mean_velocities = np.zeros((self.nspc, self.ndim))
@@ -792,9 +834,7 @@ class CollisionModel(bp.BaseModel):
         # compute viscosity
         assert dt > 0 and maxiter > 0
         result = rule.compute(dt,
-                              maxiter=maxiter,
-                              animate=animate,
-                              animate_filename=animate_filename)
+                              maxiter=maxiter)
         # compute viscosity as scalar product
         viscosity = np.sum(result[-1] * mom_func)
         normalize = np.sum(mom_func**2 * rule.initial_state)
@@ -805,9 +845,7 @@ class CollisionModel(bp.BaseModel):
                           temperature,
                           dt,
                           maxiter=100000,
-                          direction=None,
-                          animate=False,
-                          animate_filename=None):
+                          direction=None):
         # Maxwellian must be centered in 0,
         # since this computation relies heavily on symmetry,
         mean_velocities = np.zeros((self.nspc, self.ndim))
@@ -842,9 +880,7 @@ class CollisionModel(bp.BaseModel):
         # compute viscosity
         assert dt > 0 and maxiter > 0
         result = rule.compute(dt,
-                              maxiter=maxiter,
-                              animate=animate,
-                              animate_filename=animate_filename)
+                              maxiter=maxiter)
         # compute viscosity as scalar product
         heat_transfer = np.sum(result[-1] * mom_func)
         normalize = np.sum(mom_func**2 * rule.initial_state)
