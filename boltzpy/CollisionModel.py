@@ -279,19 +279,19 @@ class CollisionModel(bp.BaseModel):
         angles = np.sort(np.abs(angles), axis=-1)
 
         # lexicographically sort length and height for intraspecies collisions
-        # structured arrays of views are dangerous,
-        # thus we copy all intraspecies collisions and sort only them
-        key_spc = self.key_species(relations)[:, 1:3]
-        is_intra = key_spc[:, 0] == key_spc[:, 1]
-        inter_angles = angles[is_intra]
-        del key_spc
-
-        # create a view as a structured array, to use argsort
-        # lexsort does not really work in 3d
-        # Note: directly taking the view of angles[is_intra] does NOT work!
-        struc_array = inter_angles.view("i8, i8, i8")
-        struc_array.sort(order=("f0", "f1", "f2"), axis=1)
-        angles[is_intra] = inter_angles
+        if self.ndim == 3:
+            # structured arrays of views are dangerous,
+            # thus we copy all intraspecies collisions and sort only them
+            key_spc = self.key_species(relations)[:, 1:3]
+            is_intra = key_spc[:, 0] == key_spc[:, 1]
+            inter_angles = angles[is_intra]     # Do not remove!
+            del key_spc
+            # create a view as a structured array, to use argsort
+            # lexsort does not really work in 3d
+            # Note: directly taking the view of angles[is_intra] does NOT work!
+            struc_array = inter_angles.view("i8, i8, i8")
+            struc_array.sort(order=("f0", "f1", "f2"), axis=1)
+            angles[is_intra] = inter_angles
 
         # concatenate sorted length and height
         angles.resize((relations.shape[0], np.prod(angles.shape[1:])))
