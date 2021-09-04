@@ -151,24 +151,29 @@ class CollisionModel(bp.BaseModel):
 
     def key_shape(self, relations):
         """"Returns the sorted tuple of width and height of each collision as key.
-        In fact, the squares of width an height are used, as the root is slow."""
+        Keep squares of width an height, as the root is slow."""
         colvels = self.i_vels[relations]
-        keys = np.empty((relations.shape[0], 4), dtype=int)
+        keys = np.empty((relations.shape[0], 2), dtype=int)
         # get width, as squared norm of v_i - v_j or v_k - v_l
-        # only use the longer one, for permutation invariance
-        keys[:, 2] = np.sum((colvels[:, 1] - colvels[:, 0]) ** 2, axis=1)
-        keys[:, 3] = np.sum((colvels[:, 3] - colvels[:, 2]) ** 2, axis=1)
-        # after sorting, keys[:, 3] describes the widths
-        keys[:, 2:].sort(axis=1)
+        # only use the smaller one, for permutation invariance
+        keys[:, 0] = np.sum((colvels[:, 1] - colvels[:, 0]) ** 2, axis=1)
+        keys[:, 1] = np.sum((colvels[:, 3] - colvels[:, 2]) ** 2, axis=1)
+        # after sorting, keys[:, 0] describes the collisions length
+        keys.sort(axis=1)
         # compute height vector by adding vector segments
         height_weights = np.array([-0.5, -0.5, 0.5, 0.5])[None, :, None]
         height_vec = np.sum(height_weights * colvels, axis=1)
-        # store the computed height in width[:, 2] (overwrites unused smaller width)
-        keys[:, 2] = np.sum(height_vec ** 2, axis=-1)
-        # sort width in place to get sorted(width, height)
-        keys[:, 2:].sort(axis=-1)
-        # add species to key, this is necessary, if equal mass ratios occur
-        keys[:, :2] = self.get_spc(relations[:, 1:3])
+        # store the computed height in width[:, 2] (overwrites unused larger length)
+        keys[:, 1] = np.sum(height_vec ** 2, axis=-1)
+
+        # get intraspecies collisions
+        key_spc = self.key_species(relations)[:, 1:3]
+        is_intra = key_spc[:, 0] == key_spc[:, 1]
+        del key_spc
+        intra_keys = keys[is_intra]  # Do not remove!
+        # sort length and height only for intraspecies collisions
+        intra_keys.sort(axis=1)
+        keys[is_intra] = intra_keys
         return keys
 
     def key_center_of_gravity(self, relations, use_norm=False):
