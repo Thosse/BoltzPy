@@ -3,9 +3,7 @@ import numpy as np
 import matplotlib
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 matplotlib.rcParams['text.usetex'] = True
-matplotlib.rcParams['text.latex.preamble'] = [
-    r'\usepackage{amsmath}',
-    r'\usepackage{amssymb}']
+matplotlib.rcParams['text.latex.preamble'] = r'\usepackage{amsmath, amssymb}'
 import matplotlib.pyplot as plt
 from plot_grid_error import maxwellian
 
@@ -20,7 +18,7 @@ MASS = 1
 NUMBER_DENSITY = 1.0
 # setup velocity models
 MAX_VEL = 6
-MAX_T = 7
+MAX_T = 8
 MODEL = bp.BaseModel([MASS],
                      [(31, 31)],
                      1,
@@ -33,9 +31,12 @@ DIRECTIONS = ORIGINAL_DIRECTIONS / np.max(ORIGINAL_DIRECTIONS, axis=-1)[:, None]
 
 STYLE = ["-", "--", ":", "-.", ":"]
 if __name__ == "__main__":
-    fig, ax = plt.subplots(1, 2, constrained_layout=True,
-                           figsize=(12.75, 6.25))
-
+    fig, ax = plt.subplots(1, 2,
+                           figsize=(12.75, 6.25),
+                           gridspec_kw={'width_ratios': [1, 0.9]})
+    # fig.suptitle(r"Discretization error for all $v \in D\left(\mathfrak{V}^s\right)$"
+    #              r"and $\vartheta = 1$",
+    #              fontsize=14)
     ##############################################################
     # LEFT PLOT: Heatmap of DISCRETIZATION ERROR for each v (2D) #
     ##############################################################
@@ -70,14 +71,16 @@ if __name__ == "__main__":
     # plt.colorbar(hm, ax=ax[0], orientation='vertical')
 
     # plot grid points
-    choice = np.where(np.all((MODEL.vels <= MAX_VEL) & (MODEL.vels >= 0),
-                             axis=-1))
-    points = MODEL.vels[choice]
-    ax[0].scatter(points[:, 0], points[:, 1], c="tab:orange", marker="x", s=100)
-    ax[0].set_title(r"Discretization error for all $\mathfrak{v} \in \mathfrak{V}^s$ and arbitrary T")
+    # choice = np.where(np.all((MODEL.vels <= MAX_VEL) & (MODEL.vels >= 0),
+    #                          axis=-1))
+    # points = MODEL.vels[choice]
+    # ax[0].scatter(points[:, 0], points[:, 1], c="tab:orange", marker="x", s=100)
+    ax[0].set_title(r"Discretization error for all $v \in D\left(\mathfrak{V}^s\right)$"
+                    r" and $\vartheta = 1$",
+                    fontsize=14)
 
-    ax[0].set_xlabel(r"Mean velocity $\overline{v}_x$", fontsize=18)
-    ax[0].set_ylabel(r"Mean velocity $\overline{v}_y$", fontsize=18)
+    ax[0].set_xlabel(r"Mean Velocity Parameter $\widetilde{v}_x$", fontsize=12)
+    ax[0].set_ylabel(r"Mean Velocity Parameter $\widetilde{v}_y$", fontsize=12)
 
 
     # ##############################################################
@@ -121,7 +124,7 @@ if __name__ == "__main__":
     VELS = np.array([[0, 0], [1, 1]])
     # use quadratic scale for smaller temperatures
     TEMPERATURES = np.concatenate(([T**2 for T in np.linspace(0, 1, N)[1:]],
-                                   np.linspace(1, 7, N)[1:]))
+                                   np.linspace(1, MAX_T, N)[1:]))
 
     # add first axis in case I want to add more Velocities or Specimen
     res3 = np.full((len(VELS), len(TEMPERATURES)), np.nan)
@@ -151,12 +154,12 @@ if __name__ == "__main__":
     ax[1].xaxis.grid(color='darkgray', linestyle='dashed', which="both",
                      linewidth=0.4)
     ax[1].set_yscale("log")
-    ax[1].set_xlabel(r" Temperature $T$", fontsize=18)
+    ax[1].set_xlabel(r" Temperature Parameter $\vartheta$", fontsize=12)
     ax[1].set_ylabel(
-        r"$\left\lvert\mathcal{E}_{\mathfrak{V}^s_\infty}(\overline{v}, T) \right\rvert$",
-        fontsize=20)
+        r"$\left\lvert\mathcal{E}_{\mathfrak{V}^s_\infty}(\widetilde{v}, \vartheta) \right\rvert$",
+        fontsize=12)
 
-    ax[1].legend(title="Mean velocity $\overline{v}$", loc="lower left")
-    ax[1].set_title("Amplitude of discretization error")
+    ax[1].legend(title="Parameter $\widetilde{v}$", loc="lower left", fontsize=12)
+    ax[1].set_title("Amplitude of the discretization error", fontsize=14)
     fig.tight_layout()
-    plt.show()
+    plt.savefig(bp.SIMULATION_DIR + "/discr_error.pdf")
