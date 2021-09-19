@@ -306,41 +306,143 @@ class BaseModel(bp.BaseClass):
         result = np.sum(spc_matrix * parameter, axis=-1)
         return result.reshape(shape)
 
-    def temperature_range(self, mean_velocity=0.0, s=None):
+    def temperature_range(self,
+                          mean_velocity=0.0,
+                          s=None,
+                          atol=None,
+                          metric="temperature",
+                          intervals=100,
+                          return_error=False):
+        """Determine a range of temperatures for which a good initial state can be generated.
+        Parameters
+        ----------
+        mean_velocity : :obj:`~numpy.array` [:obj:`float`]
+            Mean velocity parameter of the maxwellians
+        s :  :obj:`~numpy.array` [:obj:`int`], optional
+            If None is given, a shared range for all specimen is given.
+        atol : :obj:`float`, optional
+            Absolute tolerance for the given error metric.
+            If None is given, then the heuristic results are returned.
+        intervals : :obj:`int`
+            Determines the number of test points for which the error metric is computed.
+        return_error : :obj:`bool`
+            Return the error metric array, instead of the temperature range.
+            This is for Debugging.
+
+
+        Returns
+        -------
+        t_range : :obj:`~numpy.array` [:obj:`float`]
+            The estimated minimum and maximum temperatures,
+            for which the newton scheme finds a common solution
+            for the mixture.
+        """
+        # compute a rough estimate with the heuristic
+        heuristic_range = self._temperature_range_mixture_heuristic(mean_velocity, s)
+        if atol is None:
+            return heuristic_range
+        else:
+            assert isinstance(atol, float)
+            assert atol > 0
+            assert isinstance(metric, str)
+
+        # by default: check all species
+        species = self.species if s is None else [s]
+        # test metric error for a set of points
+        test_points = np.linspace(*heuristic_range, intervals)
+        # use ones, in case any cell is not written it is counted as a large error
+        error = np.ones((len(species), intervals))
+        # store temperature ranges for each species in here
+        t_ranges = np.zeros((len(species), 2))
+        for i_s, s in enumerate(species):
+            # compute the error for each temperature
+            for i_t, t in enumerate(test_points):
+                # compute discrete maxwellian
+                maxwellian = self.maxwellian(self.vels[self.idx_range(s)],
+                                             temperature=t,
+                                             mass=self.masses[s],
+                                             mean_velocity=mean_velocity)
+                # enforce number density = 1
+                number_dens = self.cmp_number_density(maxwellian, s)
+                maxwellian /= number_dens
+                # compute error, depending on metric
+                if metric == "temperature":
+                    error[i_s, i_t] = t - self.cmp_temperature(maxwellian, s)
+                elif metric == "mean_velocity":
+                    vec_error = mean_velocity - self.cmp_mean_velocity(maxwellian, s)
+                    error[i_s, i_t] = np.linalg.norm(vec_error)
+                else:
+                    raise NotImplementedError
+
+        if return_error:
+            return error
+        # else: compute the temperature ranges of each species
+        for i_s, s in enumerate(species):
+            # find max temperature as last value, with error below atol
+            hits, = np.where(np.abs(error[i_s]) < atol)
+            if len(hits) == 0:
+                raise ValueError("No Acceptable temperature found for species %1d" % s)
+            i_max = hits[-1]
+            # find min temperature right after the last False, before i_max
+            hits, = np.where(np.abs(error[i_s, :i_max]) >= atol)
+            i_min = hits[-1] + 1 if len(hits) > 0 else 0
+            # get temperatures from test_points array
+            t_ranges[i_s] = test_points[np.array([i_min, i_max])]
+
+        # determine temperature range as maxmin and minmax of t_ranges
+        t_range = np.array([np.max(t_ranges[:, 0]),
+                            np.min(t_ranges[:, 1])])
+        return t_range
+
+    def _temperature_range_mixture_heuristic(self, mean_velocity=0.0, s=None):
         """Estimate a range of temperatures that can be initialized on this model.
         Parameters
         ----------
         mean_velocity : :obj:`~numpy.array` [:obj:`float`]
-
-        s : :obj:`int`, optional
+            Mean velocity parameter of the maxwellians
+        s :  :obj:`~numpy.array` [:obj:`int`], optional
             If None is given, a shared range for all specimen is given.
 
         Returns
         -------
         t_range : :obj:`~numpy.array` [:obj:`float`]
-            The estimated minimum and maximum temperatures, that fit into this model.
+            The estimated minimum and maximum temperatures,
+            for which the newton scheme finds a common solution
+            for the mixture.
         """
         mean_velocity = np.full((self.nspc, self.ndim), mean_velocity)
-        s = self.species if s is None else s
+        if s is None:
+            s = self.species
+        elif type(s) in  [list, np.ndarray]:
+            pass
+        else:
+            s = [s]
 
         # compute a shared range for possible temperatures for all specimen
-        if isinstance(s, np.ndarray):
-            # ignore duplicates in s
-            list_s = list(s)
-            if len(list_s) < self.nspc:
-                raise NotImplementedError(
-                    "This is not supported, "
-                    "the mean_velocities are ambiguous with a subset of species.")
-            assert list_s <= list(self.species)
-            # compute temperature ranges for each specimen, store in spc_temp_range
-            spc_temp_range = np.zeros((len(list_s), 2))
-            for i, spc in enumerate(list_s):
-                spc_temp_range[i] = self.temperature_range(mean_velocity, s=spc)
-            # return max(min) and min(max), thus each specimen can be initialized
-            return np.array([np.max(spc_temp_range[:, 0]),
-                             np.min(spc_temp_range[:, 1])])
+        assert np.all(0 <= spc < self.nspc for spc in s)
+        # compute temperature ranges for each specimen, store in spc_temp_range
+        spc_temp_range = [self._temperature_range_single_species_heuristic(mean_velocity, s=spc)
+                          for spc in s]
+        spc_temp_range = np.array(spc_temp_range)
+        # take max(min) and min(max), thus each specimen can be initialized
+        temp_range = np.array([np.max(spc_temp_range[:, 0]),
+                               np.min(spc_temp_range[:, 1])])
+        return temp_range
 
-        # compute temperature range for a single species
+    def _temperature_range_single_species_heuristic(self, mean_velocity, s):
+        """Estimate a range of temperatures that can be initialized on this model.
+        Parameters
+        ----------
+        mean_velocity : :obj:`~numpy.array` [:obj:`float`]
+
+        s :  :obj:`int`
+
+        Returns
+        -------
+        t_range : :obj:`~numpy.array` [:obj:`float`]
+            The estimated minimum and maximum temperatures,
+            for which the newton scheme finds a  solution.
+        """
         assert s in list(self.species)
         assert np.all(self.shapes[s] > 1)
         # compute directly, if mean_velocity is 0
@@ -380,7 +482,9 @@ class BaseModel(bp.BaseClass):
                                      [shape],
                                      self.base_delta,
                                      [self.spacings[s]])
-                interpolation += weight * model.temperature_range(s=s)
+                # model.species = [0], by construction
+                centered_range = model._temperature_range_single_species_heuristic(0, s=0)
+                interpolation += weight * centered_range
             return interpolation
 
     #####################################
