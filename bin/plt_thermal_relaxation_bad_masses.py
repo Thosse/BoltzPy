@@ -8,6 +8,7 @@ matplotlib.rcParams['text.usetex'] = True
 matplotlib.rcParams['text.latex.preamble'] = r'\usepackage{amsmath, amssymb}'
 import matplotlib.pyplot as plt
 import h5py
+import copy
 
 ###########################
 #   Control Parameters    #
@@ -22,7 +23,7 @@ COMPUTE = {"unedited": False,
            "gain": False,
            "gain + ET": False,
            "shape": False,
-           "shape + gain + ET": True,
+           "shape + gain + ET": False,
            "masses": False,
            "masses + gain": False
            }
@@ -96,9 +97,9 @@ plt.savefig(EXP_NAME + "_grids.pdf")
 plt.cla()
 print("Done!\n")
 
-print("######################################################\n",
-      "#       Compute Relaxation with uniform weights      #\n",
-      "######################################################")
+print("###############################################\n",
+      "#       Generate and Plot Initial States      #\n",
+      "###############################################")
 v0 = np.array([0, 0], dtype=float)
 v1 = np.array([0, 0], dtype=float)
 T0 = 30
@@ -119,6 +120,9 @@ rules = [bp.HomogeneousRule([1, 1],
                             **models[2].__dict__),
          ]
 del models
+# these rules are used in the sixth plot for comparisons
+rules_plot_6 = dict()
+rules_plot_6["unedited/0"] = copy.copy(rules[0])
 
 # set superposition of maxwellians for monospecies cases
 # Note: this gives a very rough comparison, results should NOT match precisely
@@ -126,7 +130,11 @@ for i in [1, 2]:
     rules[i].initial_state += rules[i].cmp_initial_state([1], np.array([v1]), [T1])
 del i
 
-print("Compute Relaxation with uniform weights")
+
+
+print("######################################################\n",
+      "#       Compute Relaxation with uniform weights      #\n",
+      "######################################################")
 key = "unedited"
 if COMPUTE[key] or (key not in FILE):
     # remove old results
@@ -138,6 +146,7 @@ if COMPUTE[key] or (key not in FILE):
         r.compute(dt, max_steps, atol=1e-10, rtol=1e-10,
                   hdf5_group=FILE[key], dataset_name=str(i_r))
         print("Time Steps = ", FILE[key][str(i_r)].shape[0])
+
     FILE.flush()
     print("Done!\n")
     del i_r
@@ -161,7 +170,7 @@ fig, ax1 = plt.subplots(1, 1, constrained_layout=True,
                         figsize=(6.375, 6.25))
 
 fig.suptitle("Relaxation of Perturbed Temperatures for a Mixture",
-             fontsize=14)
+             fontsize=16)
 ax1.set_ylabel(r"$\mathcal{L}^2$-Distance to Equilibrium", fontsize=14)
 ax1.set_xlabel("Time", fontsize=14)
 ax1.set_xscale("log")
@@ -388,6 +397,7 @@ grp = r.group((r.key_species(r.collision_relations)[:, 1:3],
 et_rels = grp[(0, 1, 1)]
 r.collision_weights[et_rels] *= 10
 r.update_collisions(r.collision_relations, r.collision_weights)
+rules_plot_6["gain + ET/0"] = copy.copy(r)
 print("Done!\n")
 
 
@@ -613,6 +623,8 @@ for i_r, r in enumerate(rules):
             et_rels = grp[(0, 1, 1)]
             r.collision_weights[et_rels] *= 10
     r.update_collisions(r.collision_relations, r.collision_weights)
+
+rules_plot_6["shape + gain + ET/1"] = rules[1]
 print("Done!\n")
 
 print("Compute Relaxation with larger, adjusted models")
@@ -805,6 +817,8 @@ for i_r, r in enumerate(rules):
         print(g, new_weight)
         r.collision_weights[rels] *= new_weight
     r.update_collisions(r.collision_relations, r.collision_weights)
+
+rules_plot_6["masses + gain/0"] = rules[0]
 print("Done!\n")
 
 print("Compute Relaxation with mass-djusted models")
@@ -886,4 +900,65 @@ for i_r in range(len(rules)):
 plt.savefig(EXP_NAME + "_5.pdf")
 print("Done!\n")
 plt.cla()
+
+
+print("############################################\n"
+      "#       Create Sixth Relaxation Plot       #\n"
+      "############################################")
+print("NOTE: All plots so far (in the dissertation) are based on centered states."
+      "For this plot (and the corresponding appendix) we require non centered states."
+      "Thus the respective parameters (at first definition of rules) must be changed!")
+print("setup figure and axes")
+# create relaxation plots
+fig, (ax1, ax2) = plt.subplots(1, 2, constrained_layout=True,
+                               figsize=(12.75, 6.25), sharex=True)
+
+fig.suptitle(r"Comparing Momentum and Energy Transfer for Different DVM", fontsize=16)
+ax1.set_title(r"Specific Momenta $M^s_x$ During Relaxation", fontsize=14)
+ax2.set_title("Specific Energies $E^s$ During Relaxation",
+              fontsize=14)
+
+for ax in [ax1, ax2]:
+    ax.set_xlabel("Time", fontsize=14)
+    ax.set_xscale("log")
+    ax.set_xlim(right=longest_relaxation_time)
+
+labels = {"unedited/0": "Original DVM, uniform $\gamma$",
+          "gain + ET/0": r"Gain Adjusted $\gamma$, increased $\gamma_E$",
+          "shape + gain + ET/1": "Larger Grids, Gain Adjusted $\gamma$,\n"
+                                 r"reduced $\Delta_\mathbb{R}$ and increased $\gamma_E$",
+          "masses + gain/0": "Adjusted Masses,\n"
+                             r"Gain Adjusted  $\gamma$"}
+colors = {"unedited/0": "tab:blue",
+          "gain + ET/0": "gold",
+          "shape + gain + ET/1": "tab:red",
+          "masses + gain/0": "tab:green"}
+
+assert set(rules_plot_6.keys()) == set(labels.keys())
+
+for key, r in rules_plot_6.items():
+    # compute momentum and energy for each species, from stored results
+    data = FILE[key]
+
+    for s in r.species:
+        momentum = r.cmp_momentum(data, s=s)[:, 0]
+        if s == 0:
+            label = labels[key]
+        else:
+            label = "_nolegend_"
+        ax1.plot(time[:data.shape[0]],
+                 momentum,
+                 c=colors[key],
+                 label=label,
+                 **lw)
+
+    for s in r.species:
+        energy = r.cmp_energy_density(data, s=s)
+        ax2.plot(time[:data.shape[0]],
+                 energy,
+                 c=colors[key],
+                 label="_nolegend",
+                 **lw)
+ax1.legend(loc="upper right")
+plt.savefig(EXP_NAME + "_6.pdf")
 
