@@ -6,6 +6,7 @@ matplotlib.rcParams['text.usetex'] = True
 matplotlib.rcParams['text.latex.preamble'] = r'\usepackage{amsmath, amssymb}'
 import matplotlib.pyplot as plt
 from plot_grid_error import maxwellian
+from fonts import fs_title, fs_legend, fs_label, fs_suptitle, fs_ticks, fs_legend_title
 
 """
 Create plots for the discretization error 
@@ -25,7 +26,7 @@ MODEL = bp.BaseModel([MASS],
                      [2])
 
 # number of discretization points
-N = 6 * 31 + 1
+N = 6 * 61 + 1
 ORIGINAL_DIRECTIONS = np.array([[1, 0], [3, 1], [6, 1]])
 DIRECTIONS = ORIGINAL_DIRECTIONS / np.max(ORIGINAL_DIRECTIONS, axis=-1)[:, None]
 
@@ -56,9 +57,10 @@ if __name__ == "__main__":
                            MASS)
         # correct value is 1
         res1[v] = T - MODEL.cmp_temperature(distr)
+    print("Computation finished!")
     print("Error range: ", res1.min(), res1.max())
 
-    # plot error heatmap
+    print("plotting error heatmap...")
     res1 = res1.reshape((N,N))
     hm = ax[0].imshow(res1, cmap=plt.cm.RdBu, interpolation='spline16',
                       extent=(0, MAX_VEL, 0, MAX_VEL)
@@ -77,10 +79,10 @@ if __name__ == "__main__":
     # ax[0].scatter(points[:, 0], points[:, 1], c="tab:orange", marker="x", s=100)
     ax[0].set_title(r"Discretization error for all $v \in D\left(\mathfrak{V}^s\right)$"
                     r" and $\vartheta = 1$",
-                    fontsize=14)
-
-    ax[0].set_xlabel(r"Mean Velocity Parameter $\widetilde{v}_x$", fontsize=12)
-    ax[0].set_ylabel(r"Mean Velocity Parameter $\widetilde{v}_y$", fontsize=12)
+                    fontsize=fs_title)
+    ax[0].tick_params(axis="both", labelsize=fs_ticks)
+    ax[0].set_xlabel(r"Mean Velocity Parameter $\widetilde{v}_x$", fontsize=fs_label)
+    ax[0].set_ylabel(r"Mean Velocity Parameter $\widetilde{v}_y$", fontsize=fs_label)
 
 
     # ##############################################################
@@ -121,6 +123,8 @@ if __name__ == "__main__":
     ##############################################################
     # RIGHT PLOT: Discretization Error Amplitude vs. Temperature #
     ##############################################################
+    print("plotting error amplitude...")
+    N = 100    # too large N leads to division by 0 error
     VELS = np.array([[0, 0], [1, 1]])
     # use quadratic scale for smaller temperatures
     TEMPERATURES = np.concatenate(([T**2 for T in np.linspace(0, 1, N)[1:]],
@@ -154,12 +158,18 @@ if __name__ == "__main__":
     ax[1].xaxis.grid(color='darkgray', linestyle='dashed', which="both",
                      linewidth=0.4)
     ax[1].set_yscale("log")
-    ax[1].set_xlabel(r" Temperature Parameter $\vartheta$", fontsize=12)
+    ax[1].set_xlabel(r" Temperature Parameter $\vartheta$",
+                     fontsize=fs_label)
     ax[1].set_ylabel(
         r"$\left\lvert\mathcal{E}_{\mathfrak{V}^s_\infty}(\widetilde{v}, \vartheta) \right\rvert$",
-        fontsize=12)
+        fontsize=fs_label)
 
-    ax[1].legend(title="Parameter $\widetilde{v}$", loc="lower left", fontsize=12)
-    ax[1].set_title("Amplitude of the discretization error", fontsize=14)
-    fig.tight_layout()
+    ax[1].legend(title=r"Parameter $\widetilde{v}$",
+                 loc="lower left",
+                 fontsize=fs_legend,
+                 title_fontsize=fs_legend_title)
+    ax[1].set_title("Amplitude of the discretization error",
+                    fontsize=fs_title)
+    ax[1].tick_params(axis="both", labelsize=fs_ticks)
+    plt.tight_layout(pad=2)
     plt.savefig(bp.SIMULATION_DIR + "/discr_error.pdf")

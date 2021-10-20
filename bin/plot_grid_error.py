@@ -3,8 +3,8 @@ import numpy as np
 import matplotlib
 matplotlib.rcParams['text.usetex'] = True
 matplotlib.rcParams['text.latex.preamble'] = r'\usepackage{amsmath, amssymb}'
-matplotlib.rcParams['legend.title_fontsize'] = 14
 import matplotlib.pyplot as plt
+from fonts import fs_title, fs_legend, fs_label, fs_suptitle, fs_ticks, fs_legend_title
 
 """
 Create a plot for the discretization error and cutoff error 
@@ -182,7 +182,7 @@ if __name__ == "__main__":
     """ PLOT: Errors vs Temperature, for fixed shapes and mean velocity = 0
         This shows the discretisation and cutoff error"""
     #################################################################################
-    fig, ax = plt.subplots(1, 3, constrained_layout=True,
+    fig, ax = plt.subplots(1, 3,
                            sharex="all", sharey="all",
                            figsize=(12.75, 6.25))
     T_TEMPS = np.linspace(0.1, MAX_T, N)
@@ -205,13 +205,14 @@ if __name__ == "__main__":
                                       force_number_density=False,
                                       mass=1, number_density=1)
     # plot errors (normal and split up)
-    fig.suptitle(r"Isolated temperature based errors for different DVM and $\widetilde{v} = 0$",
-                 fontsize=16)
+    fig.suptitle(r"Isolated Grid Errors for Different DVM and $\widetilde{v} = 0$",
+                 fontsize=fs_suptitle)
     for a in [0, 1, 2]:
         ax[a].set_axisbelow(True)
         ax[a].yaxis.grid(color='darkgray', linestyle='dashed', which="both",
                          linewidth=0.4)
-        ax[a].set_xlabel(r"Temperature Parameter $\vartheta$", fontsize=12)
+        ax[a].set_xlabel(r"Temperature Parameter $\vartheta$", fontsize=fs_label)
+        ax[a].tick_params(axis="both", labelsize=fs_ticks)
         for m, model in MODELS.items():
             if m in [3131, 3030]:
                 continue
@@ -237,25 +238,28 @@ if __name__ == "__main__":
 
     ax[0].legend(title="Grid Shapes", loc="upper left",
                  ncol=2,
-                 fontsize=12)
+                 fontsize=fs_legend,
+                 title_fontsize=fs_legend_title)
     ax[0].set_ylabel(
         r"$\mathcal{E}_{\mathfrak{V}^s}(\widetilde{v}, \vartheta)$",
-        fontsize=14
+        fontsize=fs_label
     )
     ax[1].set_ylabel(
         r"$\mathcal{E}_{\mathfrak{V}^s_\infty}(\widetilde{v}, \vartheta)$",
-        fontsize=14
+        fontsize=fs_label
     )
     ax[2].set_ylabel(
         r"$\mathcal{E}_{\mathfrak{V}^s}(\widetilde{v}, \vartheta) - \mathcal{E}_{\mathfrak{V}^s_\infty}(\widetilde{v}, \vartheta)$",
-        fontsize=14
+        fontsize=fs_label
     )
 
-    ax[0].set_title("Total Error", fontsize=14)
-    ax[1].set_title("Isolated Discretization Error", fontsize=14)
-    ax[2].set_title("Isolated Domain Error", fontsize=14)
+    ax[0].set_title("Total Error", fontsize=fs_title)
+    ax[1].set_title("Isolated Discretization Error", fontsize=fs_title)
+    ax[2].set_title("Isolated Domain Error", fontsize=fs_title)
     # fig.suptitle("Isolated Temperature Based Errors "
     #              "for Different Grid Shapes and $\overline{v} = 0$", fontsize=18)
+    plt.tight_layout(pad=2)
+    plt.subplots_adjust(top=0.85)
     plt.savefig(bp.SIMULATION_DIR + "/grid_err_T.pdf")
     plt.close(fig)
 
@@ -263,7 +267,7 @@ if __name__ == "__main__":
     """ PLOT: Errors vs Mean Velocity, for fixed Shapes and mean v = 0
         This shows the discretisation and cutoff error"""
     #################################################################################
-    fig, ax = plt.subplots(1, 3, constrained_layout=True,
+    fig, ax = plt.subplots(1, 3,
                            sharex="all",
                            figsize=(12.75, 6.25))
     # use a fixed model, and several temperatures instead
@@ -295,38 +299,43 @@ if __name__ == "__main__":
                        color=TEMP_COLOR[i_t],
                        linestyle=line_style[i_t],
                        linewidth=3)
-            ax[a].set_xlabel(r"Mean Velocity Parameters $\widetilde{v}_x = \widetilde{v}_y$", fontsize=12)
+            ax[a].set_xlabel(r"Velocity Parameters $\widetilde{v}_x = \widetilde{v}_y$",
+                             fontsize=fs_label)
             ax[a].set_axisbelow(True)
             ax[a].yaxis.grid(color='darkgray', linestyle='dashed', which="both",
                              linewidth=0.4)
+            ax[a].tick_params(axis="both", labelsize=fs_ticks)
     ax[0].legend(title=r"Parameter $\vartheta$", loc="upper left",
-                 fontsize=12)
+                 fontsize=fs_legend,
+                 title_fontsize=fs_legend_title)
     ax[0].set_ylabel(
-        r"$\mathcal{E}_T^{\mathfrak{V}^s}(\widetilde{v}, \vartheta)$",
-        fontsize=12
+        r"$\mathcal{E}_{\mathfrak{V}^s}(\widetilde{v}, \vartheta)$",
+        fontsize=fs_label
     )
     ax[1].set_ylabel(
-        r"$\mathcal{E}_T^{\mathfrak{V}^s_\infty}(\widetilde{v}, \vartheta)$",
-        fontsize=12
+        r"$\mathcal{E}_{\mathfrak{V}^s_\infty}(\widetilde{v}, \vartheta)$",
+        fontsize=fs_label
     )
     ax[2].set_ylabel(
-        r"$\mathcal{E}_T^{\mathfrak{V}^s}(\widetilde{v}, \vartheta) - \mathcal{E}_{\mathfrak{V}^s_\infty}(\widetilde{v}, \vartheta)$",
-        fontsize=12
+        r"$\mathcal{E}_{\mathfrak{V}^s}(\widetilde{v}, \vartheta) - \mathcal{E}_{\mathfrak{V}^s_\infty}(\widetilde{v}, \vartheta)$",
+        fontsize=fs_label
     )
 
-    ax[0].set_title("Total Error", fontsize=14)
-    ax[1].set_title("Isolated Discretization Error", fontsize=14)
-    ax[2].set_title("Isolated Domain Error", fontsize=14)
-    fig.suptitle(r"Isolated temperature based errors for a $(7,7)$ DVM and $\vartheta \in \{1,2,4\}$",
-                 fontsize=16)
+    ax[0].set_title("Total Error", fontsize=fs_title)
+    ax[1].set_title("Isolated Discretization Error", fontsize=fs_title)
+    ax[2].set_title("Isolated Domain Error", fontsize=fs_title)
+    fig.suptitle(r"Isolated Grid Errors for a $(7,7)$ DVM and $\vartheta \in \{1,2,4\}$",
+                 fontsize=fs_suptitle)
+    plt.tight_layout(pad=2)
+    plt.subplots_adjust(top=0.85)
     plt.savefig(bp.SIMULATION_DIR + "/grid_err_v.pdf")
     plt.close()
 
     ##################################################################################
     """ PLOT: both previous versions moment by moment in a 3 column plot"""
     #################################################################################
-    for moment in MOMENTS:
-        fig, ax = plt.subplots(1, 3, constrained_layout=True, sharex="col",
+    for i_mom, moment in enumerate(MOMENTS):
+        fig, ax = plt.subplots(1, 3, sharex="col",
                                figsize=(12.75, 6.25))
         ax = ax.reshape((1, 3))
         row = 0
@@ -386,7 +395,7 @@ if __name__ == "__main__":
                             linewidth=3)
             ax[row, 2].plot(V_VELS[:, 0],
                             dom_error,
-                            label=t,
+                            label=r"$\vartheta = " + str(t) + "$",
                             color=TEMP_COLOR[i_t],
                             linestyle=line_style[i_t],
                             linewidth=3)
@@ -399,52 +408,80 @@ if __name__ == "__main__":
                                   linewidth=0.4)
 
         # add moment on the left
-        ax[row, 0].set_ylabel(
-            moment + " Based Errors",
-            #" $" + SYMBOL[row] + "$",
-            # + r"\\$\displaystyle\mathcal{E}_{"
-            # + SYMBOL[row]
-            # + r"}^{\mathfrak{V}^s}(\widetilde{v}, \vartheta)$",
-            fontsize=16)
+        if moment == "Mean Velocity":
+            ax[row, 0].set_ylabel(
+                r"$\widetilde{v} - \overline{v}$",
+                fontsize=fs_label)
+        else:
+            ax[row, 0].set_ylabel(
+                moment + " Based Errors",
+                #" $" + SYMBOL[row] + "$",
+                # + r"\\$\displaystyle\mathcal{E}_{"
+                # + SYMBOL[row]
+                # + r"}^{\mathfrak{V}^s}(\widetilde{v}, \vartheta)$",
+                fontsize=fs_label)
 
         # set legends and title
         # fig.suptitle("Isolated " + moment + " Based Errors"
         #              + r" for different $T$ and $\overline{v}_x$" ,
         #              fontsize=18)
-        if moment == "Stress":
-            loc = "lower center"
-        else:
-            loc = "upper center"
-        ax[row, 0].legend(title="Grid Shapes", loc=loc, ncol=2,
-                 fontsize=12)
-        ax[row, 0].set_title("Total Errors for $\overline{v} = "
+        ax[row, 0].legend(title="Grid Shapes", loc="upper right", ncol=2,
+                          fontsize=fs_legend,
+                          title_fontsize=fs_legend_title)
+        ax[row, 0].set_title("Total Errors for $\widetilde{v} = "
                              + str(tuple(T_VELS[m][moment])) + "$",
-                             fontsize=18
-                             # "for Different Grid Shapes and $\overline{v} = 0$"
+                             fontsize=fs_title
+                             # "for Different Grid Shapes and $\widetilde{v} = 0$"
                              )
         # ax[row, 1].legend(title="Temperatures", loc="upper left",
         #                   fontsize=8)
-        ax[row, 1].set_title("Discretization Errors", fontsize=18
+        ax[row, 1].set_title("Discretization Errors", fontsize=fs_title
                              # " of a $(7, 7)$ Grid for Different Temperatures T"
                              )
-        ax[row, 2].legend(title="Temperatures", loc=loc,
-                 fontsize=12)
-        ax[row, 2].set_title("Domain Errors", fontsize=18
+        ax[row, 2].legend(loc="upper left", title="Temperature Parameter",
+                          fontsize=fs_legend + 1,
+                          title_fontsize=fs_legend_title)
+        ax[row, 2].set_title("Domain Errors", fontsize=fs_title
                              # " of a $(7, 7)$ Grid for Different Temperatures T"
                              )
 
         # add parameter at bottom
-        ax[row, 0].set_xlabel(r"Temperature $T$", fontsize=18)
-        ax[row, 1].set_xlabel(r"Mean Velocity $\overline{v}_x = \overline{v}_y$", fontsize=18)
-        ax[row, 2].set_xlabel(r"Mean Velocity $\overline{v}_x = \overline{v}_y$", fontsize=18)
+        ax[row, 0].set_xlabel(r"Temperature Parameter $\vartheta$", fontsize=fs_label)
+        ax[row, 1].set_xlabel(r"Velocity Parameter $\widetilde{v}_x$",
+                              fontsize=fs_label)
+        ax[row, 2].set_xlabel(r"Velocity Parameter $\widetilde{v}_x$",
+                              fontsize=fs_label)
+        for c in [0,1,2]:
+            ax[row, c].tick_params(axis="both", labelsize=fs_ticks)
 
-        plt.savefig(bp.SIMULATION_DIR + "/mom_err_" + moment + ".eps")
+        ax[row, 0].set_ylabel(
+            r"$" + SYMBOL[i_mom]
+            + r"\left[{\mathfrak{V}^s}\right](\widetilde{v}, \vartheta)$",
+            fontsize=fs_label
+        )
+        ax[row, 1].set_ylabel(
+            r"$" + SYMBOL[i_mom]
+            + r"\left[{\mathfrak{V}^s_\infty}\right](\widetilde{v}, \vartheta)$",
+            fontsize=fs_label
+        )
+        ax[row, 2].set_ylabel(
+            r"$" + SYMBOL[i_mom]
+            + r"\left[{\mathfrak{V}^s}\right](\widetilde{v}, \vartheta) - "
+            + SYMBOL[i_mom]
+            + r"\left[{\mathfrak{V}^s_\infty}\right](\widetilde{v}, \vartheta)$",
+            fontsize=fs_label
+        )
+
+        plt.suptitle("Isolated " + moment + " Based Grid Errors",
+                     fontsize=fs_suptitle)
+        plt.tight_layout(pad=2)
+        plt.subplots_adjust(top=0.85)
+        plt.savefig(bp.SIMULATION_DIR + "/mom_err_" + moment + ".pdf")
         plt.close(fig)
 
 
     print("################################################################\n"
-          "PLOT: both previous versions in a large, multirow, 3 column plot\n"
-          "      each row for another moment\n"
+          "Plot Stress Error, this was formeerly a large multiplot\n"
           "################################################################")
     # compute all again, but force number density
     res_T_normed = cmp_temp_dependent_errors(MODELS, T_TEMPS, T_VELS, MOMENTS,
@@ -456,17 +493,12 @@ if __name__ == "__main__":
 
     # create plot
     ordererd_moments = [
-        "Number Density",
-        "Mean Velocity",
-        "Momentum",
         "Stress"]
     ordered_symbols = [
-        r"\nu",
-        r"\overline{v}_x",
-        r"M_x",
         r"P_{xy}"]
     fig, ax = plt.subplots(len(ordererd_moments), 3, constrained_layout=True, sharex="col",
-                           figsize=(12.75, 17.677))
+                           figsize=(12.75, 6.25))
+    ax = np.array(ax, ndmin=2)
 
     for row, moment in enumerate(ordererd_moments):
         # plot left side: variable temperature, set of different shapes, fixed v=0
@@ -531,7 +563,7 @@ if __name__ == "__main__":
         for a in [0,1,2]:
             ylim = ax[row, a].get_ylim()
             if ylim[1] - ylim[0] < 1e-12:
-                ax[row, a].set_ylim(-1e-12, 1e-12)
+                ax[row, a].set_ylim(-1e-12, 2e-12)
 
 
         # add grids
@@ -547,36 +579,42 @@ if __name__ == "__main__":
             # + r"\\$\displaystyle\mathcal{E}_{"
             # + SYMBOL[row]
             # + r"}^{\mathfrak{V}^s}(\widetilde{v}, \vartheta)$",
-            fontsize=12)
+            fontsize=fs_label)
 
         # set legends and title
         if row == 0:
             loc = "upper center"
             ax[row, 0].legend(title="Grid Shapes", loc=loc, ncol=2,
-                              fontsize=12)
-            ax[row, 0].set_title("Total Errors"
-                                 # "for Different Grid Shapes and $\overline{v} = 0$"
+                              fontsize=fs_legend,
+                              title_fontsize=fs_legend_title)
+            ax[row, 0].set_title("Total Error",
+                                 fontsize=fs_title
                                  )
-            ax[row, 1].legend(title="Temperatures", loc=loc, ncol=3,
-                              fontsize=12)
-            ax[row, 1].set_title("Discretization Errors"
-                                 # " of a $(7, 7)$ Grid for Different Temperatures T"
+            ax[row, 1].legend(title="Temperatures", loc="upper right",
+                              fontsize=fs_legend,
+                              title_fontsize=fs_legend_title)
+            ax[row, 1].set_title("Discretization Error",
+                                 fontsize=fs_title
                                  )
-            ax[row, 2].legend(title="Temperatures", loc=loc, ncol=3,
-                              fontsize=12)
-            ax[row, 2].set_title("Domain Errors"
-                                 # " of a $(7, 7)$ Grid for Different Temperatures T"
+            ax[row, 2].legend(title="Temperatures", loc="upper right",
+                              fontsize=fs_legend,
+                              title_fontsize=fs_legend_title)
+            ax[row, 2].set_title("Domain Error",
+                                 fontsize=fs_title
                                  )
 
         # add parameter at bottom
         if row == len(ordererd_moments) - 1:
-            ax[row, 0].set_xlabel(r"Temperature Parameter $\vartheta$", fontsize=12)
-            ax[row, 1].set_xlabel(r"Mean Velocity Parameter $\widetilde{v}_x = \widetilde{v}_y$",
-                                  fontsize=12)
-            ax[row, 2].set_xlabel(r"Mean Velocity Parameter $\widetilde{v}_x = \widetilde{v}_y$",
-                                  fontsize=12)
+            ax[row, 0].set_xlabel(r"Temperature Parameter $\vartheta$",
+                                  fontsize=fs_label)
+            ax[row, 1].set_xlabel(r"Velocity Parameter $\widetilde{v}_x$",
+                                  fontsize=fs_label)
+            ax[row, 2].set_xlabel(r"Velocity Parameter $\widetilde{v}_x$",
+                                  fontsize=fs_label)
+        for c in [0,1,2]:
+            ax[row, c].tick_params(axis="both", labelsize=fs_ticks)
 
-    plt.savefig(bp.SIMULATION_DIR + "/grid_err_all.pdf")
+    plt.savefig(bp.SIMULATION_DIR + "/grid_err_stress_nondiag.pdf")
     plt.close()
 
 
@@ -639,33 +677,41 @@ if __name__ == "__main__":
                            color=TEMP_COLOR[i_t],
                            linestyle=STYLES[i_dir],
                            linewidth=3)
-                ax[a].set_xlabel(r"Mean Velocity Parameter $\overline{v}_x$", fontsize=18)
-                ax[a].set_axisbelow(True)
-                ax[a].yaxis.grid(color='darkgray', linestyle='dashed', which="both",
-                                 linewidth=0.4)
-    fig.legend(loc="lower center", ncol=3, bbox_to_anchor=(0.5, 0.0),
-               fontsize=12)
+        ax[a].set_xlabel(r"Mean Velocity Parameter $\widetilde{v}_x$",
+                         fontsize=fs_label)
+        ax[a].set_axisbelow(True)
+        ax[a].yaxis.grid(color='darkgray', linestyle='dashed', which="both",
+                         linewidth=0.4)
+
+        ax[a].tick_params(axis="both", labelsize=fs_ticks)
+    lg = fig.legend(loc="lower center", ncol=3, bbox_to_anchor=(0.5, -0.12),
+                    fontsize=fs_legend + 2,
+                    title_fontsize=fs_legend_title)
     ax[0].set_ylabel(
         r"$P_{i, i}\left[{\mathfrak{V}^s}\right](\widetilde{v}, \vartheta)$",
-        fontsize=12
+        fontsize=fs_label
     )
     ax[1].set_ylabel(
         r"$P_{i, i}\left[{\mathfrak{V}^s_\infty}\right](\widetilde{v}, \vartheta)$",
-        fontsize=12
+        fontsize=fs_label
     )
     ax[2].set_ylabel(
         r"$P_{i, i}\left[{\mathfrak{V}^s}\right](\widetilde{v}, \vartheta) - P_{i, i}\left[{\mathfrak{V}^s_\infty}\right]((\widetilde{v}, \vartheta)$",
-        fontsize=12
+        fontsize=fs_label
     )
     #
-    ax[0].set_title("Stress Diagonal Entries", fontsize=14)
-    ax[1].set_title("Discretization Related Part", fontsize=14)
-    ax[2].set_title("Domain Related Part", fontsize=14)
-    fig.suptitle(r"Diagonal entries of the stress tensor of a $(7, 7)$ DVM"
-                 r" for $\widetilde{v}_x \in [0, 6]$ and $\widetilde{v}_y = 0$", fontsize=16)
-    plt.tight_layout(rect=[0, 0.1, 1, 1])
+    ax[0].set_title("Stress Diagonal Entries", fontsize=fs_title)
+    ax[1].set_title("Discretization Related Part", fontsize=fs_title)
+    ax[2].set_title("Domain Related Part", fontsize=fs_title)
+    st = fig.suptitle(r"Diagonal entries of the stress tensor of a $(7, 7)$ DVM"
+                      r" for $\widetilde{v}_x \in [0, 6]$ and $\widetilde{v}_y = 0$",
+                      fontsize=fs_suptitle)
+    plt.tight_layout(pad=2)
     # fig.subplots_adjust(bottom=0.25)
-    plt.savefig(bp.SIMULATION_DIR + "/grid_error_stress_diagonal.pdf")
+    plt.subplots_adjust(top=0.85)
+    plt.savefig(bp.SIMULATION_DIR + "/grid_error_stress_diagonal.pdf",
+                bbox_extra_artists=(lg, st),
+                bbox_inches='tight')
     plt.close()
 
 
@@ -728,32 +774,39 @@ if __name__ == "__main__":
                            color=TEMP_COLOR[i_t],
                            linestyle=STYLES[i_dir],
                            linewidth=3)
-                ax[a].set_xlabel(r"Mean Velocity Parameter $\overline{v}_x$", fontsize=18)
-                ax[a].set_axisbelow(True)
-                ax[a].yaxis.grid(color='darkgray', linestyle='dashed', which="both",
-                                 linewidth=0.4)
-    fig.legend(loc="lower center", ncol=3, bbox_to_anchor=(0.5, 0.0),
-               fontsize=12)
+        ax[a].set_xlabel(r"Mean Velocity Parameter $\widetilde{v}_x$",
+                         fontsize=fs_label)
+        ax[a].set_axisbelow(True)
+        ax[a].yaxis.grid(color='darkgray', linestyle='dashed', which="both",
+                         linewidth=0.4)
+        ax[a].tick_params(axis="both", labelsize=fs_ticks)
+
+    lg = fig.legend(loc="lower center", ncol=3, bbox_to_anchor=(0.5, -0.12),
+                    fontsize=fs_legend + 2,
+                    title_fontsize=fs_legend_title)
     ax[0].set_ylabel(
         r"$q_{i}\left[{\mathfrak{V}^s}\right](\widetilde{v}, \vartheta)$",
-        fontsize=12
+        fontsize=fs_label
     )
     ax[1].set_ylabel(
         r"$q_{i}\left[{\mathfrak{V}^s_\infty}\right](\widetilde{v}, \vartheta)$",
-        fontsize=12
+        fontsize=fs_label
     )
     ax[2].set_ylabel(
         r"$	q_{i}\left[{\mathfrak{V}^s}\right](\widetilde{v}, \vartheta) "
         r"- q_{i}\left[{\mathfrak{V}^s_\infty}\right](\widetilde{v}, \vartheta)$",
-        fontsize=12
+        fontsize=fs_label
     )
     #
-    ax[0].set_title("Heat Flow", fontsize=14)
-    ax[1].set_title("Discretization Related Part", fontsize=14)
-    ax[2].set_title("Domain Related Part", fontsize=14)
-    fig.suptitle(r"Heat flow components of a $(7, 7)$ DVM"
-                 r" for $\widetilde{v}_x \in [0, 6]$ and $\widetilde{v}_y = 0$", fontsize=16)
-    plt.tight_layout(rect=[0, 0.1, 1, 1])
-    # fig.subplots_adjust(bottom=0.25)
-    plt.savefig(bp.SIMULATION_DIR + "/grid_error_heat_flow.pdf")
+    ax[0].set_title("Heat Flow", fontsize=fs_title)
+    ax[1].set_title("Discretization Related Part", fontsize=fs_title)
+    ax[2].set_title("Domain Related Part", fontsize=fs_title)
+    st = fig.suptitle(r"Heat flow components of a $(7, 7)$ DVM"
+                      r" for $\widetilde{v}_x \in [0, 6]$ and $\widetilde{v}_y = 0$",
+                      fontsize=fs_suptitle)
+    plt.tight_layout(pad=2)
+    plt.subplots_adjust(top=0.85)
+    plt.savefig(bp.SIMULATION_DIR + "/grid_error_heat_flow.pdf",
+                bbox_extra_artists=(lg, st),
+                bbox_inches='tight')
     plt.close()

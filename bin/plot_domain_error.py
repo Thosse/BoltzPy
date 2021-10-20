@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 from plot_grid_error import maxwellian
 from scipy.integrate import dblquad
 from scipy.special import erf as sp_erf
+from fonts import fs_title, fs_legend, fs_label, fs_suptitle, fs_ticks
 
 
 def integrate_over_domain(mean_velocity, temperature,
@@ -148,8 +149,11 @@ if __name__ == "__main__":
                      linewidth=0.4)
     ax[0].xaxis.grid(color='darkgray', linestyle='dashed', which="both",
                      linewidth=0.4)
-    ax[0].set_xlabel(r"Mean Velocity Parameter $\widetilde{v}_x$", fontsize=12)
-    ax[0].set_ylabel("Domain Error", fontsize=12)
+    ax[0].set_xlabel(r"Mean Velocity Parameter $\widetilde{v}_x$",
+                     fontsize=fs_label)
+    ax[0].set_ylabel("Domain Error",
+                     fontsize=fs_label)
+    ax[0].tick_params(axis="both", labelsize=fs_ticks)
     ax[0].set_yscale("log")
     moment = "Temperature"
     for m, model in MODELS.items():
@@ -179,10 +183,12 @@ if __name__ == "__main__":
                        linewidth=3)
     ax[0].yaxis.grid(color='darkgray', linestyle='dashed', which="both",
                      linewidth=0.4)
-    ax[0].legend(loc="upper left", fontsize=12,
+    ax[0].legend(loc="upper left",
+                 fontsize=fs_legend,
                  ncol=1)
-    ax[0].set_title(r"Measured and predicted domain errors for $\mathfrak{v}_{max} \in \{6, 7\}$ ",
-                    fontsize=14)
+    ax[0].set_title("Measured and predicted domain errors",
+                    # + r"for $\mathfrak{v}_{max} \in \{6, 7\}$ ",
+                    fontsize=fs_title)
 
     #########################################
     #   RIGHT PLOT: Show DOMAIN CHOICES     #
@@ -213,12 +219,15 @@ if __name__ == "__main__":
                    linewidth=3.0,
                    zorder=-2)
 
-    ax[1].set_xlabel(r"Mean Velocity Parameter $\widetilde{v}_x$", fontsize=12)
-    ax[1].set_ylabel(r"Mean Velocity Parameter $\widetilde{v}_y$", fontsize=12)
-    ax[1].set_title(r"Grid domain $D\left(\mathfrak{V^s}\right)$ and integration domain", fontsize=14)
-
+    ax[1].set_xlabel(r"Mean Velocity Parameter $\widetilde{v}_x$",
+                     fontsize=fs_label)
+    ax[1].set_ylabel(r"Mean Velocity Parameter $\widetilde{v}_y$",
+                     fontsize=fs_label)
+    ax[1].set_title(r"Grid domain $D\left(\mathfrak{V^s}\right)$ and integration domain",
+                    fontsize=fs_title)
+    ax[1].tick_params(axis="both", labelsize=fs_ticks)
+    plt.tight_layout(pad=2)
     plt.savefig(bp.SIMULATION_DIR + "/domain_error.pdf")
-    plt.show()
 
     #############################################
     #   Assert the upper boundary conjecture    #
@@ -258,186 +267,3 @@ if __name__ == "__main__":
     plt.show()
     print("Upper bound confirmed for a chosen set of parameters")
 
-    # ax[0].set_ylabel(
-    #     r"$\mathcal{E}_T^{\mathfrak{V}^s}(\overline{v}, T)$",
-    #     fontsize=20
-    # )
-    # ax[1].set_ylabel(
-    #     r"$\mathcal{E}_T^{\mathfrak{V}^s_\infty}(\overline{v}, T)$",
-    #     fontsize=20
-    # )
-    # ax[2].set_ylabel(
-    #     r"$\mathcal{E}_T^{\mathfrak{V}^s}(\overline{v}, T) - \mathcal{E}_T^{\mathfrak{V}^s_\infty}(\overline{v}, T)$",
-    #     fontsize=20
-    # )
-    #
-    # ax[0].set_title("Total Error")
-    # ax[1].set_title("Discretization Error")
-    # ax[2].set_title("Domain Error")
-    # fig.suptitle("Isolated Temperature Errors for Different Grid Shapes and $\overline{v} = 0$")
-    # plt.show()
-    #
-    # ##################################################################################
-    # """ PLOT: Errors vs Mean Velocity, for fixed Shapes and mean v = 0
-    #     This shows the discretisation and cutoff error"""
-    # #################################################################################
-    # fig, ax = plt.subplots(1, 3, constrained_layout=True,
-    #                        sharex="all", sharey="all",
-    #                        figsize=(12.75, 6.25))
-    # # use a fixed model, and several temperatures instead
-    # model = MODELS[77]
-    # # PARAMS
-    # TEMPERATURES = np.array([1.0, 2.0, 4.0])
-    # MEAN_VELS = np.zeros((N, 2))
-    # MEAN_VELS[:, 0] = np.linspace(0, model.max_vel, N)
-    # # store results in dict
-    # res_v = {m: {t: {key: np.full(T_cont.size, np.nan)
-    #                  for key in MOMENTS}
-    #              for t in TEMPERATURES}
-    #          for m in [77, 3131]}
-    # for m in [77, 3131]:
-    #     model = MODELS[m]
-    #     for t in TEMPERATURES:
-    #         res = res_v[m][t]
-    #         for i_v, v in enumerate(MEAN_VELS):
-    #             distr = maxwellian(model.vels,
-    #                                NUMBER_DENSITY,
-    #                                v,
-    #                                t,
-    #                                MASS)
-    #             res["Number Density"][i_v] = model.cmp_number_density(distr)
-    #             res["Momentum"][i_v] = model.cmp_momentum(distr)[0]
-    #             res["Mean Velocity"][i_v] = model.cmp_mean_velocity(distr)[0]
-    #             res["Temperature"][i_v] = model.cmp_temperature(distr)
-    #             res["Stress"][i_v] = model.cmp_stress(distr)
-    #             res["Heat Flow"][i_v] = model.cmp_heat_flow(distr)[0]
-    #
-    # # plot errors (normal and split up)
-    #
-    # for a in [0, 1, 2]:
-    #     for i_t, t in enumerate(TEMPERATURES):
-    #         offset = t - res_v[3131][t]["Temperature"]
-    #         error = t - res_v[77][t]["Temperature"]
-    #         if a == 0:
-    #             pass
-    #         elif a == 1:
-    #             error = offset
-    #         elif a == 2:
-    #             error = error - offset
-    #         else:
-    #             raise NotImplementedError
-    #
-    #         ax[a].plot(MEAN_VELS[:, 0],
-    #                    error,
-    #                    label=t,
-    #                    linestyle=line_style[i_t],
-    #                    linewidth=4)
-    #         ax[a].set_xlabel(r"Mean Velocity $\overline{v}_x$", fontsize=18)
-    #         ax[a].set_axisbelow(True)
-    #         ax[a].yaxis.grid(color='darkgray', linestyle='dashed', which="both",
-    #                          linewidth=0.4)
-    # ax[0].legend(title="Temperatures", loc="upper left")
-    # ax[0].set_ylabel(
-    #     r"$\mathcal{E}_T^{\mathfrak{V}^s}(\overline{v}, T)$",
-    #     fontsize=20
-    # )
-    # ax[1].set_ylabel(
-    #     r"$\mathcal{E}_T^{\mathfrak{V}^s_\infty}(\overline{v}, T)$",
-    #     fontsize=20
-    # )
-    # ax[2].set_ylabel(
-    #     r"$\mathcal{E}_T^{\mathfrak{V}^s}(\overline{v}, T) - \mathcal{E}_T^{\mathfrak{V}^s_\infty}(\overline{v}, T)$",
-    #     fontsize=20
-    # )
-    #
-    # ax[0].set_title("Total Error")
-    # ax[1].set_title("Discretization Error")
-    # ax[2].set_title("Domain Error")
-    # fig.suptitle("Isolated Temperature Errors of a $(7, 7)$ Grid for Different Temperatures T")
-    # plt.show()
-    #
-    # ##################################################################################
-    # """ PLOT: both previous versions in a large, multirow, 2 column plot
-    # each row for another moment"""
-    # #################################################################################
-    # fig, ax = plt.subplots(len(MOMENTS), 2, constrained_layout=True, sharex="col",
-    #                        figsize=(8.27, 11.69))
-    # for row, moment in enumerate(MOMENTS):
-    #     for i in [0, 1]:
-    #         ax[row, i].yaxis.grid(color='darkgray', linestyle='dashed', which="both",
-    #                               linewidth=0.4)
-    #         ax[row, i].xaxis.grid(color='darkgray', linestyle='dashed', which="both",
-    #                               linewidth=0.4)
-    #     ax[row, 0].set_ylabel(
-    #         moment + " $" + SYMBOL[row] + "$",
-    #         # + r"\\$\displaystyle\mathcal{E}_{"
-    #         # + SYMBOL[row]
-    #         # + r"}^{\mathfrak{V}^s}(\overline{v}, T)$",
-    #         fontsize=16)
-    #     # plot left side: variable temperature, set of different shapes, fixed v=0
-    #     for m, model in MODELS.items():
-    #         if m in [3131, 3030]:
-    #             continue
-    #         value = res_T[m][moment]
-    #         if moment == "Number Density":
-    #             expected = NUMBER_DENSITY
-    #         elif moment == "Momentum":
-    #             expected = 0
-    #         elif moment == "Mean Velocity":
-    #             expected = 0
-    #         elif moment == "Temperature":
-    #             expected = T_cont
-    #         elif moment == "Stress":
-    #             expected = 0
-    #         elif moment == "Heat Flow":
-    #             expected = 0
-    #         else:
-    #             raise NotImplementedError
-    #         error = expected - value
-    #
-    #         ax[row, 0].plot(T_cont,
-    #                         error,
-    #                         label=model.shapes[0],
-    #                         linestyle=STYLE[m],
-    #                         color=COLOR[m],
-    #                         linewidth=4)
-    #
-    #         if row == 0:
-    #             ax[row, 0].legend(title="Grid Shapes", loc="upper left", ncol=2,
-    #                               fontsize=8)
-    #             ax[row, 0].set_title("Total Errors for Different Grid Shapes and $\overline{v} = 0$")
-    #         if row == len(MOMENTS) - 1:
-    #             ax[row, 0].set_xlabel(r"Temperature $T$", fontsize=18)
-    #
-    #     # plot right side: variable velocites, set of temperatures, fixed shape
-    #     for i_t, t in enumerate(TEMPERATURES):
-    #         value = res_v[77][t][moment]
-    #         if moment == "Number Density":
-    #             expected = NUMBER_DENSITY
-    #         elif moment == "Momentum":
-    #             expected = NUMBER_DENSITY * MASS * MEAN_VELS[..., 0]
-    #         elif moment == "Mean Velocity":
-    #             expected = MEAN_VELS[..., 0]
-    #         elif moment == "Temperature":
-    #             expected = t
-    #         elif moment == "Stress":
-    #             expected = 0
-    #         elif moment == "Heat Flow":
-    #             expected = 0
-    #         else:
-    #             raise NotImplementedError
-    #         error = expected - value
-    #         ax[row, 1].plot(MEAN_VELS[:, 0],
-    #                         error,
-    #                         label=t,
-    #                         linestyle=line_style[i_t],
-    #                         linewidth=4)
-    #
-    #         if row == 0:
-    #             ax[row, 1].legend(title="Temperatures", loc="upper left",
-    #                               fontsize=8)
-    #             ax[row, 1].set_title("Total Errors of a $(7, 7)$ Grid for Different Temperatures T")
-    #         if row == len(MOMENTS) - 1:
-    #             ax[row, 1].set_xlabel(r"Mean Velocity $\overline{v}$", fontsize=18)
-    #
-    # plt.show()
