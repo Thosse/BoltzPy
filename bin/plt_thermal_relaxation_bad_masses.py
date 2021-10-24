@@ -9,17 +9,24 @@ matplotlib.rcParams['text.latex.preamble'] = r'\usepackage{amsmath, amssymb}'
 import matplotlib.pyplot as plt
 import h5py
 import copy
+from fonts import fs_title, fs_legend, fs_label, fs_suptitle, fs_ticks
 
 ###########################
 #   Control Parameters    #
 ###########################
+USE_CENTERED_MAXWELLIANS = True
 EXP_NAME = bp.SIMULATION_DIR + "/thermal_relaxation"
+if USE_CENTERED_MAXWELLIANS:
+    EXP_NAME += "_centered"
+else:
+    EXP_NAME += "_uncentered"
 FILE_ADDRESS = EXP_NAME + ".hdf5"
 FILE = h5py.File(FILE_ADDRESS, mode="a")
 
 COMPUTE = {"unedited": False,
            "ET": False,
            "All but ET": False,
+           "specific_equlibria": False,
            "gain": False,
            "gain + ET": False,
            "shape": False,
@@ -100,8 +107,12 @@ print("Done!\n")
 print("###############################################\n",
       "#       Generate and Plot Initial States      #\n",
       "###############################################")
-v0 = np.array([0, 0], dtype=float)
-v1 = np.array([0, 0], dtype=float)
+if USE_CENTERED_MAXWELLIANS:
+    v0 = np.array([0, 0], dtype=float)
+    v1 = np.array([0, 0], dtype=float)
+else:
+    v0 = np.array([-1, 0], dtype=float)
+    v1 = np.array([ 1, 0], dtype=float)
 T0 = 30
 T1 = 60
 
@@ -167,13 +178,16 @@ time = (np.arange(max_t) + 1) * dt
 
 print("setup figure and axes")
 fig, ax1 = plt.subplots(1, 1, constrained_layout=True,
-                        figsize=(6.375, 6.25))
+                        figsize=(8.375, 6.25))
 
 fig.suptitle("Relaxation of Perturbed Temperatures for a Mixture",
-             fontsize=16)
-ax1.set_ylabel(r"$\mathcal{L}^2$-Distance to Equilibrium", fontsize=14)
-ax1.set_xlabel("Time", fontsize=14)
+               fontsize=fs_suptitle)
+ax1.set_ylabel(r"$\mathcal{L}^2$-Distance to Equilibrium",
+               fontsize=fs_label)
+ax1.set_xlabel("Time",
+               fontsize=fs_label)
 ax1.set_xscale("log")
+ax1.tick_params(axis="both", labelsize=fs_ticks)
 ax1.set_xlim(right=longest_relaxation_time)
 
 # plot left figure (original weights, with references
@@ -190,7 +204,7 @@ for i_r in range(len(rules)):
              linestyle=linestyles[i_r],
              label=labels[i_r],
              **lw)
-ax1.legend(fontsize=12, loc="upper right")
+ax1.legend(loc="upper right", fontsize=fs_legend)
 
 plt.savefig(EXP_NAME + "_1.pdf")
 print("Done!\n")
@@ -283,17 +297,18 @@ fig, (ax1, ax2) = plt.subplots(1, 2, constrained_layout=True,
                                figsize=(12.75, 6.25), sharey=True, sharex=True)
 
 fig.suptitle("Weight Adjustment Effects on the Relaxation Curves",
-             fontsize=16)
-ax1.set_title(r"Increased Weights $\gamma$ for Non Energy Transferring Collisions",
-              fontsize=14)
-ax2.set_title(r"Increased Weights $\gamma_E$ for Energy Transferring Collisions",
-              fontsize=14)
-ax1.set_ylabel(r"$\mathcal{L}^2$-Distance to Equilibrium", fontsize=14)
+             fontsize=fs_suptitle)
+ax1.set_title(r"Increased Non Energy Transferring Collisions",
+              fontsize=fs_title)
+ax2.set_title(r"Increased Energy Transferring Collisions",
+              fontsize=fs_title)
+ax1.set_ylabel(r"$\mathcal{L}^2$-Distance to Equilibrium", fontsize=fs_label)
 
 for ax in [ax1, ax2]:
-    ax.set_xlabel("Time", fontsize=14)
+    ax.set_xlabel("Time", fontsize=fs_label)
     ax.set_xscale("log")
     ax.set_xlim(right=longest_relaxation_time)
+    ax.tick_params(axis="both", labelsize=fs_ticks)
     # add greyed out reference plots
     for i_r in range(len(rules)):
         raw = FILE["unedited"][str(i_r)][()]
@@ -319,7 +334,7 @@ for i_r in range(len(rules)):
              linestyle=linestyles[i_r],
              label=label_left[i_r],
              **lw)
-ax1.legend(fontsize=12, loc="upper right")
+ax1.legend(fontsize=fs_legend, loc="upper right")
 
 # plot right figure (increased energy transfer rates)
 label_right = [r"$\gamma_{E} = $" + str(etf)
@@ -334,13 +349,135 @@ for i_ef, ef in enumerate(ENERGY_FACTORS):
              color=colors[i_ef],
              label=label_right[i_ef],
              **lw)
-ax2.legend(fontsize=12, loc="upper right")
+ax2.legend(loc="upper right",
+           fontsize=fs_legend)
 
 plt.savefig(EXP_NAME + "_2.pdf")
 print("Done!")
 plt.cla()
 del i_r, i_ef, res
 
+
+print("###################################################\n"
+      "#       Compute current specific equilibria       #\n"
+      "###################################################\n")
+key = "specific_equlibria"
+if COMPUTE[key] or (key not in FILE):
+    # remove old results
+    if key in FILE:
+        del FILE[key]
+    # create new results
+    FILE.create_group(key)
+    print("Compute local equilibria for 'unedited'")
+    hdf_group = FILE[key].create_group("unedited")
+    for i_r, r in enumerate(rules):
+        hdf_group.create_dataset(str(i_r), data=FILE["unedited"][str(i_r)])
+        results = hdf_group[str(i_r)]
+        n_t = results.shape[0]
+        for i_t in range(n_t):
+            print("\r%5d / %5d" % (i_t, n_t), end="")
+            state = np.array(results[i_t])
+            nd = np.ones(1) if i_r == 0 else 2 * np.ones(1)
+            for s in r.species:
+                rng = r.idx_range(s)
+                mv = r.cmp_mean_velocity(state, s)
+                temp = r.cmp_temperature(state, s)
+                if r.nspc == 1:
+                    results[i_t, rng] = r.cmp_initial_state(nd, mv, temp)
+                else:
+                    results[i_t, rng] = rules[s+1].cmp_initial_state(nd, mv, temp)
+
+    print("\nCompute local equilibria for 'ET'")
+    hdf_group = FILE[key].create_group("ET")
+    for i_ef, ef in enumerate(ENERGY_FACTORS):
+        hdf_group.create_dataset(str(ef), data=FILE["ET"][str(ef)])
+        r = rules[0]
+        results = hdf_group[str(ef)]
+        n_t = results.shape[0]
+        for i_t in range(n_t):
+            print("\r%5d / %5d" % (i_t, n_t), end="")
+            state = np.array(results[i_t])
+            nd = np.ones(1)
+            for s in r.species:
+                rng = r.idx_range(s)
+                mv = r.cmp_mean_velocity(state, s)
+                temp = r.cmp_temperature(state, s)
+                results[i_t, rng] = rules[s+1].cmp_initial_state(nd, mv, temp)
+    print("DONE!\n")
+else:
+    print("SKIPPED!\n")
+
+
+print("################################################\n"
+      "#       Plot current specific equilibria       #\n"
+      "################################################\n")
+print("setup figure and axes")
+fig, (ax1, ax2) = plt.subplots(1, 2, constrained_layout=True,
+                               figsize=(12.75, 6.25), sharex=True)
+
+fig.suptitle(r"$\mathcal{L}^2$-Distance to the Local Specific Equilibria",
+             fontsize=fs_suptitle)
+ax1.set_title(r"Unedited, Uniform Collision Weights",
+              fontsize=fs_title)
+ax2.set_title(r"Increased Energy Transferring Collisions",
+              fontsize=fs_title)
+ax1.set_ylabel(r"$\mathcal{L}^2$-Distance to Local Specific Equilibrium",
+               fontsize=fs_label)
+
+for ax in [ax1, ax2]:
+    ax.set_xlabel("Time", fontsize=fs_label)
+    ax.set_xscale("log")
+    ax.set_xlim(right=longest_relaxation_time)
+    ax.tick_params(axis="both", labelsize=fs_ticks)
+    # ax.yaxis.grid(color='darkgray', linestyle='dashed', which="both",
+    #               linewidth=0.4)
+    # ax.xaxis.grid(color='darkgray', linestyle='dashed', which="both",
+    #               linewidth=0.4)
+
+# plot left figure (original weights for ET, all others * 10)
+label_left = [r"Mixture $\mathfrak{S} = \{1,2\}$",
+              r"$\mathfrak{S}=\{1\}$, $n^1= (7, 7)$",
+              r"$\mathfrak{S}=\{2\}$, $n^2= (11, 11)$"]
+for i_r in range(len(rules)):
+    r = rules[i_r]
+    equi = FILE["specific_equlibria"]["unedited"][str(i_r)]
+    state = FILE["unedited"][str(i_r)]
+    diff = np.zeros((equi.shape[0], r.nspc))
+    for s in r.species:
+        rng = r.idx_range(s)
+        diff[:, s] = np.linalg.norm(equi[:, rng] - state[:, rng], axis=1)
+    res = np.sum(diff, axis=1)
+    ax1.plot(time[:len(res)],
+             res,
+             linestyle=linestyles[i_r],
+             label=label_left[i_r],
+             **lw)
+ax1.legend(fontsize=fs_legend, loc="upper right")
+
+# plot right figure (increased energy transfer rates)
+label_right = [r"$\gamma_{E} = $" + str(etf)
+               for etf in ENERGY_FACTORS]
+colors = ["tab:blue", "gold", "tab:purple", "tab:red"]
+for i_ef, ef in enumerate(ENERGY_FACTORS):
+    r = rules[0]
+    equi = FILE["specific_equlibria"]["ET"][str(ef)]
+    state = FILE["ET"][str(ef)]
+    diff = np.zeros((equi.shape[0], r.nspc))
+    for s in r.species:
+        rng = r.idx_range(s)
+        diff[:, s] = np.linalg.norm(equi[:, rng] - state[:, rng], axis=1)
+    res = np.sum(diff, axis=1)
+    ax2.plot(time[:len(res)],
+             res,
+             color=colors[i_ef],
+             label=label_right[i_ef],
+             **lw)
+ax2.legend(fontsize=fs_legend, loc="upper right")
+
+plt.savefig(EXP_NAME + "_2_distance_to_eq.pdf")
+print("Done!")
+plt.cla()
+del i_r, i_ef, res
 
 print("#############################################\n"
       "#       Gain Based Weight Adjustments       #\n"
@@ -428,14 +565,18 @@ print("setup figure and axes")
 fig, (ax1, ax2) = plt.subplots(1, 2, constrained_layout=True,
                                figsize=(12.75, 6.25), sharey=True, sharex=True)
 
-ax1.set_title("Gain-Adjusted Collision Weights", fontsize=14)
-ax2.set_title("Additionally Increased Energy-Transferring Collisions", fontsize=14)
-ax1.set_ylabel(r"$\mathcal{L}^2$-Distance to Equilibrium", fontsize=14)
+ax1.set_title("Gain-Adjusted Collision Weights",
+              fontsize=fs_title)
+ax2.set_title("Additionally Increased Energy-Transfer",
+              fontsize=fs_title)
+ax1.set_ylabel(r"$\mathcal{L}^2$-Distance to Equilibrium",
+               fontsize=fs_label)
 
 for ax in [ax1, ax2]:
-    ax.set_xlabel("Time", fontsize=14)
+    ax.set_xlabel("Time", fontsize=fs_label)
     ax.set_xscale("log")
     ax.set_xlim(right=longest_relaxation_time)
+    ax.tick_params(axis="both", labelsize=fs_ticks)
     # add greyed out reference plots
     for i_r in range(len(rules)):
         raw = FILE["unedited"][str(i_r)][()]
@@ -461,7 +602,7 @@ for i_r in range(len(rules)):
              linestyle=linestyles[i_r],
              label=label_left[i_r],
              **lw)
-ax1.legend(fontsize=12, loc="upper right")
+ax1.legend(fontsize=fs_legend, loc="upper right")
 
 # plot right plot (all weights but ET increased)
 for i_r in range(len(rules)):
@@ -656,17 +797,21 @@ fig, (ax1, ax2) = plt.subplots(1, 2, constrained_layout=True,
                                figsize=(12.75, 6.25), sharey=True, sharex=True)
 axes = [ax1, ax2]
 
-fig.suptitle("DVM With Increased Grid Shapes $(9,9)$ and $(13,13)$", fontsize=16)
-ax1.set_title(r"Uniform Collision Weights $\gamma = 1$", fontsize=14)
-ax2.set_title("Gain Adjusted Collision Weights $\gamma$ and Increased "
-              r"$\gamma_E = 10 \gamma$",
-              fontsize=14)
-ax1.set_ylabel(r"$\mathcal{L}^2$-Distance to Equilibrium", fontsize=14)
+st = fig.suptitle("DVM With Increased Grid Shapes $(9,9)$ and $(13,13)$",
+             fontsize=fs_suptitle)
+ax1.set_title(r"Uniform Collision Weights $\gamma = 1$",
+              fontsize=fs_title)
+ax2.set_title("Additional Gain Adjustment\nand Increased "
+              "Energy Transfer",
+              fontsize=fs_title)
+ax1.set_ylabel(r"$\mathcal{L}^2$-Distance to Equilibrium",
+               fontsize=fs_label)
 
 for ax in [ax1, ax2]:
-    ax.set_xlabel("Time", fontsize=14)
+    ax.set_xlabel("Time", fontsize=fs_label)
     ax.set_xscale("log")
     ax.set_xlim(right=longest_relaxation_time)
+    ax.tick_params(axis="both", labelsize=fs_ticks)
     # add greyed out reference plots
     for i_r in range(3):
         raw = FILE["unedited"][str(i_r)][()]
@@ -681,8 +826,7 @@ for ax in [ax1, ax2]:
 
 
 # plot left figure (uniform weights)
-label_left = [r"Mixture $\mathfrak{S} = \{1,2\}$"
-              + "\nwith original spacings",
+label_left = [r"Mixture, original spacings",
               r"Mixture, reduced $\Delta_\mathbb{R}$",
               r"Mixture, reduced $\Delta_\mathbb{R}$,"
               + "\nonly old ET collisions",
@@ -693,7 +837,8 @@ label_left = [r"Mixture $\mathfrak{S} = \{1,2\}$"
 # keep linestyle for both mixtures
 new_linestyles = 2*linestyles[:1] + linestyles
 colors = ["tab:blue", "tab:red", "tab:purple", "tab:orange", "tab:green"]
-for i_r in range(len(rules)):
+reordering = [0, 3, 1, 4, 2]
+for i_r in reordering:
     raw = FILE["shape"][str(i_r)]
     res = np.sum((raw - raw[-1])**2, axis=-1)
     del raw
@@ -703,10 +848,10 @@ for i_r in range(len(rules)):
              color=colors[i_r],
              label=label_left[i_r],
              **lw)
-ax1.legend(fontsize=12, loc="upper right")
-
+lg = fig.legend(loc="lower center", ncol=3, bbox_to_anchor=(0.5, -0.20),
+                fontsize=fs_legend,)
 # plot left figure (gain adjusted weights)
-for i_r in range(len(rules)):
+for i_r in reordering:
     raw = FILE["shape + gain + ET"][str(i_r)]
     res = np.sum((raw - raw[-1])**2, axis=-1)[9::10]
     del raw
@@ -716,7 +861,9 @@ for i_r in range(len(rules)):
              color=colors[i_r],
              **lw)
 
-plt.savefig(EXP_NAME + "_4.pdf")
+plt.savefig(EXP_NAME + "_4.pdf",
+            bbox_extra_artists=(lg, st),
+            bbox_inches='tight')
 print("Done!\n")
 plt.cla()
 del rules
@@ -848,16 +995,20 @@ print("setup figure and axes")
 fig, (ax1, ax2) = plt.subplots(1, 2, constrained_layout=True,
                                figsize=(12.75, 6.25), sharey=True, sharex=True)
 
-fig.suptitle(r"DVM With Adjusted Masses $m=[6, 12]$", fontsize=16)
-ax1.set_title(r"Uniform Collision Weights $\gamma = 1$", fontsize=14)
+st = fig.suptitle(r"DVM With Adjusted Masses $m=[6, 12]$",
+                  fontsize=fs_suptitle)
+ax1.set_title(r"Uniform Collision Weights $\gamma = 1$",
+              fontsize=fs_title)
 ax2.set_title("Gain Adjusted Collision Weights $\gamma$",
-              fontsize=14)
-ax1.set_ylabel(r"$\mathcal{L}^2$-Distance to Equilibrium", fontsize=14)
+              fontsize=fs_title)
+ax1.set_ylabel(r"$\mathcal{L}^2$-Distance to Equilibrium",
+               fontsize=fs_label)
 
 for ax in [ax1, ax2]:
-    ax.set_xlabel("Time", fontsize=14)
+    ax.set_xlabel("Time", fontsize=fs_label)
     ax.set_xscale("log")
     ax.set_xlim(right=longest_relaxation_time)
+    ax.tick_params(axis="both", labelsize=fs_ticks)
     # add greyed out reference plots
     for i_r in range(3):
         raw = FILE["unedited"][str(i_r)][()]
@@ -885,7 +1036,7 @@ for i_r in range(len(rules)):
              linestyle=linestyles[i_r],
              label=label_left[i_r],
              **lw)
-ax1.legend(fontsize=12, loc="upper right")
+ax1.legend(fontsize=fs_legend, loc="upper right")
 
 # plot right plot (all weights but ET increased)
 for i_r in range(len(rules)):
@@ -910,18 +1061,21 @@ print("NOTE: All plots so far (in the dissertation) are based on centered states
       "Thus the respective parameters (at first definition of rules) must be changed!")
 print("setup figure and axes")
 # create relaxation plots
-fig, (ax1, ax2) = plt.subplots(1, 2, constrained_layout=True,
+fig, (ax1, ax2) = plt.subplots(1, 2,
                                figsize=(12.75, 6.25), sharex=True)
 
-fig.suptitle(r"Comparing Momentum and Energy Transfer for Different DVM", fontsize=16)
-ax1.set_title(r"Specific Momenta $M^s_x$ During Relaxation", fontsize=14)
+fs = fig.suptitle(r"Comparing Momentum and Energy Transfer for Different DVM",
+                  fontsize=fs_suptitle)
+ax1.set_title(r"Specific Momenta $M^s_x$ During Relaxation",
+              fontsize=fs_title)
 ax2.set_title("Specific Energies $E^s$ During Relaxation",
-              fontsize=14)
+              fontsize=fs_title)
 
 for ax in [ax1, ax2]:
-    ax.set_xlabel("Time", fontsize=14)
+    ax.set_xlabel("Time", fontsize=fs_label)
     ax.set_xscale("log")
     ax.set_xlim(right=longest_relaxation_time)
+    ax.tick_params(axis="both", labelsize=fs_ticks)
 
 labels = {"unedited/0": "Original DVM, uniform $\gamma$",
           "gain + ET/0": r"Gain Adjusted $\gamma$, increased $\gamma_E$",
@@ -935,8 +1089,13 @@ colors = {"unedited/0": "tab:blue",
           "masses + gain/0": "tab:green"}
 
 assert set(rules_plot_6.keys()) == set(labels.keys())
+list_rules_plot_6 = [[key, rules_plot_6[key]]
+                     for key in ["unedited/0",
+                                 "shape + gain + ET/1",
+                                 "gain + ET/0",
+                                 "masses + gain/0"]]
 
-for key, r in rules_plot_6.items():
+for key, r in list_rules_plot_6:
     # compute momentum and energy for each species, from stored results
     data = FILE[key]
 
@@ -959,6 +1118,14 @@ for key, r in rules_plot_6.items():
                  c=colors[key],
                  label="_nolegend",
                  **lw)
-ax1.legend(loc="upper right")
-plt.savefig(EXP_NAME + "_6.pdf")
+lg = fig.legend(loc="lower center", ncol=2, bbox_to_anchor=(0.5, -0.2),
+                fontsize=fs_legend)
+plt.subplots_adjust(top=0.85)
+# For some reason this must be a png,
+# otherwise a large block of whitespace is put on top of the plot
+plt.savefig(EXP_NAME + "_6.png",
+            bbox_extra_artists=(lg, st),
+            bbox_inches='tight',
+            # transparent=True
+            )
 
