@@ -77,7 +77,7 @@ plot_models = [models[0],
 
 fig, ax = plt.subplots(1, 2, constrained_layout=True,
                        sharey=True,sharex=True,
-                       figsize=(12.75, 6.25))
+                       figsize=(8.75, 6.25))
 for i, m in enumerate(plot_models):
     grp = m.group((m.key_species(m.collision_relations)[:, 1:3],
                    m.key_energy_transfer(m.collision_relations)),
@@ -337,10 +337,12 @@ for i_r in range(len(rules)):
 ax1.legend(fontsize=fs_legend, loc="upper right")
 
 # plot right figure (increased energy transfer rates)
-label_right = [r"$\gamma_{E} = $" + str(etf)
+label_right = [r"$\gamma_{ET} = $" + str(etf)
                for etf in ENERGY_FACTORS]
 colors = ["tab:blue", "gold", "tab:purple", "tab:red"]
 for i_ef, ef in enumerate(ENERGY_FACTORS):
+    if ef == 1:
+        continue
     raw = FILE["ET"][str(ef)][()]
     res = np.sum((raw - raw[-1])**2, axis=-1)
     del raw
@@ -415,13 +417,13 @@ print("setup figure and axes")
 fig, (ax1, ax2) = plt.subplots(1, 2, constrained_layout=True,
                                figsize=(12.75, 6.25), sharex=True)
 
-fig.suptitle(r"$\mathcal{L}^2$-Distance to the Local Specific Equilibria",
-             fontsize=fs_suptitle)
+# fig.suptitle(r"$\mathcal{L}^2$-Distance to the Local Specific Maxwellian",
+#              fontsize=fs_suptitle)
 ax1.set_title(r"Unedited, Uniform Collision Weights",
               fontsize=fs_title)
 ax2.set_title(r"Increased Energy Transferring Collisions",
               fontsize=fs_title)
-ax1.set_ylabel(r"$\mathcal{L}^2$-Distance to Local Specific Equilibrium",
+ax1.set_ylabel(r"$\mathcal{L}^2$-Distance to Local Specific Maxwellian",
                fontsize=fs_label)
 
 for ax in [ax1, ax2]:
@@ -455,7 +457,7 @@ for i_r in range(len(rules)):
 ax1.legend(fontsize=fs_legend, loc="upper right")
 
 # plot right figure (increased energy transfer rates)
-label_right = [r"$\gamma_{E} = $" + str(etf)
+label_right = [r"$\gamma_{ET} = $" + str(etf)
                for etf in ENERGY_FACTORS]
 colors = ["tab:blue", "gold", "tab:purple", "tab:red"]
 for i_ef, ef in enumerate(ENERGY_FACTORS):
@@ -848,8 +850,8 @@ for i_r in reordering:
              color=colors[i_r],
              label=label_left[i_r],
              **lw)
-lg = fig.legend(loc="lower center", ncol=3, bbox_to_anchor=(0.5, -0.20),
-                fontsize=fs_legend,)
+lg = fig.legend(loc="lower center", ncol=3, bbox_to_anchor=(0.5, -0.22),
+                fontsize=fs_legend + 2,)
 # plot left figure (gain adjusted weights)
 for i_r in reordering:
     raw = FILE["shape + gain + ET"][str(i_r)]
@@ -1066,9 +1068,9 @@ fig, (ax1, ax2) = plt.subplots(1, 2,
 
 fs = fig.suptitle(r"Comparing Momentum and Energy Transfer for Different DVM",
                   fontsize=fs_suptitle)
-ax1.set_title(r"Specific Momenta $M^s_x$ During Relaxation",
+ax1.set_title(r"Specific Momenta $M^s_x$",
               fontsize=fs_title)
-ax2.set_title("Specific Energies $E^s$ During Relaxation",
+ax2.set_title("Specific Energy Densitites $E^s$",
               fontsize=fs_title)
 
 for ax in [ax1, ax2]:
@@ -1078,9 +1080,9 @@ for ax in [ax1, ax2]:
     ax.tick_params(axis="both", labelsize=fs_ticks)
 
 labels = {"unedited/0": "Original DVM, uniform $\gamma$",
-          "gain + ET/0": r"Gain Adjusted $\gamma$, increased $\gamma_E$",
+          "gain + ET/0": r"Gain Adjusted $\gamma$, increased $\gamma_{ET}$",
           "shape + gain + ET/1": "Larger Grids, Gain Adjusted $\gamma$,\n"
-                                 r"reduced $\Delta_\mathbb{R}$ and increased $\gamma_E$",
+                                 r"reduced $\Delta_\mathbb{R}$ and increased $\gamma_{ET}$",
           "masses + gain/0": "Adjusted Masses,\n"
                              r"Gain Adjusted  $\gamma$"}
 colors = {"unedited/0": "tab:blue",
@@ -1119,12 +1121,14 @@ for key, r in list_rules_plot_6:
                  label="_nolegend",
                  **lw)
 lg = fig.legend(loc="lower center", ncol=2, bbox_to_anchor=(0.5, -0.2),
-                fontsize=fs_legend)
+                fontsize=fs_legend + 2)
 plt.subplots_adjust(top=0.85)
-# For some reason this must be a png,
+# For some reason this must be a png to contain the suptitle,
+# however this is bad quality
+# if I increase the dpi, the same issue appears
 # otherwise a large block of whitespace is put on top of the plot
-plt.savefig(EXP_NAME + "_6.png",
-            bbox_extra_artists=(lg, st),
+plt.savefig(EXP_NAME + "_6.pdf",
+            bbox_extra_artists=(lg,),
             bbox_inches='tight',
             # transparent=True
             )
