@@ -9,15 +9,17 @@ from time import process_time
 #   Generation Parameters    #
 ##############################
 FILENAME = "/exp_collision_generation.hdf5"
-masses = [25, 30]
-mass_str = "({},{})".format(*masses)
+masses = np.array([25, 30])
 SHAPES = {dim: np.array([np.full((2, dim), i, dtype=int)
                          for i in range(3, 51)])
           for dim in [2, 3]}
 MAX_TIME = 3600
-ALGORITHMS = ["four_loop", "three_loop", "vectorized",
-              "group_distance", "group_sorted_distance",
-              "group_norm_and_sorted_distance",
+ALGORITHMS = ["four_loop",
+              "three_loop",
+              "vectorized",
+              "group_distance",                     # dist
+              "group_sorted_distance",              # sdist
+              "group_norm_and_sorted_distance",     # nasd
               "group_distance_no_cutoff",
               "group_sorted_distance_no_cutoff"]
 
@@ -25,6 +27,7 @@ ALGORITHMS = ["four_loop", "three_loop", "vectorized",
 I don't know why, but its not worth solving.
 Use png as format!"""
 
+FORCE_COMPUTE = True
 
 #######################################
 #   Collision Generation Functions    #
@@ -117,14 +120,16 @@ def cmp_relations(self, group_by, cufoff=True, group=None, idx=None):
                         "sorted_distance",
                         "None",
                         "norm_and_sorted_distance"}
+    # time variables for all species measurement
     t_get_colvels = 0.0
     t_shifting = 0.0
     t_get_idx = 0.0
     t_choice = 0.0
     t_partition = 0.0
-    t0_total = process_time()
+    t_total = 0.0
+
     # collect collisions in a lists
-    relations = []
+    all_relations = []
     # Collisions are computed for every pair of specimen
     species_pairs = np.array([(s0, s1) for s0 in self.species
                               for s1 in range(s0, self.nspc)])
@@ -135,10 +140,19 @@ def cmp_relations(self, group_by, cufoff=True, group=None, idx=None):
 
     # Compute collisions iteratively, for each pair
     for s0, s1 in species_pairs:
-        masses = self.masses[[s0, s1]]
+        spc_relations = []
+        # time variables for species measurement
+        ts_get_colvels = 0.0
+        ts_shifting = 0.0
+        ts_get_idx = 0.0
+        ts_choice = 0.0
+        ts_partition = 0.0
+        ts_total_0 = process_time()
 
-        # partition velocities
-        t0_partition = process_time()
+        #####################################################################################
+        #                       partition velocities
+        #####################################################################################
+        ts_partition_0 = process_time()
         if group_by == "None":
             # imitate grouping, to fit into the remaining algorithm
             grp = grids[s0].iG[:, np.newaxis]
@@ -200,14 +214,18 @@ def cmp_relations(self, group_by, cufoff=True, group=None, idx=None):
                 max_distance = None
         else:
             raise ValueError
-        t_partition += process_time() - t0_partition
 
-        # compute collision relations for each partition
+        ts_partition += process_time() - ts_partition_0
+        #####################################################################################
+
+        #####################################################################################
+        #       compute collision relations for each partition
+        #####################################################################################
         for p, partition in enumerate(grp):
             # choose representative velocity
             repr_vel = partition[0]
             # generate collision velocities for representative
-            t0_get_colvels = process_time()
+            ts_get_colvels_0 = process_time()
             repr_colvels = self.get_colvels([s0, s1],
                                             repr_vel,
                                             extended_grids,
@@ -221,12 +239,13 @@ def cmp_relations(self, group_by, cufoff=True, group=None, idx=None):
             # shift to zero for other partition elements
             else:
                 repr_colvels -= repr_vel
-            t_get_colvels += process_time() - t0_get_colvels
+
+            ts_get_colvels += process_time() - ts_get_colvels_0
 
             # compute partitions collision relations, based on repr_colvels
             for pos, v0 in enumerate(partition):
                 # shift repr_colvels onto v0
-                t0_shifting = process_time()
+                ts_shifting_0 = process_time()
                 if grp_sym is None:
                     new_colvels = repr_colvels + v0
                 # rotate and shift repr_colvels onto v0
@@ -235,13 +254,13 @@ def cmp_relations(self, group_by, cufoff=True, group=None, idx=None):
                                             sym_mat[grp_sym[p][pos]],
                                             repr_colvels)
                     new_colvels += v0
-                t_shifting += process_time() - t0_shifting
+                ts_shifting += process_time() - ts_shifting_0
                 # get indices
-                t0_get_idx = process_time()
+                ts_get_idx_0 = process_time()
                 new_rels = self.get_idx([s0, s0, s1, s1], new_colvels)
-                t_get_idx += process_time() - t0_get_idx
+                ts_get_idx += process_time() - ts_get_idx_0
                 # remove out-of-bounds or useless collisions
-                t0_choice = process_time()
+                ts_choice_0 = process_time()
                 choice = np.where(
                     # must be in the grid
                     np.all(new_rels >= 0, axis=1)
@@ -249,25 +268,50 @@ def cmp_relations(self, group_by, cufoff=True, group=None, idx=None):
                     & (new_rels[..., 0] != new_rels[..., 3])
                     & (new_rels[..., 0] != new_rels[..., 1])
                 )
-                t_choice += process_time() - t0_choice
+                ts_choice += process_time() - ts_choice_0
                 # add relations to list
-                relations.extend(new_rels[choice])
-    t_total = process_time() - t0_total
+                spc_relations.extend(new_rels[choice])
+        ts_total = process_time() - ts_total_0
+
+        # store all relations in total relations, relations here,
+        # just denote the ones of this species combinations
+        all_relations.extend(spc_relations)
+
+        # convert list into array
+        spc_relations = np.array(spc_relations, dtype=int)
+        # remove redundant collisions
+        ts_filter_0 = process_time()
+        relations = self.filter(self.key_index(spc_relations), spc_relations)
+        ts_filter = process_time() - ts_filter_0
+        # sort collisions for better comparability
+        relations = self.sort(self.key_index(spc_relations), spc_relations)
+        spc_group = group[str((s0, s1))]
+        spc_group["total_time"][idx] = ts_total
+        spc_group["colvel_time"][idx] = ts_get_colvels
+        spc_group["shifting_time"][idx] = ts_shifting
+        spc_group["get_idx_time"][idx] = ts_get_idx
+        spc_group["choice_time"][idx] = ts_choice
+        spc_group["filter_time"][idx] = ts_filter
+        t_total += ts_total
+        t_get_colvels += ts_get_colvels
+        t_shifting += ts_shifting
+        t_get_idx += ts_get_idx
+        t_choice += ts_choice
     # convert list into array
-    relations = np.array(relations, dtype=int)
+    all_relations = np.array(all_relations, dtype=int)
     # remove redundant collisions
     t0_filter = process_time()
-    relations = self.filter(self.key_index(relations), relations)
+    all_relations = self.filter(self.key_index(all_relations), all_relations)
     t_filter = process_time() - t0_filter
-    # sort collisions for better comparability
-    relations = self.sort(self.key_index(relations), relations)
     group["total_time"][idx] = t_total
     group["colvel_time"][idx] = t_get_colvels
     group["shifting_time"][idx] = t_shifting
     group["get_idx_time"][idx] = t_get_idx
     group["choice_time"][idx] = t_choice
     group["filter_time"][idx] = t_filter
-    return relations
+    # sort collisions for better comparability
+    all_relations = self.sort(self.key_index(all_relations), all_relations)
+    return all_relations
 
 
 def vectorized(self, group=None, idx=None):
@@ -299,35 +343,39 @@ def group_norm_and_sorted_distance(self, group=None, idx=None):
 #################################
 if __name__ == "__main__":
     FILE = h5py.File(bp.SIMULATION_DIR + FILENAME, mode="a")
-    if mass_str in FILE.keys():
-        compute = (input("Precomputed Solution detected for '{}' in"
-                         "\n'{}'.\n"
-                         "Do you want to recompute? (yes/no)"
-                         "".format(mass_str, FILENAME)) == "yes")
-        if compute:
-            del FILE[mass_str]
-    else:
-        print("No precomputed solution detected for '{}'.\n"
-              "Start Computing.".format(mass_str))
-        compute = True
 
-    if not compute:
+    mass_str = "({},{})".format(*masses)
+    if mass_str in FILE.keys() and not FORCE_COMPUTE:
         h5py_group = FILE[mass_str]
     else:
+        # remove existing group
+        if mass_str in FILE.keys():
+            del FILE[mass_str]
+
+        # set up new groups
         FILE.create_group(mass_str)
         for dim in [2, 3]:
             h5py_group = FILE[mass_str].create_group(str(dim))
-            h5py_group["SHAPES"] = SHAPES[dim]
-            h5py_group["ncols"] = np.full(len(SHAPES[dim]), -1, dtype=int)
+            h5py_group.attrs["Grid Shapes"] = SHAPES[dim]
+            # Assert number of found collisions are always equal! (after computation)
+            h5py_group.attrs["Found Collisions"] = np.full(len(SHAPES[dim]), -1, dtype=int)
             SKIP = []
+            # set up groups to store measured times
             for alg in ALGORITHMS:
-                h5py_group.create_group(alg)
-                h5py_group[alg]["total_time"] = np.full(len(SHAPES[dim]), np.nan, dtype=float)
-                h5py_group[alg]["colvel_time"] = np.full(len(SHAPES[dim]), np.nan, dtype=float)
-                h5py_group[alg]["shifting_time"] = np.full(len(SHAPES[dim]), np.nan, dtype=float)
-                h5py_group[alg]["get_idx_time"] = np.full(len(SHAPES[dim]), np.nan, dtype=float)
-                h5py_group[alg]["choice_time"] = np.full(len(SHAPES[dim]), np.nan, dtype=float)
-                h5py_group[alg]["filter_time"] = np.full(len(SHAPES[dim]), np.nan, dtype=float)
+                for spc_str in ["", "/(0, 0)", "/(0, 1)", "/(1, 1)"]:
+                    grp_name = alg + spc_str
+                    h5py_group.create_group(grp_name)
+                    for ds_name in ["total_time",
+                                    "colvel_time",
+                                    "shifting_time",
+                                    "get_idx_time",
+                                    "choice_time",
+                                    "filter_time"]:
+                        h5py_group[grp_name][ds_name] = np.full(len(SHAPES[dim]),
+                                                           np.nan,
+                                                           dtype=float)
+
+            # MEASURE COMPUTATION TIMES
             for i, shapes in enumerate(SHAPES[dim]):
                 print("Computing shape ", shapes[0], "\t", FILENAME)
                 model = bp.CollisionModel(masses, shapes,
@@ -340,11 +388,14 @@ if __name__ == "__main__":
                     tic = process_time()
                     result = locals()[alg](model, h5py_group[alg], i)
                     toc = process_time()
-                    if h5py_group["ncols"][i][()] != -1:
-                        assert h5py_group["ncols"][i][()] == result.shape[0]
+                    # Assert number of found collisions are always equal!
+                    if h5py_group.attrs["Found Collisions"][i][()] != -1:
+                        assert (h5py_group.attrs["Found Collisions"][i][()]
+                                == result.shape[0])
                     else:
-                        h5py_group["ncols"][i] = result.shape[0]
+                        h5py_group.attrs["Found Collisions"][i] = result.shape[0]
                     FILE.flush()
+
                     del result
                     print("\t", alg, toc - tic)
                     # dont wait too long for algorithms
@@ -375,6 +426,15 @@ if __name__ == "__main__":
               "group_sorted_distance_no_cutoff": "tab:olive",
               "group_norm_and_sorted_distance": "tab:blue"}
 
+    NAMES = {"four_loop": "FOUR_LOOP",
+              "three_loop": "THREE_LOOP",
+              "vectorized": "VECTORIZED",
+              "group_distance": "GROUP_DIST",
+              "group_distance_no_cutoff": "GROUP_DIST_NO_CUTOFF",
+              "group_sorted_distance": "GROUP_SADI",
+              "group_sorted_distance_no_cutoff": "GROUP_SADI_NO_CUTOFF",
+              "group_norm_and_sorted_distance": "GROUP_SABV"}
+
     ALL_ALGS = [["four_loop"],
                 ["four_loop", "three_loop"],
                 ["three_loop", "vectorized"],
@@ -388,9 +448,14 @@ if __name__ == "__main__":
                [2, 0],
                [2, 0],
                [2, 0],
+               [2, 0],
+               [2, 0],
                [2, 0]]
     plt_spacing = [[1, 1],
                    [2, 1],
+                   [10, 2],
+                   [10, 2],
+                   [10, 2],
                    [10, 2],
                    [10, 2],
                    [10, 2],
@@ -414,7 +479,7 @@ if __name__ == "__main__":
         # plot different algorithm times
         for d, dim in enumerate([str(2), str(3)]):
             for a, alg in enumerate(CUR_ALGS):
-                label = alg
+                label = NAMES[alg]
                 res = FILE[mass_str][dim][alg]["total_time"][:max_idx[d]]
                 # widths = np.linspace(-0.5, 0.5, len(CUR_ALGS) + 2)
                 # ax[d].bar(x_vals[d] + widths[a+1], res, color=COLORS[alg],
@@ -432,10 +497,12 @@ if __name__ == "__main__":
             ax[d].set_xticklabels(SHAPES[d + 2][:max_idx[d], 0][plt_beg[c][d]::plt_spacing[c][d]])
 
         fig.suptitle("Collision Generation Time "
-                     "for Masses = {} and Different Grid Shapes".format(masses))
+                     "for Masses = {} and Spacings = {}"
+                     "".format(tuple(masses), tuple(2*masses[::-1])))
         ax[0].legend(title="Algorithms:", loc="upper left")
         ax[0].set_ylabel("Computation Time In Seconds")
-        ax[0].set_ylim(ymax=300)
+        # cut off extreme y values (activate, pick and save the plot, uncomment again
+        # ax[0].set_ylim(ymax=250)
         # plt.tight_layout()
         plt.show()
         del fig, ax
