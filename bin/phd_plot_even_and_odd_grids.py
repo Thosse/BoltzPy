@@ -72,7 +72,7 @@ models = [bp.BaseModel(masses,
                        1,
                        spacing),
           bp.BaseModel(masses[[0, 0]],
-                       ((5, 5), (7, 7)),
+                       ((5, 5), (5, 5)),
                        1,
                        [2, 4]),
           ]

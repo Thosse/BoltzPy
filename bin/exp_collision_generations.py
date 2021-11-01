@@ -11,8 +11,10 @@ from time import process_time
 FILENAME = "/exp_collision_generation.hdf5"
 masses = np.array([25, 30])
 SHAPES = {dim: np.array([np.full((2, dim), i, dtype=int)
-                         for i in range(3, 51)])
-          for dim in [2, 3]}
+                         for i in range(3, max_shape)])
+          for dim, max_shape in zip([2, 3], [46, 12])
+}
+
 MAX_TIME = 3600
 ALGORITHMS = ["four_loop",
               "three_loop",
@@ -27,7 +29,8 @@ ALGORITHMS = ["four_loop",
 I don't know why, but its not worth solving.
 Use png as format!"""
 
-FORCE_COMPUTE = True
+FORCE_COMPUTE = False
+
 
 #######################################
 #   Collision Generation Functions    #

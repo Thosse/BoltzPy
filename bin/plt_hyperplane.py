@@ -2,10 +2,9 @@ import boltzpy as bp
 import numpy as np
 import matplotlib
 matplotlib.rcParams['text.usetex'] = True
-matplotlib.rcParams['text.latex.preamble'] = [
-    r'\usepackage{amsmath}',
-    r'\usepackage{amssymb}']
+matplotlib.rcParams['text.latex.preamble'] = r'\usepackage{amsmath, amssymb}'
 import matplotlib.pyplot as plt
+from fonts import fs_title, fs_legend, fs_label, fs_suptitle, fs_ticks
 
 masses = np.array([2, 3])
 model = bp.CollisionModel(masses, [[5, 5], [5, 5]])
@@ -35,25 +34,27 @@ normal = dv[::-1] * [1, -1]
 print(dv, normal)
 
 
-fig, ax = plt.subplots(1, 1)
+fig, ax = plt.subplots(1, 1, constrained_layout=True,
+                       figsize=(3, 3))
 # plot collisions
 model.plot_collisions(cols, plot_object=ax)
 # denote v_i and v_j
-offset = np.array([0.8, -0.7])
-ax.text(*v0 - offset, "$\mathfrak{v}_i$", fontsize=20)
-offset = np.array([-0.8, 0.5])
-ax.text(*v1 - offset, "$\mathfrak{v}_j$", fontsize=20)
+offset = np.array([0.8, -1.1])
+ax.text(*v0 - offset, "$\mathfrak{v}_i$", fontsize=25)
+offset = np.array([-0.9, 0.5])
+ax.text(*v1 - offset, "$\mathfrak{v}_j$", fontsize=25)
 
 # plot right hyperplane
 h1 = w_p + np.array([2*normal, -2*normal])
 ax.plot(h1[:, 0], h1[:, 1],
         linestyle="dashed",
         linewidth=2,
-        c="tab:red",
+        c="black",
         zorder=-11)
-ax.text(9, 4.5, "$H^{s,r}_{\mathfrak{v}_i, \mathfrak{v}_j}$",
-        fontsize=18,
-        c="tab:red")
+ax.text(4.75, 1.75, "$H^{s,r}_{\mathfrak{v}_i, \mathfrak{v}_j}$",
+        # rotation=45,
+        fontsize=28,
+        c="black")
 
 # # plot left hyperplane
 # h2 = w_p_2 + np.array([2*normal, -2*normal])
@@ -78,9 +79,9 @@ ax.annotate(text="", xy=M, xytext=w_p,
             arrowprops=dict(arrowstyle='<->',
                             linewidth=1.5,
                             color="black"))
-offset = np.array([1.5, 0.5])
-ax.text(*w_p - offset, "$p$", fontsize=20)
-ax.scatter(*w_p, c="black", marker="+", s=150,
+offset = np.array([3.0, 0.5])
+ax.text(*w_p - offset, "$p$", fontsize=25)
+ax.scatter(*w_p, c="black", marker="+", s=250,
            zorder=11)
 
 
@@ -91,5 +92,9 @@ ax.set_ylim(-lim, lim)
 ax.set_aspect('equal')
 ax.set_xticks([])
 ax.set_yticks([])
-plt.show()
+ax.spines['top'].set_visible(False)
+ax.spines['right'].set_visible(False)
+ax.spines['bottom'].set_visible(False)
+ax.spines['left'].set_visible(False)
+plt.savefig(bp.SIMULATION_DIR + "/plt_hyperplane.pdf")
 

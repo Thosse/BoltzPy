@@ -75,9 +75,10 @@ plot_models = [models[0],
                                  col_factors)
                ]
 
-fig, ax = plt.subplots(1, 2, constrained_layout=True,
-                       sharey=True,sharex=True,
-                       figsize=(8.75, 6.25))
+fig, ax = plt.subplots(1, 2,
+                       sharey=True,
+                       sharex=True,
+                       figsize=(12.75, 6.25))
 for i, m in enumerate(plot_models):
     grp = m.group((m.key_species(m.collision_relations)[:, 1:3],
                    m.key_energy_transfer(m.collision_relations)),
@@ -100,7 +101,26 @@ for i, m in enumerate(plot_models):
     ax[i].set_aspect('equal')
     ax[i].set_xticks([])
     # ax[i].set_yticks([])
-plt.savefig(EXP_NAME + "_grids.pdf")
+fig.suptitle(r"Energy Transferring Collisions for Bad Masses "
+             + r"$m = " + str(tuple(masses)) + "$",
+             fontsize=fs_suptitle)
+plt.subplots_adjust(top=0.85)
+ax[0].set_title(r"$n^1 = " + str(tuple(plot_models[0].shapes[0]))
+                + ",\:"
+                + r"n^2= " + str(tuple(plot_models[0].shapes[1]))
+                + r"$",
+                fontsize=fs_title)
+ax[1].set_title(r"$n^1 = " + str(tuple(plot_models[1].shapes[0]))
+                + ",\:"
+                + r"n^2= " + str(tuple(plot_models[1].shapes[1]))
+                + r"$",
+                fontsize=fs_title)
+plt.savefig(EXP_NAME + "_grids.pdf",
+            # bbox_extra_artists=(lg,),
+            bbox_inches='tight',
+            # transparent=True
+            )
+# plt.savefig(EXP_NAME + "_grids.pdf")
 plt.cla()
 print("Done!\n")
 
@@ -180,8 +200,8 @@ print("setup figure and axes")
 fig, ax1 = plt.subplots(1, 1, constrained_layout=True,
                         figsize=(8.375, 6.25))
 
-fig.suptitle("Relaxation of Perturbed Temperatures for a Mixture",
-               fontsize=fs_suptitle)
+ax1.set_title("Relaxation of Perturbed Temperatures for a Mixture",
+              fontsize=fs_title)
 ax1.set_ylabel(r"$\mathcal{L}^2$-Distance to Equilibrium",
                fontsize=fs_label)
 ax1.set_xlabel("Time",

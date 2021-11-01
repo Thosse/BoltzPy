@@ -1,9 +1,15 @@
 
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib as mpl
+mpl.rcParams['text.usetex'] = True
+mpl.rcParams['text.latex.preamble'] = r'\usepackage{amsmath, amssymb}'
+from mpl_toolkits.mplot3d import Axes3D
+import matplotlib.animation as mpl_ani
+from fonts import fs_title, fs_legend, fs_label, fs_suptitle, fs_ticks, fs_legend_title
+import boltzpy as bp
 
-
-def plot(masses, vels0, vels1, ax=None, save=None):
+def plot(masses, vels0, vels1, ax=None):
     """plot 2 given velocity arrays"""
     dim = vels0.shape[1]
     # Just in case, I wnad to male a plot of multiple axes
@@ -15,10 +21,17 @@ def plot(masses, vels0, vels1, ax=None, save=None):
     print("Linear independent collision invariants = ",
           n_collision_invariants(masses, vels0, vels1))
     # plot the velocities
-    line1 = ax.scatter(*(vels0.transpose()), **{"marker": 'o', "alpha": 0.5, "s": 100})
-    line2 = ax.scatter(*(vels1.transpose()), **{"marker": 'x', "alpha": 0.9, "s": 150})
+    ax.scatter(*(vels0.transpose()),
+               **{"marker": 'o', "alpha": 0.5, "s": 100},
+               label=r"$m^1=" + str(masses[0]) + r"$"
+    )
+    ax.scatter(*(vels1.transpose()), **{"marker": 'x', "alpha": 0.9, "s": 150},
+               label=r"$m^2=" + str(masses[1]) + r"$"
+    )
     # add a legend that states the masses
-    ax.legend((masses[0], masses[1]), title="masses:")
+    ax.legend(title="Masses:",
+              fontsize=fs_legend,
+              title_fontsize=fs_legend_title)
     # classic view of coordinate axes
     if dim == 2:
         ax.spines['left'].set_position('zero')
@@ -37,11 +50,6 @@ def plot(masses, vels0, vels1, ax=None, save=None):
         plt.gca().set_aspect('equal', adjustable='box')
     elif dim == 3:
         plt.gca().set_aspect('auto', adjustable='box')
-    if save is None:
-        plt.show()
-    else:
-        assert type(save) is str
-        plt.savefig(save)
     return
 
 
@@ -67,18 +75,22 @@ def n_collision_invariants(masses, vels0, vels1=None):
 # mass ratio for all models
 masses = [2, 3]
 
-# 2D-Broadwell Mixture
-# unitless velocities, are mutliplied with a factor for each specimen
-base_vels = np.array([[ 1,  0],
-                      [-1,  0],
-                      [ 0,  1],
-                      [ 0, -1]],
-                     dtype=int)
-# velocities of the concatenated grid
-vels0 = base_vels * masses[1]
-vels1 = base_vels * masses[0]
-plot(masses, vels0, vels1)
+# # 2D-Broadwell Mixture
+# # unitless velocities, are mutliplied with a factor for each specimen
+# base_vels = np.array([[ 1,  0],
+#                       [-1,  0],
+#                       [ 0,  1],
+#                       [ 0, -1]],
+#                      dtype=int)
+# # velocities of the concatenated grid
+# vels0 = base_vels * masses[1]
+# vels1 = base_vels * masses[0]
+# plot(masses, vels0, vels1)
 
+fig = plt.figure(figsize=(12.75, 6.25),
+                 constrained_layout=True)
+ax1 = fig.add_subplot(1, 2, 1, projection='3d')
+ax2 = fig.add_subplot(1, 2, 2, projection='3d')
 # 3D-Broadwell Mixture
 # unitless velocities, are mutliplied with a factor for each specimen
 base_vels = np.array([[ 1,  0,  0],
@@ -91,7 +103,7 @@ base_vels = np.array([[ 1,  0,  0],
 # velocities of the concatenated grid
 vels0 = base_vels * masses[1]
 vels1 = base_vels * masses[0]
-plot(masses, vels0, vels1)
+plot(masses, vels0, vels1, ax=ax1)
 
 # 3D-(2,2,2) model
 # unitless velocities, are mutliplied with a factor for each specimen
@@ -107,6 +119,13 @@ base_vels = np.array([[ 1,  1,  1],
 # velocities of the concatenated grid
 vels0 = base_vels * masses[1]
 vels1 = base_vels * masses[0]
-plot(masses, vels0, vels1)
+plot(masses, vels0, vels1, ax=ax2)
 
-
+for ax in [ax1, ax2]:
+    ax.view_init(elev=15.,
+                 azim=15 # 22.5
+                 )
+    plt.tight_layout()
+plt.savefig(bp.SIMULATION_DIR + "/degenerated_models.pdf",
+            bbox_inches='tight',
+            )
