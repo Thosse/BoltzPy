@@ -81,9 +81,9 @@ ax1.set_title(r"Shifted Collisions in $\mathfrak{C}^{s,s}$",
               fontsize=fs_title)
 ax2.set_title(r"Shifting Collisions in a Mixture",
               fontsize=fs_title)
-ax3.set_title(# r"Equivalence Classes of "
-              r"$\faktor{\mathfrak{V}^1}{dist_2}$"
-              r" and $\faktor{\mathfrak{V}^2}{dist_1}$",
+ax3.set_title(r"Equivalence Classes $\faktor{\mathfrak{V}^s}{dist^r}$",
+              # r"$\faktor{\mathfrak{V}^1}{dist_2}$"
+              # r" and $\faktor{\mathfrak{V}^2}{dist_1}$",
               fontsize=fs_title)
 
 plt.subplots_adjust(top=0.7)

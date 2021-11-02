@@ -1,6 +1,11 @@
 import boltzpy as bp
 import numpy as np
+import matplotlib
+matplotlib.use('Qt5Agg')
+matplotlib.rcParams['text.usetex'] = True
+matplotlib.rcParams['text.latex.preamble'] = r'\usepackage{amsmath, amssymb, faktor}'
 import matplotlib.pyplot as plt
+from fonts import fs_title, fs_legend, fs_label, fs_suptitle, fs_ticks
 
 '''
 NOTE: These plots often require the right display resolution 
@@ -121,4 +126,8 @@ ax1.set_aspect('equal')
 ax1.set_xticks([])
 ax1.set_yticks([])
 
+ax1.set_title(r"Velocity Grids $\mathfrak{V}^s$ and $\mathfrak{V}^r$",
+              fontsize=45)
+ax2.set_title(r"Extended Grids $\mathfrak{V}^s_{ext}$ and $\mathfrak{V}^r_{ext}$",
+              fontsize=45)
 plt.show()
