@@ -56,13 +56,17 @@ for shape in SHAPES:
         print(result[shape][dim]["nasd"])
 COLORS = ["tab:purple", "tab:green", "tab:blue"]
 STYLE = ["-o", "-x", "-"]
-WIDTH = [0.3, 0.3, 1]
+WIDTH = [0.5, 0.5, 3]
 # setup plot
 fig, ax = plt.subplots(1, 3,
                        # constrained_layout=True,
                        figsize=(12.75, 6.25),
                        sharex="all", sharey="all")
 
+labels = {"sdist": r"\textsc{sadi}",
+          "dist":  r"\textsc{dist}",
+          "nasd":  r"\textsc{nasd}"
+          }
 shape = SHAPES[0]
 for d, dim in enumerate([2, 3]):
     max_val = 1
@@ -70,7 +74,7 @@ for d, dim in enumerate([2, 3]):
     for k, key in enumerate(["sdist", "dist", "nasd"]):
         res = result[shape][dim][key]
         ax[d].plot(np.arange(N) + 1, res, STYLE[k], color=COLORS[k],
-                   linewidth=WIDTH[k], label=key)
+                   linewidth=WIDTH[k], label=labels[key])
         # max_val = max(max_val, np.partition(res, -5)[-5])
         max_val = max(max_val, np.max(res))
     ax[d].set_yscale("log")
@@ -115,7 +119,7 @@ fig.suptitle("Partition Sizes for Masses $m=(m^1, 30)$ and Different Grid Shapes
              fontsize=fs_suptitle)
 ax[0].set_ylabel("Partition Size",
                  fontsize=fs_label)
-ax[0].legend(loc="upper center", title="Key Function",
+ax[0].legend(loc="upper center", title="Key Functions",
              fontsize=fs_legend,
              title_fontsize=fs_legend_title)
 plt.subplots_adjust(top=0.85)
