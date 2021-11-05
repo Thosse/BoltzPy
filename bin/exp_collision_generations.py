@@ -1,7 +1,12 @@
 import numpy as np
 import boltzpy as bp
 
+import matplotlib
+matplotlib.use('Qt5Agg')
+matplotlib.rcParams['text.usetex'] = True
+matplotlib.rcParams['text.latex.preamble'] = r'\usepackage{amsmath, amssymb}'
 import matplotlib.pyplot as plt
+from fonts import fs_title, fs_legend, fs_label, fs_suptitle, fs_ticks, fs_legend_title
 import h5py
 from time import process_time
 
@@ -417,9 +422,9 @@ if __name__ == "__main__":
             print("shifting_time:\n", FILE[mass_str][d][alg]["shifting_time"][()])
             print("\n")
 
-    # ################
-    # # create plots #
-    # ################
+    ###############################################################################
+    #       create Collision Generation time plots and Algorithm Comparisons      #
+    ###############################################################################
     COLORS = {"four_loop": "tab:brown",
               "three_loop": "tab:pink",
               "vectorized": "tab:orange",
@@ -429,14 +434,14 @@ if __name__ == "__main__":
               "group_sorted_distance_no_cutoff": "tab:olive",
               "group_norm_and_sorted_distance": "tab:blue"}
 
-    NAMES = {"four_loop": "FOUR_LOOP",
-              "three_loop": "THREE_LOOP",
-              "vectorized": "VECTORIZED",
-              "group_distance": "GROUP_DIST",
-              "group_distance_no_cutoff": "GROUP_DIST_NO_CUTOFF",
-              "group_sorted_distance": "GROUP_SADI",
-              "group_sorted_distance_no_cutoff": "GROUP_SADI_NO_CUTOFF",
-              "group_norm_and_sorted_distance": "GROUP_SABV"}
+    NAMES = {"four_loop": r"\textsc{four\_loop}",
+              "three_loop": r"\textsc{three\_loop}",
+              "vectorized": r"\textsc{vectorized}",
+              "group_distance": r"\textsc{group\_dist}",
+              "group_distance_no_cutoff": r"\textsc{group\_dist\_no\_cutoff}",
+              "group_sorted_distance": r"\textsc{group\_sadi}",
+              "group_sorted_distance_no_cutoff": r"\textsc{group\_sadi\_no\_cutoff}",
+              "group_norm_and_sorted_distance": r"\textsc{group\_nasd}"}
 
     ALL_ALGS = [["four_loop"],
                 ["four_loop", "three_loop"],
@@ -455,7 +460,7 @@ if __name__ == "__main__":
                [2, 0],
                [2, 0]]
     plt_spacing = [[1, 1],
-                   [2, 1],
+                   [3, 1],
                    [10, 2],
                    [10, 2],
                    [10, 2],
@@ -466,7 +471,8 @@ if __name__ == "__main__":
 
     for c, CUR_ALGS in enumerate(ALL_ALGS):
         # setup plot
-        fig, ax = plt.subplots(1, 2, constrained_layout=True)
+        fig, ax = plt.subplots(1, 2,
+                               figsize=(12.75, 6.25))
         print("Algorithms = ", CUR_ALGS)
         # get max index (shape) that was computed
         max_idx = np.full(2, 0, dtype=int)
@@ -490,7 +496,8 @@ if __name__ == "__main__":
                 ax[d].plot(x_vals[d], res, "-o",
                            color=COLORS[alg], label=label)
 
-            ax[d].set_xlabel("Grid Shapes".format(dim))
+            ax[d].set_xlabel(r"Grid Shape $n^1 = n^2 \in \mathbb{R}^" + str(dim) + r"$",
+                             fontsize=fs_label)
             ax[d].set_axisbelow(True)
             ax[d].yaxis.grid(color='darkgray', linestyle='dashed')
             ax[d].xaxis.grid(color='darkgray', linestyle='dashed')
@@ -499,13 +506,127 @@ if __name__ == "__main__":
             ax[d].set_xticks(x_vals[d][plt_beg[c][d]::plt_spacing[c][d]])
             ax[d].set_xticklabels(SHAPES[d + 2][:max_idx[d], 0][plt_beg[c][d]::plt_spacing[c][d]])
 
-        fig.suptitle("Collision Generation Time "
-                     "for Masses = {} and Spacings = {}"
-                     "".format(tuple(masses), tuple(2*masses[::-1])))
-        ax[0].legend(title="Algorithms:", loc="upper left")
-        ax[0].set_ylabel("Computation Time In Seconds")
+        fig.suptitle("Collision Generation Times for "
+                     + r"$m=" + str(tuple(masses))
+                     + r"$ and $\Delta_{\mathbb{Z}} = "
+                     + str(tuple(2*masses[::-1]))
+                     + r"$",
+                     fontsize=fs_suptitle)
+        ax[1].legend(title="Algorithms:", loc="upper left",
+                     fontsize=fs_legend, title_fontsize=fs_legend_title)
+        ax[0].set_ylabel("Computation Time In Seconds",
+                         fontsize=fs_label)
+        for i in [0, 1]:
+            ax[i].tick_params(axis="both", labelsize=fs_ticks)
         # cut off extreme y values (activate, pick and save the plot, uncomment again
         # ax[0].set_ylim(ymax=250)
-        # plt.tight_layout()
-        plt.show()
+        plt.tight_layout()
+        # plt.show()
+        plt.savefig(bp.SIMULATION_DIR + "/col_gen_"
+                    + CUR_ALGS[-1] + ".pdf")
+        del fig, ax
+
+
+    ###############################################################################
+    #       create Collision Times for Non Mixtures     #
+    ###############################################################################
+    COLORS = {"four_loop": "tab:brown",
+              "three_loop": "tab:pink",
+              "vectorized": "tab:orange",
+              "group_distance": "tab:red",
+              "group_distance_no_cutoff": "gold",
+              "group_sorted_distance": "tab:green",
+              "group_sorted_distance_no_cutoff": "tab:olive",
+              "group_norm_and_sorted_distance": "tab:blue"}
+
+    NAMES = {"four_loop": r"\textsc{four\_loop}",
+              "three_loop": r"\textsc{three\_loop}",
+              "vectorized": r"\textsc{vectorized}",
+              "group_distance": r"\textsc{group\_dist}",
+              "group_distance_no_cutoff": r"\textsc{group\_dist\_no\_cutoff}",
+              "group_sorted_distance": r"\textsc{group\_sadi}",
+              "group_sorted_distance_no_cutoff": r"\textsc{group\_sadi\_no\_cutoff}",
+              "group_norm_and_sorted_distance": r"\textsc{group\_nasd}"}
+
+    ALL_ALGS = [["four_loop"],
+                ["four_loop", "three_loop"],
+                ["three_loop", "vectorized"],
+                ["vectorized", "group_distance"],
+                ["vectorized", "group_distance", "group_sorted_distance"],
+                ["vectorized", "group_sorted_distance", "group_norm_and_sorted_distance"],
+                ["group_distance", "group_distance_no_cutoff"]
+                ]
+    plt_beg = [[0, 0],
+               [0, 0],
+               [2, 0],
+               [2, 0],
+               [2, 0],
+               [2, 0],
+               [2, 0],
+               [2, 0]]
+    plt_spacing = [[1, 1],
+                   [3, 1],
+                   [10, 2],
+                   [10, 2],
+                   [10, 2],
+                   [10, 2],
+                   [10, 2],
+                   [10, 2],
+                   [10, 2]]
+
+    for c, CUR_ALGS in enumerate(ALL_ALGS):
+        # setup plot
+        fig, ax = plt.subplots(1, 2,
+                               figsize=(12.75, 6.25))
+        print("Algorithms = ", CUR_ALGS)
+        # get max index (shape) that was computed
+        max_idx = np.full(2, 0, dtype=int)
+        for d, dim in enumerate([str(2),str(3)]):
+            for alg in CUR_ALGS:
+                res = FILE[mass_str][dim][alg]["(0, 0)/total_time"][()]
+                res = np.where(np.isnan(res), -1, res)
+                max_idx[d] = np.max([max_idx[d], res.argmax() + 1])
+        print("max index = ", max_idx)
+        # get x positions of plot from max_idx
+        x_vals = [np.arange(max_idx[d]) for d in [0, 1]]
+
+        # plot different algorithm times
+        for d, dim in enumerate([str(2), str(3)]):
+            for a, alg in enumerate(CUR_ALGS):
+                label = NAMES[alg]
+                res = FILE[mass_str][dim][alg]["(0, 0)/total_time"][:max_idx[d]]
+                # widths = np.linspace(-0.5, 0.5, len(CUR_ALGS) + 2)
+                # ax[d].bar(x_vals[d] + widths[a+1], res, color=COLORS[alg],
+                #           width=widths[1] - widths[0], label=label,)
+                ax[d].plot(x_vals[d], res, "-o",
+                           color=COLORS[alg], label=label)
+
+            ax[d].set_xlabel(r"Grid Shape $n^1 \in \mathbb{R}^" + str(dim) + r"$",
+                             fontsize=fs_label)
+            ax[d].set_axisbelow(True)
+            ax[d].yaxis.grid(color='darkgray', linestyle='dashed')
+            ax[d].xaxis.grid(color='darkgray', linestyle='dashed')
+
+            ax[d].set_ylim(ymin=0)
+            ax[d].set_xticks(x_vals[d][plt_beg[c][d]::plt_spacing[c][d]])
+            ax[d].set_xticklabels(SHAPES[d + 2][:max_idx[d], 0][plt_beg[c][d]::plt_spacing[c][d]])
+
+        fig.suptitle("Collision Generation Times for Non-Mixture with "
+                     + r"$m=" + str(masses[0])
+                     + r"$ and $\Delta_{\mathbb{Z}} = "
+                     + str(2*masses[-1])
+                     + r"$",
+                     fontsize=fs_suptitle)
+        ax[1].legend(title="Algorithms:", loc="upper left",
+                     fontsize=fs_legend, title_fontsize=fs_legend_title)
+        ax[0].set_ylabel("Computation Time In Seconds",
+                         fontsize=fs_label)
+        for i in [0, 1]:
+            ax[i].tick_params(axis="both", labelsize=fs_ticks)
+        # cut off extreme y values (activate, pick and save the plot, uncomment again
+        # ax[0].set_ylim(ymax=250)
+        plt.tight_layout()
+        # plt.show()
+        plt.savefig(bp.SIMULATION_DIR + "/col_gen_nonMixture_"
+                    + CUR_ALGS[-1] + ".pdf")
         del fig, ax
