@@ -447,24 +447,31 @@ class BaseModel(bp.BaseClass):
         assert np.all(self.shapes[s] > 1)
         # compute directly, if mean_velocity is 0
         if np.allclose(mean_velocity, 0):
-            # set up array of manhattan distances to the center
             idx = self.idx_range(s)
-            dist = np.sum(np.abs(self.i_vels[idx] / self.spacings[s]), axis=-1)
-            # use distances as exponent of a gaussian
-            # with a very small/large base to determine minimal maximal temperature
-            # These values were determined by try and error
-            base_min = 0.05
-            base_max = 0.99
-            # compute the respective temperatures
-            t_min = self.cmp_temperature(base_min ** dist, s=s)
-            t_max = self.cmp_temperature(base_max ** dist, s=s)
+            # set up spacing-indepentent maxwellians
+            # as slowly/quickly exponentially decaying functions
+            # to determine minimal maximal temperature
+            # MINIMAL TEMPERATURE:
+            # use a small base and normalize by spacing
+            base = 0.05
+            norm = self.spacings[s]
+            dist = np.sum((self.i_vels[idx] / norm)**2, axis=-1)
+            t_min = self.cmp_temperature(base ** dist, s=s)
+            # MAXIMAL TEMPERATURE:
+            # use a large base and normalize by maximum velocity
+            base = 0.95
+            norm = self.max_i_vels[s] * self.base_delta
+            dist = np.sum((self.i_vels[idx] / norm)**2, axis=-1)
+            t_max = self.cmp_temperature(base ** dist, s=s)
             return np.array([t_min, t_max])
-        # if a mean_velocity is given, compute range for a reduced model
+        # if a mean_velocity is given,
+        # compute two ranges for reduced models
+        # and interpolate between them
         else:
             # use relative difference, for model reduction
-            # the model MUST be reduced in all dimension
+            # Note: the model must be reduced in all dimensions
             rel_diff = np.full(self.ndim, np.max(np.abs(mean_velocity[s]) / self.dv[s]))
-            lower_reduction = np.array(rel_diff, dtype=int)
+            lower_reduction = np.array(rel_diff, dtype=int)     # rounds down
             upper_reduction = lower_reduction + 1
             new_shapes = np.array([self.shapes[s] - lower_reduction,
                                    self.shapes[s] - upper_reduction])
