@@ -30,9 +30,6 @@ ALGORITHMS = ["four_loop",
               "group_distance_no_cutoff",
               "group_sorted_distance_no_cutoff"]
 
-"""This Plot has issues with exporting it as eps.   
-I don't know why, but its not worth solving.
-Use png as format!"""
 
 FORCE_COMPUTE = False
 
@@ -349,284 +346,540 @@ def group_norm_and_sorted_distance(self, group=None, idx=None):
 #################################
 #   Generate Collision Times    #
 #################################
-if __name__ == "__main__":
-    FILE = h5py.File(bp.SIMULATION_DIR + FILENAME, mode="a")
+FILE = h5py.File(bp.SIMULATION_DIR + FILENAME, mode="a")
 
-    mass_str = "({},{})".format(*masses)
-    if mass_str in FILE.keys() and not FORCE_COMPUTE:
-        h5py_group = FILE[mass_str]
-    else:
-        # remove existing group
-        if mass_str in FILE.keys():
-            del FILE[mass_str]
+mass_str = "({},{})".format(*masses)
+if mass_str in FILE.keys() and not FORCE_COMPUTE:
+    h5py_group = FILE[mass_str]
+else:
+    # remove existing group
+    if mass_str in FILE.keys():
+        del FILE[mass_str]
 
-        # set up new groups
-        FILE.create_group(mass_str)
-        for dim in [2, 3]:
-            h5py_group = FILE[mass_str].create_group(str(dim))
-            h5py_group.attrs["Grid Shapes"] = SHAPES[dim]
-            # Assert number of found collisions are always equal! (after computation)
-            h5py_group.attrs["Found Collisions"] = np.full(len(SHAPES[dim]), -1, dtype=int)
-            SKIP = []
-            # set up groups to store measured times
-            for alg in ALGORITHMS:
-                for spc_str in ["", "/(0, 0)", "/(0, 1)", "/(1, 1)"]:
-                    grp_name = alg + spc_str
-                    h5py_group.create_group(grp_name)
-                    for ds_name in ["total_time",
-                                    "colvel_time",
-                                    "shifting_time",
-                                    "get_idx_time",
-                                    "choice_time",
-                                    "filter_time"]:
-                        h5py_group[grp_name][ds_name] = np.full(len(SHAPES[dim]),
-                                                           np.nan,
-                                                           dtype=float)
-
-            # MEASURE COMPUTATION TIMES
-            for i, shapes in enumerate(SHAPES[dim]):
-                print("Computing shape ", shapes[0], "\t", FILENAME)
-                model = bp.CollisionModel(masses, shapes,
-                                          collision_relations=[],
-                                          collision_weights=[],
-                                          setup_collision_matrix=False)
-                for a, alg in enumerate(ALGORITHMS):
-                    if alg in SKIP:
-                        continue
-                    tic = process_time()
-                    result = locals()[alg](model, h5py_group[alg], i)
-                    toc = process_time()
-                    # Assert number of found collisions are always equal!
-                    if h5py_group.attrs["Found Collisions"][i][()] != -1:
-                        assert (h5py_group.attrs["Found Collisions"][i][()]
-                                == result.shape[0])
-                    else:
-                        h5py_group.attrs["Found Collisions"][i] = result.shape[0]
-                    FILE.flush()
-
-                    del result
-                    print("\t", alg, toc - tic)
-                    # dont wait too long for algorithms
-                    if toc - tic > MAX_TIME:
-                        print("STOP ", alg, "\nat shape= ", shapes)
-                        SKIP.append(alg)
-
-    print("Results are:")
-    for d in [str(2), str(3)]:
+    # set up new groups
+    FILE.create_group(mass_str)
+    for dim in [2, 3]:
+        h5py_group = FILE[mass_str].create_group(str(dim))
+        h5py_group.attrs["Grid Shapes"] = SHAPES[dim]
+        # Assert number of found collisions are always equal! (after computation)
+        h5py_group["Found Collisions"] = np.full(len(SHAPES[dim]), -1, dtype=int)
+        SKIP = []
+        # set up groups to store measured times
         for alg in ALGORITHMS:
-            if alg not in FILE[mass_str][d].keys():
-                continue
-            print(alg, "dim = ", d)
-            print("total:\n", FILE[mass_str][d][alg]["total_time"][()])
-            print("colvel_time:\n", FILE[mass_str][d][alg]["colvel_time"][()])
-            print("shifting_time:\n", FILE[mass_str][d][alg]["shifting_time"][()])
-            print("\n")
+            for spc_str in ["", "/(0, 0)", "/(0, 1)", "/(1, 1)"]:
+                grp_name = alg + spc_str
+                h5py_group.create_group(grp_name)
+                for ds_name in ["total_time",
+                                "colvel_time",
+                                "shifting_time",
+                                "get_idx_time",
+                                "choice_time",
+                                "filter_time"]:
+                    h5py_group[grp_name][ds_name] = np.full(len(SHAPES[dim]),
+                                                       np.nan,
+                                                       dtype=float)
 
-    ###############################################################################
-    #       create Collision Generation time plots and Algorithm Comparisons      #
-    ###############################################################################
-    COLORS = {"four_loop": "tab:brown",
-              "three_loop": "tab:pink",
-              "vectorized": "tab:orange",
-              "group_distance": "tab:red",
-              "group_distance_no_cutoff": "gold",
-              "group_sorted_distance": "tab:green",
-              "group_sorted_distance_no_cutoff": "tab:olive",
-              "group_norm_and_sorted_distance": "tab:blue"}
+        # MEASURE COMPUTATION TIMES
+        for i, shapes in enumerate(SHAPES[dim]):
+            print("Computing shape ", shapes[0], "\t", FILENAME)
+            model = bp.CollisionModel(masses, shapes,
+                                      collision_relations=[],
+                                      collision_weights=[],
+                                      setup_collision_matrix=False)
+            for a, alg in enumerate(ALGORITHMS):
+                if alg in SKIP:
+                    continue
+                tic = process_time()
+                result = locals()[alg](model, h5py_group[alg], i)
+                toc = process_time()
+                # Assert number of found collisions are always equal!
+                if h5py_group["Found Collisions"][i][()] != -1:
+                    assert (h5py_group["Found Collisions"][i][()]
+                            == result.shape[0])
+                else:
+                    h5py_group["Found Collisions"][i] = result.shape[0]
+                FILE.flush()
 
-    NAMES = {"four_loop": r"\textsc{four\_loop}",
-              "three_loop": r"\textsc{three\_loop}",
-              "vectorized": r"\textsc{vectorized}",
-              "group_distance": r"\textsc{group\_dist}",
-              "group_distance_no_cutoff": r"\textsc{group\_dist\_no\_cutoff}",
-              "group_sorted_distance": r"\textsc{group\_sadi}",
-              "group_sorted_distance_no_cutoff": r"\textsc{group\_sadi\_no\_cutoff}",
-              "group_norm_and_sorted_distance": r"\textsc{group\_nasd}"}
+                del result
+                print("\t", alg, toc - tic)
+                # dont wait too long for algorithms
+                if toc - tic > MAX_TIME:
+                    print("STOP ", alg, "\nat shape= ", shapes)
+                    SKIP.append(alg)
 
-    ALL_ALGS = [["four_loop"],
-                ["four_loop", "three_loop"],
-                ["three_loop", "vectorized"],
-                ["vectorized", "group_distance"],
-                ["vectorized", "group_distance", "group_sorted_distance"],
-                ["vectorized", "group_sorted_distance", "group_norm_and_sorted_distance"],
-                ["group_distance", "group_distance_no_cutoff"]
-                ]
-    plt_beg = [[0, 0],
-               [0, 0],
-               [2, 0],
-               [2, 0],
-               [2, 0],
-               [2, 0],
-               [2, 0],
-               [2, 0]]
-    plt_spacing = [[1, 1],
-                   [3, 1],
-                   [10, 2],
-                   [10, 2],
-                   [10, 2],
-                   [10, 2],
-                   [10, 2],
-                   [10, 2],
-                   [10, 2]]
+print("Results are:")
+for d in [str(2), str(3)]:
+    for alg in ALGORITHMS:
+        if alg not in FILE[mass_str][d].keys():
+            continue
+        print(alg, "dim = ", d)
+        print("total:\n", FILE[mass_str][d][alg]["total_time"][()])
+        print("colvel_time:\n", FILE[mass_str][d][alg]["colvel_time"][()])
+        print("shifting_time:\n", FILE[mass_str][d][alg]["shifting_time"][()])
+        print("\n")
 
-    for c, CUR_ALGS in enumerate(ALL_ALGS):
-        # setup plot
-        fig, ax = plt.subplots(1, 2,
-                               figsize=(12.75, 6.25))
-        print("Algorithms = ", CUR_ALGS)
-        # get max index (shape) that was computed
-        max_idx = np.full(2, 0, dtype=int)
-        for d, dim in enumerate([str(2),str(3)]):
-            for alg in CUR_ALGS:
-                res = FILE[mass_str][dim][alg]["total_time"][()]
-                res = np.where(np.isnan(res), -1, res)
-                max_idx[d] = np.max([max_idx[d], res.argmax() + 1])
-        print("max index = ", max_idx)
-        # get x positions of plot from max_idx
-        x_vals = [np.arange(max_idx[d]) for d in [0, 1]]
+###############################################################################
+#       create Collision Generation time plots and Algorithm Comparisons      #
+###############################################################################
+COLORS = {"four_loop": "tab:brown",
+          "three_loop": "tab:pink",
+          "vectorized": "tab:orange",
+          "group_distance": "tab:red",
+          "group_distance_no_cutoff": "gold",
+          "group_sorted_distance": "tab:green",
+          "group_sorted_distance_no_cutoff": "tab:olive",
+          "group_norm_and_sorted_distance": "tab:blue"}
 
-        # plot different algorithm times
-        for d, dim in enumerate([str(2), str(3)]):
-            for a, alg in enumerate(CUR_ALGS):
-                label = NAMES[alg]
-                res = FILE[mass_str][dim][alg]["total_time"][:max_idx[d]]
-                # widths = np.linspace(-0.5, 0.5, len(CUR_ALGS) + 2)
-                # ax[d].bar(x_vals[d] + widths[a+1], res, color=COLORS[alg],
-                #           width=widths[1] - widths[0], label=label,)
-                ax[d].plot(x_vals[d], res, "-o",
-                           color=COLORS[alg], label=label)
+NAMES = {"four_loop": r"\textsc{four\_loop}",
+          "three_loop": r"\textsc{three\_loop}",
+          "vectorized": r"\textsc{vectorized}",
+          "group_distance": r"\textsc{group\_dist}",
+          "group_distance_no_cutoff": r"\textsc{group\_dist\_no\_cutoff}",
+          "group_sorted_distance": r"\textsc{group\_sadi}",
+          "group_sorted_distance_no_cutoff": r"\textsc{group\_sadi\_no\_cutoff}",
+          "group_norm_and_sorted_distance": r"\textsc{group\_nasd}"}
 
-            ax[d].set_xlabel(r"Grid Shape $n^1 = n^2 \in \mathbb{R}^" + str(dim) + r"$",
-                             fontsize=fs_label)
-            ax[d].set_axisbelow(True)
-            ax[d].yaxis.grid(color='darkgray', linestyle='dashed')
-            ax[d].xaxis.grid(color='darkgray', linestyle='dashed')
+ALL_ALGS = [["four_loop"],
+            ["four_loop", "three_loop"],
+            ["three_loop", "vectorized"],
+            ["vectorized", "group_distance"],
+            ["vectorized", "group_distance", "group_sorted_distance"],
+            ["vectorized", "group_sorted_distance", "group_norm_and_sorted_distance"],
+            ["group_distance", "group_distance_no_cutoff"]
+            ]
+plt_beg = [[0, 0],
+           [0, 0],
+           [2, 0],
+           [2, 0],
+           [2, 0],
+           [2, 0],
+           [2, 0],
+           [2, 0]]
+plt_spacing = [[1, 1],
+               [3, 1],
+               [10, 2],
+               [10, 2],
+               [10, 2],
+               [10, 2],
+               [10, 2],
+               [10, 2],
+               [10, 2]]
 
-            ax[d].set_ylim(ymin=0)
-            ax[d].set_xticks(x_vals[d][plt_beg[c][d]::plt_spacing[c][d]])
-            ax[d].set_xticklabels(SHAPES[d + 2][:max_idx[d], 0][plt_beg[c][d]::plt_spacing[c][d]])
+for c, CUR_ALGS in enumerate(ALL_ALGS):
+    # setup plot
+    fig, ax = plt.subplots(1, 2,
+                           figsize=(12.75, 6.25))
+    print("Algorithms = ", CUR_ALGS)
+    # get max index (shape) that was computed
+    max_idx = np.full(2, 0, dtype=int)
+    for d, dim in enumerate([str(2),str(3)]):
+        for alg in CUR_ALGS:
+            res = FILE[mass_str][dim][alg]["total_time"][()]
+            res = np.where(np.isnan(res), -1, res)
+            max_idx[d] = np.max([max_idx[d], res.argmax() + 1])
+    print("max index = ", max_idx)
+    # get x positions of plot from max_idx
+    x_vals = [np.arange(max_idx[d]) for d in [0, 1]]
 
-        fig.suptitle("Collision Generation Times for "
-                     + r"$m=" + str(tuple(masses))
-                     + r"$ and $\Delta_{\mathbb{Z}} = "
-                     + str(tuple(2*masses[::-1]))
-                     + r"$",
-                     fontsize=fs_suptitle)
-        ax[1].legend(title="Algorithms:", loc="upper left",
-                     fontsize=fs_legend, title_fontsize=fs_legend_title)
+    # plot different algorithm times
+    for d, dim in enumerate([str(2), str(3)]):
+        for a, alg in enumerate(CUR_ALGS):
+            label = NAMES[alg]
+            res = FILE[mass_str][dim][alg]["total_time"][:max_idx[d]]
+            # widths = np.linspace(-0.5, 0.5, len(CUR_ALGS) + 2)
+            # ax[d].bar(x_vals[d] + widths[a+1], res, color=COLORS[alg],
+            #           width=widths[1] - widths[0], label=label,)
+            ax[d].plot(x_vals[d], res, "-o",
+                       color=COLORS[alg], label=label)
+
+        ax[d].set_xlabel(r"Grid Shape $n^1 = n^2 \in \mathbb{R}^" + str(dim) + r"$",
+                         fontsize=fs_label)
+        ax[d].set_axisbelow(True)
+        ax[d].yaxis.grid(color='darkgray', linestyle='dashed')
+        ax[d].xaxis.grid(color='darkgray', linestyle='dashed')
+
+        ax[d].set_ylim(ymin=0)
+        ax[d].set_xticks(x_vals[d][plt_beg[c][d]::plt_spacing[c][d]])
+        ax[d].set_xticklabels(SHAPES[d + 2][:max_idx[d], 0][plt_beg[c][d]::plt_spacing[c][d]])
+
+    fig.suptitle("Collision Generation Times for "
+                 + r"$m=" + str(tuple(masses))
+                 + r"$ and $\Delta_{\mathbb{Z}} = "
+                 + str(tuple(2*masses[::-1]))
+                 + r"$",
+                 fontsize=fs_suptitle)
+    ax[1].legend(title="Algorithms:", loc="upper left",
+                 fontsize=fs_legend, title_fontsize=fs_legend_title)
+    ax[0].set_ylabel("Computation Time In Seconds",
+                     fontsize=fs_label)
+    for i in [0, 1]:
+        ax[i].tick_params(axis="both", labelsize=fs_ticks)
+    # cut off extreme y values (activate, pick and save the plot, uncomment again
+    # ax[0].set_ylim(ymax=250)
+    plt.tight_layout()
+    # plt.show()
+    plt.savefig(bp.SIMULATION_DIR + "/col_gen_"
+                + CUR_ALGS[-1] + ".pdf")
+    del fig, ax
+
+
+###############################################################################
+#       create Collision Times for Non Mixtures     #
+###############################################################################
+COLORS = {"four_loop": "tab:brown",
+          "three_loop": "tab:pink",
+          "vectorized": "tab:orange",
+          "group_distance": "tab:red",
+          "group_distance_no_cutoff": "gold",
+          "group_sorted_distance": "tab:green",
+          "group_sorted_distance_no_cutoff": "tab:olive",
+          "group_norm_and_sorted_distance": "tab:blue"}
+
+NAMES = {"four_loop": r"\textsc{four\_loop}",
+          "three_loop": r"\textsc{three\_loop}",
+          "vectorized": r"\textsc{vectorized}",
+          "group_distance": r"\textsc{group\_dist}",
+          "group_distance_no_cutoff": r"\textsc{group\_dist\_no\_cutoff}",
+          "group_sorted_distance": r"\textsc{group\_sadi}",
+          "group_sorted_distance_no_cutoff": r"\textsc{group\_sadi\_no\_cutoff}",
+          "group_norm_and_sorted_distance": r"\textsc{group\_nasd}"}
+
+ALL_ALGS = [["four_loop"],
+            ["four_loop", "three_loop"],
+            ["three_loop", "vectorized"],
+            ["vectorized", "group_distance"],
+            ["vectorized", "group_distance", "group_sorted_distance"],
+            ["vectorized", "group_sorted_distance", "group_norm_and_sorted_distance"],
+            ["group_distance", "group_distance_no_cutoff"]
+            ]
+plt_beg = [[0, 0],
+           [0, 0],
+           [2, 0],
+           [2, 0],
+           [2, 0],
+           [2, 0],
+           [2, 0],
+           [2, 0]]
+plt_spacing = [[1, 1],
+               [3, 1],
+               [10, 2],
+               [10, 2],
+               [10, 2],
+               [10, 2],
+               [10, 2],
+               [10, 2],
+               [10, 2]]
+
+for c, CUR_ALGS in enumerate(ALL_ALGS):
+    # setup plot
+    fig, ax = plt.subplots(1, 2,
+                           figsize=(12.75, 6.25))
+    print("Algorithms = ", CUR_ALGS)
+    # get max index (shape) that was computed
+    max_idx = np.full(2, 0, dtype=int)
+    for d, dim in enumerate([str(2),str(3)]):
+        for alg in CUR_ALGS:
+            res = FILE[mass_str][dim][alg]["(0, 0)/total_time"][()]
+            res = np.where(np.isnan(res), -1, res)
+            max_idx[d] = np.max([max_idx[d], res.argmax() + 1])
+    print("max index = ", max_idx)
+    # get x positions of plot from max_idx
+    x_vals = [np.arange(max_idx[d]) for d in [0, 1]]
+
+    # plot different algorithm times
+    for d, dim in enumerate([str(2), str(3)]):
+        for a, alg in enumerate(CUR_ALGS):
+            label = NAMES[alg]
+            res = FILE[mass_str][dim][alg]["(0, 0)/total_time"][:max_idx[d]]
+            # widths = np.linspace(-0.5, 0.5, len(CUR_ALGS) + 2)
+            # ax[d].bar(x_vals[d] + widths[a+1], res, color=COLORS[alg],
+            #           width=widths[1] - widths[0], label=label,)
+            ax[d].plot(x_vals[d], res, "-o",
+                       color=COLORS[alg], label=label)
+
+        ax[d].set_xlabel(r"Grid Shape $n^1 \in \mathbb{R}^" + str(dim) + r"$",
+                         fontsize=fs_label)
+        ax[d].set_axisbelow(True)
+        ax[d].yaxis.grid(color='darkgray', linestyle='dashed')
+        ax[d].xaxis.grid(color='darkgray', linestyle='dashed')
+
+        ax[d].set_ylim(ymin=0)
+        ax[d].set_xticks(x_vals[d][plt_beg[c][d]::plt_spacing[c][d]])
+        ax[d].set_xticklabels(SHAPES[d + 2][:max_idx[d], 0][plt_beg[c][d]::plt_spacing[c][d]])
+
+    fig.suptitle("Collision Generation Times for Non-Mixture with "
+                 + r"$m=" + str(masses[0])
+                 + r"$ and $\Delta_{\mathbb{Z}} = "
+                 + str(2*masses[-1])
+                 + r"$",
+                 fontsize=fs_suptitle)
+    ax[1].legend(title="Algorithms:", loc="upper left",
+                 fontsize=fs_legend, title_fontsize=fs_legend_title)
+    ax[0].set_ylabel("Computation Time In Seconds",
+                     fontsize=fs_label)
+    for i in [0, 1]:
+        ax[i].tick_params(axis="both", labelsize=fs_ticks)
+    # cut off extreme y values (activate, pick and save the plot, uncomment again
+    # ax[0].set_ylim(ymax=250)
+    plt.tight_layout()
+    # plt.show()
+    plt.savefig(bp.SIMULATION_DIR + "/col_gen_nonMixture_"
+                + CUR_ALGS[-1] + ".pdf")
+    del fig, ax
+
+
+###############################################################################
+#       Profiling: plot time of subroutines                                   #
+###############################################################################
+SUBROUTINES = ["colvel_time",
+               "shifting_time",
+               "get_idx_time",
+               "choice_time",
+               # "filter_time",
+               "total_time"
+               ]
+COLORS = {"colvel_time": "tab:blue",
+          "shifting_time": "tab:red",
+          "get_idx_time": "gold",
+          "choice_time": "tab:green",
+          "filter_time": "tab:purple",
+          "total_time": "black"}
+
+SR_NAMES = {"colvel_time": r"Compute $\vec{\mathfrak{C}}^{s,r} [\mathfrak{r}^s_p]$",
+            "shifting_time": "Shifting Operations",
+            "get_idx_time": r"\textsc{get\_index}",
+            "choice_time": "Removal of Bad Collisions",
+            "filter_time": r"\textsc{filter}",
+            "total_time": "Total Time"}
+
+ALG_NAMES = {"four_loop": r"\textsc{four\_loop}",
+             "three_loop": r"\textsc{three\_loop}",
+             "vectorized": r"\textsc{vectorized}",
+             "group_distance": r"\textsc{group\_dist}",
+             "group_distance_no_cutoff": r"\textsc{group\_dist\_no\_cutoff}",
+             "group_sorted_distance": r"\textsc{group\_sadi}",
+             "group_sorted_distance_no_cutoff": r"\textsc{group\_sadi\_no\_cutoff}",
+             "group_norm_and_sorted_distance": r"\textsc{group\_nasd}"}
+CUR_ALGS = ["vectorized", "group_distance", "group_sorted_distance", "group_norm_and_sorted_distance"]
+
+print("Algorithms = ", CUR_ALGS)
+# get max index (shape) that was computed
+max_idx = np.full(2, 0, dtype=int)
+for d, dim in enumerate([str(2), str(3)]):
+    for alg in CUR_ALGS:
+        res = FILE[mass_str][dim][alg]["(0, 0)/total_time"][()]
+        res = np.where(np.isnan(res), -1, res)
+        max_idx[d] = np.max([max_idx[d], res.argmax() + 1])
+print("max index = ", max_idx)
+# get x positions of plot from max_idx
+x_vals = [np.arange(max_idx[d]) for d in [0, 1]]
+
+# plot different algorithm times
+for c, alg in enumerate(CUR_ALGS):
+    # setup plot
+    fig, ax = plt.subplots(1, 2,
+                           figsize=(12.75, 6.25),
+                           # sharey="row",
+                           # sharex="col"
+                           )
+    for d, dim in enumerate([str(2), str(3)]):
+        res = [FILE[mass_str][dim][alg][subroutine][:max_idx[d]]
+               for subroutine in SUBROUTINES]
+        res.append(np.zeros(max_idx[d]))
+        # widths = np.linspace(-0.5, 0.5, len(CUR_ALGS) + 2)
+        # ax[d].bar(x_vals[d] + widths[a+1], res, color=COLORS[alg],
+        #           width=widths[1] - widths[0], label=label,)
+        for i_s, s in enumerate(SUBROUTINES):
+            if s == "total_time":
+                style = "dotted"
+            else:
+                style = "solid"
+            if alg == "vectorized" and s == "shifting_time":
+                ax[d].plot([], [],
+                           color=COLORS[s],
+                           label=SR_NAMES[s],
+                           lw=5)
+            else:
+                # ax[c, d].fill_between(x_vals[d],
+                #                       res[i_s-1],
+                #                       res[i_s],
+                #                       color=COLORS[s],
+                #                       label=NAMES[s])
+                ax[d].plot(x_vals[d],
+                              res[i_s],
+                              color=COLORS[s],
+                              label=SR_NAMES[s],
+                              ls=style,
+                              lw=5)
+
+        ax[d].set_axisbelow(True)
+        ax[d].yaxis.grid(color='darkgray', linestyle='dashed')
+        ax[d].xaxis.grid(color='darkgray', linestyle='dashed')
+
+        ax[d].set_ylim(1e-4, 1e4)
+        ax[d].set_xticks(x_vals[d][plt_beg[-1][d]::plt_spacing[-1][d]])
+        ax[d].set_xticklabels(SHAPES[d + 2][:max_idx[d], 0][plt_beg[-1][d]::plt_spacing[-1][d]])
         ax[0].set_ylabel("Computation Time In Seconds",
                          fontsize=fs_label)
-        for i in [0, 1]:
-            ax[i].tick_params(axis="both", labelsize=fs_ticks)
-        # cut off extreme y values (activate, pick and save the plot, uncomment again
-        # ax[0].set_ylim(ymax=250)
-        plt.tight_layout()
-        # plt.show()
-        plt.savefig(bp.SIMULATION_DIR + "/col_gen_"
-                    + CUR_ALGS[-1] + ".pdf")
-        del fig, ax
-
-
-    ###############################################################################
-    #       create Collision Times for Non Mixtures     #
-    ###############################################################################
-    COLORS = {"four_loop": "tab:brown",
-              "three_loop": "tab:pink",
-              "vectorized": "tab:orange",
-              "group_distance": "tab:red",
-              "group_distance_no_cutoff": "gold",
-              "group_sorted_distance": "tab:green",
-              "group_sorted_distance_no_cutoff": "tab:olive",
-              "group_norm_and_sorted_distance": "tab:blue"}
-
-    NAMES = {"four_loop": r"\textsc{four\_loop}",
-              "three_loop": r"\textsc{three\_loop}",
-              "vectorized": r"\textsc{vectorized}",
-              "group_distance": r"\textsc{group\_dist}",
-              "group_distance_no_cutoff": r"\textsc{group\_dist\_no\_cutoff}",
-              "group_sorted_distance": r"\textsc{group\_sadi}",
-              "group_sorted_distance_no_cutoff": r"\textsc{group\_sadi\_no\_cutoff}",
-              "group_norm_and_sorted_distance": r"\textsc{group\_nasd}"}
-
-    ALL_ALGS = [["four_loop"],
-                ["four_loop", "three_loop"],
-                ["three_loop", "vectorized"],
-                ["vectorized", "group_distance"],
-                ["vectorized", "group_distance", "group_sorted_distance"],
-                ["vectorized", "group_sorted_distance", "group_norm_and_sorted_distance"],
-                ["group_distance", "group_distance_no_cutoff"]
-                ]
-    plt_beg = [[0, 0],
-               [0, 0],
-               [2, 0],
-               [2, 0],
-               [2, 0],
-               [2, 0],
-               [2, 0],
-               [2, 0]]
-    plt_spacing = [[1, 1],
-                   [3, 1],
-                   [10, 2],
-                   [10, 2],
-                   [10, 2],
-                   [10, 2],
-                   [10, 2],
-                   [10, 2],
-                   [10, 2]]
-
-    for c, CUR_ALGS in enumerate(ALL_ALGS):
-        # setup plot
-        fig, ax = plt.subplots(1, 2,
-                               figsize=(12.75, 6.25))
-        print("Algorithms = ", CUR_ALGS)
-        # get max index (shape) that was computed
-        max_idx = np.full(2, 0, dtype=int)
-        for d, dim in enumerate([str(2),str(3)]):
-            for alg in CUR_ALGS:
-                res = FILE[mass_str][dim][alg]["(0, 0)/total_time"][()]
-                res = np.where(np.isnan(res), -1, res)
-                max_idx[d] = np.max([max_idx[d], res.argmax() + 1])
-        print("max index = ", max_idx)
-        # get x positions of plot from max_idx
-        x_vals = [np.arange(max_idx[d]) for d in [0, 1]]
-
-        # plot different algorithm times
-        for d, dim in enumerate([str(2), str(3)]):
-            for a, alg in enumerate(CUR_ALGS):
-                label = NAMES[alg]
-                res = FILE[mass_str][dim][alg]["(0, 0)/total_time"][:max_idx[d]]
-                # widths = np.linspace(-0.5, 0.5, len(CUR_ALGS) + 2)
-                # ax[d].bar(x_vals[d] + widths[a+1], res, color=COLORS[alg],
-                #           width=widths[1] - widths[0], label=label,)
-                ax[d].plot(x_vals[d], res, "-o",
-                           color=COLORS[alg], label=label)
-
-            ax[d].set_xlabel(r"Grid Shape $n^1 \in \mathbb{R}^" + str(dim) + r"$",
-                             fontsize=fs_label)
-            ax[d].set_axisbelow(True)
-            ax[d].yaxis.grid(color='darkgray', linestyle='dashed')
-            ax[d].xaxis.grid(color='darkgray', linestyle='dashed')
-
-            ax[d].set_ylim(ymin=0)
-            ax[d].set_xticks(x_vals[d][plt_beg[c][d]::plt_spacing[c][d]])
-            ax[d].set_xticklabels(SHAPES[d + 2][:max_idx[d], 0][plt_beg[c][d]::plt_spacing[c][d]])
-
-        fig.suptitle("Collision Generation Times for Non-Mixture with "
-                     + r"$m=" + str(masses[0])
-                     + r"$ and $\Delta_{\mathbb{Z}} = "
-                     + str(2*masses[-1])
-                     + r"$",
-                     fontsize=fs_suptitle)
-        ax[1].legend(title="Algorithms:", loc="upper left",
-                     fontsize=fs_legend, title_fontsize=fs_legend_title)
-        ax[0].set_ylabel("Computation Time In Seconds",
+        ax[d].tick_params(axis="both", labelsize=fs_ticks)
+        ax[d].set_yscale("log")
+        ax[d].set_xlabel(r"Grid Shape $n^1 = n^2 \in \mathbb{R}^" + str(dim) + r"$",
                          fontsize=fs_label)
-        for i in [0, 1]:
-            ax[i].tick_params(axis="both", labelsize=fs_ticks)
-        # cut off extreme y values (activate, pick and save the plot, uncomment again
-        # ax[0].set_ylim(ymax=250)
-        plt.tight_layout()
-        # plt.show()
-        plt.savefig(bp.SIMULATION_DIR + "/col_gen_nonMixture_"
-                    + CUR_ALGS[-1] + ".pdf")
-        del fig, ax
+    ax[1].legend(loc="upper left",
+                 fontsize=fs_legend)
+    fig.suptitle("Computation Time Analysis of"
+                 + ALG_NAMES[alg] + " for "
+                 + r"$m=" + str(tuple(masses))
+                 + r"$",
+                 fontsize=fs_suptitle)
+
+    # cut off extreme y values (activate, pick and save the plot, uncomment again
+    # ax[0].set_ylim(ymax=250)
+    plt.tight_layout()
+    # plt.show()
+    plt.savefig(bp.SIMULATION_DIR + "/col_gen_" + alg + "_profiling_2.pdf")
+    del fig, ax
+
+
+###############################################################################
+#       Compute Collision Times for different Masses                          #
+###############################################################################
+FILENAME = "/exp_collision_generation_fixed_shape.hdf5"
+SHAPES = [31, 9]
+max_mass = 30
+masses = np.zeros((max_mass, 2), dtype=int)
+masses[:, 1] = max_mass
+masses[:, 0] = np.arange(1, max_mass + 1)
+ALGORITHMS = [
+    "vectorized",
+    "group_distance",                     # dist
+    "group_sorted_distance",              # sdist
+    "group_norm_and_sorted_distance",     # nasd
+    # "group_distance_no_cutoff",
+    # "group_sorted_distance_no_cutoff"
+    ]
+
+FORCE_COMPUTE = True
+
+FILE = h5py.File(bp.SIMULATION_DIR + FILENAME, mode="a")
+if str(SHAPES) in FILE.keys() and not FORCE_COMPUTE:
+    print("SKIP COMPUTATION FOR FIXED SHAPE")
+    h5py_group = FILE[str(SHAPES)]
+else:
+    print("COMPUTE TIMES FOR FIXED SHAPE")
+    # remove existing group
+    if str(SHAPES) in FILE.keys():
+        del FILE[str(SHAPES)]
+
+    # set up new groups
+    h5py_group = FILE.create_group(str(SHAPES))
+    h5py_group.attrs["masses"] = masses
+    for dim in [2, 3]:
+        h5py_group = FILE[str(SHAPES)].create_group(str(dim))
+        # Assert number of found collisions are always equal! (after computation)
+        h5py_group["Found Collisions"] = np.full(len(masses), -1, dtype=int)
+        # set up groups to store measured times
+        for alg in ALGORITHMS:
+            for spc_str in ["", "/(0, 0)", "/(0, 1)", "/(1, 1)"]:
+                grp_name = alg + spc_str
+                h5py_group.create_group(grp_name)
+                for ds_name in ["total_time",
+                                "colvel_time",
+                                "shifting_time",
+                                "get_idx_time",
+                                "choice_time",
+                                "filter_time"]:
+                    h5py_group[grp_name][ds_name] = np.full(masses.shape[0],
+                                                            np.nan,
+                                                            dtype=float)
+
+        SHAPE = np.full((2, dim), SHAPES[dim-2], dtype=int)
+        # MEASURE COMPUTATION TIMES
+        for i_m, m in enumerate(masses):
+            print("Computing dim = ", dim, " mass = ", m[0], "\t", FILENAME)
+            model = bp.CollisionModel(m, SHAPE,
+                                      collision_relations=[],
+                                      collision_weights=[],
+                                      setup_collision_matrix=False)
+            for a, alg in enumerate(ALGORITHMS):
+                tic = process_time()
+                result = locals()[alg](model, h5py_group[alg], i_m)
+                toc = process_time()
+                # Assert number of found collisions are always equal!
+                if h5py_group["Found Collisions"][i_m][()] != -1:
+                    assert (h5py_group["Found Collisions"][i_m][()]
+                            == result.shape[0])
+                else:
+                    h5py_group["Found Collisions"][i_m] = result.shape[0]
+                FILE.flush()
+
+                del result
+                print("\t", alg, toc - tic)
+FILE.close()
+FILE = h5py.File(bp.SIMULATION_DIR + FILENAME, mode="r")
+
+###############################################################################
+#       Create Plot, for mass dependence of collision times                   #
+###############################################################################
+COLORS = {"vectorized": "tab:orange",
+          "group_distance": "tab:red",
+          "group_distance_no_cutoff": "gold",
+          "group_sorted_distance": "tab:green",
+          "group_sorted_distance_no_cutoff": "tab:olive",
+          "group_norm_and_sorted_distance": "tab:blue"}
+
+NAMES = {"vectorized": r"\textsc{vectorized}",
+         "group_distance": r"\textsc{group\_dist}",
+         "group_distance_no_cutoff": r"\textsc{group\_dist\_no\_cutoff}",
+         "group_sorted_distance": r"\textsc{group\_sadi}",
+         "group_sorted_distance_no_cutoff": r"\textsc{group\_sadi\_no\_cutoff}",
+         "group_norm_and_sorted_distance": r"\textsc{group\_nasd}"}
+
+# setup plot
+fig, ax = plt.subplots(1, 2,
+                       figsize=(12.75, 6.25))
+# plot different algorithm times
+for d, dim in enumerate([str(2), str(3)]):
+    SHAPE = np.full(d+2, SHAPES[d], dtype=int)
+    ax[d].set_title("Grid Shapes "
+                    + r"$n^1 = n^2 = " + str(tuple(SHAPE))
+                    + r"$",
+                    fontsize=fs_suptitle)
+    for a, alg in enumerate(ALGORITHMS):
+        label = NAMES[alg]
+        res = FILE[str(SHAPES)][dim][alg]["total_time"][()]
+        # widths = np.linspace(-0.5, 0.5, len(CUR_ALGS) + 2)
+        # ax[d].bar(x_vals[d] + widths[a+1], res, color=COLORS[alg],
+        #           width=widths[1] - widths[0], label=label,)
+        ax[d].plot(masses[:, 0],
+                   res, "-o",
+                   color=COLORS[alg], label=label)
+
+    ax[d].set_xlabel(r"Mass $m^1$",
+                     # r" for $m^2 = " + str(max_mass) + r"$",
+                     fontsize=fs_label)
+    ax[d].set_axisbelow(True)
+    ax[d].yaxis.grid(color='darkgray', linestyle='dashed')
+    ax[d].xaxis.grid(color='darkgray', linestyle='dashed')
+
+    ax[d].set_ylim(ymin=0)
+    # ax[d].set_xticks(x_vals[d][plt_beg[c][d]::plt_spacing[c][d]])
+    # ax[d].set_xticklabels(SHAPES[d + 2][:max_idx[d], 0][plt_beg[c][d]::plt_spacing[c][d]])
+
+fig.suptitle("Collision Generation Times for "
+             + "Different Masses "
+             + r"$m = (m^1, " + str(max_mass)
+             + r")$",
+             fontsize=fs_suptitle)
+ax[1].legend(title="Algorithms:", loc="upper left",
+             fontsize=fs_legend, title_fontsize=fs_legend_title)
+ax[0].set_ylabel("Computation Time In Seconds",
+                 fontsize=fs_label)
+for i in [0, 1]:
+    ax[i].tick_params(axis="both", labelsize=fs_ticks)
+# cut off extreme y values (activate, pick and save the plot, uncomment again
+# ax[0].set_ylim(ymax=250)
+plt.tight_layout()
+# plt.show()
+plt.savefig(bp.SIMULATION_DIR + "/col_gen_profiling_1" + ".pdf")
+del fig, ax

@@ -1,5 +1,9 @@
 import boltzpy as bp
 import numpy as np
+import matplotlib
+matplotlib.use('Qt5Agg')
+matplotlib.rcParams['text.usetex'] = True
+matplotlib.rcParams['text.latex.preamble'] = r'\usepackage{amsmath, amssymb, faktor}'
 import matplotlib.pyplot as plt
 
 '''
@@ -129,5 +133,9 @@ ax1.set_aspect('equal')
 ax2.set_aspect('equal')
 ax1.set_xticks([])
 ax1.set_yticks([])
+ax1.set_title(r"Collision Shifts in $\faktor{\mathfrak{C}^{s,r}}{dist^r}$",
+              fontsize=45, pad=20)
+ax2.set_title(r"Symmetric Shifts in $\faktor{\mathfrak{C}^{s,r}}{sadi^r}$",
+              fontsize=45, pad=20)
 
 plt.show()
