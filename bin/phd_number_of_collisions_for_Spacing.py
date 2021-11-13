@@ -194,3 +194,79 @@ plt.subplots_adjust(top=0.85)
 plt.savefig(bp.SIMULATION_DIR + "/phd_number_of_collisions_for_spacing.pdf",
             bbox_extra_artists=(lg, st ),
             bbox_inches='tight')
+
+##################################################################################
+#           Local Symmetries in mixtures with unequal spacings                   #
+##################################################################################
+fig = plt.figure(figsize=(12.75, 6.25))
+ax = fig.add_subplot()
+
+model = bp.CollisionModel([2, 3],
+                          [(4, 4), (6, 6)],
+                          2.0)
+
+ax = model.plot_collisions(plot_object=ax)
+col_black = np.array(
+    [[6, -6],
+     [4,-4],
+     [-4, -4],
+     [-6, -6],
+     [6, -6],
+     [6, 6],
+     [4, 4],
+     [4, -4],
+     [6, -6]],
+    dtype=float
+)
+ax.plot(col_black[:, 0], col_black[:, 1], color="black")
+red_shift = col_black + np.array([[-12, 12]])
+ax.plot(red_shift[:, 0], red_shift[:, 1],
+        color="red",
+        linewidth=2,
+        linestyle="dotted",
+        # dashes=(20, 15)
+        )
+red_rotate = np.array(
+    [[6, -6],
+     [-6, -6],
+     [-4, -8],
+     [4, -8],
+     [6, -6],
+     [18, -6],
+     [16, -8],
+     [8, -8],
+     [6, -6],
+     [18, -6],
+     [16, -4],
+     [8, -4],
+     [6, -6],
+     [6, 6],
+     [8, 4],
+     [8, -4],
+     [6, -6],
+     [8, -8],
+     [8, -16],
+     [6, -18],
+     [6, -6],
+     [4, -8],
+     [4, -16],
+     [6, -18],
+     [6, -6],
+     ],
+    dtype=float
+)
+ax.plot(red_rotate[:, 0], red_rotate[:, 1],
+        color="red",
+        linewidth=2,
+        linestyle="dotted",
+        # dashes=(20, 15)
+        )
+ax.set_xticks([])
+ax.set_yticks([])
+ax.set_aspect('equal')
+ax.set_title(r"Missing Local Symmetries in a Mixture",
+             fontsize=fs_title)
+
+plt.tight_layout()
+plt.savefig(bp.SIMULATION_DIR + "/phd_local_symmetries_mixture.pdf")
+# plt.show()
