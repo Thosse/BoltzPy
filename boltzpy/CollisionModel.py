@@ -619,14 +619,14 @@ class CollisionModel(bp.BaseModel):
                 max_distance = None
             elif group_by == "norm_and_sorted_distance":
                 # group based on sorted velocity components and sorted distance
-                sort_dist = grids[s1].key_distance(grids[s0].iG)[..., :-1]
+                # sort_dist = grids[s1].key_sorted_distance(grids[s0].iG)[..., :-1]
                 sort_vel = np.sort(np.abs(grids[s0].iG), axis=-1)
                 sym_vel = grids[s1].key_symmetry_group(grids[s0].iG)
                 # group both grp and grp_sym in one go (and with same order)
-                grp, grp_sym = self.group((sort_vel, sort_dist),
+                grp, grp_sym = self.group(sort_vel,
                                           (grids[s0].iG, sym_vel),
                                           as_dict=False)
-                del sort_dist, sort_vel, sym_vel
+                del sort_vel, sym_vel
                 # no extended grids necessary
                 extended_grids = np.array([grids[s0], grids[s1]], dtype=object)
                 # no cutoff with max_distances necessary
@@ -838,8 +838,7 @@ class CollisionModel(bp.BaseModel):
 
         # compute viscosity
         assert dt > 0 and maxiter > 0
-        result = rule.compute(dt,
-                              maxiter=maxiter)
+        result = rule.compute(dt, maxiter=maxiter)
         # compute viscosity as scalar product
         viscosity = np.sum(result[-1] * mom_func)
         normalize = np.sum(mom_func**2 * rule.initial_state)
@@ -905,6 +904,7 @@ class CollisionModel(bp.BaseModel):
                         relations=None,
                         species=None,
                         plot_object=None,
+                        lw=0.2,
                         **kwargs):
         """Plot the Grid using matplotlib."""
         relations = [] if relations is None else np.array(relations, ndmin=2)
@@ -928,7 +928,7 @@ class CollisionModel(bp.BaseModel):
             rels = np.tile(r, 2)
             # transpose the velocities, for easy unpacking
             vels = (self.vels[rels]).transpose()
-            ax.plot(*vels, color="gray", linewidth=0.2)
+            ax.plot(*vels, color="gray", linewidth=lw)
 
         # set tick values on axes, None = auto choice of matplotlib
         if "xticks" in kwargs.keys():
