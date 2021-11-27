@@ -26,12 +26,13 @@ ALGORITHMS = ["four_loop",
               "vectorized",
               "group_distance",                     # dist
               "group_sorted_distance",              # sdist
-              "group_norm_and_sorted_distance",     # nasd
-              "group_distance_no_cutoff",
-              "group_sorted_distance_no_cutoff"]
+              "group_norm_and_sorted_distance",     # sabv
+              # "group_distance_no_cutoff",
+              # "group_sorted_distance_no_cutoff"
+              ]
 
 
-FORCE_COMPUTE = False
+FORCE_COMPUTE = True
 
 
 #######################################
@@ -169,14 +170,13 @@ def cmp_relations(self, group_by, cufoff=True, group=None, idx=None):
             max_distance = None
         elif group_by == "norm_and_sorted_distance":
             # group based on sorted velocity components and sorted distance
-            sort_dist = grids[s1].key_distance(grids[s0].iG)[..., :-1]
             sort_vel = np.sort(np.abs(grids[s0].iG), axis=-1)
             sym_vel = grids[s1].key_symmetry_group(grids[s0].iG)
             # group both grp and grp_sym in one go (and with same order)
-            grp, grp_sym = self.group((sort_vel, sort_dist),
+            grp, grp_sym = self.group(sort_vel,
                                       (grids[s0].iG, sym_vel),
                                       as_dict=False)
-            del sort_dist, sort_vel, sym_vel
+            del sort_vel, sym_vel
             # no extended grids necessary
             extended_grids = np.array([grids[s0], grids[s1]], dtype=object)
             # no cutoff with max_distances necessary
@@ -437,7 +437,7 @@ NAMES = {"four_loop": r"\textsc{four\_loop}",
           "group_distance_no_cutoff": r"\textsc{group\_dist\_no\_cutoff}",
           "group_sorted_distance": r"\textsc{group\_sadi}",
           "group_sorted_distance_no_cutoff": r"\textsc{group\_sadi\_no\_cutoff}",
-          "group_norm_and_sorted_distance": r"\textsc{group\_nasd}"}
+          "group_norm_and_sorted_distance": r"\textsc{group\_sabv}"}
 
 ALL_ALGS = [["four_loop"],
             ["four_loop", "three_loop"],
@@ -445,7 +445,7 @@ ALL_ALGS = [["four_loop"],
             ["vectorized", "group_distance"],
             ["vectorized", "group_distance", "group_sorted_distance"],
             ["vectorized", "group_sorted_distance", "group_norm_and_sorted_distance"],
-            ["group_distance", "group_distance_no_cutoff"]
+            # ["group_distance", "group_distance_no_cutoff"]
             ]
 plt_beg = [[0, 0],
            [0, 0],
@@ -542,7 +542,7 @@ NAMES = {"four_loop": r"\textsc{four\_loop}",
           "group_distance_no_cutoff": r"\textsc{group\_dist\_no\_cutoff}",
           "group_sorted_distance": r"\textsc{group\_sadi}",
           "group_sorted_distance_no_cutoff": r"\textsc{group\_sadi\_no\_cutoff}",
-          "group_norm_and_sorted_distance": r"\textsc{group\_nasd}"}
+          "group_norm_and_sorted_distance": r"\textsc{group\_sabv}"}
 
 ALL_ALGS = [["four_loop"],
             ["four_loop", "three_loop"],
@@ -550,7 +550,7 @@ ALL_ALGS = [["four_loop"],
             ["vectorized", "group_distance"],
             ["vectorized", "group_distance", "group_sorted_distance"],
             ["vectorized", "group_sorted_distance", "group_norm_and_sorted_distance"],
-            ["group_distance", "group_distance_no_cutoff"]
+            # ["group_distance", "group_distance_no_cutoff"]
             ]
 plt_beg = [[0, 0],
            [0, 0],
@@ -638,8 +638,8 @@ SUBROUTINES = ["colvel_time",
                # "filter_time",
                "total_time"
                ]
-COLORS = {"colvel_time": "tab:blue",
-          "shifting_time": "tab:red",
+COLORS = {"colvel_time": "tab:red",
+          "shifting_time": "tab:blue",
           "get_idx_time": "gold",
           "choice_time": "tab:green",
           "filter_time": "tab:purple",
@@ -659,7 +659,7 @@ ALG_NAMES = {"four_loop": r"\textsc{four\_loop}",
              "group_distance_no_cutoff": r"\textsc{group\_dist\_no\_cutoff}",
              "group_sorted_distance": r"\textsc{group\_sadi}",
              "group_sorted_distance_no_cutoff": r"\textsc{group\_sadi\_no\_cutoff}",
-             "group_norm_and_sorted_distance": r"\textsc{group\_nasd}"}
+             "group_norm_and_sorted_distance": r"\textsc{group\_sabv}"}
 CUR_ALGS = ["vectorized", "group_distance", "group_sorted_distance", "group_norm_and_sorted_distance"]
 
 print("Algorithms = ", CUR_ALGS)
@@ -695,9 +695,21 @@ for c, alg in enumerate(CUR_ALGS):
             else:
                 style = "solid"
             if alg == "vectorized" and s == "shifting_time":
-                ax[d].plot([], [],
+                # ax[d].plot([], [],
+                #            color=COLORS[s],
+                #            label=SR_NAMES[s],
+                #            lw=5)
+                pass
+            elif alg == "vectorized" and s == "colvel_time":
+                # ax[d].plot([], [],
+                #            color=COLORS[s],
+                #            label=SR_NAMES[s],
+                #            lw=5)
+                ax[d].plot(x_vals[d],
+                           res[i_s],
                            color=COLORS[s],
-                           label=SR_NAMES[s],
+                           label=r"\textsc{hyperplane}",
+                           ls=style,
                            lw=5)
             else:
                 # ax[c, d].fill_between(x_vals[d],
@@ -727,7 +739,7 @@ for c, alg in enumerate(CUR_ALGS):
                          fontsize=fs_label)
     ax[1].legend(loc="upper left",
                  fontsize=fs_legend)
-    fig.suptitle("Computation Time Analysis of"
+    fig.suptitle("Computation Time Analysis of "
                  + ALG_NAMES[alg] + " for "
                  + r"$m=" + str(tuple(masses))
                  + r"$",
@@ -737,7 +749,7 @@ for c, alg in enumerate(CUR_ALGS):
     # ax[0].set_ylim(ymax=250)
     plt.tight_layout()
     # plt.show()
-    plt.savefig(bp.SIMULATION_DIR + "/col_gen_" + alg + "_profiling_2.pdf")
+    plt.savefig(bp.SIMULATION_DIR + "/col_gen_" + alg + "_profiling.pdf")
     del fig, ax
 
 
@@ -833,7 +845,7 @@ NAMES = {"vectorized": r"\textsc{vectorized}",
          "group_distance_no_cutoff": r"\textsc{group\_dist\_no\_cutoff}",
          "group_sorted_distance": r"\textsc{group\_sadi}",
          "group_sorted_distance_no_cutoff": r"\textsc{group\_sadi\_no\_cutoff}",
-         "group_norm_and_sorted_distance": r"\textsc{group\_nasd}"}
+         "group_norm_and_sorted_distance": r"\textsc{group\_sabv}"}
 
 # setup plot
 fig, ax = plt.subplots(1, 2,
@@ -881,5 +893,5 @@ for i in [0, 1]:
 # ax[0].set_ylim(ymax=250)
 plt.tight_layout()
 # plt.show()
-plt.savefig(bp.SIMULATION_DIR + "/col_gen_profiling_1" + ".pdf")
+plt.savefig(bp.SIMULATION_DIR + "/col_gen_profiling" + ".pdf")
 del fig, ax
