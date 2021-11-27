@@ -26,7 +26,7 @@ result = {shape: {dim: {key: np.full(MASSES.shape[0], -1, dtype=int)
 for shape in SHAPES:
     for dim in [2, 3]:
         for m, masses in enumerate(MASSES):
-            # print("Masses = ", masses)
+            print("\rMasses = ", masses, end="")
             model = bp.CollisionModel(masses,
                                       np.full((2, dim), shape, dtype=int),
                                       0.25,
@@ -65,7 +65,7 @@ fig, ax = plt.subplots(1, 3,
 
 labels = {"sdist": r"\textsc{sadi}",
           "dist":  r"\textsc{dist}",
-          "nasd":  r"\textsc{nasd}"
+          "nasd":  r"\textsc{sabv}"
           }
 shape = SHAPES[0]
 for d, dim in enumerate([2, 3]):
@@ -104,9 +104,9 @@ for k, key in enumerate(["sdist", "dist", "nasd"]):
     # max_val = max(max_val, np.partition(res, -5)[-5])
     max_val = max(max_val, np.max(res))
 ax[d].set_yscale("log")
-ax[d].set_ylim(1, max_val ** 1.05)
+ax[d].set_ylim(0.8, max_val ** 1.05)
 # ax[d].set_ylim(0, max_val * 1.05)
-ax[d].set_xlim(1, MASSES[:, 0].max())
+ax[d].set_xlim(0, MASSES[:, 0].max() + 1)
 ax[d].set_axisbelow(True)
 ax[d].yaxis.grid(color='darkgray', linestyle='dashed', which="both",
                  linewidth=0.15)
@@ -117,7 +117,7 @@ ax[d].set_title("Grid Shape {}".format(tuple([shape] * dim)),
 
 fig.suptitle("Partition Sizes for Masses $m=(m^1, 30)$ and Different Grid Shapes",
              fontsize=fs_suptitle)
-ax[0].set_ylabel("Partition Size",
+ax[0].set_ylabel(r"Partition Size of $\mathfrak{V}^1$",
                  fontsize=fs_label)
 ax[0].legend(loc="upper center", title="Key Functions",
              fontsize=fs_legend,

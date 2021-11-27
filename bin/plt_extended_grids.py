@@ -127,7 +127,7 @@ ax1.set_xticks([])
 ax1.set_yticks([])
 
 ax1.set_title(r"Velocity Grids $\mathfrak{V}^s$ and $\mathfrak{V}^r$",
-              fontsize=45)
+              fontsize=65)
 ax2.set_title(r"Extended Grids $\mathfrak{V}^s_{ext}$ and $\mathfrak{V}^r_{ext}$",
-              fontsize=45)
+              fontsize=65)
 plt.show()
