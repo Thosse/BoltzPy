@@ -32,7 +32,7 @@ ALGORITHMS = ["four_loop",
               ]
 
 
-FORCE_COMPUTE = True
+FORCE_COMPUTE = False
 
 
 #######################################
@@ -509,7 +509,7 @@ for c, CUR_ALGS in enumerate(ALL_ALGS):
                  + r"$",
                  fontsize=fs_suptitle)
     ax[1].legend(title="Algorithms:", loc="upper left",
-                 fontsize=fs_legend, title_fontsize=fs_legend_title)
+                 fontsize=fs_legend + 1, title_fontsize=fs_legend_title)
     ax[0].set_ylabel("Computation Time In Seconds",
                      fontsize=fs_label)
     for i in [0, 1]:
@@ -614,7 +614,7 @@ for c, CUR_ALGS in enumerate(ALL_ALGS):
                  + r"$",
                  fontsize=fs_suptitle)
     ax[1].legend(title="Algorithms:", loc="upper left",
-                 fontsize=fs_legend, title_fontsize=fs_legend_title)
+                 fontsize=fs_legend+1, title_fontsize=fs_legend_title)
     ax[0].set_ylabel("Computation Time In Seconds",
                      fontsize=fs_label)
     for i in [0, 1]:
@@ -638,10 +638,10 @@ SUBROUTINES = ["colvel_time",
                # "filter_time",
                "total_time"
                ]
-COLORS = {"colvel_time": "tab:red",
-          "shifting_time": "tab:blue",
-          "get_idx_time": "gold",
-          "choice_time": "tab:green",
+COLORS = {"colvel_time": "gold",
+          "shifting_time": "tab:red",
+          "get_idx_time": "tab:green",
+          "choice_time": "tab:blue",
           "filter_time": "tab:purple",
           "total_time": "black"}
 
@@ -771,7 +771,7 @@ ALGORITHMS = [
     # "group_sorted_distance_no_cutoff"
     ]
 
-FORCE_COMPUTE = True
+FORCE_COMPUTE = False
 
 FILE = h5py.File(bp.SIMULATION_DIR + FILENAME, mode="a")
 if str(SHAPES) in FILE.keys() and not FORCE_COMPUTE:
@@ -808,7 +808,7 @@ else:
         SHAPE = np.full((2, dim), SHAPES[dim-2], dtype=int)
         # MEASURE COMPUTATION TIMES
         for i_m, m in enumerate(masses):
-            print("Computing dim = ", dim, " mass = ", m[0], "\t", FILENAME)
+            print("Computing dim = ", dim, " mass = ", np.min(m), "\t", FILENAME)
             model = bp.CollisionModel(m, SHAPE,
                                       collision_relations=[],
                                       collision_weights=[],
@@ -827,6 +827,7 @@ else:
 
                 del result
                 print("\t", alg, toc - tic)
+    assert str(dim) in FILE[str(SHAPES)].keys()
 FILE.close()
 FILE = h5py.File(bp.SIMULATION_DIR + FILENAME, mode="r")
 
@@ -849,7 +850,7 @@ NAMES = {"vectorized": r"\textsc{vectorized}",
 
 # setup plot
 fig, ax = plt.subplots(1, 2,
-                       figsize=(12.75, 6.25))
+                       figsize=(12.75, 7.25))
 # plot different algorithm times
 for d, dim in enumerate([str(2), str(3)]):
     SHAPE = np.full(d+2, SHAPES[d], dtype=int)
@@ -858,7 +859,7 @@ for d, dim in enumerate([str(2), str(3)]):
                     + r"$",
                     fontsize=fs_suptitle)
     for a, alg in enumerate(ALGORITHMS):
-        label = NAMES[alg]
+        label = NAMES[alg] if d == 1 else "_nolegend_"
         res = FILE[str(SHAPES)][dim][alg]["total_time"][()]
         # widths = np.linspace(-0.5, 0.5, len(CUR_ALGS) + 2)
         # ax[d].bar(x_vals[d] + widths[a+1], res, color=COLORS[alg],
@@ -878,13 +879,17 @@ for d, dim in enumerate([str(2), str(3)]):
     # ax[d].set_xticks(x_vals[d][plt_beg[c][d]::plt_spacing[c][d]])
     # ax[d].set_xticklabels(SHAPES[d + 2][:max_idx[d], 0][plt_beg[c][d]::plt_spacing[c][d]])
 
-fig.suptitle("Collision Generation Times for "
-             + "Different Masses "
-             + r"$m = (m^1, " + str(max_mass)
-             + r")$",
-             fontsize=fs_suptitle)
-ax[1].legend(title="Algorithms:", loc="upper left",
-             fontsize=fs_legend, title_fontsize=fs_legend_title)
+st = fig.suptitle("Collision Generation Times for "
+                  + "Different Masses "
+                  + r"$m = (m^1, " + str(max_mass)
+                  + r")$",
+                  fontsize=fs_suptitle)
+lg = fig.legend(title="Algorithms:",
+                loc="lower center",
+                bbox_to_anchor=(0.5, -0.12),
+                ncol=4,
+                fontsize=fs_legend+2,
+                title_fontsize=fs_legend_title+4)
 ax[0].set_ylabel("Computation Time In Seconds",
                  fontsize=fs_label)
 for i in [0, 1]:
@@ -893,5 +898,7 @@ for i in [0, 1]:
 # ax[0].set_ylim(ymax=250)
 plt.tight_layout()
 # plt.show()
-plt.savefig(bp.SIMULATION_DIR + "/col_gen_profiling" + ".pdf")
+plt.savefig(bp.SIMULATION_DIR + "/col_gen_profiling" + ".pdf",
+            bbox_extra_artists=(lg, st),
+            bbox_inches='tight')
 del fig, ax
