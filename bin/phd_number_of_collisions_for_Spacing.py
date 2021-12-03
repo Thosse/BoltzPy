@@ -218,7 +218,10 @@ col_black = np.array(
      [6, -6]],
     dtype=float
 )
-ax.plot(col_black[:, 0], col_black[:, 1], color="black")
+ax.plot(col_black[:, 0],
+        col_black[:, 1],
+        color="black",
+        label="Existing Collisions,\nAll Velocities On Grid")
 red_shift = col_black + np.array([[-12, 12]])
 ax.plot(red_shift[:, 0], red_shift[:, 1],
         color="red",
@@ -259,13 +262,15 @@ ax.plot(red_rotate[:, 0], red_rotate[:, 1],
         color="red",
         linewidth=2,
         linestyle="dotted",
-        # dashes=(20, 15)
+        label="Missing Collisions,\nSome Velocities Off Grid"
         )
 ax.set_xticks([])
 ax.set_yticks([])
 ax.set_aspect('equal')
 ax.set_title(r"Missing Local Symmetries in a Mixture",
              fontsize=fs_title)
+ax.legend(loc="upper right",
+          fontsize=fs_legend)
 
 plt.tight_layout()
 plt.savefig(bp.SIMULATION_DIR + "/phd_local_symmetries_mixture.pdf")

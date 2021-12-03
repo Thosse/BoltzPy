@@ -652,7 +652,7 @@ if __name__ == "__main__":
                     direction[:, i_dir] = 1
                     res[i_dir][i_v] = model.cmp_stress(distr, directions=direction)
 
-    LABEL_P = [r"$\vartheta - P_{%1d, %1d}$" % (i+1, i+1)
+    LABEL_P = [r"$P_{%1d, %1d}$" % (i+1, i+1)
                for i in [0,1]]
     LABELS_THETA = [r", $\vartheta = %1d $" % t for t in TEMPS]
     STYLES = ["dotted", "solid", ]
@@ -684,8 +684,8 @@ if __name__ == "__main__":
                          linewidth=0.4)
 
         ax[a].tick_params(axis="both", labelsize=fs_ticks)
-    lg = fig.legend(loc="lower center", ncol=3, bbox_to_anchor=(0.5, -0.12),
-                    fontsize=fs_legend + 2,
+    lg = fig.legend(loc="lower center", ncol=3, bbox_to_anchor=(0.5, -0.15),
+                    fontsize=fs_legend + 4,
                     title_fontsize=fs_legend_title)
     ax[0].set_ylabel(
         r"$P_{i, i}\left[{\mathfrak{V}^s}\right](\widetilde{v}, \vartheta)$",
@@ -703,7 +703,7 @@ if __name__ == "__main__":
     ax[0].set_title("Stress Diagonal Entries", fontsize=fs_title)
     ax[1].set_title("Discretization Related Part", fontsize=fs_title)
     ax[2].set_title("Domain Related Part", fontsize=fs_title)
-    st = fig.suptitle(r"Diagonal entries of the stress tensor of a $(7, 7)$ DVM"
+    st = fig.suptitle(r"Diagonal Entries of the Stress Tensor of a $(7, 7)$ DVM"
                       r" for $\widetilde{v}_x \in [0, 6]$ and $\widetilde{v}_y = 0$",
                       fontsize=fs_suptitle)
     plt.tight_layout(pad=2)
@@ -781,8 +781,8 @@ if __name__ == "__main__":
                          linewidth=0.4)
         ax[a].tick_params(axis="both", labelsize=fs_ticks)
 
-    lg = fig.legend(loc="lower center", ncol=3, bbox_to_anchor=(0.5, -0.12),
-                    fontsize=fs_legend + 2,
+    lg = fig.legend(loc="lower center", ncol=3, bbox_to_anchor=(0.5, -0.15),
+                    fontsize=fs_legend + 4,
                     title_fontsize=fs_legend_title)
     ax[0].set_ylabel(
         r"$q_{i}\left[{\mathfrak{V}^s}\right](\widetilde{v}, \vartheta)$",
@@ -801,7 +801,7 @@ if __name__ == "__main__":
     ax[0].set_title("Heat Flow", fontsize=fs_title)
     ax[1].set_title("Discretization Related Part", fontsize=fs_title)
     ax[2].set_title("Domain Related Part", fontsize=fs_title)
-    st = fig.suptitle(r"Heat flow components of a $(7, 7)$ DVM"
+    st = fig.suptitle(r"Heat Flow Components of a $(7, 7)$ DVM"
                       r" for $\widetilde{v}_x \in [0, 6]$ and $\widetilde{v}_y = 0$",
                       fontsize=fs_suptitle)
     plt.tight_layout(pad=2)
