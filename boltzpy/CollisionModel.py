@@ -585,8 +585,11 @@ class CollisionModel(bp.BaseModel):
                                 "norm_and_sorted_distance"}
         elif self.is_cubic_grid:
             group_by = "norm_and_sorted_distance"
-        else:   # faster algorithms, require additional work for non-cubic grids
-            group_by = "distance"
+        else:
+            group_by = "None"
+        # grouping algorithms require cubic grids
+        if group_by in {"sorted_distance", "norm_and_sorted_distance"}:
+            assert self.is_cubic_grid
 
         # collect collisions in a lists
         relations = []
