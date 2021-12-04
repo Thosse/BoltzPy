@@ -452,12 +452,16 @@ class CollisionModel(bp.BaseModel):
         else:
             return positions
 
-    # todo choose: given list of indices (of collision relations)
-    #  or relations(what to do with the weights?) -> merge and filter redundants
+    # todo: save collision arrays directly to a file,
+    #   then only store used_collision_relations in the ram
+    #   this reduces memory demands and allows safe weight adjustments
+    #   without removing any (currently) unused collisions
+    #   It also allows to compute the collisions in chunks,
+    #   avoiding the out of memory errors in large grids
     ##################################
     #           Collisions           #
     ##################################
-    def update_collisions(self, relations, weights):
+    def update_collisions(self, relations, weights, min_weight=1e-12):
         """Updates the collision_relations, collision_weights
         and computes a new sparse collision_matrix.
 
@@ -468,20 +472,21 @@ class CollisionModel(bp.BaseModel):
             that point at velocities of the model.
         weights : :obj:`~numpy.array` [:obj:`float`]
             A 1d array, of numerical weights for each relation.
+        min_weight : :obj:`float`
+            Any collisions with a lower weight that this are ignored
+            in the computation, but NOT removed from the arrays.
         """
         if relations.shape != (weights.size, 4) or weights.ndim != 1:
             raise ValueError
         if np.any(np.logical_or(relations < 0, relations >= self.nvels)):
             raise ValueError
-        # update attributes
-        self.collision_relations = relations
-        self.collision_weights = weights
 
-        # Filter out any duplicates, Weights are NOT added
-        # This might lead to unpredictable behaviour,
-        # if a relation is given twice with different weights
-        relations, weights = self.filter(self.key_index(self.collision_relations),
-                                         (relations, weights))
+        # ignore collisions with weights < atol
+        choice = weights > min_weight
+        relations = relations[choice]
+        weights = weights[choice]
+
+        # update attributes
         self.collision_relations = relations
         self.collision_weights = weights
 
@@ -810,7 +815,8 @@ class CollisionModel(bp.BaseModel):
                       temperature,
                       dt,
                       maxiter=100000,
-                      directions=None):
+                      directions=None,
+                      normalize=True):
         # Maxwellian must be centered in 0,
         # since this computation relies heavily on symmetry,
         mean_velocities = np.zeros((self.nspc, self.ndim))
@@ -823,36 +829,28 @@ class CollisionModel(bp.BaseModel):
                                   temperatures=temperature,
                                   **self.__dict__)
 
-        # set up source moment function (stress)
-        if directions is None:
-            directions = np.eye(self.ndim)[0:2]
-        else:
-            directions = np.array(directions, dtype=float, copy=False)
-            assert directions.shape == (2, self.ndim)
-            norm = np.linalg.norm(directions, axis=1).reshape(2, 1)
-            directions /= norm
-
         # use only the first mean_velocity, otherwise a (2, nvels) array is created
         mom_func = self.mf_stress(mean_velocities[0], directions, orthogonalize=True)
         # set up source term
         rule.source_term = mom_func * rule.initial_state
         # check, that source term is orthogonal on all moments
         rule.check_integrity()
-
         # compute viscosity
         assert dt > 0 and maxiter > 0
-        result = rule.compute(dt, maxiter=maxiter)
-        # compute viscosity as scalar product
-        viscosity = np.sum(result[-1] * mom_func)
-        normalize = np.sum(mom_func**2 * rule.initial_state)
-        return viscosity / normalize
+        inverse_source_term = rule.compute(dt, maxiter=maxiter)
+        viscosity = np.sum(inverse_source_term[-1] * mom_func)
+
+        if normalize:
+            viscosity = viscosity / np.sum(mom_func**2 * rule.initial_state)
+        return viscosity
 
     def cmp_heat_transfer(self,
                           number_densities,
                           temperature,
                           dt,
                           maxiter=100000,
-                          direction=None):
+                          direction=None,
+                          normalize=True):
         # Maxwellian must be centered in 0,
         # since this computation relies heavily on symmetry,
         mean_velocities = np.zeros((self.nspc, self.ndim))
@@ -867,31 +865,22 @@ class CollisionModel(bp.BaseModel):
                                   temperatures=temperature,
                                   **self.__dict__)
 
-        # set up source moment function (stress)
-        if direction is None:
-            directions = np.eye(self.ndim)[0]
-        else:
-            directions = np.array(direction, dtype=float)
-            assert directions.shape == (self.ndim,)
-            norm = np.linalg.norm(directions)
-            directions /= norm
         # use only the first mean_velocity, otherwise a (2, nvels) array is created
         mom_func = self.mf_heat_flow(mean_velocities[0],
-                                     directions,
+                                     direction,
                                      orthogonalize_state=rule.initial_state)
         # set up source term
         rule.source_term = mom_func * rule.initial_state
         # check, that source term is orthogonal on all moments
         rule.check_integrity()
-
-        # compute viscosity
+        # compute heat transfer
         assert dt > 0 and maxiter > 0
-        result = rule.compute(dt,
-                              maxiter=maxiter)
-        # compute viscosity as scalar product
-        heat_transfer = np.sum(result[-1] * mom_func)
-        normalize = np.sum(mom_func**2 * rule.initial_state)
-        return heat_transfer / normalize
+        inverse_source_term = rule.compute(dt, maxiter=maxiter)
+        heat_transfer = np.sum(inverse_source_term[-1] * mom_func)
+
+        if normalize:
+            heat_transfer = heat_transfer / np.sum(mom_func**2 * rule.initial_state)
+        return heat_transfer
 
     #####################################
     #           Visualization           #

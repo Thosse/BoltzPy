@@ -693,22 +693,23 @@ class BaseModel(bp.BaseClass):
     ##################################
     @staticmethod
     def is_orthogonal(direction_1, direction_2):
-        return np.allclose(np.dot(direction_1, direction_2), 0)
+        return np.isclose(np.dot(direction_1, direction_2), 0)
 
     @staticmethod
     def is_parallel(direction_1, direction_2):
         norms = np.linalg.norm(direction_1) * np.linalg.norm(direction_2)
-        return np.allclose(np.dot(direction_1, direction_2), norms)
+        return np.isclose(np.dot(direction_1, direction_2), norms)
 
-    def mf_stress(self, mean_velocity, directions, s=None, orthogonalize=False):
+    def mf_stress(self, mean_velocity, directions=None, s=None, orthogonalize=False):
         """Compute the stress moment function for given directions
         and either a single specimen or the mixture.
 
         Parameters
         ----------
         mean_velocity : :obj:`~numpy.array` [ :obj:`float` ]
-        directions : :obj:`~numpy.array` [ :obj:`float` ]
+        directions : :obj:`~numpy.array` [ :obj:`float` ], optional
             Must be of shape=(2,ndim).
+            By default the first two unit vectors are used.
         s : :obj:`int`, optional
         orthogonalize : :obj:`bool`. optional
             If True, the moment components of the moment function are subtracted.
@@ -717,27 +718,32 @@ class BaseModel(bp.BaseClass):
         -------
         mf_Stress : :obj:`~numpy.array` [ :obj:`float` ]
         """
-        directions = np.array(directions, dtype=float, copy=False)
         mean_velocity = np.array(mean_velocity, dtype=float, copy=False)
+
+        # set up directions
+        if directions is None:
+            directions = np.eye(2, self.ndim)
+        else:
+            directions = np.array(directions, dtype=float, copy=False)
         assert directions.shape == (2, self.ndim,)
         is_parallel = self.is_parallel(directions[0], directions[1])
         is_orthogonal = self.is_orthogonal(directions[0], directions[1])
         if not (is_parallel or is_orthogonal):
             raise ValueError("directions must be either parallel or orthogonal")
-        # normalize directions
         norm = np.linalg.norm(directions, axis=1).reshape(2, 1)
         directions /= norm
-        # compute stress
+
+        # set up moment function
         mass = self.get_array(self.masses) if s is None else self.masses[s]
         c_vels = self.c_vels(mean_velocity, s)
         p_vels_1 = self.p_vels(c_vels, directions[0])
         p_vels_2 = self.p_vels(c_vels, directions[1])
         moment_function = mass * p_vels_1 * p_vels_2
-        # orthogonalize, if necessary
+
         if orthogonalize and is_parallel:
-            return moment_function - self.mf_pressure(mean_velocity, s)
-        else:
-            return moment_function
+            moment_function = moment_function - self.mf_pressure(mean_velocity, s)
+
+        return moment_function
 
     def mf_pressure(self, mean_velocity, s=None):
         """Compute the pressure moment function
@@ -769,14 +775,15 @@ class BaseModel(bp.BaseClass):
         mf_pressure = mass / dim * np.sum(c_vels**2, axis=-1)
         return mf_pressure.reshape(shape + (velocities.shape[0],))
 
-    def mf_heat_flow(self, mean_velocity, direction, s=None, orthogonalize_state=None):
+    def mf_heat_flow(self, mean_velocity, direction=None, s=None, orthogonalize_state=None):
         """Compute the heat flow moment function for a direction
         and either a single specimen or the mixture.
 
         Parameters
         ----------
         mean_velocity : :obj:`~numpy.array` [ :obj:`float` ]
-        direction : :obj:`~numpy.array` [ :obj:`float` ]
+        direction : :obj:`~numpy.array` [ :obj:`float` ], optional
+            By default the first unit vector is used.
         s : :obj:`int`, optional
         orthogonalize_state : :obj:`~numpy.array` [ :obj:`float` ], optional
             If not None, the moment components of the moment function are subtracted.
@@ -787,26 +794,32 @@ class BaseModel(bp.BaseClass):
         mf_heaf_flow : :obj:`~numpy.array` [ :obj:`float` ]
         """
         mean_velocity = np.array(mean_velocity, dtype=float, copy=False)
-        direction = np.array(direction, dtype=float, copy=False)
+
+        # set up directions
+        if direction is None:
+            direction = np.eye(1, self.ndim).flatten()
+        else:
+            direction = np.array(direction, dtype=float, copy=False)
         assert direction.shape == (self.ndim,)
+        direction /= np.linalg.norm(direction)
+
+        # set up moment function
         mass = self.get_array(self.masses) if s is None else self.masses[s]
         c_vels = self.c_vels(mean_velocity, s)
         p_vels = self.p_vels(c_vels, direction)
         squared_sum = np.sum(c_vels ** 2, axis=-1)
         moment_function = mass * p_vels * squared_sum
-        # orthogonalize, if necessary
-        if orthogonalize_state is None:
-            return moment_function
-        else:
-            # Subtract non-orthogonal part to orthogonalize.
-            # In continuum this is (d+2)*T*c_vels,
-            # this is not precise in grids!
-            # thus subtract correction term based on state
+
+        # orthogonalize by subtracting non-orthogonal part
+        # In continuum this is (d+2)*T*c_vels, but this is not precise in grids!
+        # Note: the subtract correction term depends on the state!
+        if orthogonalize_state is not None:
             p_vels = self.c_vels(mean_velocity) @ direction
             momentum = self.cmp_momentum(moment_function * orthogonalize_state) @ direction
             norm = (self.cmp_momentum(p_vels * orthogonalize_state) @ direction)
             correction_term = momentum / norm * p_vels
-            return moment_function - correction_term
+            moment_function = moment_function - correction_term
+        return moment_function
 
     ##################################
     #            Moments             #
