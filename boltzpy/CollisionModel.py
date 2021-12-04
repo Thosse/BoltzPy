@@ -35,12 +35,15 @@ class CollisionModel(bp.BaseModel):
                               shapes,
                               base_delta,
                               spacings)
+        # collision factors can be 0 or 2 dimensional
         if collision_factors is None:
             self.collision_factors = np.ones((self.nspc, self.nspc), dtype=float)
         else:
             assert isinstance(collision_factors, (list, tuple, np.ndarray))
             self.collision_factors = np.array(collision_factors, dtype=float)
-        assert self.collision_factors.ndim == 2
+        if self.collision_factors.size == 1:
+            self.collision_factors = np.full((self.nspc, self.nspc), self.collision_factors)
+        assert self.collision_factors.shape == (self.nspc, self.nspc)
 
         # setup collisions
         if collision_relations is None:
@@ -133,6 +136,51 @@ class CollisionModel(bp.BaseModel):
             if op_rels.shape[0] != rels.shape[0]:
                 return False
         return True
+
+    def submodel(self, s):
+        """Returns a Copy of the current model, that is restricted to a set of specimen.
+
+        Parameters
+        ----------
+        s : :obj:`int` (or list/array)
+
+        Returns
+        -------
+        model : :class:`~boltzpy.CollisionModel` or :obj:`~numpy.array` [:class:`~boltzpy.Grid`]
+            Collision model restricted to the given species.
+        """
+        s = np.array(s, ndmin=1, copy=False)
+        assert s.shape == (len(set(s)),), "all entries must be unique"
+
+        # reduce collisions, keep only collisions between the given species
+        spc = self.key_species(self.collision_relations)
+        grp = self.group(spc, as_dict=True)
+        chosen_keys = [key for key in grp.keys()
+                       if all(k in s for k in key)]
+        choice = np.concatenate([grp[key] for key in chosen_keys])
+        new_rels = np.array(self.collision_relations[choice], copy=False)
+        new_weights = np.array(self.collision_weights[choice], copy=False)
+
+        # undo global indices, obtain local indices
+        spc = self.key_species(new_rels)
+        new_rels -= self._idx_offset[spc]
+
+        # compute index_offsets in new grids (note: rearrangements are possible)
+        new_pos = [list(s).index(i) if i in s else s.size
+                   for i in self.species]
+        sizes = np.prod(self.shapes[s], axis=-1)
+        new_offsets = np.array([np.sum(sizes[:pos]) for pos in new_pos])
+        new_rels += new_offsets[spc]
+
+        # construct model
+        submodel = CollisionModel(masses=self.masses[s],
+                                  shapes=self.shapes[s],
+                                  base_delta=self.base_delta,
+                                  spacings=self.spacings[s],
+                                  collision_factors=self.collision_factors[s][:, s],
+                                  collision_relations=new_rels,
+                                  collision_weights=new_weights)
+        return submodel
 
     ################################################
     #        Sorting and Ordering Collisions       #
