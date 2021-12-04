@@ -118,34 +118,6 @@ class BaseModel(bp.BaseClass):
         The array of all specimen indices."""
         return np.arange(self.nspc)
 
-    def subgrids(self, s=None):
-        """Generate the Velocity Grids of all given specimen
-
-        Parameters
-        ----------
-        s : :obj:`int`, optional
-
-        Returns
-        -------
-        grids : :class:`~boltzpy.Grid`] or :obj:`~numpy.array` [:class:`~boltzpy.Grid`]
-            Velocity Grids of the specimen
-        """
-        if np.issubdtype(type(s), np.integer):
-            return bp.Grid(self.shapes[s],
-                           self.base_delta,
-                           self.spacings[s],
-                           is_centered=True)
-        grids = np.array([bp.Grid(self.shapes[s],
-                                  self.base_delta,
-                                  self.spacings[s],
-                                  is_centered=True)
-                          for s in self.species],
-                         dtype=bp.Grid)
-        if s is None:
-            return grids
-        else:
-            return grids[s]
-
     @property
     def max_i_vels(self):
         """:obj:`~numpy.array` [:obj:`float`]
@@ -231,6 +203,35 @@ class BaseModel(bp.BaseClass):
         sym_matrices = np.array(sym_list)
         return sym_matrices
 
+    @staticmethod
+    def p_vels(velocities, direction):
+        """Project the velocities onto a direction
+
+        This is simply vels @ direction, but allows higher dimensions
+
+        Parameters
+        ----------
+        velocities : :obj:`~numpy.array` [:obj:`float`]
+        direction : :obj:`~numpy.array` [:obj:`float`]
+
+        Returns
+        -------
+        p_vels : :obj:`~numpy.array` [:obj:`float`]
+            Projected velocities. one dimension less (last) than velocities.
+        """
+        direction = np.array(direction, copy=False)
+        assert direction.shape == (velocities.shape[-1],)
+        assert np.linalg.norm(direction) > 1e-8
+        shape = velocities.shape[:-1]
+        size = np.prod(shape, dtype=int)
+        velocities = velocities.reshape((size, direction.size))
+        angle = direction / np.linalg.norm(direction)
+        result = np.dot(velocities, angle)
+        return result.reshape(shape)
+
+    #####################################
+    #              Methods              #
+    #####################################
     def c_vels(self, mean_velocity, s=None):
         """Returns the difference to the mean_velocity for each velocity
 
@@ -261,31 +262,34 @@ class BaseModel(bp.BaseClass):
         result = velocities[np.newaxis, ...] - mean_velocity
         return result.reshape(shape + (velocities.shape[0], dim))
 
-    @staticmethod
-    def p_vels(velocities, direction):
-        """Project the velocities onto a direction
-
-        This is simply vels @ direction, but allows higher dimensions
+    def subgrids(self, s=None):
+        """Generate the Velocity Grids of all given specimen
 
         Parameters
         ----------
-        velocities : :obj:`~numpy.array` [:obj:`float`]
-        direction : :obj:`~numpy.array` [:obj:`float`]
+        s : :obj:`int` (or list/array), optional
 
         Returns
         -------
-        p_vels : :obj:`~numpy.array` [:obj:`float`]
-            Projected velocities. one dimension less (last) than velocities.
+        grids : :class:`~boltzpy.Grid`] or :obj:`~numpy.array` [:class:`~boltzpy.Grid`]
+            Velocity Grids of the specimen
         """
-        direction = np.array(direction, copy=False)
-        assert direction.shape == (velocities.shape[-1],)
-        assert np.linalg.norm(direction) > 1e-8
-        shape = velocities.shape[:-1]
-        size = np.prod(shape, dtype=int)
-        velocities = velocities.reshape((size, direction.size))
-        angle = direction / np.linalg.norm(direction)
-        result = np.dot(velocities, angle)
-        return result.reshape(shape)
+        return_unpacked = np.issubdtype(type(s), np.integer)
+        if s is None:
+            s = self.species
+        else:
+            s = np.array(s, ndmin=1, copy=False)
+        grids = np.array([bp.Grid(self.shapes[spc],
+                                  self.base_delta,
+                                  self.spacings[spc],
+                                  is_centered=True)
+                          for spc in s],
+                         dtype=bp.Grid)
+        if return_unpacked:
+            assert grids.size == 1
+            return grids[0]
+        else:
+            return grids
 
     def get_array(self, parameter):
         """Generate a (nvels,) shaped array

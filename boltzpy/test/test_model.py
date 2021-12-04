@@ -1,6 +1,5 @@
 import pytest
 import numpy as np
-
 import boltzpy as bp
 
 ###################################
@@ -57,6 +56,7 @@ KEY_FUNCTIONS = ["key_species",
 #           Randomized Models           #
 #########################################
 # Random Test parameters for collision generation
+N_SPC = 2
 N_SAMPLES = 20
 MAX_MASS = 20
 MAX_SHAPE = {2: 13, 3: 7}
@@ -64,14 +64,13 @@ MAX_SHAPE = {2: 13, 3: 7}
 
 @pytest.fixture(scope="module", params=range(N_SAMPLES))
 def rand_model():
-    nspc = 2
     ndim = np.random.randint(2, 4)
-    masses = np.random.randint(1, MAX_MASS, size=nspc)
+    masses = np.random.randint(1, MAX_MASS, size=N_SPC)
     if bool(np.random.randint(0, 2)):
-        spacings = 2 * np.random.randint(1, 13, size=nspc)
+        spacings = 2 * np.random.randint(1, 13, size=N_SPC)
     else:
         spacings = None
-    shapes = np.random.randint(3, MAX_SHAPE[ndim], size=(nspc, ndim))
+    shapes = np.random.randint(3, MAX_SHAPE[ndim], size=(N_SPC, ndim))
     use_cubic_grids = bool(np.random.randint(0, 2))
     if use_cubic_grids:
         shapes[...] = shapes[:, 0, None]
@@ -135,6 +134,24 @@ def test_orbits_have_single_keys(rand_model, key_name):
                 rand_model.plot_collisions(o[None, ...])
             rand_model.plot_collisions(orb)
             assert False
+
+
+@pytest.mark.parametrize("sub_spc", [None, 0, 1, [0], [1], [0, 1], [1,0]])
+def test_subgrids(rand_model, sub_spc):
+    res = rand_model.subgrids(sub_spc)
+    if sub_spc is None:
+        sub_spc = rand_model.species
+    if type(sub_spc) in [np.ndarray, list]:
+        assert isinstance(res, np.ndarray)
+        assert res.shape == (len(sub_spc),)
+        for i, g in enumerate(res):
+            assert isinstance(g, bp.Grid)
+            idx_range = rand_model.idx_range(sub_spc[i])
+            assert np.all(g.iG == rand_model.i_vels[idx_range])
+    else:
+        assert isinstance(res, bp.Grid)
+        idx_range = rand_model.idx_range(sub_spc)
+        assert np.all(res.iG == rand_model.i_vels[idx_range])
 
 
 @pytest.mark.parametrize("key", MODELS.keys())
