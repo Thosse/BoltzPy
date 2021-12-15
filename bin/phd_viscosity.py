@@ -19,13 +19,21 @@ COMPUTE = {"angle_dependency_2D": False,
            "bisection_2D": False,
            "angular_invariance_2D": False,
            "weight_adjustment_effects": False,
+           "print prandtl numbers": False,
            "angle_dependency_3D": False,
            "angle_effect_3D": False,
-           "simplified_angular_weight_adjustment_effects": True,
+           "simplified_angular_weight_adjustment_effects": False,
            "heuristic": False,
-           "persistence_over_altered_temperature": False,
            "multispecies": False,
            "bisection_3D": False,
+           "bisection3D_angular_invariance": False,
+           "bisection_3D_free_parameter": False,
+           "prandtl_shape_Effect_2D": False,
+           "persistence_over_altered_temperature": False,
+           "persistence_over_altered_number_densities_1": False,
+           "bisection_3d_pairwise": False,
+           "persistence_over_altered_number_densities_2": True,
+           "bisection_3d_multispecies_pairwise": True,
            "range_test": False
            }
 m = dict()
@@ -69,7 +77,7 @@ def adjust_weight_by_angle(model, weights, relation_choice=None):
     if model.ndim == 2:
         W_MAT = np.array([[1, 0], [-1, 1]])
     else:
-        W_MAT = np.array([[1, 0, 0], [-1, 1, 0], [-1, -1, 1]])
+        W_MAT = np.array([[1, 0, 0], [-1, 1, 0], [0, -1, 1]])
     weight_factor = np.dot(weights, W_MAT)
 
     key_spc = model.key_species(relations)[:, 1:3]
@@ -96,7 +104,7 @@ def adjust_weight_by_angle(model, weights, relation_choice=None):
     return
 
 
-def cmp_visc(i):
+def cmp_visc(i, normalize=False):
     result = np.empty(m[i].ndim)
     if m[i].ndim == 3:
         result[0] = m[i].cmp_viscosity(
@@ -104,19 +112,19 @@ def cmp_visc(i):
             temperature=temp[i],
             directions=[[1, 1, 1], [0, 1, -1]],
             dt=dt,
-            normalize=False)
+            normalize=normalize)
         result[1] = m[i].cmp_viscosity(
             number_densities=nd[i],
             temperature=temp[i],
             directions=[[0, 1, 1], [0, 1, -1]],
             dt=dt,
-            normalize=False)
+            normalize=normalize)
         result[2] = m[i].cmp_viscosity(
             number_densities=nd[i],
             temperature=temp[i],
             directions=[[0, 0, 1], [1, 0, 0]],
             dt=dt,
-            normalize=False)
+            normalize=normalize)
 
     elif m[i].ndim == 2:
         result[0] = m[i].cmp_viscosity(
@@ -124,13 +132,13 @@ def cmp_visc(i):
             temperature=temp[i],
             directions=[[1, 1], [1, -1]],
             dt=dt,
-            normalize=False)
+            normalize=normalize)
         result[1] = m[i].cmp_viscosity(
             number_densities=nd[i],
             temperature=temp[i],
             directions=[[0, 1], [1, 0]],
             dt=dt,
-            normalize=False)
+            normalize=normalize)
 
     return result
 
@@ -171,6 +179,43 @@ def cmp_heat(i):
             dt=dt,
             normalize=False)
     return result
+
+
+def cmp_visc_ext(model, nd, temp, normalize=False):
+    result = np.empty(model.ndim)
+    if model.ndim == 3:
+        result[0] = model.cmp_viscosity(
+            number_densities=nd,
+            temperature=temp,
+            directions=[[1, 1, 1], [0, 1, -1]],
+            dt=dt)
+        result[1] = model.cmp_viscosity(
+            number_densities=nd,
+            temperature=temp,
+            directions=[[0, 1, 1], [0, 1, -1]],
+            dt=dt)
+        result[2] = model.cmp_viscosity(
+            number_densities=nd,
+            temperature=temp,
+            directions=[[0, 0, 1], [1, 0, 0]],
+            dt=dt)
+    elif model.ndim == 2:
+        result[0] = model.cmp_viscosity(
+            number_densities=nd,
+            temperature=temp,
+            directions=[[1, 1], [1, -1]],
+            dt=dt,
+            normalize=normalize)
+        result[1] = model.cmp_viscosity(
+            number_densities=nd,
+            temperature=temp,
+            directions=[[0, 1], [1, 0]],
+            dt=dt,
+            normalize=normalize)
+    else:
+        raise NotImplementedError
+    return result
+
 
 
 print("#################################\n"
@@ -234,8 +279,7 @@ else:
 print("######################################\n"
       "Plot: Angular Dependencies in 2D\n"
       "######################################")
-plt.cla()
-plt.clf()
+plt.close("all")
 fig, axes = plt.subplots(2, 2, constrained_layout=True,
                          figsize=(12.75, 13),
                          subplot_kw={"projection": "polar"})
@@ -281,35 +325,35 @@ print("#########################################################################
 key = "angle_effect_2D"
 if key not in file.keys():
     hdf_group = file.create_group(key)
-    dim = 2
-    grp = m[dim].group(m[dim].key_angle(m[dim].collision_relations))
+    ndim = 2
+    grp = m[ndim].group(m[ndim].key_angle(m[ndim].collision_relations))
     n_keys = len(grp.keys())
-    angles = np.empty((n_keys + 1, dim * (dim - 1)), dtype=int)
-    visc = np.empty((n_keys + 1, dim))
-    heat = np.empty((n_keys + 1, dim))
+    angles = np.empty((n_keys + 1, ndim * (ndim - 1)), dtype=int)
+    visc = np.empty((n_keys + 1, ndim))
+    heat = np.empty((n_keys + 1, ndim))
     ncols = np.empty(n_keys, dtype=int)
     for idx, (key, val) in enumerate(grp.items()):
         print("\rdim = %1d    -   angle = %3d / %3d"
-              % (dim, idx, n_keys),
+              % (ndim, idx, n_keys),
               end="")
         # first element is without any changes
         ncols[idx] = val.size
         idx = idx + 1
         w_factor = 10
-        m[dim].collision_weights[val] *= w_factor
-        m[dim].update_collisions(m[dim].collision_relations,
-                                 m[dim].collision_weights)
+        m[ndim].collision_weights[val] *= w_factor
+        m[ndim].update_collisions(m[ndim].collision_relations,
+                                 m[ndim].collision_weights)
         angles[idx] = key
-        visc[idx] = cmp_visc(dim)
-        heat[idx] = cmp_heat(dim)
-        m[dim].collision_weights[val] = DEFAULT_WEIGHT
+        visc[idx] = cmp_visc(ndim)
+        heat[idx] = cmp_heat(ndim)
+        m[ndim].collision_weights[val] = DEFAULT_WEIGHT
     # reset collision weights
-    m[dim].collision_weights[...] = DEFAULT_WEIGHT
-    m[dim].update_collisions(m[dim].collision_relations,
-                             m[dim].collision_weights)
+    m[ndim].collision_weights[...] = DEFAULT_WEIGHT
+    m[ndim].update_collisions(m[ndim].collision_relations,
+                             m[ndim].collision_weights)
     angles[0] = [0.0]
-    visc[0] = cmp_visc(dim)
-    heat[0] = cmp_heat(dim)
+    visc[0] = cmp_visc(ndim)
+    heat[0] = cmp_heat(ndim)
     # store results in file
     hdf_group["angles"] = angles
     hdf_group["visc"] = visc
@@ -333,18 +377,19 @@ if key not in file.keys():
         hdf_group["heat_corr"][i] = np.sum(heat_mf ** 2 * maxwellian)
 
     file.flush()
-    print("DONE!\n")
+    print("\nDONE!\n")
 else:
-    print("SKIPPED!\n")
+    print("\nSKIPPED!\n")
 
 
 print("############################################################################\n"
       "Plot: Feasibility of Angular Weight Adjustments in 2D\n"
       "############################################################################")
+plt.close("all")
 fig = plt.figure(figsize=(12.75, 5.25))
 ax = fig.add_subplot()
 
-ax.set_title("Influence of Different Collision Angles on Flow Parameters in a 2D Model",
+ax.set_title("Effect of Amplified Collision Angles on Flow Parameters in a 2D Model",
              fontsize=fs_title)
 
 BAR_WIDTH = 0.2
@@ -364,15 +409,20 @@ heat = hdf_group["heat"][()]
 visc_corr = hdf_group["visc_corr"][()]
 heat_corr = hdf_group["heat_corr"][()]
 
-dim = 2
+ndim = 2
 ax.set_xlabel(r"Affected Collision Angles", fontsize=fs_label)
 pos = np.arange(angles.shape[0])
 twax = ax.twinx()
-# twax.set_ylabel(r"Prandtl Number", fontsize=fs_label, rotation=270, labelpad=18)
-for i in range(dim):
+ax.set_ylabel("Flow Parameter Coefficients",
+              fontsize=fs_label)
+twax.set_ylabel(r"Prandtl Numbers",
+                fontsize=fs_label,
+                rotation=270,
+                labelpad=25)
+for i in range(ndim):
     twax.scatter(pos + OFFSET[i],
                  visc[:, i] * heat_corr[i] / (visc_corr[i] * heat[:, i]),
-                 color=colors[dim + i],
+                 color=colors[ndim + i],
                  edgecolor="black",
                  # label=labels[i],
                  lw=3,
@@ -388,17 +438,17 @@ ax.scatter([],
            lw=3,
            s=75)
 
-for i in range(dim):
+for i in range(ndim):
     ax.bar(x=pos + OFFSET[i],
            height=visc[:, i],
            width=BAR_WIDTH,
            bottom=0.0,
            color=colors[i],
            label=labels[i])
-    cur_label = labels[dim] if i == 0 else "_nolegend_"
+    cur_label = labels[ndim] if i == 0 else "_nolegend_"
     ax.plot(pos,
             0.1 * heat[:, i],
-            color=colors[2*dim],
+            color=colors[2*ndim],
             label=cur_label,
             marker="o",
             markersize=6)
@@ -409,7 +459,7 @@ ax.set_xticks(pos)
 ax.set_xticklabels(ticklabels)
 # change order in legend
 handles, labels = ax.get_legend_handles_labels()
-order = [2,3, 0, 1]
+order = [2, 3, 0, 1]
 fig.legend([handles[idx] for idx in order],
            [labels[idx] for idx in order],
            loc="lower center",
@@ -437,10 +487,10 @@ if "bisection_2D" not in file.keys():
         print("Angular Weight Adjustment for " + str(key))
         subgrp = hdf_group.create_group(str(key))
         # prepare initial parameters for bisection
-        initial_weights = [0.1, 10]
+        weights = [0.1, 10]
         # store all computed viscosities here
         visc = []
-        for w in initial_weights:
+        for w in weights:
             m[2].collision_weights[:] = DEFAULT_WEIGHT
             m[2].collision_weights[grp[key]] *= w
             m[2].update_collisions(m[2].collision_relations,
@@ -451,8 +501,8 @@ if "bisection_2D" not in file.keys():
         # store all weights and viscosities here, dvided into uuper and lower bounds
         visc_lo = [visc[order[0]], ] * 2
         visc_hi = [visc[order[1]], ] * 2
-        w_lo = [initial_weights[order[0]]] * 2
-        w_hi = [initial_weights[order[1]]] * 2
+        w_lo = [weights[order[0]]] * 2
+        w_hi = [weights[order[1]]] * 2
         assert visc_lo[-1][1] - visc_lo[-1][0] < 0
         assert (visc_hi[-1][1] - visc_hi[-1][0] > 0)
         assert len(w_hi) == len(w_lo)
@@ -462,6 +512,7 @@ if "bisection_2D" not in file.keys():
 
         while True:
             w = (w_lo[-1] + w_hi[-1]) / 2
+            weights.append(w)
             # compute new viscosity
             m[2].collision_weights[:] = DEFAULT_WEIGHT
             m[2].collision_weights[grp[key]] *= w
@@ -495,6 +546,7 @@ if "bisection_2D" not in file.keys():
                 m[2].collision_weights[:] = DEFAULT_WEIGHT
                 break
         # store results in h5py
+        subgrp["weights"] = np.array(weights)
         subgrp["w_hi"] = np.array(w_hi)
         subgrp["w_lo"] = np.array(w_lo)
         subgrp["visc_hi"] = np.array(visc_hi)
@@ -509,33 +561,41 @@ else:
 print("####################################\n"
       "Plot: bisection Scheme for 2D models\n"
       "####################################")
-# fig = plt.figure(constrained_layout=True, figsize=(12.75, 6.25))
-# ax = fig.add_subplot()
+plt.close("all")
 fig, axes = plt.subplots(1, 3, constrained_layout=True,
-                         sharex="all",
                          sharey="all",
                          figsize=(12.75, 5.25))
+# set up second ax
+twax = [axes[k].twinx() for k in [0, 1, 2]]
 
 fig.suptitle("Bisecting "
              r"$\left\lvert \widetilde{\mu}_1 - \widetilde{\mu}_2\right\rvert$"
-             " with Angular Weight Adjustments",
+             " with an Angular Weight Adjustment "
+             r"$\gamma_\eta$",
              fontsize=fs_suptitle)
 
 axes[0].set_ylabel(r"Viscosity Coefficients", fontsize=fs_label)
+twax[2].set_ylabel(r"Angular Weight Factor $\gamma_\eta$",
+                   fontsize=fs_label,
+                   rotation=270,
+                   labelpad=25)
 colors = ["tab:green", "tab:blue"]
 labels = [r"$\widetilde{\mu}_1$",
           r"$\widetilde{\mu}_2$"]
 max_steps = 0
 
+
 for k, key in enumerate([(0,1), (1,1), (1,2)]):
     print("load stored results for key = ", key)
     subgrp = file["bisection_2D/" + str(key)]
     visc = subgrp["visc"][()]
+    weights = subgrp["weights"][()]
     final_weight = 0.5 * (subgrp["w_hi"][-1] + subgrp["w_lo"][-1])
     print("final weight = ",
           final_weight)
     pos = np.arange(visc.shape[0]) + 1
-    max_steps = max(max_steps, visc.shape[0])
+    # max_steps = max(max_steps, visc.shape[0])
+    max_Steps = pos
     for j in [0, 1]:
         axes[k].plot(pos,
                      visc[:, j],
@@ -545,6 +605,22 @@ for k, key in enumerate([(0,1), (1,1), (1,2)]):
                      marker="o",
                      markersize=4,
                      label=labels[j])
+        twax[k].plot(pos,
+                     weights[:],
+                     color="black",
+                     lw=2,
+                     ls="dotted",
+                     marker="s",
+                     markersize=4,
+                     label=r"$\gamma_\eta$")
+    # add twax to legend
+    axes[k].plot([],[],
+                 color="black",
+                 lw=2,
+                 ls="dotted",
+                 marker="x",
+                 markersize=4,
+                 label=r"$\gamma_\eta$")
     # axes[k].plot(pos,
     #              np.abs(visc[:, 0] - visc[:, 1]),
     #              # color=colors[j],
@@ -555,15 +631,22 @@ for k, key in enumerate([(0,1), (1,1), (1,2)]):
     #              )
     # axes[k].set_yscale("log")
     pos = np.arange(max_steps) + 1
-    axes[k].set_xticks(pos[4::5])
+    # axes[k].set_xticks(pos[4::5])
     axes[k].tick_params(axis="x", labelsize=fs_ticks)
     axes[k].tick_params(axis="y", labelsize=fs_ticks)
-    axes[k].set_title(r"$\phi = " + str(key) +
-                      ",\: \gamma_\phi = " + str(final_weight)[:5] + "$",
+    axes[k].set_title(r"Angle $\eta = " + str(key)
+                      # + ",\: \gamma_\eta = " + str(final_weight)[:5]
+                      + "^T$",
                       fontsize=fs_title)
     axes[k].set_xlabel(r"Algorithmic Time Step", fontsize=fs_label)
     axes[k].grid(linestyle="dotted")
-axes[2].legend(loc="upper right", fontsize=fs_legend+6)
+# set up aesthetics for twin axes
+for i in [0, 1,2]:
+    twax[i].set_ylim(0, 10)
+    twax[i].tick_params(axis="y", labelsize=fs_ticks)
+    if i != 2:
+        twax[i].set_yticks([])
+axes[0].legend(loc="upper right", fontsize=fs_legend+6)
 
 plt.savefig(bp.SIMULATION_DIR + "/phd_viscosity_bisection_2D.pdf")
 print("Done!\n")
@@ -622,8 +705,7 @@ m[2].update_collisions(m[2].collision_relations,
 print("##########################################################\n"
       "#    Plot Angular Dependencies on Bisected Model in 2D   #\n"
       "##########################################################")
-plt.cla()
-plt.clf()
+plt.close("all")
 fig, axes = plt.subplots(1, 2,
                          figsize=(12.75, 15),
                          subplot_kw={"projection": "polar"})
@@ -664,37 +746,40 @@ print("Done!\n")
 print("#################################################\n"
       "#    Print out Prandtl Numbers of adjusted DVM  #\n"
       "#################################################")
-for angle in [(0, 1),  (1,1), (1,2)]:
-    bisection_results = file["bisection_2D/" + str(angle)]
-    final_weight = 0.5 * (bisection_results["w_hi"][-1]
-                          + bisection_results["w_lo"][-1])
-    # adjust weights
-    grp = m[2].group(m[2].key_angle(m[2].collision_relations))
+key = "print prandtl numbers"
+if COMPUTE[key]:
+    for angle in [(0, 1),  (1,1), (1,2)]:
+        bisection_results = file["bisection_2D/" + str(angle)]
+        final_weight = 0.5 * (bisection_results["w_hi"][-1]
+                              + bisection_results["w_lo"][-1])
+        # adjust weights
+        grp = m[2].group(m[2].key_angle(m[2].collision_relations))
+        m[2].collision_weights[:] = DEFAULT_WEIGHT
+        m[2].collision_weights[grp[angle]] *= final_weight
+        m[2].update_collisions(m[2].collision_relations,
+                               m[2].collision_weights)
+
+        visc = m[2].cmp_viscosity(
+            number_densities=nd[2],
+            temperature=temp[2],
+            directions=np.eye(2),
+            dt=dt,
+            normalize=True)
+        heat = m[2].cmp_heat_transfer(
+            number_densities=nd[2],
+            temperature=temp[2],
+            direction=np.eye(2)[0],
+            dt=dt,
+            normalize=True)
+        print("Prandlt", angle, " = ", visc / heat)
+    # restore original model
     m[2].collision_weights[:] = DEFAULT_WEIGHT
-    m[2].collision_weights[grp[angle]] *= final_weight
     m[2].update_collisions(m[2].collision_relations,
                            m[2].collision_weights)
+    print("Done!\n")
+else:
+    print("Skipped!\n")
 
-    visc = m[2].cmp_viscosity(
-        number_densities=nd[2],
-        temperature=temp[2],
-        directions=np.eye(2),
-        dt=dt,
-        normalize=True)
-    heat = m[2].cmp_heat_transfer(
-        number_densities=nd[2],
-        temperature=temp[2],
-        direction=np.eye(2)[0],
-        dt=dt,
-        normalize=True)
-    print("Prandlt", angle, " = ", visc / heat)
-# restore original model
-m[2].collision_weights[:] = DEFAULT_WEIGHT
-m[2].update_collisions(m[2].collision_relations,
-                       m[2].collision_weights)
-
-
-print("Done!\n")
 print("##########################################################\n"
       "#    compute Angular Dependency (2 Angles) for 3D DVM    #\n"
       "##########################################################")
@@ -778,8 +863,7 @@ else:
 print("######################################\n"
       "Plot: Dependency of Second Angle in 3D\n"
       "######################################")
-plt.cla()
-plt.clf()
+plt.close("all")
 fig = plt.figure(constrained_layout=True, figsize=(10, 10))
 ax = fig.add_subplot(projection="polar")
 print("Create  plot: Angle Dependency of the Viscosity in a 3D Model")
@@ -832,8 +916,7 @@ print("Done!\n")
 print("######################################\n"
       "Plot: Both Angular Dependencies in 3D\n"
       "######################################")
-plt.cla()
-plt.clf()
+plt.close("all")
 fig, axes = plt.subplots(1, 2, constrained_layout=True,
                          figsize=(12.75, 7),
                          subplot_kw={"projection": "polar"})
@@ -849,6 +932,10 @@ labels = [
     r"$\eta = \begin{pmatrix}0 \\ 1 \\ 1 \end{pmatrix}$",
     r"$\eta = \begin{pmatrix}0 \\ 0 \\ 1 \end{pmatrix}$",
     r"$\eta = \begin{pmatrix}1 \\ 2 \\ 3 \end{pmatrix}$"
+]
+titles = [
+    r"Viscosity Coefficient $\widetilde{\mu}(\eta, \theta)$",
+    r"Heat Conductivity Coefficient $\widetilde{\kappa}(\theta)$"
 ]
 # iterate over this, to have a fixed order!
 a_keys = [(1, 1, 1), (0, 1, 1), (0, 0, 1), (1, 2, 3)]
@@ -866,6 +953,7 @@ for k, first_angle in enumerate(a_keys):
                      c=colors[k],
                      label=labels[k] if a == 0 else "_nolegend_",
                      lw=4)
+        axes[a].set_title(titles[a], fontsize=fs_title)
         if a == 1:
             max_val = np.max(subgrp[coeff][()])
             axes[a].set_rticks([0, 0.0075, 0.015, 0.0225])
@@ -893,8 +981,8 @@ print("########################################################\n"
 key = "angle_effect_3D"
 if key not in file.keys():
     hdf_group = file.create_group(key)
-    dim = 3
-    grp = m[dim].group(m[dim].key_angle(m[dim].collision_relations))
+    ndim = 3
+    grp = m[ndim].group(m[ndim].key_angle(m[ndim].collision_relations))
     grp = {key: grp[key]
            for key in [(0, 0, 1, 0, 0, 1),
                        (0, 0, 1, 0, 1, 1),
@@ -904,32 +992,32 @@ if key not in file.keys():
                        (1, 1, 1, 1, 1, 2)
                        ]}
     n_keys = len(grp.keys())
-    angles = np.empty((n_keys + 1, dim * (dim - 1)), dtype=int)
-    visc = np.empty((n_keys + 1, dim))
-    heat = np.empty((n_keys + 1, dim))
+    angles = np.empty((n_keys + 1, ndim * (ndim - 1)), dtype=int)
+    visc = np.empty((n_keys + 1, ndim))
+    heat = np.empty((n_keys + 1, ndim))
     ncols = np.empty(n_keys, dtype=int)
     for idx, (key, val) in enumerate(grp.items()):
-        print("\rdim = %1d    -   angle = %3d / %3d"
-              % (dim, idx, n_keys),
+        print("\rndim = %1d    -   angle = %3d / %3d"
+              % (ndim, idx, n_keys),
               end="")
         # first element is without any changes
         ncols[idx] = val.size
         idx = idx + 1
         w_factor = 10
-        m[dim].collision_weights[val] *= w_factor
-        m[dim].update_collisions(m[dim].collision_relations,
-                                 m[dim].collision_weights)
+        m[ndim].collision_weights[val] *= w_factor
+        m[ndim].update_collisions(m[ndim].collision_relations,
+                                 m[ndim].collision_weights)
         angles[idx] = key
-        visc[idx] = cmp_visc(dim)
-        heat[idx] = cmp_heat(dim)
-        m[dim].collision_weights[val] = DEFAULT_WEIGHT
+        visc[idx] = cmp_visc(ndim)
+        heat[idx] = cmp_heat(ndim)
+        m[ndim].collision_weights[val] = DEFAULT_WEIGHT
     # reset collision weights
-    m[dim].collision_weights[...] = DEFAULT_WEIGHT
-    m[dim].update_collisions(m[dim].collision_relations,
-                             m[dim].collision_weights)
+    m[ndim].collision_weights[...] = DEFAULT_WEIGHT
+    m[ndim].update_collisions(m[ndim].collision_relations,
+                             m[ndim].collision_weights)
     angles[0] = [0.0]
-    visc[0] = cmp_visc(dim)
-    heat[0] = cmp_heat(dim)
+    visc[0] = cmp_visc(ndim)
+    heat[0] = cmp_heat(ndim)
     # store results in file
     hdf_group["angles"] = angles
     hdf_group["visc"] = visc
@@ -937,17 +1025,17 @@ if key not in file.keys():
     file.flush()
 
     # compute correction terms separately
-    hdf_group["visc_corr"] = np.zeros(dim)
-    hdf_group["heat_corr"] = np.zeros(dim)
+    hdf_group["visc_corr"] = np.zeros(ndim)
+    hdf_group["heat_corr"] = np.zeros(ndim)
     eta = np.array([[1, 1, 1], [0, 1, 1], [0, 0, 1]], dtype=float)
     theta = np.array([[0, 1, -1], [0, 1, -1], [1, 0, 0]], dtype=float)
-    maxwellian = m[dim].cmp_initial_state(nd[dim], 0, temp[dim])
-    for i in range(dim):
-        visc_mf = m[dim].mf_stress(np.zeros(dim),
+    maxwellian = m[ndim].cmp_initial_state(nd[ndim], 0, temp[ndim])
+    for i in range(ndim):
+        visc_mf = m[ndim].mf_stress(np.zeros(ndim),
                                    np.array([eta[i], theta[i]]),
                                    orthogonalize=True)
         hdf_group["visc_corr"][i] = np.sum(visc_mf ** 2 * maxwellian)
-        heat_mf = m[dim].mf_heat_flow(np.zeros(dim),
+        heat_mf = m[ndim].mf_heat_flow(np.zeros(ndim),
                                       theta[i],
                                       orthogonalize_state=maxwellian)
         hdf_group["heat_corr"][i] = np.sum(heat_mf ** 2 * maxwellian)
@@ -960,13 +1048,12 @@ print("###########################################\n"
       "Plot: Feasibility for Angular Weights in 3D\n"
       "###########################################")
 print("Create  Plot: effects of weight adjustments for specific  angles")
-plt.cla()
-plt.clf()
+plt.close("all")
 fig = plt.figure(constrained_layout=True, figsize=(12.75, 5.25))
 ax = fig.add_subplot()
 # fig.suptitle("Influence of Collision Angles on Viscosity, Heat Transfer, and Prandtl Number",
 #              fontsize=16)
-ax.set_title(r"Influence of Different Collision Angles on Flow Parameters in a 3D Model",
+ax.set_title(r"Effect of Amplified Collision Angles on Flow Parameters in a 3D Model",
              fontsize=fs_title)
 # ax.text(0.5, 1.08, r"Weight Adjustments for Selected Angles in  3D",
 #              horizontalalignment='center',
@@ -991,14 +1078,17 @@ labels = [r"$\widetilde{\mu}_1$",
           r"$\widetilde{\mu}_3$",
           r"Rescaled Heat Conductivity $\frac{\kappa}{10}$"]
 # ax.set_ylabel(r"Viscosity and Heat Transfer", fontsize=fs_label)
-dim = 3
+ndim = 3
 ax.set_xlabel(r"Affected Collision Angles", fontsize=fs_label)
 pos = np.arange(angles.shape[0])
 twax = ax.twinx()
-# twax.set_ylabel(r"Prandtl Number", fontsize=fs_label,
-#                 # rotation=270, labelpad=20
-#                 )
-for i in range(dim):
+ax.set_ylabel("Flow Parameter Coefficients",
+              fontsize=fs_label)
+twax.set_ylabel(r"Prandtl Numbers",
+                fontsize=fs_label,
+                rotation=270,
+                labelpad=25)
+for i in range(ndim):
     twax.scatter(pos + OFFSET[i],
                  visc[:, i] * heat_corr[i] / (visc_corr[i] * heat[:, i]),
                  color=colors[i],
@@ -1016,7 +1106,7 @@ ax.scatter([],
            lw=3,
            s=75)
 
-for i in range(dim):
+for i in range(ndim):
     ax.bar(x=pos + OFFSET[i],
            height=visc[:, i],
            width=BAR_WIDTH,
@@ -1026,7 +1116,7 @@ for i in range(dim):
     cur_label = labels[3] if i == 0 else "_nolegend_"
     ax.plot(pos,
             0.1 * heat[:, i],
-            color=colors[2*dim],
+            color=colors[2*ndim],
             label=cur_label,
             marker="o",
             markersize=6)
@@ -1068,19 +1158,19 @@ if key not in file.keys():
     hdf_group = file.create_group(key)
     hdf_group["weights"] = np.linspace(MIN_W, MAX_W, N_POINTS)
     weights = np.linspace(MIN_W, MAX_W, N_POINTS)
-    for dim in [2, 3]:
-        ds = hdf_group.create_dataset(str(dim),
-                                      (dim, N_POINTS, dim), dtype=float)
-        for a in range(dim):
+    for ndim in [2, 3]:
+        ds = hdf_group.create_dataset(str(ndim),
+                                      (ndim, N_POINTS, ndim), dtype=float)
+        for a in range(ndim):
             for i_w, w in enumerate(weights):
-                print("\rdim = %1d, a = %1d, weight = %3d / %3d"
-                      % (dim, a, i_w, N_POINTS),
+                print("\rndim = %1d, a = %1d, weight = %3d / %3d"
+                      % (ndim, a, i_w, N_POINTS),
                       end="")
-                m[dim].collision_weights[...] = DEFAULT_WEIGHT
-                new_weights = np.ones(dim, dtype=float)
+                m[ndim].collision_weights[...] = DEFAULT_WEIGHT
+                new_weights = np.ones(ndim, dtype=float)
                 new_weights[a] = w
-                adjust_weight_by_angle(m[dim], new_weights)
-                ds[a, i_w] = cmp_visc(dim)
+                adjust_weight_by_angle(m[ndim], new_weights)
+                ds[a, i_w] = cmp_visc(ndim)
                 file.flush()
     print("DONE!\n")
 else:
@@ -1090,8 +1180,8 @@ print("####################################################\n"
       "     Create Plot for weight_adjustment_effects      \n"
       "####################################################")
 key = "simplified_angular_weight_adjustment_effects"
-visc = {dim: file[key][str(dim)][()]
-        for dim in [2, 3]}
+visc = {ndim: file[key][str(ndim)][()]
+        for ndim in [2, 3]}
 weights = file[key + "/weights"][()]
 
 
@@ -1119,27 +1209,27 @@ styles = {3: np.array(["dotted", "dashed", "solid"])}
 styles[2] = styles[3][1:]
 
 axes[0].set_ylabel("Directional Viscosities", fontsize=fs_label)
-for ax, dim in enumerate([2, 3]):
+for ax, ndim in enumerate([2, 3]):
     axes[ax].set_xlabel(r"Weight factor $\omega_\bullet$", fontsize=fs_label)
-    for a in range(dim):
-        for i in range(dim):
+    for a in range(ndim):
+        for i in range(ndim):
             axes[ax].plot(weights,
-                          visc[dim][a, :, i],
-                          color=colors[dim][a, i],
-                          label=labels[dim][a, i],
-                          ls=styles[dim][a],
+                          visc[ndim][a, :, i],
+                          color=colors[ndim][a, i],
+                          label=labels[ndim][a, i],
+                          ls=styles[ndim][a],
                           lw=3,
                           zorder=5 - i)
     # create legend, with colums and per-column-title
     leg = axes[ax].get_legend_handles_labels()
     new_leg = []
     for i_l in [0,1]:
-        l = np.array(leg[i_l]).reshape((dim, dim))
-        new_l = np.empty((dim, dim+1), dtype=object)
+        l = np.array(leg[i_l]).reshape((ndim, ndim))
+        new_l = np.empty((ndim, ndim+1), dtype=object)
         new_l[:, 1:] = l
         if i_l == 0:
             new_l[:, 0] = plt.plot([],marker="", ls="")[0]
-        elif dim == 2:
+        elif ndim == 2:
             new_l[:, 0] = [r"$\boldmath{\omega_1:}$",
                            r"$\boldmath{\omega_2:}$"]
         else:
@@ -1147,7 +1237,7 @@ for ax, dim in enumerate([2, 3]):
                            r"$\boldmath{\omega_2:}$",
                            r"$\boldmath{\omega_3:}$"]
         new_leg.append(new_l.flatten())
-    axes[ax].legend(*new_leg, ncol=dim, loc="upper right",
+    axes[ax].legend(*new_leg, ncol=ndim, loc="upper right",
                     # fontsize=fs_legend
                     )
 plt.savefig(bp.SIMULATION_DIR + "/phd_simplified_angular_weight_adjustment_effects.pdf")
@@ -1157,8 +1247,8 @@ print("##########################################################\n"
       "#   Plot: Feasibility of Simplified Weight Adjustments   #\n"
       "##########################################################")
 key = "simplified_angular_weight_adjustment_effects"
-visc = {dim: file[key][str(dim)][()]
-        for dim in [2, 3]}
+visc = {ndim: file[key][str(ndim)][()]
+        for ndim in [2, 3]}
 weights = file[key + "/weights"][()]
 
 colors = {3: [["red", "darkred", "orange"],
@@ -1181,60 +1271,60 @@ styles = {3: ["solid", "dashed", "dotted"],
           2: ["solid", "dashed", "dotted"]
           }
 
-for dim in [2, 3]:
-    fig, axes = plt.subplots(1, dim, constrained_layout=True,
+for ndim in [2, 3]:
+    fig, axes = plt.subplots(1, ndim, constrained_layout=True,
                              sharey="all",
                              figsize=(12.75, 5.25))
     fig.suptitle("Effects of Componentwise Simplified Weight Adjustments "
-                 "in " + str(dim) + "D DVM",
+                 "in " + str(ndim) + "D DVM",
                  fontsize=fs_suptitle)
 
     axes[0].set_ylabel("Viscosity Coefficients", fontsize=fs_label)
-    for a in range(dim):
-        axes[a].set_xlabel("Weight Factor " + xlabels[dim][a], fontsize=fs_label)
+    for a in range(ndim):
+        axes[a].set_xlabel("Weight Factor " + xlabels[ndim][a], fontsize=fs_label)
         axes[a].grid(linestyle="dotted")
         axes[a].tick_params(axis="both", labelsize=fs_ticks)
-        for i in range(dim):
+        for i in range(ndim):
             axes[a].plot(weights,
-                         visc[dim][a, :, i],
-                         color=colors[dim][a][i],
-                         label=labels[dim][i],
-                         ls=styles[dim][i],
+                         visc[ndim][a, :, i],
+                         color=colors[ndim][a][i],
+                         label=labels[ndim][i],
+                         ls=styles[ndim][i],
                          lw=3)
         axes[a].legend(loc="upper right",
                        fontsize=fs_legend+4)
     plt.savefig(bp.SIMULATION_DIR + "/phd_simplified_weight_effects"
-                + str(dim) + "D.pdf")
+                + str(ndim) + "D.pdf")
 print("Done!\n")
 
 
-print("######################################################\n"
-      "Harmonize 3D Model, and compute its angle dependencies\n"
-      "######################################################\n")
+print("#########################################################\n"
+      "    Compute Heuristic for 2D and 3D Model of 2 Species   \n"
+      "#########################################################\n")
 key = "heuristic"
 atol = 1e-6
 rtol = 1e-4
 if key not in file.keys():
     hdf_group = file.create_group(key)
-    for dim in [2,3]:
-        print("Harmonize %1dD model..." % dim)
-        subgrp = hdf_group.create_group(str(dim))
-        m[dim].collision_weights[...] = DEFAULT_WEIGHT
-        visc = [cmp_visc(dim)]
-        weights = [np.ones(dim)]
+    for ndim in [2,3]:
+        print("Harmonize %1dD model..." % ndim)
+        subgrp = hdf_group.create_group(str(ndim))
+        m[ndim].collision_weights[...] = DEFAULT_WEIGHT
+        visc = [cmp_visc(ndim)]
+        weights = [np.ones(ndim)]
         ctr = 0
         while True:
             pos = np.argsort(visc[-1])
-            # w = np.ones(dim, dtype=float)
-            mean = np.sum(visc[-1]) / dim
+            # w = np.ones(ndim, dtype=float)
+            mean = np.sum(visc[-1]) / ndim
             # w[pos[0]] = visc[-1][pos[0]] / mean
             # w[pos[-1]] = visc[-1][pos[-1]] / mean
             w = visc[-1] / mean
             weights.append(weights[-1] * w)
             # reset previous weight adjustments, to keep weights linear
-            m[dim].collision_weights[...] = DEFAULT_WEIGHT
-            adjust_weight_by_angle(m[dim], weights[-1])
-            visc.append(cmp_visc(dim))
+            m[ndim].collision_weights[...] = DEFAULT_WEIGHT
+            adjust_weight_by_angle(m[ndim], weights[-1])
+            visc.append(cmp_visc(ndim))
             adiff = np.max(visc[-1]) - np.min(visc[-1])
             rdiff = np.max(visc[-1]) / np.min(visc[-1]) - 1
             print("\rweights = ", ["{:3e}".format(w) for w in weights[-1]],
@@ -1249,7 +1339,7 @@ if key not in file.keys():
         subgrp["visc"] = np.array(visc)
         print("\nDONE!\n")
 
-        if dim == 3:
+        if ndim == 3:
             print("compute angular dependecies for adjusted 3D model ")
             rotations = []
             rotations.append([[1, 0, 0],
@@ -1333,29 +1423,29 @@ labels = {2: [r"$\Lambda_1$",
               r"$\Lambda_3$"]}
 axes[0].set_ylabel(r"Directional Viscosities", fontsize=fs_label)
 
-for a, dim in enumerate([2, 3]):
-    visc = file["heuristic"][str(dim)]["visc"]
-    weights = file["heuristic"][str(dim)]["weights"]
+for a, ndim in enumerate([2, 3]):
+    visc = file["heuristic"][str(ndim)]["visc"]
+    weights = file["heuristic"][str(ndim)]["weights"]
     pos = np.arange(visc.shape[0]) + 1
     axes[a].set_xlabel(r"Algorithmic Time Step", fontsize=fs_label)
     twax = axes[a].twinx()
     if a == 1:
         twax.set_ylabel(r"Weight Factor $\omega$", fontsize=fs_label)
-    for i in range(dim):
+    for i in range(ndim):
         axes[a].plot(pos,
                      visc[:, i],
-                     color=colors[dim][i],
-                     label=labels[dim][i],
+                     color=colors[ndim][i],
+                     label=labels[ndim][i],
                      marker="o",
                      markersize=6)
         twax.plot(pos,
                   weights[:, i],
-                  color=colors[dim][i],
+                  color=colors[ndim][i],
                   ls="dotted",
                   markersize=6)
-    for i in range(dim):
+    for i in range(ndim):
         axes[a].plot([], [],
-                     color=colors[dim][i],
+                     color=colors[ndim][i],
                      label=r"$\omega_{%1d}$" % (i + 1),
                      ls="dotted",
                      markersize=6)
@@ -1369,10 +1459,9 @@ print("Done!\n")
 
 
 print("######################################################\n"
-      "Plot: Dependency of Second Angle in adjusted  3D Model\n"
+      "# Plot: Dependency for adjusted 3D Model (heuristic) #\n"
       "######################################################")
-plt.cla()
-plt.clf()
+plt.close("all")
 fig = plt.figure(constrained_layout=True, figsize=(10, 10))
 ax = fig.add_subplot(projection="polar")
 ax.set_title(r"Angular Dependencies of the Viscosity $\lambda$ in the Adjusted 3D Model",
@@ -1418,111 +1507,90 @@ ax.legend(loc="lower center", bbox_to_anchor=(0.5, -0.18), ncol=4,
           fontsize=fs_legend)
 ax.grid(linestyle="dotted")
 
-plt.savefig(bp.SIMULATION_DIR + "/phd_viscosity3D_heuristic_angle_dependency.pdf")
+plt.savefig(bp.SIMULATION_DIR + "/phd_angular_invariance_3D_heuristic.pdf")
 print("Done!\n")
 
 
-print("#####################################################################\n"
-      "   Compute harmonized Angular viscosities for altered temperatures\n"
-      "#####################################################################")
-N_TEMPS = 50
-key = "persistence_over_altered_temperature"
-if key not in file.keys():
-    hdf_group = file.create_group(key)
-    # copy old parameters for viscosity
-    nd_orig = nd.copy()
-    mean_v_orig = mean_v.copy()
-    temp_orig = temp.copy()
-    for dim in [2,3]:
-        print("\nCheck %1dD model..." % dim)
-        subgrp = hdf_group.create_group(str(dim))
-        m[dim].collision_weights[...] = DEFAULT_WEIGHT
-        weights = file["heuristic"][str(dim)]["weights"][-1]
-        adjust_weight_by_angle(m[dim], weights)
-        temp_range = m[dim].temperature_range(atol=0.1)
-        temperatures = np.linspace(*temp_range, N_TEMPS)
-        visc = np.zeros((N_TEMPS, dim))
-        for i_t, t in enumerate(temperatures):
-            print("\r%3d / %3d" % (i_t+1, N_TEMPS), end="")
-            temp[dim][...] = t
-            visc[i_t] = cmp_visc(dim)
-        subgrp["temperatures"] = temperatures
-        subgrp["visc"] = visc
-    print("\nDONE!\n")
-else:
-    print("SKIPPED!\n")
-
-print("########################################################################\n",
-      "#     Plot harmonized angular viscosities for altered temperatures     #\n",
-      "########################################################################")
-print("Create Plot for weight_adjustment_effects")
-fig, axes = plt.subplots(1, 2, constrained_layout=True,
-                         figsize=(12.75, 6.25))
-fig.suptitle("Angular Viscosities of Equalized DVM for Altered Temperatures",
-             fontsize=fs_suptitle)
-axes[0].set_title(r"2D Collision Model",
-                  fontsize=fs_title)
-axes[1].set_title(r"3D Collision Model",
-                  fontsize=fs_title)
-
-colors = {3: np.array(["tab:red",
-                       "tab:green",
-                       "tab:blue"])}
-colors[2] = colors[3][1:]
-labels = {3: np.array([r"$\Lambda_1$", r"$\Lambda_2$", r"$\Lambda_3$"]),
-          2: np.array([r"$\Lambda_1$", r"$\Lambda_2$"])
-          }
-
-styles = {3: np.array(["dotted", "dashed", "solid"])}
-styles[2] = styles[3][1:]
-
-axes[0].set_ylabel("Directional Viscosities", fontsize=fs_label)
-
-key = "persistence_over_altered_temperature"
-hdf_group = file[key]
-for ax, dim in enumerate([2, 3]):
-    axes[ax].set_xlabel(r"Temperature", fontsize=fs_label)
-    for i in range(dim):
-        temperatures = hdf_group[str(dim)]["temperatures"][()]
-        visc = hdf_group[str(dim)]["visc"][:, i]
-        axes[ax].plot(temperatures,
-                      visc,
-                      color=colors[dim][i],
-                      label=labels[dim][i],
-                      ls=styles[dim][i],
-                      lw=3)
-    axes[ax].set_ylim(0, 1.5 * np.max(visc))
-    axes[ax].tick_params(axis="both", labelsize=fs_ticks)
-    axes[ax].legend(loc="upper right", fontsize=fs_legend)
-
-plt.savefig(bp.SIMULATION_DIR + "/phd_persistence_over_altered_temperature.pdf")
-print("Done!\n")
+# print("#####################################################################\n"
+#       "   Compute harmonized Angular viscosities for altered temperatures\n"
+#       "#####################################################################")
+# N_TEMPS = 50
+# key = "persistence_over_altered_temperature"
+# if key not in file.keys():
+#     hdf_group = file.create_group(key)
+#     # copy old parameters for viscosity
+#     nd_orig = nd.copy()
+#     mean_v_orig = mean_v.copy()
+#     temp_orig = temp.copy()
+#     for ndim in [2,3]:
+#         print("\nCheck %1dD model..." % ndim)
+#         subgrp = hdf_group.create_group(str(ndim))
+#         m[ndim].collision_weights[...] = DEFAULT_WEIGHT
+#         weights = file["heuristic"][str(ndim)]["weights"][-1]
+#         adjust_weight_by_angle(m[ndim], weights)
+#         temp_range = m[ndim].temperature_range(atol=0.1)
+#         temperatures = np.linspace(*temp_range, N_TEMPS)
+#         visc = np.zeros((N_TEMPS, ndim))
+#         for i_t, t in enumerate(temperatures):
+#             print("\r%3d / %3d" % (i_t+1, N_TEMPS), end="")
+#             temp[ndim][...] = t
+#             visc[i_t] = cmp_visc(ndim)
+#         subgrp["temperatures"] = temperatures
+#         subgrp["visc"] = visc
+#     print("\nDONE!\n")
+# else:
+#     print("SKIPPED!\n")
+#
+# print("########################################################################\n",
+#       "#     Plot harmonized angular viscosities for altered temperatures     #\n",
+#       "########################################################################")
+# fig, axes = plt.subplots(1, 2, constrained_layout=True,
+#                          figsize=(12.75, 6.25))
+# fig.suptitle("Viscosity Coefficients of an Adjusted DVM for Altered Temperatures",
+#              fontsize=fs_suptitle)
+# axes[0].set_title(r"2D Collision Model",
+#                   fontsize=fs_title)
+# axes[1].set_title(r"3D Collision Model",
+#                   fontsize=fs_title)
+#
+# colors = {3: np.array(["tab:orange",
+#                        "tab:green",
+#                        "tab:blue"])}
+# colors[2] = colors[3][1:]
+# labels = np.array([r"$\widetilde{\mu}_1$",
+#                    r"$\widetilde{\mu}_2$",
+#                    r"$\widetilde{\mu}_3$"])
+#
+# styles = {3: np.array(["dotted", "dashed", "solid"])}
+# styles[2] = styles[3][1:]
+#
+# axes[0].set_ylabel("Viscosity Coefficients", fontsize=fs_label)
+#
+# key = "persistence_over_altered_temperature"
+# hdf_group = file[key]
+# for ax, ndim in enumerate([2, 3]):
+#     axes[ax].set_xlabel(r"Temperature", fontsize=fs_label)
+#     for i in range(ndim):
+#         temperatures = hdf_group[str(ndim)]["temperatures"][()]
+#         visc = hdf_group[str(ndim)]["visc"][:, i]
+#         axes[ax].plot(temperatures,
+#                       visc,
+#                       color=colors[ndim][i],
+#                       label=labels[i],
+#                       ls=styles[ndim][i],
+#                       lw=3)
+#     axes[ax].set_ylim(0, 1.5 * np.max(visc))
+#     axes[ax].tick_params(axis="both", labelsize=fs_ticks)
+#     axes[ax].legend(loc="upper right", fontsize=fs_legend)
+#     axes[ax].grid(linestyle="dotted")
+#
+# plt.savefig(bp.SIMULATION_DIR + "/phd_persistence_over_altered_temperature.pdf")
+# print("Done!\n")
 
 
 print("##################################################################\n"
       "#   Multispecies: Apply 3D-Heuristic Species-Wise to 3-Mixture   #\n"
       "##################################################################")
-
-def cmp_visc_ext(model, nd, temp):
-    result = np.empty(3)
-    assert model.ndim == 3
-    result[0] = model.cmp_viscosity(
-        number_densities=nd,
-        temperature=temp,
-        directions=[[1, 1, 1], [0, 1, -1]],
-        dt=dt)
-    result[1] = model.cmp_viscosity(
-        number_densities=nd,
-        temperature=temp,
-        directions=[[0, 1, 1], [0, 1, -1]],
-        dt=dt)
-    result[2] = model.cmp_viscosity(
-        number_densities=nd,
-        temperature=temp,
-        directions=[[0, 0, 1], [1, 0, 0]],
-        dt=dt)
-    return result
-
 
 atol = 1e-5
 rtol = 1e-3
@@ -1574,7 +1642,7 @@ if key not in file.keys():
                                      temp3[list({s1, s2})]))
 
             # compute weight factor for new weight
-            mean_visc = np.sum(visc[-1]) / dim
+            mean_visc = np.sum(visc[-1]) / ndim
             w_factor = visc[-1] / mean_visc
 
             # check tolerance break conditions
@@ -1676,8 +1744,7 @@ else:
 print("########################################################\n"
       "#   Plot: Dependency in adjusted 3D, 3-Species Model   #\n"
       "########################################################")
-plt.cla()
-plt.clf()
+plt.close("all")
 fig = plt.figure(constrained_layout=True, figsize=(12.75, 8))
 ax = fig.add_subplot(projection="polar")
 ax.set_title(r"Angular Dependencies of the Viscosity $\lambda$ in the Adjusted 3D Model",
@@ -1725,161 +1792,1169 @@ plt.savefig(bp.SIMULATION_DIR + "/phd_viscosity_multispecies_dependency.pdf")
 print("Done!\n")
 
 
+print("######################################################\n"
+      "#       compute bisection Scheme for 3D models       #\n"
+      "######################################################")
+rtol = 1e-3
+if "bisection_3D" not in file.keys():
+    file.create_group("bisection_3D")
+    for ndim in [2,3]:
+        hdf_group = file["bisection_3D"].create_group(str(ndim))
+        for used_weight in range(ndim):
+            subgrp = hdf_group.create_group(str(used_weight))
+            angular_weights = np.ones(ndim)
+            # prepare initial parameters for bisection
+            if used_weight == ndim - 1:
+                biscetion_weights = [0.1, 2.0]
+            else:
+                biscetion_weights = [1.0, 6.0]
+            # compute initial viscosities
+            visc = []
+            for w in biscetion_weights:
+                m[ndim].collision_weights[:] = DEFAULT_WEIGHT
+                angular_weights[used_weight] = w
+                adjust_weight_by_angle(m[ndim], angular_weights)
+                visc.append(cmp_visc(ndim))
+            print("Initial Viscosity Coefficients:")
+            print(np.array(visc))
+            visc_diff = [visc[i][ndim-2] - visc[i][ndim-1] for i in [0, 1]]
+            # the signs must differ, for the bisection scheme
+            assert visc_diff[0] * visc_diff[1] < 0
+            # the current weights and diffs describe the best results so far
+            order = np.argsort(visc_diff)
+            # store all weights, divided into upper and lower bounds
+            w_lo = [biscetion_weights[np.argmin(visc_diff)]] * 2
+            w_hi = [biscetion_weights[np.argmax(visc_diff)]] * 2
+            print("Start Bisection Algorithm")
+            while True:
+                w = (w_lo[-1] + w_hi[-1]) / 2
+                biscetion_weights.append(w)
+                # compute new viscosity
+                m[ndim].collision_weights[:] = DEFAULT_WEIGHT
+                angular_weights[used_weight] = w
+                adjust_weight_by_angle(m[ndim], angular_weights)
+                visc.append(cmp_visc(ndim))
+                visc_diff.append(visc[-1][ndim-2] - visc[-1][ndim-1])
+                # update hi/lo lists
+                if visc_diff[-1] < 0:
+                    w_lo.append(w)
+                    w_hi.append(w_hi[-1])
+                else:
+                    w_hi.append(w)
+                    w_lo.append(w_lo[-1])
+                assert len(w_hi) == len(w_lo)
+                assert len(w_hi) == len(visc)
+                rdiff = np.max(visc[-1]) / np.min(visc[-1]) - 1
+                print("\rWeight = {:10e} - RDiff = {:3e}"
+                      " - i = {}".format(w, rdiff, len(visc)),
+                      end="")
+                if rdiff < rtol:
+                    m[ndim].collision_weights[:] = DEFAULT_WEIGHT
+                    break
+            # store results in h5py
+            subgrp["biscetion_weights"] = np.array(biscetion_weights)
+            subgrp["w_hi"] = np.array(w_hi)
+            subgrp["w_lo"] = np.array(w_lo)
+            subgrp["visc"] = np.array(visc)
+            file.flush()
+            print("\nDONE!\n")
+else:
+    print("SKIPPED!\n")
 
-# print("Compute viscosities for complete mixture")
-# print("Restore original weights")
-# # print this should be unnecessary, only weights should have changed
-# model.collision_relations = hdf_group["Collisions"][()]
-# model.collision_weights = np.full(model.collision_relations.shape[0],
-#                                   DEFAULT_WEIGHT)
-# print("apply computed weight adjustments, per species pair")
-# for (s1, s2) in spc_pairs:
-#     weights = hdf_group[str((s1, s2))]["weights"][-1]
-#     col_choice = grp[(s1, s2)]
-#     adjust_weight_by_angle(model, weights, col_choice)
-# model.update_collisions(model.collision_relations,
-#                         model.collision_weights)
-# # compute viscosity
-# nd3 = np.ones(3)
-# temp3 = np.array([2.25] * 3)
-# hdf_group["Viscosities"] = cmp_visc_ext(model, nd3, temp3)
-# file.flush()
-# print(hdf_group["Viscosities"][()])
+
+print("####################################\n"
+      "Plot: bisection Scheme for 3D models\n"
+      "####################################")
+# fig = plt.figure(constrained_layout=True, figsize=(12.75, 6.25))
+# ax = fig.add_subplot()
+fig, axes = plt.subplots(1, 3, constrained_layout=True,
+                         sharey="all",
+                         figsize=(12.75, 5.25))
+# set up second ax
+twax = [axes[k].twinx() for k in [0, 1, 2]]
+
+fig.suptitle("Bisecting "
+             r"$\left\lvert \widetilde{\mu}_2 - \widetilde{\mu}_3\right\rvert$"
+             " with a Single Component Simplified Angular Weight Adjustment",
+             fontsize=fs_suptitle)
+
+axes[0].set_ylabel(r"Viscosity Coefficients", fontsize=fs_label)
+twax[2].set_ylabel(r"Angular Weight Factor $\gamma_\eta$",
+                   fontsize=fs_label,
+                   rotation=270,
+                   labelpad=25)
+colors = ["tab:orange", "tab:green", "tab:blue"]
+labels = [r"$\widetilde{\mu}_1$",
+          r"$\widetilde{\mu}_2$",
+          r"$\widetilde{\mu}_3$"]
+angles = [r"(1,1,1)^T",
+          r"(0,1,1)^T",
+          r"(0,0,1)^T"]
+ndim = 3
+
+for k in range(ndim):
+    print("load stored results ", k)
+    subgrp = file["bisection_3D"][str(ndim)][str(k)]
+    visc = subgrp["visc"][()]
+    weights = subgrp["biscetion_weights"][()]
+    print("final weight = ",
+          weights[-1])
+    pos = np.arange(visc.shape[0]) + 1
+    # max_steps = max(max_steps, visc.shape[0])
+    max_Steps = pos
+    for j in range(ndim):
+        axes[k].plot(pos,
+                     visc[:, j],
+                     color=colors[j],
+                     lw=2,
+                     ls="solid",
+                     marker="o",
+                     markersize=4,
+                     label=labels[j])
+        twax[k].plot(pos,
+                     weights[:],
+                     color="black",
+                     lw=2,
+                     ls="dotted",
+                     marker="s",
+                     markersize=4,
+                     label=r"$\gamma_\eta$")
+    # add twax to legend
+    axes[k].plot([],[],
+                 color="black",
+                 lw=2,
+                 ls="dotted",
+                 marker="x",
+                 markersize=4,
+                 label=r"$\gamma_\eta$")
+    pos = np.arange(max_steps) + 1
+    # axes[k].set_xticks(pos[4::5])
+    axes[k].tick_params(axis="x", labelsize=fs_ticks)
+    axes[k].tick_params(axis="y", labelsize=fs_ticks)
+    axes[k].set_title(r"Angle $\eta = " + angles[k]
+                      + "$",
+                      fontsize=fs_title)
+    axes[k].set_xlabel(r"Algorithmic Time Step", fontsize=fs_label)
+    axes[k].grid(linestyle="dotted")
+# set up aesthetics for twin axes
+for i in [0, 1,2]:
+    twax[i].set_ylim(0, 10)
+    twax[i].tick_params(axis="y", labelsize=fs_ticks)
+    if i != 2:
+        twax[i].set_yticks([])
+axes[0].legend(loc="upper right", fontsize=fs_legend+5)
+
+plt.savefig(bp.SIMULATION_DIR + "/phd_viscosity_bisection_3D.pdf")
+print("Done!\n")
+
+
+print("######################################################\n"
+      "# compute bisection angular invariance for 3D models #\n"
+      "######################################################")
+ndim = 3
+N_ANGLES = 101
+key = "bisection3D_angular_invariance"
+if key not in file.keys():
+    hdf_group = file.create_group(key)
+    print("apply computed weight")
+    weight = file["bisection_3D"]["2"]["biscetion_weights"][-1]
+    m[ndim].collision_weights[:] = DEFAULT_WEIGHT
+    angular_weights = np.ones(ndim)
+    angular_weights[ndim-1] = weight
+    adjust_weight_by_angle(m[ndim], angular_weights)
+
+    print("compute angular dependecies for adjusted 3D model ")
+    rotations = []
+    rotations.append([[1, 0, 0],
+                      [0, 1, 0],
+                      [0, 0, 1]])
+    rotations.append([[1,  0, 0],
+                      [0,  1, 1],
+                      [0, -1, 1]])
+    rotations.append([[-1,  1, 1],
+                      [-1, -1, 1],
+                      [ 2,  0, 1]])
+    rotations.append([[-3, -2, 1],
+                      [ 0, 10, 2],
+                      [ 1, -6, 3]])
+    rotations = np.array(rotations, dtype=int)
+    # store integer first angles, to use as keys
+    first_angles = np.copy(rotations[:, :, -1])
+    # change data type to float and normalize each column
+    rotations = np.array(rotations, dtype=float)
+    for a in range(rotations.shape[0]):
+        for col in range(rotations.shape[-1]):
+            rotations[a, :, col] /= np.linalg.norm(rotations[a, :, col])
+    # base angles in xy plane
+    xy_angles = np.zeros((N_ANGLES, 3))
+    ls = np.linspace(0, 2 * np.pi, N_ANGLES)
+    xy_angles[:, 0] = np.cos(ls)
+    xy_angles[:, 1] = np.sin(ls)
+    # compute second angles from rotating base_angles
+    second_angles = np.einsum("abc, dc -> adb", rotations, xy_angles)
+
+    for i_a, a in enumerate(first_angles):
+        subgrp = hdf_group.create_group(str(tuple(a)))
+        ang_visc = np.empty(N_ANGLES, dtype=float)
+        ang_heat = np.empty(N_ANGLES, dtype=float)
+        for n, sa in enumerate(second_angles[i_a]):
+            print("\rangle_1 = %1d / %1d,     angle_2 = %3d / %3d"
+                  % (i_a + 1, first_angles.shape[0], n + 1, N_ANGLES),
+                  end="")
+            ang_visc[n] = m[ndim].cmp_viscosity(
+                number_densities=nd[ndim],
+                temperature=temp[ndim],
+                directions=[a, sa],
+                dt=dt,
+                normalize=False)
+            ang_heat[n] = m[3].cmp_heat_transfer(
+                number_densities=nd[ndim],
+                temperature=temp[ndim],
+                direction=sa,
+                dt=dt,
+                normalize=False)
+        subgrp["rad_angle"] = ls
+        subgrp["first_angle"] = a
+        subgrp["rotations"] = rotations[i_a]
+        subgrp["angular_visc"] = ang_visc
+        subgrp["angular_heat"] = ang_heat
+        file.flush()
+    print("\nDONE!\n")
+else:
+    print("SKIPPED!\n")
+
+
+print("######################################################\n"
+      "# Plot: Dependency for adjusted 3D Model (bisection) #\n"
+      "######################################################")
+plt.close("all")
+fig, axes = plt.subplots(1, 2,
+                         figsize=(12.75, 9),
+                         subplot_kw={"projection": "polar"})
+
+fig.suptitle(r"Angular Dependencies of Flow Parameters in the Adjusted 3D Model",
+             fontsize=fs_suptitle)
+
+key = "bisection3D_angular_invariance"
+styles = ["solid", "solid", "solid", "dashed"]
+colors = ["tab:orange", "tab:green", "tab:blue", "tab:purple"]
+labels = [
+    r"$\eta = \begin{pmatrix}1 \\ 1 \\ 1 \end{pmatrix}$",
+    r"$\eta = \begin{pmatrix}0 \\ 1 \\ 1 \end{pmatrix}$",
+    r"$\eta = \begin{pmatrix}0 \\ 0 \\ 1 \end{pmatrix}$",
+    r"$\eta = \begin{pmatrix}1 \\ 2 \\ 3 \end{pmatrix}$"
+]
+titles = [
+    r"Viscosity Coefficient $\widetilde{\mu}(\eta, \theta)$",
+    r"Heat Conductivity Coefficient $\widetilde{\kappa}(\theta)$"
+]
+
+# iterate over this, to have a fixed order!
+a_keys = [(1, 1, 1),
+          (0, 1, 1),
+          (0, 0, 1),
+          (1, 2, 3)
+          ]
+hdf_group = file[key]
+for k, first_angle in enumerate(a_keys):
+    subgrp = hdf_group[str(first_angle)]
+    visc = subgrp["angular_visc"][()]
+    print("Relative Differences for ", first_angle)
+    print("Viscosity: ", np.max(visc) / np.min(visc) - 1)
+    heat = subgrp["angular_heat"][()]
+    print("Heat Conductivity: ", np.max(heat) / np.min(heat) - 1)
+
+    if k == 3:
+        rad = subgrp["rad_angle"][()] + 0.9
+    else:
+        rad = subgrp["rad_angle"][()]
+    for a, coeff in enumerate(["angular_visc", "angular_heat"]):
+        axes[a].plot(rad,
+                     subgrp[coeff][()],
+                     ls=styles[k],
+                     c=colors[k],
+                     label=labels[k] if a == 0 else "_nolegend_",
+                     lw=4)
+        axes[a].set_title(titles[a], fontsize=fs_title)
+        if a == 1:
+            max_val = np.max(subgrp[coeff][()])
+            axes[a].set_rticks([0, 0.0075, 0.015, 0.0225])
+            axes[a].set_rlim(0, 1.15 * max_val)
+        else:
+            axes[a].set_rticks([0, 0.0005, 0.001, 0.0015])
+            axes[a].set_rlim(0, 0.0015)
+            # boundaries for counter example
+            # axes[a].set_rticks([0.00136, 0.001365])
+for ax in axes:
+    ax.set_rlabel_position(225)
+    ax.tick_params(axis="both", labelsize=16)
+    ax.grid(linestyle="dotted")
+fig.legend(loc="lower center", bbox_to_anchor=(0.5, 0.15), ncol=4,
+               fontsize=fs_legend+4)
+plt.subplots_adjust(bottom=0.3)
+plt.savefig(bp.SIMULATION_DIR + "/phd_angular_invariance_3D_bisection.pdf",
+            bbox_inches='tight')
+print("Done!\n")
+
+
+print("#######################################################\n"
+      "# compute Prandtl Dependency on Bisection Scheme (3D) #\n"
+      "#######################################################")
+rtol = 1e-3
+N_WEIGHTS = 100
+key = "bisection_3D_free_parameter"
+if key not in file.keys():
+    hdf_group = file.create_group(key)
+    ndim = 3
+    diagonal_weights = np.linspace(0.25, 10, N_WEIGHTS)
+    hdf_group["diagonal_weights"] = diagonal_weights
+    hdf_group["biscetion_weights"] = np.full((N_WEIGHTS, MAX_ITER), -1.0)
+    hdf_group["w_hi"] = np.full((N_WEIGHTS, MAX_ITER), -1.0)
+    hdf_group["w_lo"] = np.full((N_WEIGHTS, MAX_ITER), -1.0)
+    hdf_group["visc"] = np.full((N_WEIGHTS, MAX_ITER, ndim), -1.0)
+    hdf_group["prandtl"] = np.full(N_WEIGHTS, -1.0)
+    for i_dw, dw in enumerate(diagonal_weights):
+        print("i_dw = {:3d}/{:3d} - dw = {:3e} ".format(i_dw, N_WEIGHTS, dw))
+        angular_weights = np.ones(ndim)
+        angular_weights[0] = dw
+        # prepare initial parameters for bisection
+        biscetion_weights = [0.1, 4]
+        print("Compute Initial Viscosity Coefficients:")
+        visc = []
+        for w in biscetion_weights:
+            m[ndim].collision_weights[:] = DEFAULT_WEIGHT
+            angular_weights[ndim-1] = w
+            adjust_weight_by_angle(m[ndim], angular_weights)
+            visc.append(cmp_visc(ndim))
+        print(np.array(visc))
+        visc_diff = [visc[i][ndim-2] - visc[i][ndim-1] for i in [0, 1]]
+        # the signs must differ, for the bisection scheme
+        print(visc_diff)
+        assert visc_diff[0] * visc_diff[1] < 0
+        # the current weights and diffs describe the best results so far
+        order = np.argsort(visc_diff)
+        # store all weights, divided into upper and lower bounds
+        w_lo = [biscetion_weights[np.argmin(visc_diff)]] * 2
+        w_hi = [biscetion_weights[np.argmax(visc_diff)]] * 2
+        print("Start Bisection Algorithm")
+        while True:
+            w = (w_lo[-1] + w_hi[-1]) / 2
+            biscetion_weights.append(w)
+            # compute new viscosity
+            m[ndim].collision_weights[:] = DEFAULT_WEIGHT
+            angular_weights[ndim-1] = w
+            adjust_weight_by_angle(m[ndim], angular_weights)
+            visc.append(cmp_visc(ndim))
+            visc_diff.append(visc[-1][ndim-2] - visc[-1][ndim-1])
+            # update hi/lo lists
+            if visc_diff[-1] < 0:
+                w_lo.append(w)
+                w_hi.append(w_hi[-1])
+            else:
+                w_hi.append(w)
+                w_lo.append(w_lo[-1])
+            assert len(w_hi) == len(w_lo)
+            assert len(w_hi) == len(visc)
+            rdiff = np.max(visc[-1]) / np.min(visc[-1]) - 1
+            print("\rWeight = {:10e} - RDiff = {:3e}"
+                  " - i = {}".format(w, rdiff, len(visc)),
+                  end="")
+            if rdiff < rtol:
+                break
+            if np.allclose(*biscetion_weights[-2:]):
+                print("WARNING! Error below specified threshold")
+                break
+        print("\nstore results in h5py")
+        pos = len(visc)
+        hdf_group["biscetion_weights"][i_dw, :pos] = np.array(biscetion_weights)
+        hdf_group["w_hi"][i_dw, :pos] = np.array(w_hi)
+        hdf_group["w_lo"][i_dw, :pos] = np.array(w_lo)
+        hdf_group["visc"][i_dw, :pos] = np.array(visc)
+        file.flush()
+        # compute prandtl number
+        visc_coeff = m[ndim].cmp_viscosity(
+            number_densities=nd[ndim],
+            temperature=temp[ndim],
+            directions=[[1, 1, 1], [0, 1, -1]],
+            dt=dt,
+            normalize=True)
+        heat_coeff = m[ndim].cmp_heat_transfer(
+            number_densities=nd[ndim],
+            temperature=temp[ndim],
+            direction=[1, 1, 1],
+            dt=dt,
+            normalize=True)
+        hdf_group["prandtl"][i_dw] = visc_coeff / heat_coeff
+        file.flush()
+    print("\nDONE!\n")
+    m[ndim].collision_weights[:] = DEFAULT_WEIGHT
+else:
+    print("SKIPPED!\n")
+
+print("#####################################################\n"
+      "# Plot: Prandtl Dependency on Bisection Scheme (3D) #\n"
+      "#####################################################")
+plt.close("all")
+fig = plt.figure(constrained_layout=True, figsize=(12.75, 5.25))
+ax = fig.add_subplot()
+
+fig.suptitle(r"Effect of $\gamma_{(1,1,1)}$ on Prandtl Number "
+             r"after 3D Bisection Scheme",
+             fontsize=fs_suptitle)
+prandtl = file["bisection_3D_free_parameter"]["prandtl"][()]
+diag_weights = file["bisection_3D_free_parameter"]["diagonal_weights"][()]
+print(prandtl.shape, diag_weights.shape)
+ax.plot(diag_weights,
+        prandtl,
+        lw=4,
+        label="$Pr_1 = Pr_2 = Pr_3$")
+ax.legend(loc="upper left", fontsize=fs_legend)
+ax.tick_params(axis="x", labelsize=fs_ticks)
+ax.tick_params(axis="y", labelsize=fs_ticks)
+ax.set_xlabel(r"$\gamma_{(1,1,1)}$ Component of $\gamma_\mathcal{P}$ ",
+              fontsize=fs_label)
+ax.set_ylabel(r"Prandtl Number",
+              fontsize=fs_label)
+ax.grid(linestyle="dotted")
+plt.savefig(bp.SIMULATION_DIR + "/phd_viscosity3D_prandtl_effects.pdf")
+print("Done!\n")
+
+
+print("#################################################\n"
+      "# compute Prandtl Dependency on Grid Shape (2D) #\n"
+      "#################################################")
+rtol = 1e-3
+SHAPES = np.arange(5, 41)
+key = "prandtl_shape_Effect_2D"
+if key not in file.keys():
+    hdf_group = file.create_group(key)
+    ndim = 2
+    hdf_group["prandtl"] = np.full(SHAPES.size, -1.0)
+    hdf_group["shapes"] = SHAPES
+    for i_w, width in enumerate(SHAPES):
+        print("i_w = {:2d}/{:3d} - width = {:2d} ".format(i_w, SHAPES.size, width))
+        print("compute model...", end="")
+        model = bp.CollisionModel(masses=[1],
+                                  shapes=[[width, width]],
+                                  base_delta=5 / (width - 1)
+                                  )
+        if width < 10:
+            _DEFAULT_WEIGHT = 10 * DEFAULT_WEIGHT
+        else:
+            _DEFAULT_WEIGHT = DEFAULT_WEIGHT
+        print("Done")
+        _nd = np.ones(1)
+        _temp = np.ones(1) * 2
+        angular_weights = np.ones(ndim)
+        # prepare initial parameters for bisection
+        biscetion_weights = [0.1, 1]
+        # compute initial viscosities
+        visc = []
+        print("Compute Initial Viscosity Coefficients:")
+        for w in biscetion_weights:
+            model.collision_weights[:] = _DEFAULT_WEIGHT
+            angular_weights[ndim-1] = w
+            adjust_weight_by_angle(model, angular_weights)
+            visc.append([model.cmp_viscosity(
+                    number_densities=_nd,
+                    temperature=_temp,
+                    directions=directions,
+                    dt=dt,
+                    normalize=True)
+                for directions in [[[1, 1], [1, -1]],
+                                   [[0, 1], [1, 0]]]])
+        print(np.array(visc))
+        visc_diff = [visc[i][ndim-2] - visc[i][ndim-1] for i in [0, 1]]
+        # the signs must differ, for the bisection scheme
+        assert visc_diff[0] * visc_diff[1] < 0
+        # the current weights and diffs describe the best results so far
+        order = np.argsort(visc_diff)
+        # store all weights, divided into upper and lower bounds
+        w_lo = [biscetion_weights[np.argmin(visc_diff)]] * 2
+        w_hi = [biscetion_weights[np.argmax(visc_diff)]] * 2
+        print("Start Bisection Algorithm")
+        while True:
+            w = (w_lo[-1] + w_hi[-1]) / 2
+            biscetion_weights.append(w)
+            # compute new viscosity
+            model.collision_weights[:] = _DEFAULT_WEIGHT
+            angular_weights[ndim-1] = w
+            adjust_weight_by_angle(model, angular_weights)
+            visc.append([model.cmp_viscosity(
+                    number_densities=_nd,
+                    temperature=_temp,
+                    directions=directions,
+                    dt=dt,
+                    normalize=True)
+                for directions in [[[1, 1], [1, -1]],
+                                   [[0, 1], [1, 0]]]])
+            visc_diff.append(visc[-1][ndim-2] - visc[-1][ndim-1])
+            # update hi/lo lists
+            if visc_diff[-1] < 0:
+                w_lo.append(w)
+                w_hi.append(w_hi[-1])
+            else:
+                w_hi.append(w)
+                w_lo.append(w_lo[-1])
+            assert len(w_hi) == len(w_lo)
+            assert len(w_hi) == len(visc)
+            rdiff = np.max(visc[-1]) / np.min(visc[-1]) - 1
+            print("\rWeight = {:10e} - RDiff = {:3e}"
+                  " - i = {}".format(w, rdiff, len(visc)),
+                  end="")
+            if rdiff < rtol:
+                break
+            if np.allclose(*biscetion_weights[-2:]):
+                print("WARNING! Error below specified threshold")
+                break
+        print("\nstore results in h5py")
+        # compute prandtl number
+        visc_coeff = model.cmp_viscosity(
+            number_densities=_nd,
+            temperature=_temp,
+            directions=[[0, 1], [1, 0]],
+            dt=dt,
+            normalize=True)
+        heat_coeff = model.cmp_heat_transfer(
+            number_densities=_nd,
+            temperature=_temp,
+            direction=[0, 1],
+            dt=dt,
+            normalize=True)
+        hdf_group["prandtl"][i_w] = visc_coeff / heat_coeff
+        file.flush()
+    print("\nDONE!\n")
+else:
+    print("SKIPPED!\n")
+
+
+print("####################################################\n"
+      "#   Plot: Prandtl Dependency on Grid Shape (2D)    #\n"
+      "####################################################")
+plt.close("all")
+fig = plt.figure(constrained_layout=True, figsize=(12.75, 5.25))
+ax = fig.add_subplot()
+
+fig.suptitle(r"Effect of $\gamma_{(1,1,1)}$ on Prandtl Number "
+             r"after 3D Bisection Scheme",
+             fontsize=fs_suptitle)
+prandtl = file["prandtl_shape_Effect_2D"]["prandtl"][()]
+shapes = file["prandtl_shape_Effect_2D"]["shapes"][()]
+ax.plot(shapes,
+        prandtl,
+        lw=4,
+        label="$Pr_1 = Pr_2 = Pr_3$")
+ax.legend(loc="upper left", fontsize=fs_legend)
+ax.tick_params(axis="x", labelsize=fs_ticks)
+ax.tick_params(axis="y", labelsize=fs_ticks)
+ax.set_xlabel(r"$\gamma_{(1,1,1)}$ Component of $\gamma_\mathcal{P}$ ",
+              fontsize=fs_label)
+ax.set_ylabel(r"Prandtl Number",
+              fontsize=fs_label)
+ax.grid(linestyle="dotted")
+plt.savefig(bp.SIMULATION_DIR + "/phd_viscosity2D_prandtl_shape.pdf")
+print("Done!\n")
+
+
+print("######################################################\n"
+      "#   compute Persistence over Altered Temperatures    #\n"
+      "######################################################")
+N_TEMPS = 50
+key = "persistence_over_altered_temperature"
+if key not in file.keys():
+    hdf_group = file.create_group(key)
+    # copy old parameters for viscosity
+    temp_orig = temp.copy()
+    for ndim in [2,3]:
+        print("Setup {}D model...".format(ndim))
+        m[ndim].collision_weights[...] = DEFAULT_WEIGHT
+        hdf5_adjustment = file["bisection_3D"][str(ndim)][str(ndim - 1)]
+        weights = hdf5_adjustment["biscetion_weights"][-1]
+        adjust_weight_by_angle(m[ndim], weights)
+        temp_range = m[ndim].temperature_range(atol=0.1)
+        temperatures = np.linspace(*temp_range, N_TEMPS)
+
+        print("\nSetup hdf groups")
+        subgrp = hdf_group.create_group(str(ndim))
+        subgrp["viscosities"] = np.zeros((N_TEMPS, ndim))
+        subgrp["temperatures"] = temperatures
+
+        visc = np.zeros((N_TEMPS, ndim))
+        for i_t, t in enumerate(temperatures):
+            print("\r%3d / %3d" % (i_t+1, N_TEMPS), end="")
+            temp[ndim][...] = t
+            subgrp["viscosities"][i_t] = cmp_visc(ndim)
+            file.flush()
+    print("\nDONE!\n")
+    temp = temp_orig
+else:
+    print("SKIPPED!\n")
+
+print("#######################################################\n",
+      "#     Plot  Persistence over Altered Temperatures     #\n",
+      "#######################################################")
+fig, axes = plt.subplots(1, 2, constrained_layout=True,
+                         figsize=(12.75, 6.25))
+fig.suptitle("Viscosity Coefficients for Altered Temperatures",
+             fontsize=fs_suptitle)
+axes[0].set_title(r"Adjusted 2D Model",
+                  fontsize=fs_title)
+axes[1].set_title(r"Adjusted 3D Model",
+                  fontsize=fs_title)
+
+colors = {3: np.array(["tab:orange",
+                       "tab:green",
+                       "tab:blue"])}
+colors[2] = colors[3][1:]
+labels = np.array([r"$\widetilde{\mu}_1$",
+                   r"$\widetilde{\mu}_2$",
+                   r"$\widetilde{\mu}_3$"])
+
+styles = {3: np.array(["dotted", "dashed", "solid"])}
+styles[2] = styles[3][1:]
+
+axes[0].set_ylabel("Viscosity Coefficients", fontsize=fs_label)
+
+key = "persistence_over_altered_temperature"
+hdf_group = file[key]
+for ax, ndim in enumerate([2, 3]):
+    axes[ax].set_xlabel(r"Temperature", fontsize=fs_label)
+    visc = hdf_group[str(ndim)]["visc"]
+    temperatures = hdf_group[str(ndim)]["temperatures"][()]
+    for i in range(ndim):
+        axes[ax].plot(temperatures,
+                      visc[:, i],
+                      color=colors[ndim][i],
+                      label=labels[i],
+                      ls=styles[ndim][i],
+                      lw=3)
+    axes[ax].set_ylim(0, 1.5 * np.max(visc))
+    axes[ax].tick_params(axis="both", labelsize=fs_ticks)
+    axes[ax].legend(loc="upper left", fontsize=fs_legend)
+    axes[ax].grid(linestyle="dotted")
+
+plt.savefig(bp.SIMULATION_DIR + "/phd_persistence_over_altered_temperature.pdf")
+print("Done!\n")
+
+
+print("#########################################################\n"
+      "# compute Persistence over Altered Number Densities (1) #\n"
+      "#########################################################")
+NUMBER_DENSITIES = np.linspace(0, 10, 50)
+key = "persistence_over_altered_number_densities_1"
+if key not in file.keys():
+    hdf_group = file.create_group(key)
+    # store nd parameters and reset after computations
+    original_nd = nd.copy()
+    for ndim in [2,3]:
+        print("\nSetup hdf groups")
+        subgrp = hdf_group.create_group(str(ndim))
+        subgrp["number_densities"] = NUMBER_DENSITIES
+        subgrp["viscosities"] = np.zeros((NUMBER_DENSITIES.size, 2, ndim))
+
+        print("Setup {}D model...".format(ndim))
+        m[ndim].collision_weights[...] = DEFAULT_WEIGHT
+        weights = np.ones(ndim)
+        hdf5_adjustment = file["bisection_3D"][str(ndim)][str(ndim-1)]
+        weights[ndim-1] = hdf5_adjustment["biscetion_weights"][-1]
+        adjust_weight_by_angle(m[ndim], weights)
+        print("Compute Viscosites for Altered Number Densities")
+        for s in [0, 1]:
+            _number_Densitites = np.ones((NUMBER_DENSITIES.size, 2))
+            _number_Densitites[:, s] = NUMBER_DENSITIES
+            for i_nd, _nd in enumerate(_number_Densitites):
+                print("\r%3d / %3d" % (i_nd+1, NUMBER_DENSITIES.size), end="")
+                nd[ndim] = _nd
+                subgrp["viscosities"][i_nd, s] = cmp_visc(ndim)
+                file.flush()
+    print("\nDONE!\n")
+    nd = original_nd
+else:
+    print("SKIPPED!\n")
+
+print("##########################################################\n",
+      "#     Plot  Persistence over Altered Number Densities    #\n",
+      "##########################################################")
+fig, axes = plt.subplots(1, 2, constrained_layout=True,
+                         figsize=(12.75, 6.25))
+fig.suptitle("Viscosity Coefficients"
+             + r"for Altered $\nu \in \mathbb{R}^2$",
+             fontsize=fs_suptitle)
+axes[0].set_title(r"Adjusted 2D Model",
+                  fontsize=fs_title)
+axes[1].set_title(r"Adjusted 3D Model",
+                  fontsize=fs_title)
+
+colors = {3: np.array(["tab:orange",
+                       "tab:green",
+                       "tab:blue"])}
+colors[2] = colors[3][1:]
+labels = np.array([r"$\widetilde{\mu}_1$",
+                   r"$\widetilde{\mu}_2$",
+                   r"$\widetilde{\mu}_3$"])
+
+styles = {3: np.array(["dotted", "dashed", "solid"])}
+styles[2] = styles[3][1:]
+
+axes[0].set_ylabel("Viscosity Coefficients", fontsize=fs_label)
+
+key = "persistence_over_altered_number_densities_1"
+hdf_group = file[key]
+for ax, ndim in enumerate([2, 3]):
+    axes[ax].set_xlabel(r"Temperature", fontsize=fs_label)
+    number_densities = hdf_group[str(ndim)]["number_densities"][()]
+    viscosities = hdf_group[str(ndim)]["viscosities"][()]
+    for s in [0, 1]:
+        for i in range(ndim):
+            visc = viscosities[:, s, i]
+            axes[ax].plot(number_densities,
+                          visc,
+                          color=colors[ndim][s],
+                          label=labels[i],
+                          ls=styles[ndim][i],
+                          lw=3)
+    axes[ax].set_ylim(0, 1.5 * np.max(viscosities))
+    axes[ax].tick_params(axis="both", labelsize=fs_ticks)
+    axes[ax].legend(loc="upper right", fontsize=fs_legend)
+    axes[ax].grid(linestyle="dotted")
+
+plt.savefig(bp.SIMULATION_DIR + "/phd_persistence_over_altered_number_densities_1.pdf")
+print("Done!\n")
+
 #
-# print("################################################################\n"
-#       "harmonize 3D model with bisection and compute angular dependency\n"
-#       "################################################################\n")
-# key = "bisection_3D"
-# atol = 1e-8
-# rtol= 1e-3
-# dim = 3
+# print("########################################################\n"
+#       "#   Compute: Enforce Invariance for each species pair  #\n"
+#       "########################################################")
 #
+# rtol = 1e-3
+# key = "bisection_3d_pairwise"
+# if key not in file.keys():
+#     file.create_group(key)
+#     for ndim in [2, 3]:
+#         hdf_group = file[key].create_group(str(ndim))
+#         hdf_group.create_group("model")
+#         print("Apply Bisection pairwise onto the species")
+#         spc_keys = m[ndim].key_species(m[ndim].collision_relations)[:, 1:3]
+#         spc_grp = m[ndim].group(spc_keys)
+#         # process intraspecies collisions first,
+#         # then harmonize interspecies collisions based on harmonized Single Species
+#         spc_pairs = [(0, 0), (1, 1), (0, 1)]
+#         for (s1, s2) in spc_pairs:
+#             subgrp = hdf_group.create_group(str((s1, s2)))
+#
+#             # Note: the intraspecies collisions are already adjusted
+#             # and used when we are adjusting the interspecies collisions
+#             sm = m[ndim].submodel(list({s1, s2}))
+#             sm_grp = sm.group((sm.key_species(sm.collision_relations)[:, 1:3]))
+#             if s1 == s2:
+#                 cur_spc = (0, 0)
+#             else:
+#                 cur_spc = (0, 1)
+#
+#             # prepare initial parameters for bisection
+#             angular_weights = np.ones(ndim)
+#             biscetion_weights = [0.1, 4]
+#             print("Compute Initial Viscosity Coefficients "
+#                   "for ({},{})".format(s1, s2))
+#             visc = []
+#             for w in biscetion_weights:
+#                 sm.collision_weights[sm_grp[cur_spc]] = DEFAULT_WEIGHT
+#                 angular_weights[ndim-1] = w
+#                 adjust_weight_by_angle(sm, angular_weights, sm_grp[cur_spc])
+#                 visc.append(cmp_visc_ext(sm,
+#                                          nd[ndim][list({s1, s2})],
+#                                          temp[ndim][list({s1, s2})]
+#                                          )
+#                             )
+#             print(np.array(visc))
+#             visc_diff = [visc[i][ndim-2] - visc[i][ndim-1] for i in [0, 1]]
+#             # the signs must differ, for the bisection scheme
+#             print(visc_diff)
+#             assert visc_diff[0] * visc_diff[1] < 0
+#             # the current weights and diffs describe the best results so far
+#             order = np.argsort(visc_diff)
+#             # store all weights, divided into upper and lower bounds
+#             w_lo = [biscetion_weights[np.argmin(visc_diff)]] * 2
+#             w_hi = [biscetion_weights[np.argmax(visc_diff)]] * 2
+#             print("Start Bisection Algorithm")
+#             while True:
+#                 w = (w_lo[-1] + w_hi[-1]) / 2
+#                 biscetion_weights.append(w)
+#                 angular_weights[ndim - 1] = w
+#                 # apply new collision weights
+#                 sm.collision_weights[sm_grp[cur_spc]] = DEFAULT_WEIGHT
+#                 adjust_weight_by_angle(sm, angular_weights, sm_grp[cur_spc])
+#
+#                 # compute new viscosity
+#                 visc.append(cmp_visc_ext(sm,
+#                                          nd[ndim][list({s1, s2})],
+#                                          temp[ndim][list({s1, s2})]
+#                                          )
+#                             )
+#                 visc_diff.append(visc[-1][ndim-2] - visc[-1][ndim-1])
+#                 # update hi/lo lists
+#                 if visc_diff[-1] < 0:
+#                     w_lo.append(w)
+#                     w_hi.append(w_hi[-1])
+#                 else:
+#                     w_hi.append(w)
+#                     w_lo.append(w_lo[-1])
+#                 assert len(w_hi) == len(w_lo)
+#                 assert len(w_hi) == len(visc)
+#                 rdiff = np.max(visc[-1]) / np.min(visc[-1]) - 1
+#                 print("\rWeight = {:10e} - RDiff = {:3e}"
+#                       " - i = {}".format(w, rdiff, len(visc)),
+#                       end="")
+#                 if rdiff < rtol:
+#                     break
+#                 if np.allclose(*biscetion_weights[-2:]):
+#                     print("\n\tWARNING! Error below specified threshold")
+#                     break
+#             print("\nstore results in h5py")
+#             pos = len(visc)
+#             subgrp["biscetion_weights"] = np.array(biscetion_weights)
+#             subgrp["w_hi"] = np.array(w_hi)
+#             subgrp["w_lo"] = np.array(w_lo)
+#             subgrp["visc"]= np.array(visc)
+#             file.flush()
+#             print("apply weights to model")
+#             adjust_weight_by_angle(m[ndim], angular_weights, spc_grp[(s1, s2)])
+#
+#         print("store adjusted model")
+#         m[ndim].save(hdf5_group=hdf_group["model"])
+#         file.flush()
+#     print("DONE!\n")
+#     m[ndim].collision_weights[:] = DEFAULT_WEIGHT
+# else:
+#     print("SKIPPED!\n")
+#
+#
+# print("#########################################################\n"
+#       "# compute Persistence over Altered Number Densities (2) #\n"
+#       "#########################################################")
+# # NUMBER_DENSITIES = np.linspace(0, 10, 50)
+# NUMBER_DENSITIES = np.array([0., 0.5, 1.0, 2.0, 10.0])
+# key = "persistence_over_altered_number_densities_2"
 # if key not in file.keys():
 #     hdf_group = file.create_group(key)
-#     for i_w in range(3):
-#         subgrp = hdf_group.create_group(str(i_w))
-#         if i_w == 2:
-#             weights = [0.1, 3.0]
+#     # store nd parameters and reset after computations
+#     original_nd = nd.copy()
+#     for ndim in [2,3]:
+#         print("\nSetup hdf groups")
+#         subgrp = hdf_group.create_group(str(ndim))
+#         subgrp["number_densities"] = NUMBER_DENSITIES
+#         subgrp["viscosities"] = np.zeros((NUMBER_DENSITIES.size, 2, ndim))
+#
+#         # print("Load {}D model...".format(ndim))
+#         # model_group = file["bisection_3d_pairwise"][str(ndim)]["model"]
+#         # model = bp.CollisionModel.load(model_group)
+#         spc_keys = m[ndim].key_species(m[ndim].collision_relations)[:, 1:3]
+#         spc_grp = m[ndim].group(spc_keys)
+#         spc_pairs = [(0, 0), (1, 1), (0,1)]
+#         for pair in spc_pairs:
+#             weight_group = file["bisection_3d_pairwise"][str(ndim)][str(pair)]
+#             angular_weights = np.ones(ndim)
+#             angular_weights[ndim-1] = weight_group["biscetion_weights"][-1]
+#             adjust_weight_by_angle(m[ndim], angular_weights, spc_grp[pair])
+#         # just a renaming
+#         model = m[ndim]
+#         print("Compute Viscosites for Altered Number Densities")
+#         for s in [0, 1]:
+#             _number_Densitites = np.ones((NUMBER_DENSITIES.size, 2))
+#             _number_Densitites[:, s] = NUMBER_DENSITIES
+#             for i_nd, _nd in enumerate(_number_Densitites):
+#                 print("\rs = %1d : %3d / %3d"
+#                       % (s, i_nd+1, NUMBER_DENSITIES.size),
+#                       end="")
+#                 nd[ndim] = _nd
+#                 subgrp["viscosities"][i_nd, s] = cmp_visc_ext(
+#                     model,
+#                     nd[ndim],
+#                     temp[ndim]
+#                 )
+#                 file.flush()
+#     print("\nDONE!\n")
+#     nd = original_nd
+#     for ndim in [2, 3]:
+#         m[ndim].collision_weights[...] = DEFAULT_WEIGHT
+# else:
+#     print("SKIPPED!\n")
+#
+# print("#############################################################\n",
+#       "#     Plot  Persistence over Altered Number Densities (2)   #\n",
+#       "#############################################################")
+# fig, axes = plt.subplots(1, 2, constrained_layout=True,
+#                          figsize=(12.75, 6.25))
+# fig.suptitle("Viscosity Coefficients"
+#              + r"for Altered $\nu \in \mathbb{R}^2$",
+#              fontsize=fs_suptitle)
+# axes[0].set_title(r"Adjusted 2D Model",
+#                   fontsize=fs_title)
+# axes[1].set_title(r"Adjusted 3D Model",
+#                   fontsize=fs_title)
+#
+# colors = {3: np.array(["tab:orange",
+#                        "tab:green",
+#                        "tab:blue"])}
+# colors[2] = colors[3][1:]
+# labels = np.array([r"$\widetilde{\mu}_1$",
+#                    r"$\widetilde{\mu}_2$",
+#                    r"$\widetilde{\mu}_3$"])
+#
+# styles = {3: np.array(["dotted", "dashed", "solid"])}
+# styles[2] = styles[3][1:]
+#
+# axes[0].set_ylabel("Viscosity Coefficients", fontsize=fs_label)
+#
+# key = "persistence_over_altered_number_densities_2"
+# hdf_group = file[key]
+# for ax, ndim in enumerate([2]):
+#     axes[ax].set_xlabel(r"Temperature", fontsize=fs_label)
+#     number_densities = hdf_group[str(ndim)]["number_densities"][()]
+#     viscosities = hdf_group[str(ndim)]["viscosities"][()]
+#     for s in [0, 1]:
+#         for i in range(ndim):
+#             visc = viscosities[:, s, i]
+#             axes[ax].plot(number_densities,
+#                           visc,
+#                           color=colors[ndim][s],
+#                           label=labels[i],
+#                           ls=styles[ndim][i],
+#                           lw=3)
+#     axes[ax].set_ylim(0, 1.5 * np.max(visc))
+#     axes[ax].tick_params(axis="both", labelsize=fs_ticks)
+#     axes[ax].legend(loc="upper right", fontsize=fs_legend)
+#     axes[ax].grid(linestyle="dotted")
+#
+# plt.savefig(bp.SIMULATION_DIR + "/phd_persistence_over_altered_number_densities_2.pdf")
+# print("Done!\n")
+#
+#
+# print("########################################################\n"
+#       "#   Compute: Enforce Invariance for each species pair  #\n"
+#       "########################################################")
+# rtol = 1e-3
+# key = "bisection_3d_multispecies_pairwise"
+# if key not in file.keys():
+#     file.create_group(key)
+#     # distribution parameters
+#     nd3 = np.ones(3)
+#     temp3 = np.array([2.25] * 3)
+#     print("Generate Collision Model")
+#     masses = [2, 3, 4]
+#     ndim = 3
+#     model = bp.CollisionModel(masses,
+#                               [[5] * ndim, [7] * ndim, [7] * ndim],
+#                               0.125,
+#                               [12, 8, 6],
+#                               np.full((len(masses), len(masses)), DEFAULT_WEIGHT),
+#                               )
+#     print(model.ncols, " total collisions")
+#     hdf_group = file[key].create_group(str(ndim))
+#     hdf_group.create_group("model")
+#     print("Apply Bisection pairwise onto the species")
+#     spc_keys = m[ndim].key_species(m[ndim].collision_relations)[:, 1:3]
+#     spc_grp = m[ndim].group(spc_keys)
+#     # process intraspecies collisions first,
+#     # then harmonize interspecies collisions based on harmonized Single Species
+#     spc_pairs = [(0, 0), (1, 1), (0, 1)]
+#     for (s1, s2) in spc_pairs:
+#         subgrp = hdf_group.create_group(str((s1, s2)))
+#
+#         # Note: the intraspecies collisions are already adjusted
+#         # and used when we are adjusting the interspecies collisions
+#         sm = m[ndim].submodel(list({s1, s2}))
+#         sm_grp = sm.group((sm.key_species(sm.collision_relations)[:, 1:3]))
+#         if s1 == s2:
+#             cur_spc = (0, 0)
 #         else:
-#             weights = [0.1, 10.0]
+#             cur_spc = (0, 1)
 #
+#         # prepare initial parameters for bisection
+#         angular_weights = np.ones(ndim)
+#         biscetion_weights = [0.1, 4]
+#         print("Compute Initial Viscosity Coefficients:")
 #         visc = []
-#         for val in weights:
-#             m[3].collision_weights[:] = DEFAULT_WEIGHT
-#             new_w = np.ones(3)
-#             new_w[i_w] = val
-#             adjust_weight_by_angle(m[3], new_w)
-#             m[3].update_collisions(m[3].collision_relations,
-#                                    m[3].collision_weights)
-#             visc.append(cmp_visc(3))
+#         for w in biscetion_weights:
+#             sm.collision_weights[:] = DEFAULT_WEIGHT
+#             angular_weights[ndim-1] = w
+#             adjust_weight_by_angle(sm, angular_weights)
+#             visc.append(cmp_visc_ext(sm,
+#                                      nd[ndim][list({s1, s2})],
+#                                      temp[ndim][list({s1, s2})]
+#                                      )
+#                         )
+#         print(np.array(visc))
+#         visc_diff = [visc[i][ndim-2] - visc[i][ndim-1] for i in [0, 1]]
+#         # the signs must differ, for the bisection scheme
+#         print(visc_diff)
+#         assert visc_diff[0] * visc_diff[1] < 0
 #         # the current weights and diffs describe the best results so far
-#         print([visc[i][2] - visc[i][1] for i in [0, 1]])
-#         order = np.argsort([visc[i][2] - visc[i][1] for i in [0, 1]])
-#         # store all weights and viscosities here, divided into upper and lower bounds
-#         visc_lo = [visc[order[0]], ] * 2
-#         visc_hi = [visc[order[1]], ] * 2
-#         w_lo = [weights[order[0]]] * 2
-#         w_hi = [weights[order[1]]] * 2
-#         assert visc_lo[-1][2] - visc_lo[-1][1] < 0
-#         assert (visc_hi[-1][2] - visc_hi[-1][1] > 0)
-#         assert len(w_hi) == len(w_lo)
-#         assert len(visc_hi) == len(visc_lo)
-#         assert len(w_hi) == len(visc_lo)
-#         assert len(visc) == len(visc_lo)
-#
+#         order = np.argsort(visc_diff)
+#         # store all weights, divided into upper and lower bounds
+#         w_lo = [biscetion_weights[np.argmin(visc_diff)]] * 2
+#         w_hi = [biscetion_weights[np.argmax(visc_diff)]] * 2
+#         print("Start Bisection Algorithm")
 #         while True:
-#             new_w = np.ones(3)
-#             new_w[i_w] = (w_lo[-1] + w_hi[-1]) / 2
-#             # compute new viscosity
-#             m[3].collision_weights[:] = DEFAULT_WEIGHT
-#             adjust_weight_by_angle(m[3], new_w)
-#             m[3].update_collisions(m[3].collision_relations,
-#                                    m[3].collision_weights)
-#             visc.append(cmp_visc(3))
-#             diff = visc[-1][2] - visc[-1][1]
-#             # update hi/lo lists
-#             visc_lo.append(visc_lo[-1])
-#             w_lo.append(w_lo[-1])
-#             visc_hi.append(visc_hi[-1])
-#             w_hi.append(w_hi[-1])
-#             if diff < 0:
-#                 visc_lo[-1] = visc[-1]
-#                 w_lo[-1] = new_w[i_w]
-#             else:
-#                 visc_hi[-1] = visc[-1]
-#                 w_hi[-1] = new_w[i_w]
-#             assert len(w_hi) == len(w_lo)
-#             assert len(visc_hi) == len(visc_lo)
-#             assert len(w_hi) == len(visc_lo)
-#             assert len(visc) == len(visc_lo)
-#             assert (visc_lo[-1][2] - visc_lo[-1][1] < 0)
-#             assert (visc_hi[-1][2] - visc_hi[-1][1] > 0)
+#             w = (w_lo[-1] + w_hi[-1]) / 2
+#             biscetion_weights.append(w)
+#             angular_weights[ndim - 1] = w
+#             # apply new collision weights
+#             sm.collision_weights[sm_grp[cur_spc]] = DEFAULT_WEIGHT
+#             adjust_weight_by_angle(sm, angular_weights, sm_grp[cur_spc])
 #
-#             adiff = np.max(visc[-1]) - np.min(visc[-1])
+#             # compute new viscosity
+#             visc.append(cmp_visc_ext(sm,
+#                                      nd[ndim][list({s1, s2})],
+#                                      temp[ndim][list({s1, s2})]
+#                                      )
+#                         )
+#             visc_diff.append(visc[-1][ndim-2] - visc[-1][ndim-1])
+#             # update hi/lo lists
+#             if visc_diff[-1] < 0:
+#                 w_lo.append(w)
+#                 w_hi.append(w_hi[-1])
+#             else:
+#                 w_hi.append(w)
+#                 w_lo.append(w_lo[-1])
+#             assert len(w_hi) == len(w_lo)
+#             assert len(w_hi) == len(visc)
 #             rdiff = np.max(visc[-1]) / np.min(visc[-1]) - 1
-#             print("Weight = ", new_w[i_w], "\tAbsolute: ",
-#                   adiff, "\tRealtive: ", rdiff)
-#             if adiff < atol and rdiff < rtol:
+#             print("\rWeight = {:10e} - RDiff = {:3e}"
+#                   " - i = {}".format(w, rdiff, len(visc)),
+#                   end="")
+#             if rdiff < rtol:
 #                 break
-#         # store results in h5py
+#             if np.allclose(*biscetion_weights[-2:]):
+#                 print("WARNING! Error below specified threshold")
+#                 break
+#         print("\nstore results in h5py")
+#         pos = len(visc)
+#         subgrp["biscetion_weights"] = np.array(biscetion_weights)
 #         subgrp["w_hi"] = np.array(w_hi)
 #         subgrp["w_lo"] = np.array(w_lo)
-#         subgrp["visc_hi"] = np.array(visc_hi)
-#         subgrp["visc_lo"] = np.array(visc_lo)
-#         subgrp["visc"] = np.array(visc)
+#         subgrp["visc"]= np.array(visc)
 #         file.flush()
+#         print("apply weights to model")
+#         adjust_weight_by_angle(m[ndim], angular_weights, spc_grp[cur_spc])
 #
-#         print("compute angular dependecies for adjusted model")
-#         rotations = []
-#         rotations.append([[1, 0, 0],
-#                           [0, 1, 0],
-#                           [0, 0, 1]])
-#         rotations.append([[1,  0, 0],
-#                           [0,  1, 1],
-#                           [0, -1, 1]])
-#         rotations.append([[-1,  1, 1],
-#                           [-1, -1, 1],
-#                           [ 2,  0, 1]])
-#         rotations.append([[-3, -2, 1],
-#                           [ 0, 10, 2],
-#                           [ 1, -6, 3]])
+#     print("store adjusted model")
+#     m[ndim].save(hdf5_group=hdf_group["model"])
+#     file.flush()
 #
-#         rotations = np.array(rotations, dtype=int)
-#         # store integer first angles, to use as keys
-#         first_angles = np.copy(rotations[:, :, -1])
-#         # change data type to float and normalize each column
-#         rotations = np.array(rotations, dtype=float)
-#         for a in range(rotations.shape[0]):
-#             for col in range(rotations.shape[-1]):
-#                 rotations[a, :, col] /= np.linalg.norm(rotations[a, :, col])
-#         # base angles in xy plane
-#         xy_angles = np.zeros((N_ANGLES, 3))
-#         ls = np.linspace(0, 2 * np.pi, N_ANGLES)
-#         xy_angles[:, 0] = np.cos(ls)
-#         xy_angles[:, 1] = np.sin(ls)
-#         # compute second angles from rotating base_angles
-#         second_angles = np.einsum("abc, dc -> adb", rotations, xy_angles)
+#     print("###########################################################\n"
+#           "#    compute angular dependecies for adjusted 3D model    #\n"
+#           "###########################################################")
+#     rotations = []
+#     rotations.append([[1, 0, 0],
+#                       [0, 1, 0],
+#                       [0, 0, 1]])
+#     rotations.append([[1, 0, 0],
+#                       [0, 1, 1],
+#                       [0, -1, 1]])
+#     rotations.append([[-1, 1, 1],
+#                       [-1, -1, 1],
+#                       [2, 0, 1]])
+#     rotations.append([[-3, -2, 1],
+#                       [0, 10, 2],
+#                       [1, -6, 3]])
 #
-#         for i_a, a in enumerate(first_angles):
-#             ssubgrp = subgrp.create_group(str(tuple(a)))
-#             ang_visc = np.empty(N_ANGLES, dtype=float)
-#             for n, sa in enumerate(second_angles[i_a]):
-#                 print("\rangle_1 = %1d / %1d,     angle_2 = %3d / %3d"
-#                       % (i_a + 1, first_angles.shape[0], n + 1, N_ANGLES),
-#                       end="")
-#                 ang_visc[n] = m[3].cmp_viscosity(
-#                     number_densities=nd[3],
-#                     temperature=temp[3],
-#                     directions=[a, sa],
-#                     dt=dt)
-#             ssubgrp["rad_angle"] = ls
-#             ssubgrp["first_angle"] = a
-#             ssubgrp["rotations"] = rotations[i_a]
-#             ssubgrp["angular_visc"] = ang_visc
-#             file.flush()
+#     rotations = np.array(rotations, dtype=int)
+#     # store integer first angles, to use as keys
+#     first_angles = np.copy(rotations[:, :, -1])
+#     # change data type to float and normalize each column
+#     rotations = np.array(rotations, dtype=float)
+#     for a in range(rotations.shape[0]):
+#         for col in range(rotations.shape[-1]):
+#             rotations[a, :, col] /= np.linalg.norm(rotations[a, :, col])
+#     # base angles in xy plane
+#     xy_angles = np.zeros((N_ANGLES, 3))
+#     ls = np.linspace(0, 2 * np.pi, N_ANGLES)
+#     xy_angles[:, 0] = np.cos(ls)
+#     xy_angles[:, 1] = np.sin(ls)
+#     # compute second angles from rotating base_angles
+#     second_angles = np.einsum("abc, dc -> adb", rotations, xy_angles)
+#
+#     for i_a, a in enumerate(first_angles):
+#         subgrp = hdf_group.create_group(str(tuple(a)))
+#         ang_visc = np.empty(N_ANGLES, dtype=float)
+#         ang_heat = np.empty(N_ANGLES, dtype=float)
+#         for n, sa in enumerate(second_angles[i_a]):
+#             print("\rangle_1 = %1d / %1d,     angle_2 = %3d / %3d"
+#                   % (i_a + 1, first_angles.shape[0], n + 1, N_ANGLES),
+#                   end="")
+#             ang_visc[n] = model.cmp_viscosity(
+#                 number_densities=nd3,
+#                 temperature=temp3,
+#                 directions=[a, sa],
+#                 dt=dt,
+#                 normalize=False)
+#             ang_heat[n] = model.cmp_heat_transfer(
+#                 number_densities=nd3,
+#                 temperature=temp3,
+#                 direction=sa,
+#                 dt=dt,
+#                 normalize=False)
+#         subgrp["rad_angle"] = ls
+#         subgrp["first_angle"] = a
+#         subgrp["rotations"] = rotations[i_a]
+#         subgrp["angular_visc"] = ang_visc
+#         subgrp["angular_heat"] = ang_heat
+#         file.flush()
 #     print("\nDONE!\n")
 # else:
 #     print("SKIPPED!\n")
+#
+#
+# print("########################################################\n"
+#       "#   Plot: Dependency in adjusted 3D, 3-Species Model   #\n"
+#       "########################################################")
+# plt.close("all")
+# fig = plt.figure(constrained_layout=True, figsize=(12.75, 8))
+# ax = fig.add_subplot(projection="polar")
+# ax.set_title(r"Angular Dependencies of the Viscosity $\lambda$ in the Adjusted 3D Model",
+#              fontsize=fs_title)
+#
+# key = "bisection_3d_multispecies_pairwise/model"
+# styles = ["solid", "solid", "solid", "dashed"]
+# colors = ["tab:orange", "tab:green", "tab:blue", "tab:purple"]
+# labels = [
+#     r"$\lambda\left(\begin{pmatrix}1 \\ 1 \\ 1 \end{pmatrix}, \psi\right)$",
+#     r"$\lambda\left(\begin{pmatrix}0 \\ 1 \\ 1 \end{pmatrix}, \psi\right)$",
+#     r"$\lambda\left(\begin{pmatrix}0 \\ 0 \\ 1 \end{pmatrix}, \psi\right)$",
+#     r"$\lambda\left(\begin{pmatrix}1 \\ 2 \\ 3 \end{pmatrix}, \psi\right)$",
+# ]
+# # iterate over this, to have a fixed order!
+# a_keys = [(1,1,1), (0,1,1), (0,0,1), (1,2,3)]
+# hdf_group = file[key]
+# for k, first_angle in enumerate(a_keys):
+#     subgrp = hdf_group[str(first_angle)]
+#     visc = subgrp["angular_visc"][()]
+#     print("Relative Differences for ", first_angle)
+#     print("Viscosity: ", np.max(visc) / np.min(visc) - 1)
+#     heat = subgrp["angular_heat"][()]
+#     print("Heat Conductivity: ", np.max(heat) / np.min(heat) - 1)
+#
+#     if k == 3:
+#         rad = subgrp["rad_angle"][()] + 0.9
+#     else:
+#         rad = subgrp["rad_angle"][()]
+#     ax.plot(rad,
+#             visc,
+#             ls=styles[k],
+#             c=colors[k],
+#             label=labels[k],
+#             lw=4)
+# ax.set_rlabel_position(225)
+# # axes[1].set_rlim(0, 1.4)
+# # ax.set_rticks([0, 0.00005, 0.0001, 0.00015])
+# ax.tick_params(axis="both", labelsize=16)
+# ax.legend(loc="lower center", bbox_to_anchor=(0.5, -0.18), ncol=4,
+#           fontsize=fs_legend)
+# ax.grid(linestyle="dotted")
+#
+# plt.savefig(bp.SIMULATION_DIR + "/phd_bisection3D_multispecies_invariance.pdf")
+# print("Done!\n")
 #
 
 print("#################################\n"
