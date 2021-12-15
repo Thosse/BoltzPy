@@ -529,11 +529,6 @@ class CollisionModel(bp.BaseModel):
         if np.any(np.logical_or(relations < 0, relations >= self.nvels)):
             raise ValueError
 
-        # ignore collisions with weights < atol
-        choice = weights > min_weight
-        relations = relations[choice]
-        weights = weights[choice]
-
         # update attributes
         self.collision_relations = relations
         self.collision_weights = weights
@@ -864,7 +859,8 @@ class CollisionModel(bp.BaseModel):
                       dt,
                       maxiter=100000,
                       directions=None,
-                      normalize=True):
+                      normalize=True,
+                      hdf5_group=None):
         # Maxwellian must be centered in 0,
         # since this computation relies heavily on symmetry,
         mean_velocities = np.zeros((self.nspc, self.ndim))
@@ -885,7 +881,7 @@ class CollisionModel(bp.BaseModel):
         rule.check_integrity()
         # compute viscosity
         assert dt > 0 and maxiter > 0
-        inverse_source_term = rule.compute(dt, maxiter=maxiter)
+        inverse_source_term = rule.compute(dt, maxiter=maxiter, hdf5_group=hdf5_group)
         viscosity = np.sum(inverse_source_term[-1] * mom_func)
 
         if normalize:
