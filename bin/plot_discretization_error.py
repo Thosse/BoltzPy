@@ -165,7 +165,7 @@ if __name__ == "__main__":
         fontsize=fs_label)
 
     ax[1].legend(title=r"Parameter $\widetilde{v}$",
-                 loc="lower left",
+                 loc="upper right",
                  fontsize=fs_legend,
                  title_fontsize=fs_legend_title)
     ax[1].set_title("Amplitude of the discretization error",

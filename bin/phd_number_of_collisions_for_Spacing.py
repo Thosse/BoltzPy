@@ -267,7 +267,7 @@ ax.plot(red_rotate[:, 0], red_rotate[:, 1],
 ax.set_xticks([])
 ax.set_yticks([])
 ax.set_aspect('equal')
-ax.set_title(r"Missing Local Symmetries in a Mixture",
+ax.set_title(r"Missing Local Symmetries in a Mixture with Mass-Adjusted Spacings",
              fontsize=fs_title)
 ax.legend(loc="upper right",
           fontsize=fs_legend)

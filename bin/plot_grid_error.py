@@ -685,7 +685,7 @@ if __name__ == "__main__":
 
         ax[a].tick_params(axis="both", labelsize=fs_ticks)
     lg = fig.legend(loc="lower center", ncol=3, bbox_to_anchor=(0.5, -0.15),
-                    fontsize=fs_legend + 4,
+                    fontsize=fs_legend + 6,
                     title_fontsize=fs_legend_title)
     ax[0].set_ylabel(
         r"$P_{i, i}\left[{\mathfrak{V}^s}\right](\widetilde{v}, \vartheta)$",
@@ -782,7 +782,7 @@ if __name__ == "__main__":
         ax[a].tick_params(axis="both", labelsize=fs_ticks)
 
     lg = fig.legend(loc="lower center", ncol=3, bbox_to_anchor=(0.5, -0.15),
-                    fontsize=fs_legend + 4,
+                    fontsize=fs_legend + 6,
                     title_fontsize=fs_legend_title)
     ax[0].set_ylabel(
         r"$q_{i}\left[{\mathfrak{V}^s}\right](\widetilde{v}, \vartheta)$",

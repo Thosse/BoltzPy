@@ -316,8 +316,8 @@ print("setup figure and axes")
 fig, (ax1, ax2) = plt.subplots(1, 2, constrained_layout=True,
                                figsize=(12.75, 6.25), sharey=True, sharex=True)
 
-fig.suptitle("Weight Adjustment Effects on the Relaxation Curves",
-             fontsize=fs_suptitle)
+# fig.suptitle("Weight Adjustment Effects on the Relaxation Curves",
+#              fontsize=fs_suptitle)
 ax1.set_title(r"Increased Non Energy Transferring Collisions",
               fontsize=fs_title)
 ax2.set_title(r"Increased Energy Transferring Collisions",
@@ -334,10 +334,19 @@ for ax in [ax1, ax2]:
         raw = FILE["unedited"][str(i_r)][()]
         res = np.sum((raw - raw[-1]) ** 2, axis=-1)
         del raw
+        if ax == ax2 and i_r != 0:
+            if i_r == 1:
+                color = "tab:orange"
+            elif i_r == 2:
+                color = "tab:green"
+            else:
+                raise NotImplementedError
+        else:
+            color = "darkgray"
         ax.plot(time[:len(res)],
                 res,
                 linestyle=linestyles[i_r],
-                color="darkgray",
+                color=color,
                 label="_nolegend_",
                 **lw)
 
@@ -589,7 +598,7 @@ fig, (ax1, ax2) = plt.subplots(1, 2, constrained_layout=True,
 
 ax1.set_title("Gain-Adjusted Collision Weights",
               fontsize=fs_title)
-ax2.set_title("Additionally Increased Energy-Transfer",
+ax2.set_title(r"Gain-Adjustment and Additionally \\ Increased Energy-Transfer by $\gamma^{1,2}_{ET} = 10$",
               fontsize=fs_title)
 ax1.set_ylabel(r"$\mathcal{L}^2$-Distance to Equilibrium",
                fontsize=fs_label)
