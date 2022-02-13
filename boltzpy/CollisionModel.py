@@ -1,6 +1,7 @@
 import numpy as np
 from scipy.sparse import csr_matrix, lil_matrix
 import boltzpy as bp
+import h5py
 
 
 class CollisionModel(bp.BaseModel):
@@ -62,6 +63,9 @@ class CollisionModel(bp.BaseModel):
         CollisionModel.check_integrity(self)
         return
 
+    #####################################
+    #           Properties              #
+    #####################################
     @staticmethod
     def parameters():
         params = bp.BaseModel.parameters()
@@ -78,9 +82,6 @@ class CollisionModel(bp.BaseModel):
                       "collision_invariants"})
         return attrs
 
-    #####################################
-    #           Properties              #
-    #####################################
     @property
     def ncols(self):
         """:obj:`int` :
@@ -99,7 +100,7 @@ class CollisionModel(bp.BaseModel):
     def is_invariant(self, relations=None, operations=None):
         """:obj:`bool` :
         Returns True if the collisions, more precisely i_vels[relations],
-        are invariant under the given operations."""
+        are invariant under the given matrix operations."""
         # set default parameters
         if relations is None:
             relations = self.collision_relations
@@ -371,22 +372,28 @@ class CollisionModel(bp.BaseModel):
             return energy_transfer
 
     @staticmethod
-    def group(group_keys, values=None, as_dict=True, sort_key=None):
-        """Create Partitions of positions (indices) with equal keys.
+    def group(group_keys, *values, as_dict=True, sort_key=None):
+        """Create Partitions of positions (or indices) with equal keys.
+
+        This method collects all values, that correspond to an equal key.
+        Mathematically, this is similar to taking the quotient space.
 
         Parameters
         ----------
-        group_keys : :obj:`~numpy.array` [:obj:`int`] or :obj:`tuple’
-            If a tuple is given, then the keys are merged (concatenated).
-        values : :obj:`~numpy.array` [:obj:`int`] or :obj:`tuple’, optional
-            If None, then the grouped positions are returned.
-            If not None, the values are grouped and returned.
-            relations.shape[0] must match keys.shape[0]
+        group_keys : :obj:`~numpy.array` [:obj:`int`], :obj:`tuple`, or :obj:`list`
+            If a tuple or list is given, then the keys are merged (concatenated).
+        values : :obj:`list`[ :obj:`~numpy.array` [:obj:`int`] ], optional
+            If no values are given, then group the position indices.
+            Otherwise all values are simultaneously grouped
+            and returned as a tuple.
+            Every values.shape[0] must match keys.shape[0]
         as_dict : :obj:`bool`, optional
-            If False, returns an array of arrays, instead of a dictionary.
+            If False, returns an array of arrays.
+            Otherwise, by default, a dictionary.
         sort_key : :obj:`~numpy.array` [:obj:`int`], optional
+            Enforces a specific order to each group.
             If not None, then equal group_keys are sorted by the sort_key.
-            If None, equal group_keys are sorted randomly.
+            Otherwise, equal group_keys are sorted randomly.
         """
         # merge group_keys
         if type(group_keys) in {tuple, list}:
@@ -396,7 +403,7 @@ class CollisionModel(bp.BaseModel):
             assert all(key.ndim == 2 for key in group_keys)
             group_keys = np.concatenate(group_keys, axis=1)
         assert isinstance(group_keys, np.ndarray)
-        assert group_keys.ndim == 2
+        assert group_keys.ndim == 2, "merged keys must be a 2D array"
 
         # construct sort_key
         if sort_key is None:
@@ -405,100 +412,116 @@ class CollisionModel(bp.BaseModel):
             # allow 1D keys for concatenation
             sort_key = sort_key if sort_key.ndim == 2 else sort_key[:, np.newaxis]
             sort_key = np.concatenate((group_keys, sort_key), axis=1)
-
-        # get lexicographic order of sort_key
-        positions = np.lexsort(np.flip(sort_key.transpose(), axis=0))
+        # determine lexicographic order based on sort_key
+        positions = CollisionModel.sort(sort_key)
         del sort_key
-        # sort group_keys by this order
+
+        # apply order to group_keys and values
         group_keys = group_keys[positions]
+        if len(values) == 0:        # no values are given
+            values = [positions]   # group position indices
+        else:
+            # convert the values to arrays, if necessary
+            values = [np.array(val, copy=False) for val in values]
+            # all values must  have a matching number of elements
+            assert all(val.shape[0] == group_keys.shape[0]
+                       for val in values)
+            # apply reordering
+            values = [val[positions] for val in values]
+        del positions
+
         # find first occurrence of each key in sorted array
         # pos determines the splitting points below
         key, pos = np.unique(group_keys, axis=0, return_index=True)
         del group_keys
 
-        # define results as a list, for any given values
-        if values is None:
-            # if no values are given, then return the groupes positions
-            results = [positions]
-        elif isinstance(values, np.ndarray):
-            results = [values[positions]]
-        elif type(values) in {tuple, list}:
-            results = [val[positions] for val in values]
-        else:
-            raise TypeError
-
         # split each result into array slices
         # all segments point to the elements with the same key
-        for v, val in enumerate(results):
+        for v, val in enumerate(values):
             # pos[0]==0 must be removed for split() to work correctly
-            results[v] = np.split(val, pos[1:])
+            # otherwise it creates an empty array as first entry
+            values[v] = np.split(val, pos[1:])
             # convert to a dictionary, if wanted
             if as_dict:
-                results[v] = {tuple(k): val for k, val in zip(key, results[v])}
+                values[v] = {tuple(k): val for k, val in zip(key, values[v])}
 
         # return result or tuple of results
-        if len(results) == 1:
-            return results[0]
+        if len(values) == 1:
+            return values[0]
         else:
-            return tuple(results)
+            return tuple(values)
 
     @staticmethod
-    def filter(keys, values=None):
+    def filter(keys, *values):
         """Filter out elements with redundant keys.
 
         Parameters
         ----------
         keys : :obj:`~numpy.array` [:obj:`int`]
-        values : :obj:`~numpy.array` [:obj:`int`] or :obj:`tuple’, optional
-            If None, then the filtered positions are returned.
-            If not None, the filtered valuesand returned.
-            relations.shape[0] must match keys.shape[0]
+        values : :obj:`list`[ :obj:`~numpy.array` [:obj:`int`] ], optional
+            If no values are given, then filter the position indices.
+            Otherwise all values are simultaneously filtered
+            and returned as a tuple.
+            Every values.shape[0] must match keys.shape[0]
         """
-        assert keys.ndim == 2
-        # ignore unique values ([0]), only take first positions ([1]=
+        assert keys.ndim == 2, "keys must be a 2D array"
+        # using return_index=True returns a tuple of
+        #   [0] the unique values (keys)
+        #   [1] the position of first occurrence
+        # we only require the position here
         positions = np.unique(keys, return_index=True, axis=0)[1]
 
-        # define results as a list, for any given values
-        if values is None:
-            # if no values are given, then return the groupes positions
-            results = [positions]
-        elif isinstance(values, np.ndarray):
-            results = [values[positions]]
-        elif type(values) in {tuple, list}:
-            results = [val[positions] for val in values]
+        # return filtered positions or values
+        if len(values) == 0:
+            return positions
+        elif len(values) == 1:
+            return values[0][positions]
         else:
-            raise TypeError
-
-        # return result or tuple of results
-        if len(results) == 1:
-            return results[0]
-        else:
-            return tuple(results)
+            # convert the values to arrays, if necessary
+            values = [np.array(val, copy=False) for val in values]
+            # all values must  have a matching number of elements
+            assert all(val.shape[0] == keys.shape[0]
+                       for val in values)
+            return tuple([val[positions] for val in values])
 
     @staticmethod
-    def sort(keys, relations=None):
-        """Sort keys (or relations) lexicographically.
-        Returns a sorting permutation (if no relations are given)
-        or the permuted/sorted relations (if relations are given).
+    def sort(keys, *values):
+        """Sort keys (or values based on keys) lexicographically.
+
+        Returns sorted indices (if no values are given)
+        or the sorted values (if values are given).
 
         Parameters
         ----------
         keys : :obj:`~numpy.array` [:obj:`int`]
-        relations : :obj:`~numpy.array` [:obj:`int`], optional
-            If not None, then the sorted relations at are returned.
-            relations.shape[0] must match keys.shape[0]
+        values : :obj:`list`[ :obj:`~numpy.array` [:obj:`int`] ], optional
+            If no values are given, then sort the positions indices.
+            Otherwise all values are simultaneously sorted
+            and returned as a tuple.
+            Every values.shape[0] must match keys.shape[0]
         """
-        assert keys.ndim == 2
+        assert keys.ndim == 2, "keys must be a 2D array"
+        # lexsort sorts the columns, not the rows
+        # thus we transpose first, to sort the rows
+        keys = keys.transpose()
+        # lexsort assigns the last key element (row) the highest priority
+        # thus we flip the keys
+        # Since we transposed before, we flip along axis 0
+        keys = np.flip(keys, axis=0)
+        positions = np.lexsort(keys)
 
-        # lexsort sorts columns, thus we transpose first
-        # flip keys, as the last key (row) has highest priority
-        positions = np.lexsort(np.flip(keys.transpose(), axis=0))
-        # return sorted relations, if given
-        if relations is not None:
-            return relations[positions]
-        # otherwise return ordering positions (technically a permutation)
-        else:
+        # return sorted values, if given
+        if len(values) == 0:
             return positions
+        elif len(values) == 1:
+            return values[0][positions]
+        else:
+            # convert the values to arrays, if necessary
+            values = [np.array(val, copy=False) for val in values]
+            # all values must  have a matching number of elements
+            assert all(val.shape[0] == keys.shape[0]
+                       for val in values)
+            return tuple([val[positions] for val in values])
 
     # todo: save collision arrays directly to a file,
     #   then only store used_collision_relations in the ram
@@ -675,7 +698,8 @@ class CollisionModel(bp.BaseModel):
                 sym_vel = grids[s1].key_symmetry_group(grids[s0].iG)
                 # group both grp and grp_sym in one go (and with same order)
                 grp, grp_sym = self.group(sort_vel,
-                                          (grids[s0].iG, sym_vel),
+                                          grids[s0].iG,
+                                          sym_vel,
                                           as_dict=False)
                 del sort_vel, sym_vel
                 # no extended grids necessary
@@ -704,7 +728,8 @@ class CollisionModel(bp.BaseModel):
                 norm = bp.Grid.key_norm(grids[s0].iG)
                 # group both grp and grp_sym in one go (and with same order)
                 grp, grp_sym = self.group(sort_dist[..., :-1],
-                                          (grids[s0].iG, sort_dist[:, -1]),
+                                          grids[s0].iG,
+                                          sort_dist[:, -1],
                                           as_dict=False, sort_key=norm)
                 del norm, sort_dist
                 # compute representative colliding velocities in extended grids
@@ -941,6 +966,8 @@ class CollisionModel(bp.BaseModel):
                         species=None,
                         plot_object=None,
                         lw=0.2,
+                        color="gray",
+                        zorder=4,
                         **kwargs):
         """Plot the Grid using matplotlib."""
         relations = [] if relations is None else np.array(relations, ndmin=2)
@@ -964,7 +991,10 @@ class CollisionModel(bp.BaseModel):
             rels = np.tile(r, 2)
             # transpose the velocities, for easy unpacking
             vels = (self.vels[rels]).transpose()
-            ax.plot(*vels, color="gray", linewidth=lw)
+            ax.plot(*vels,
+                    color=color,
+                    linewidth=lw,
+                    zorder=zorder)
 
         # set tick values on axes, None = auto choice of matplotlib
         if "xticks" in kwargs.keys():
