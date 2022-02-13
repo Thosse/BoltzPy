@@ -372,6 +372,32 @@ class CollisionModel(bp.BaseModel):
             return energy_transfer
 
     @staticmethod
+    def merge_keys(*keys):
+        """Merge multiple key arrays by elementwise concatenation
+
+        Parameters
+        ----------
+        keys : :obj:`tuple`[ :obj:`~numpy.array` [:obj:`int`] ]
+            If no values are given, then group the position indices.
+            Otherwise all values are simultaneously grouped
+            and returned as a tuple.
+            Every values.shape[0] must match keys.shape[0]
+
+        """
+        assert len(keys) >= 1, "At least as single key must be given"
+        # allow 1D keys for concatenation
+        keys = [key if key.ndim == 2
+                else key[:, np.newaxis]
+                for key in keys]
+        assert all(key.ndim == 2 for key in keys)
+        assert all(key.shape[0] == keys[0].shape[0] for key in keys)
+        # merge keys, by elementwise concatenation
+        merged_keys = np.concatenate(keys, axis=1)
+        assert isinstance(merged_keys, np.ndarray)
+        assert merged_keys.ndim == 2, "merged keys must be a 2D array"
+        return merged_keys
+
+    @staticmethod
     def group(group_keys, *values, as_dict=True, sort_key=None):
         """Create Partitions of positions (or indices) with equal keys.
 
@@ -391,35 +417,24 @@ class CollisionModel(bp.BaseModel):
             If False, returns an array of arrays.
             Otherwise, by default, a dictionary.
         sort_key : :obj:`~numpy.array` [:obj:`int`], optional
-            Enforces a specific order to each group.
+            Enforces a specific order between elements in the same group.
             If not None, then equal group_keys are sorted by the sort_key.
             Otherwise, equal group_keys are sorted randomly.
         """
         # merge group_keys
         if type(group_keys) in {tuple, list}:
-            # allow 1D keys for concatenation
-            group_keys = [key if key.ndim == 2 else key[:, np.newaxis]
-                          for key in group_keys]
-            assert all(key.ndim == 2 for key in group_keys)
-            group_keys = np.concatenate(group_keys, axis=1)
-        assert isinstance(group_keys, np.ndarray)
-        assert group_keys.ndim == 2, "merged keys must be a 2D array"
+            group_keys = CollisionModel.merge_keys(*group_keys)
 
-        # construct sort_key
-        if sort_key is None:
-            sort_key = group_keys
-        else:
-            # allow 1D keys for concatenation
-            sort_key = sort_key if sort_key.ndim == 2 else sort_key[:, np.newaxis]
-            sort_key = np.concatenate((group_keys, sort_key), axis=1)
-        # determine lexicographic order based on sort_key
+        # obtain sorting order
+        sort_key = (group_keys if sort_key is None
+                    else CollisionModel.merge_keys(group_keys, sort_key))
         positions = CollisionModel.sort(sort_key)
         del sort_key
 
         # apply order to group_keys and values
         group_keys = group_keys[positions]
-        if len(values) == 0:        # no values are given
-            values = [positions]   # group position indices
+        if len(values) == 0:
+            values = [positions]
         else:
             # convert the values to arrays, if necessary
             values = [np.array(val, copy=False) for val in values]
@@ -443,7 +458,8 @@ class CollisionModel(bp.BaseModel):
             values[v] = np.split(val, pos[1:])
             # convert to a dictionary, if wanted
             if as_dict:
-                values[v] = {tuple(k): val for k, val in zip(key, values[v])}
+                values[v] = {tuple(k): partition
+                             for k, partition in zip(key, values[v])}
 
         # return result or tuple of results
         if len(values) == 1:

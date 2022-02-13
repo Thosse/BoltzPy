@@ -288,8 +288,9 @@ if COMPUTE[key] or (key not in FILE):
         r.collision_weights[:] = 10
         # undo increase for ET Collisions
         if i_r == 0:
-            grp = r.group((r.key_species(r.collision_relations)[:, 1:3],
-                           r.key_energy_transfer(r.collision_relations)))
+            key_spc_ef = r.merge_keys(r.key_species(r.collision_relations)[:, 1:3],
+                                      r.key_energy_transfer(r.collision_relations))
+            grp = r.group(key_spc_ef)
             et_rels = grp[(0, 1, 1)]
             r.collision_weights[et_rels] = 1
         r.update_collisions(r.collision_relations, r.collision_weights)

@@ -70,7 +70,7 @@ for i in [0, 1]:
 
 ax[0].set_title(r"Collision Trapezoids of $\beta \in [\alpha]_\sim$",
                 fontsize=fs_title)
-ax[1].set_title(r"Deformed Collision Trapezoids of $\beta \notin [\alpha]_\sim$",
+ax[1].set_title(r"Twisted Collision Trapezoids of $\beta \notin [\alpha]_\sim$",
                 fontsize=fs_title)
 for i in [0, 1]:
     # set tick values on axes, None = auto choice of matplotlib

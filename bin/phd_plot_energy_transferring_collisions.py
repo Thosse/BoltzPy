@@ -19,7 +19,8 @@ m = bp.CollisionModel(MASSES, SHAPES)
 key_spc = m.key_species(m.collision_relations)[:, 1:3]
 key_E = m.key_energy_transfer(m.collision_relations)
 
-grp = m.group([key_spc, key_E], m.collision_relations)
+key = m.merge_keys(key_spc, key_E)
+grp = m.group(key, m.collision_relations)
 
 ET = grp[(0, 1, 1)]
 NET = grp[(0, 1, 0)]

@@ -63,8 +63,8 @@ else:
                                       spacings=spacings,
                                       setup_collision_matrix=False)
             # get collision numbers, grouped by species
-            grp = model. group(model.key_species(model.collision_relations)[:, 1:3],
-                               as_dict=True)
+            grp = model.group(model.key_species(model.collision_relations)[:, 1:3],
+                              as_dict=True)
             for (s1, s2) in [(0, 0), (0, 1)]:
                 try:
                     h5py_group["ncols"][i, s1, s2] = grp[(s1, s2)].shape[0]
@@ -113,8 +113,8 @@ else:
                                       spacings=spacings,
                                       setup_collision_matrix=False)
             # get collision numbers, grouped by species
-            grp = model. group(model.key_species(model.collision_relations)[:, 1:3],
-                               as_dict=True)
+            grp = model.group(model.key_species(model.collision_relations)[:, 1:3],
+                              as_dict=True)
             for (s1, s2) in [(0, 0), (0, 1)]:
                 try:
                     h5py_group["ncols"][i, s1, s2] = grp[(s1, s2)].shape[0]

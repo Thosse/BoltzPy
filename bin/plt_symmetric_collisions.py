@@ -85,7 +85,8 @@ ax2.scatter(grid[1].iG[:, 0], grid[1].iG[:, 1],
 # compute equivalence classes by distance
 key_pd = grid[1].key_sorted_distance(grid[0].iG)
 partitions, rotations = model.group(key_pd[:, :-1],
-                                    (grid[0].iG, key_pd[:, -1]),
+                                    grid[0].iG,
+                                    key_pd[:, -1],
                                     as_dict=False)
 
 # plot first species as equivalence classes
