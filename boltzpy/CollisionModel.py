@@ -187,6 +187,41 @@ class CollisionModel(bp.BaseModel):
     #        Sorting and Ordering Collisions       #
     ################################################
     @staticmethod
+    def _nd_lexsort(array, copy=True, axis=-2, partition_position=None):
+        # This is an in-place operation!,
+        # do no change to parameter objects, if not specifically allowed
+        if copy:
+            array = np.copy(array)
+
+        # numpys lexsort does not really work in 3d
+        assert array.ndim >= 3, "_nd_lexsort is intended for ndim >= 3"
+        # instead: create a view as a structured array
+        # where the last axis is viewed as (named) tuple
+        # and used for lexicographic sorting
+        assert array.shape[-1] > 0
+        assert axis != -1 and axis != array.ndim - 1
+        struc_array = array.view("i8" + (array.shape[-1] - 1) * ", i8")
+
+        # give a priority order for the elements along the last axis
+        # ("f0", "f1",...) is the default naming for the named tuple
+        order = tuple(["f%i" % i for i in range(array.shape[-1])])
+        if partition_position is None:
+            # sort struc_array based on the priority order
+            # this directly applies to the original array!
+            struc_array.sort(order=order, axis=axis)
+        else:
+            assert isinstance(partition_position, int)
+            assert abs(partition_position) < array.shape[axis] - 1
+            # quicker version of sort, after which
+            # only the partition_position-th element is at the right position
+            struc_array.partition(partition_position,
+                                  order=order, axis=axis)
+        if copy is True:
+            return array
+        else:
+            return
+
+    @staticmethod
     def key_index(relations):
         """"Sorts a set of relations,
         such that each relations indices are in ascending"""
@@ -198,31 +233,56 @@ class CollisionModel(bp.BaseModel):
         species = self.get_spc(relations)
         return np.sort(species, axis=-1)
 
-    def key_shape(self, relations):
-        """"Returns the sorted tuple of width and height of each collision as key.
-        Keep squares of width an height, as the root is slow."""
+    def key_shape(self, relations, use_norm=False):
+        """"Describes the geometric shape of the collision trapezoid.
+
+        Keep squares of width an height, as the root is slow and no integer."""
+        # 3D models require two angles: length and height
+        # in 2D models both angles are always equal
+        # thus the second angle is omitted
+
+        keys = np.empty((relations.shape[0], 2, self.ndim),
+                        dtype=int)
+
+        # determine the width vectors of the trapezoid
+        # compute both options and store temporarily in keys
         colvels = self.i_vels[relations]
-        keys = np.empty((relations.shape[0], 2), dtype=int)
-        # get width, as squared norm of v_i - v_j or v_k - v_l
-        # only use the smaller one, for permutation invariance
-        keys[:, 0] = np.sum((colvels[:, 1] - colvels[:, 0]) ** 2, axis=1)
-        keys[:, 1] = np.sum((colvels[:, 3] - colvels[:, 2]) ** 2, axis=1)
-        # after sorting, keys[:, 0] describes the collisions length
-        keys.sort(axis=1)
+        keys[:, 0] = colvels[:, 1] - colvels[:, 0]     # = v_1 - v_0
+        keys[:, 1] = colvels[:, 3] - colvels[:, 2]     # = v_3 - v_2
+        # compute norm of width vectors
+        norm = np.sum(keys ** 2, axis=-1)
+        switch = (norm[:, 0] > norm[:, 1])
+        # pick width vector of smaller length as first component
+        keys[:, 0, :] = np.where(switch[:, None],
+                                 keys[:, 1],
+                                 keys[:, 0])
+
         # compute height vector by adding vector segments
         height_weights = np.array([-0.5, -0.5, 0.5, 0.5])[None, :, None]
-        height_vec = np.sum(height_weights * colvels, axis=1)
-        # store the computed height in width[:, 2] (overwrites unused larger length)
-        keys[:, 1] = np.sum(height_vec ** 2, axis=-1)
+        heights = np.sum(height_weights * colvels, axis=1)
+        keys[:, 1, :] = heights
 
-        # get intraspecies collisions
+        # take sorted absolutes of length and height
+        # to merge all grid symmetries
+        keys = np.sort(np.abs(keys), axis=-1)
+
+        # lexicographically sort length and height for intraspecies collisions
+        # select keys of intraspecies collisions
         key_spc = self.key_species(relations)[:, 1:3]
         is_intra = key_spc[:, 0] == key_spc[:, 1]
+        intra_angles = keys[is_intra]     # Do not remove!
         del key_spc
-        intra_keys = keys[is_intra]  # Do not remove!
-        # sort length and height only for intraspecies collisions
-        intra_keys.sort(axis=1)
-        keys[is_intra] = intra_keys
+        # sort angles in intraspecies keys
+        self._nd_lexsort(intra_angles, axis=1, copy=False)
+        keys[is_intra] = intra_angles
+
+        if use_norm:
+            # ignore orientation information, and replace vecors by their norms
+            # do NOT take square root, to keep integer values (it is also faster)
+            keys = np.sum(keys ** 2, axis=-1)
+        else:
+            # concatenate sorted length and height vectors in keys
+            keys.resize((relations.shape[0], np.prod(keys.shape[1:])))
         return keys
 
     def key_center_of_gravity(self, relations, use_norm=False):
@@ -273,19 +333,13 @@ class CollisionModel(bp.BaseModel):
         # 3. sort orbkeys, for permutation invariance
         # sort indices in each relation of every orbit
         keys.sort(axis=2)
-        # sort/partition the orbit elements (axis=1)
-        # create a view as a structured array, to use argsort
-        # lexsort does not really work in 3d
-        struc_keys = keys.view("i8, i8, i8, i8")
-
-        # if reduce, then return only the lexicographically smallest collision
+        # sort the orbit elements of each original collision (axis=1)
+        pos = 0 if reduce else None
+        self._nd_lexsort(keys, axis=1, copy=False, partition_position=pos)
         if reduce:
-            struc_keys.partition(0, order=("f0", "f1", "f2", "f3"), axis=1)
-            return keys[:, 0]
-        # if not reduce, then return the lexicographically sorted collisions
+            return keys[:, 0, ...]
         else:
-            struc_keys.sort(order=("f0", "f1", "f2", "f3"), axis=1)
-            return keys.reshape((keys.shape[0], -1))
+            return keys
 
     def key_area(self, relations):
         (v0, v1, w0, w1) = self.i_vels[relations.transpose()]
@@ -309,47 +363,49 @@ class CollisionModel(bp.BaseModel):
 
     def key_angle(self, relations):
         # 3D models require two angles: length and height
-        # in 2D model the height is inherently determined, by the orthogonality
-        angles = np.empty((relations.shape[0], self.ndim - 1, self.ndim),
-                          dtype=int)
-        # determine the length of the trapezoid
+        # in 2D models both angles are always equal
+        # thus the second angle is omitted
+        key_components = 1 if self.ndim == 2 else 2
+        keys = np.empty((relations.shape[0], key_components, self.ndim),
+                        dtype=int)
+
+        # determine the width of the trapezoid
         colvels = self.i_vels[relations]
-        angles[:, 0, :] = colvels[:, 1] - colvels[:, 0]     # length
+        widths = colvels[:, 1] - colvels[:, 0]     # = v_1 - v_0
+        keys[:, 0, :] = widths
 
         # 3D models additionally require the height vector
-        if self.ndim ==3:
+        if self.ndim != 2:
             # compute height vector by adding vector segments
             height_weights = np.array([-0.5, -0.5, 0.5, 0.5])[None, :, None]
-            angles[:, 1, :] = np.sum(height_weights * colvels, axis=1)  # height
+            heights = np.sum(height_weights * colvels, axis=1)
+            keys[:, 1, :] = heights
 
         # compute gcd of length and height
-        gcd = np.gcd.reduce(angles, axis=-1)
-        # gcd can be zero, in this case divide by 1
+        gcd = np.gcd.reduce(keys, axis=-1)
+        # gcd can be zero (height == 0), in this case divide by 1
         gcd[gcd == 0] = 1
         # normalize with gcd to get the direction
-        angles = angles // gcd[..., np.newaxis]
+        keys = keys // gcd[..., np.newaxis]
 
-        # sort entries of length and height, to merge symmetries
-        angles = np.sort(np.abs(angles), axis=-1)
+        # take sorted absolutes of length and height
+        # to merge all grid symmetries
+        keys = np.sort(np.abs(keys), axis=-1)
 
         # lexicographically sort length and height for intraspecies collisions
-        if self.ndim == 3:
-            # structured arrays of views are dangerous,
-            # thus we copy all intraspecies collisions and sort only them
+        if self.ndim != 2:
+            # select keys of intraspecies collisions
             key_spc = self.key_species(relations)[:, 1:3]
             is_intra = key_spc[:, 0] == key_spc[:, 1]
-            inter_angles = angles[is_intra]     # Do not remove!
+            intra_angles = keys[is_intra]     # Do not remove!
             del key_spc
-            # create a view as a structured array, to use argsort
-            # lexsort does not really work in 3d
-            # Note: directly taking the view of angles[is_intra] does NOT work!
-            struc_array = inter_angles.view("i8, i8, i8")
-            struc_array.sort(order=("f0", "f1", "f2"), axis=1)
-            angles[is_intra] = inter_angles
+            # sort angles in intraspecies keys
+            self._nd_lexsort(intra_angles, axis=1, copy=False)
+            keys[is_intra] = intra_angles
 
-        # concatenate sorted length and height
-        angles.resize((relations.shape[0], np.prod(angles.shape[1:])))
-        return angles
+        # concatenate sorted length and height vectors in keys
+        keys.resize((relations.shape[0], np.prod(keys.shape[1:])))
+        return keys
 
     def key_energy_transfer(self, relations, as_bool=True):
         assert relations.ndim == 2
@@ -399,7 +455,7 @@ class CollisionModel(bp.BaseModel):
 
     @staticmethod
     def group(group_keys, *values, as_dict=True, sort_key=None):
-        """Create Partitions of positions (or indices) with equal keys.
+        """Create Partitions of values (or indices) with equal keys.
 
         This method collects all values, that correspond to an equal key.
         Mathematically, this is similar to taking the quotient space.
@@ -421,7 +477,7 @@ class CollisionModel(bp.BaseModel):
             If not None, then equal group_keys are sorted by the sort_key.
             Otherwise, equal group_keys are sorted randomly.
         """
-        # merge group_keys
+        # concatenate multiple group_keys into a single key_array
         if type(group_keys) in {tuple, list}:
             group_keys = CollisionModel.merge_keys(*group_keys)
 

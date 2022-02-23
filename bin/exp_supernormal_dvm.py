@@ -59,11 +59,11 @@ grp_colls = model.group(model.key_species(model.collision_relations),
 
 
 # delete intraspecies diamond collisions
-for k in [(0,0,0,0), (1,1,1,1)]:
-    grp_shp = model.group(model.key_shape(grp_colls[k]))
+for k in [(0, 0, 0, 0), (1, 1, 1, 1)]:
+    grp_shp = model.group(model.key_shape(grp_colls[k], use_norm=True))
     print(grp_shp)
-    removed_colls = np.copy(grp_colls[k][grp_shp[(8,8)]])
-    grp_colls[k] = np.delete(grp_colls[k], grp_shp[(8,8)], axis=0)
+    removed_colls = np.copy(grp_colls[k][grp_shp[(8, 8)]])
+    grp_colls[k] = np.delete(grp_colls[k], grp_shp[(8, 8)], axis=0)
     # print("Plotting Reduced Model")
     # model.plot_collisions(grp_colls[k])
 

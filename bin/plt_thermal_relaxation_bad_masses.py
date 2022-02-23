@@ -665,7 +665,7 @@ grp = m.group((m.key_species(m.collision_relations)[:, 1:3],
 # get an id for the old ET Collisions
 e_cols = m.collision_relations[grp[(0,1,1)]]
 old_cog = m.key_center_of_gravity(e_cols)[0]
-old_colshape = m.key_shape(e_cols)[0]
+old_colshape = m.key_shape(e_cols, use_norm=True)[0]
 old_col_id = tuple(old_cog) + tuple(old_colshape)
 del m, old_cog, old_colshape
 
@@ -736,7 +736,7 @@ r = rules[2]
 grp = r.group((r.key_species(r.collision_relations)[:, 1:3],
                r.key_energy_transfer(r.collision_relations),
                r.key_center_of_gravity(r.collision_relations),
-               r.key_shape(r.collision_relations)),
+               r.key_shape(r.collision_relations, use_norm=True)),
               as_dict=True)
 old_et_pos = grp[(0,1,1) + old_col_id]
 # find all new ET Collisions in rules[3]
