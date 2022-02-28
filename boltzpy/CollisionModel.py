@@ -427,6 +427,55 @@ class CollisionModel(bp.BaseModel):
             )
             return energy_transfer
 
+    def key_is_normality_collision(self, relations, group_by="shape"):
+        """Returns 1, for all collisions required for normality (based on shape).
+
+        The collisions required for normality are
+            - the smallest collisions along the grid axes
+            - the smalles collisions along the 2-axis-diagonals
+
+        Parameters
+        ----------
+        relations : :obj:`~numpy.array` [:obj:`int`]
+        group_by : :obj:`str`, optional
+            Allows to mark more general groups, like "angles"
+            as required for normality.
+        """
+        assert relations.ndim == 2
+        is_normality_collision = np.zeros((relations.shape[0], 1),
+                                          dtype=int)
+        species = self.key_species(relations)[:, 1:3]
+        shapes = self.key_shape(relations)
+        grp = self.group((species, shapes))
+        # find normality collisions based on species and shape
+        for key, positions in grp.items():
+            key = np.array(key, dtype=int)
+            # only consider intraspecies collisions
+            if key[0] != key[1]:
+                continue
+            # only consider quadratic collisions
+            length = key[2: 2 + self.ndim]
+            width = key[2 + self.ndim: 2 + 2*self.ndim]
+            if np.any(length != width):
+                continue
+            # only consider smallest possible squares
+            # parallel to grid axes or along 2-axis-diagonals
+            if group_by in ["shape", "orbit"]:
+                spacing = self.spacings[key[0]]
+            elif group_by == "angle":
+                spacing = 1
+            else:
+                raise ValueError
+            parallel = np.zeros(self.ndim, dtype=int)
+            parallel[-1] = spacing
+            diagonal = np.zeros(self.ndim, dtype=int)
+            diagonal[-2:] = spacing
+            if np.all(length == parallel) or np.all(length == diagonal):
+                is_normality_collision[positions] = 1
+            else:
+                continue
+        return is_normality_collision
+
     @staticmethod
     def merge_keys(*keys):
         """Merge multiple key arrays by elementwise concatenation
@@ -651,6 +700,78 @@ class CollisionModel(bp.BaseModel):
 
         # convert to csr_matrix, for fast arithmetics
         self.collision_matrix = col_mat.tocsr()
+        return
+
+    def remove_collisions(self, indices=None,
+                          probability=None,
+                          key_function=None,
+                          update_collision_matrix=True,
+                          only_set_weight_to_zero=False):
+        """Remove collisions either by index or a probability array.
+
+        Parameters
+        ----------
+        indices : :obj:`~numpy.array` [:obj:`int`], optional
+        probability : :obj:`~numpy.array` [:obj:`int`], optional
+            Entries must be non negative integers.
+            Values do **not** need to sum up to 1.
+        key_function : :obj:`function`, optional
+            Used to partition the collisions into groups.
+            Instead of removeing a single emelents,
+            its whole group is removed.
+            By default :meth:`key_index` is used.
+        update_collision_matrix : :obj:`bool`, optional
+            If True (default), then the collision matrix
+            is updated after removal. Otherwise not.
+        only_set_weight_to_zero : :obj:`bool`, optional
+            If False (default), both then remove from both
+             the collision relations and weights arrays.
+        """
+        # remove either by index or probability
+        assert (indices is None) != (probability is None)
+        # negative collision weights are used to mark collision removal
+        assert np.all(self.collision_weights >= 0)
+        # if specified find a single collision based on probability
+        if probability is not None:
+            assert probability.shape == (self.ncols,)
+            assert probability.dtype == float
+            assert np.all(probability >= 0)
+            # enforce a probability distribution, with altering the original
+            sum = probability.sum()
+            if not np.isclose(sum, 1):
+                probability = probability / probability.sum()
+            # select a random collision, by it position
+            indices = np.random.choice(self.ncols, p=probability)
+            indices = np.array([indices])
+
+        assert isinstance(indices, np.ndarray)
+        assert indices.dtype == int
+        assert np.all((0 <= indices) & (indices < self.ncols))
+        # key_function is used to remove whole collision groups
+        if key_function is None:
+            key_function = self.key_index
+        assert callable(key_function)
+        grp = self.group(key_function(self.collision_relations))
+        # mark specified collision groups for removal
+        for idx in indices:
+            col = self.collision_relations[idx]
+            key = key_function(col.reshape((1, 4)))
+            key = tuple(key.reshape(4))
+            positions = grp[key]
+            # mark removal by a negative collision weight
+            self.collision_weights[positions] = -np.inf
+
+        # process markd collisions
+        if only_set_weight_to_zero:     # Set weights of marked collisions to 0
+            self.collision_weights = np.where(self.collision_weights >= 0,
+                                              self.collision_weights,
+                                              0)
+        else:                           # remove marked collisions
+            keep = np.where(self.collision_weights >= 0)[0]
+            self.collision_relations = self.collision_relations[keep]
+            self.collision_weights = self.collision_weights[keep]
+        if update_collision_matrix:
+            self.update_collisions()
         return
 
     def cmp_weights(self, relations=None, scheme="uniform"):
