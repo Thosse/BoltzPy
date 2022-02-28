@@ -604,24 +604,31 @@ class CollisionModel(bp.BaseModel):
     ##################################
     #           Collisions           #
     ##################################
-    def update_collisions(self, relations, weights, min_weight=1e-12):
+    def update_collisions(self,
+                          relations=None,
+                          weights=None):
         """Updates the collision_relations, collision_weights
         and computes a new sparse collision_matrix.
 
         Parameters
         ----------
-        relations : :obj:`~numpy.array` [:obj:`int`]
+        relations : :obj:`~numpy.array` [:obj:`int`], optional
             A 2d Array. Each relation (row) has 4 integers,
             that point at velocities of the model.
-        weights : :obj:`~numpy.array` [:obj:`float`]
+        weights : :obj:`~numpy.array` [:obj:`float`], optional
             A 1d array, of numerical weights for each relation.
-        min_weight : :obj:`float`
-            Any collisions with a lower weight that this are ignored
-            in the computation, but NOT removed from the arrays.
         """
-        if relations.shape != (weights.size, 4) or weights.ndim != 1:
+        if relations is None:
+            relations = self.collision_relations
+        if weights is None:
+            weights = self.collision_weights
+        if weights.ndim != 1:
             raise ValueError
-        if np.any(np.logical_or(relations < 0, relations >= self.nvels)):
+        if relations.shape != (weights.size, 4):
+            raise ValueError
+        if not relations.dtype == int:
+            raise TypeError
+        if np.any((relations < 0) | (relations >= self.nvels)):
             raise ValueError
 
         # update attributes
