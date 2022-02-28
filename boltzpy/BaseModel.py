@@ -314,10 +314,12 @@ class BaseModel(bp.BaseClass):
                           mean_velocity=0.0,
                           s=None,
                           atol=None,
+                          rtol=None,
                           metric="temperature",
                           intervals=100,
                           return_error=False):
         """Determine a range of temperatures for which a good initial state can be generated.
+
         Parameters
         ----------
         mean_velocity : :obj:`~numpy.array` [:obj:`float`]
@@ -326,44 +328,52 @@ class BaseModel(bp.BaseClass):
             If None is given, a shared range for all specimen is given.
         atol : :obj:`float`, optional
             Absolute tolerance for the given error metric.
-            If None is given, then the heuristic results are returned.
+        rtol : :obj:`float`, optional
+            Relative tolerance for the given error metric.
         intervals : :obj:`int`
             Determines the number of test points for which the error metric is computed.
         return_error : :obj:`bool`
             Return the error metric array, instead of the temperature range.
             This is for Debugging.
 
-
         Returns
         -------
         t_range : :obj:`~numpy.array` [:obj:`float`]
-            The estimated minimum and maximum temperatures,
-            for which the newton scheme finds a common solution
-            for the mixture.
+            A 2-Tuple of minimum and maximum temperatures, proposed for the DVM,
+            such that the given grid error is within the given tolerances.
+            If neither atol nor rtol are given, then retun the temperature range
+            for which the newton scheme finds a common solution for the mixture.
         """
         # compute a rough estimate with the heuristic
         heuristic_range = self._temperature_range_mixture_heuristic(mean_velocity, s)
         if atol is None:
+            atol = np.inf
+        if rtol is None:
+            rtol = np.inf
+        if atol == np.inf and rtol == np.inf:
             return heuristic_range
         else:
-            assert isinstance(atol, float)
-            assert atol > 0
             assert isinstance(metric, str)
+        for tol in [atol, rtol]:
+            assert isinstance(tol, float)
+            assert tol > 0
 
-        # by default: check all species
+        # 1. compute errors of some teste_temperatures for all species
         species = self.species if s is None else [s]
-        # test metric error for a set of points
-        test_points = np.linspace(*heuristic_range, intervals)
-        # use ones, in case any cell is not written it is counted as a large error
-        error = np.ones((len(species), intervals))
+        # test metric error for a set of temperatures
+        tested_temps = np.linspace(*heuristic_range, intervals)
+        # store measured errors ia arrays
+        # initialize with -1, to detect missing writes
+        err_abs = np.full((len(species), intervals), -1, dtype=float)
+        err_rel = np.full((len(species), intervals), -1, dtype=float)
         # store temperature ranges for each species in here
         t_ranges = np.zeros((len(species), 2))
         for i_s, s in enumerate(species):
             # compute the error for each temperature
-            for i_t, t in enumerate(test_points):
+            for i_t, t_ref in enumerate(tested_temps):
                 # compute discrete maxwellian
                 maxwellian = self.maxwellian(self.vels[self.idx_range(s)],
-                                             temperature=t,
+                                             temperature=t_ref,
                                              mass=self.masses[s],
                                              mean_velocity=mean_velocity)
                 # enforce number density = 1
@@ -371,29 +381,45 @@ class BaseModel(bp.BaseClass):
                 maxwellian /= number_dens
                 # compute error, depending on metric
                 if metric == "temperature":
-                    error[i_s, i_t] = t - self.cmp_temperature(maxwellian, s)
+                    t_cmp = self.cmp_temperature(maxwellian, s)
+                    err_abs[i_s, i_t] = t_ref - t_cmp
+                    # divide by maximum to avoid division by zero
+                    divisor = np.max(np.abs([t_ref, t_cmp]))
+                    err_rel[i_s, i_t] = err_abs[i_s, i_t] / divisor
                 elif metric == "mean_velocity":
-                    vec_error = mean_velocity - self.cmp_mean_velocity(maxwellian, s)
-                    error[i_s, i_t] = np.linalg.norm(vec_error)
+                    v_cmp = self.cmp_mean_velocity(maxwellian, s)
+                    vec_error = mean_velocity - v_cmp
+                    err_abs[i_s, i_t] = np.linalg.norm(vec_error)
+                    # divide by maximum to avoid division by zero
+                    divisor = np.max([np.linalg.norm(mean_velocity),
+                                      np.linalg.norm(v_cmp)])
+                    if divisor < 1e-8:
+                        err_rel[i_s, i_t] = 1e-8
+                    else:
+                        err_rel[i_s, i_t] = err_abs[i_s, i_t] / divisor
                 else:
                     raise NotImplementedError
 
         if return_error:
-            return error
-        # else: compute the temperature ranges of each species
+            return err_abs
+
+        # 2. compute the temperature ranges of each species
         for i_s, s in enumerate(species):
-            # find max temperature as last value, with error below atol
-            hits, = np.where(np.abs(error[i_s]) < atol)
+            # find max temperature as last value,
+            # with error below the tolerances
+            hits, = np.where((np.abs(err_abs[i_s]) < atol)
+                             & (np.abs(err_rel[i_s]) < rtol))
             if len(hits) == 0:
                 raise ValueError("No Acceptable temperature found for species %1d" % s)
             i_max = hits[-1]
             # find min temperature right after the last False, before i_max
-            hits, = np.where(np.abs(error[i_s, :i_max]) >= atol)
+            hits, = np.where((np.abs(err_abs[i_s, :i_max]) >= atol)
+                             | (np.abs(err_rel[i_s, :i_max]) >= rtol))
             i_min = hits[-1] + 1 if len(hits) > 0 else 0
             # get temperatures from test_points array
-            t_ranges[i_s] = test_points[np.array([i_min, i_max])]
+            t_ranges[i_s] = tested_temps[np.array([i_min, i_max])]
 
-        # determine temperature range as maxmin and minmax of t_ranges
+        # 3. determine temperature range as maxmin and minmax of t_ranges
         t_range = np.array([np.max(t_ranges[:, 0]),
                             np.min(t_ranges[:, 1])])
         return t_range
