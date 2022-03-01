@@ -3,7 +3,7 @@ import os
 import h5py
 import numpy as np
 
-import boltzpy.helpers.tests as test_helper
+import boltzpy.Tools.tests as test_helper
 import boltzpy as bp
 from boltzpy.test.test_grid import GRIDS
 from boltzpy.test.test_model import MODELS

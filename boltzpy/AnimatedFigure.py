@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib as mpl
 from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.animation as mpl_ani
-import boltzpy.helpers.TimeTracker as h_tt
+import boltzpy.Tools.TimeTracker as h_tt
 
 
 # Todo check maximum tmax over all elements >= fig.tmax

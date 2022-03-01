@@ -2,7 +2,7 @@ import os
 import h5py
 import numpy as np
 
-import boltzpy.helpers.TimeTracker as h_tt
+import boltzpy.Tools.TimeTracker as h_tt
 import boltzpy as bp
 
 

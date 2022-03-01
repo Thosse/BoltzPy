@@ -4,7 +4,7 @@ import numpy as np
 import h5py
 import os
 import matplotlib.pyplot as plt
-import boltzpy.helpers.TimeTracker as h_tt
+import boltzpy.Tools.TimeTracker as h_tt
 
 file_name = "Simulations/plot_spacing_vs_ncols"
 
