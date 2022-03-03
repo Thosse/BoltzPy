@@ -5,6 +5,98 @@ import boltzpy as bp
 import matplotlib.pyplot as plt
 from time import process_time
 from boltzpy.Tools import GainBasedModelReduction
+from boltzpy.Tools import balance_gains
+from boltzpy.Tools import plot_gains
+
+# Example: Gain based weight adjustment
+import boltzpy as bp
+from boltzpy.Tools import balance_gains
+
+# Adjust a 3-Species Mixture
+model = bp.CollisionModel(masses=[2, 3],
+                          shapes=[[9, 9],
+                                  [9, 9]],
+                          base_delta=1.0
+                          )
+# Choose Mean Velocity and Temperature Parameters
+MAX_MV = 0
+T = 45
+# Verify parameters with model.temp_range()
+print(model.temperature_range(rtol=1e-3,
+                        mean_velocity=MAX_MV))
+
+# use a homogeneous simulation
+# to compute gains based on a reference Maxwellian
+rule = bp.HomogeneousRule(
+    number_densities=np.full(model.nspc, 1),
+    mean_velocities=np.full((model.nspc, model.ndim),
+                            MAX_MV),
+    temperatures=np.full(model.nspc, T),
+    **model.__dict__)
+
+# balance gains for species and energy transfer
+col_rels = rule.collision_relations
+k_spc = rule.key_species(col_rels)[:, 1:3]
+k_et = rule.key_energy_transfer(col_rels)
+grp = rule.group((k_spc, k_et))
+
+plot_gains(rule,
+           grp=grp)
+
+# specify gain ratios for each group
+GAINS = {"INTRA": 1.0,
+         "ET": 1,
+         "NET": 1}
+
+# create a dictionary with the desired gain ratios
+gain_ratios=dict()
+for key in grp.keys():
+    # define s, r, and is_et
+    (s, r, is_et) = key
+    if s == r:
+        gain_ratios[key] = GAINS["INTRA"]
+    elif is_et:
+        gain_ratios[key] = GAINS["ET"]
+    else:
+        gain_ratios[key] = GAINS["NET"]
+
+# apply desired gain_ratios
+print("Balance Gains!")
+balance_gains(rule, grp, gain_ratios, verbose=True)
+
+plot_gains(rule,
+           grp=grp)
+
+# fig, axes = plt.subplots(nrows=1, ncols=rule.nspc,
+#                          figsize=(12.75, 5.05),
+#                          constrained_layout=True)
+
+# rule.initial_state[...] = 1.0
+# for key, val in grp.items():
+#     gain_arr = rule.gain_term(val)
+#     fig.suptitle(key)
+#     for s in rule.species:
+#         arr = gain_arr[rule.idx_range(s)]
+#         arr = arr.reshape(rule.shapes[s])
+#         axes[s].imshow(arr, cmap='coolwarm',
+#                    interpolation="quadric",
+#                    origin="lower",
+#                    vmax=gain_arr.max() * 1.2,
+#                    vmin=0)
+#     plt.savefig(str(key) + ".png")
+
+# determine a proper temperature range of the model
+# compute per species to compare ranges
+temp_range = {s: model.temperature_range( s=s,
+                                         rtol=1e-3,
+                                         mean_velocity=MAX_MV)
+              for s in model.species}
+print("Temperatures Range of each Grid:\n"
+      "(if range varies too much, change shape)")
+for key, val in temp_range.items():
+    print(key, ":\t", list(val))
+
+# Define reference Temperature for Adjustments
 
 
 
@@ -66,12 +158,13 @@ k_et = rule.key_energy_transfer(rule.collision_relations)
 class_keys = rule.merge_keys(k_spc, k_et)
 
 # add collisions based on shape
-sub_keys = rule.key_shape(rule.collision_relations)
+sub_keys = rule.key_orbit(rule.collision_relations)
 reduction = GainBasedModelReduction(rule, class_keys, sub_keys,
                                     gain_factor_normality_collisions=1e-2)
 
+grp = model.group((k_spc, k_et))
 for k, idx in reduction.log_empty_times.items():
-    print(k, ": ", reduction.log_ncols[idx])
+    print(k, ": ", grp[k].shape[0], " / ", reduction.log_ncols[idx])
 
 reduction.plot(legend_ncol=3, yscale="log")
 

@@ -1,1 +1,3 @@
 from boltzpy.Tools.ModelReductions import GainBasedModelReduction
+from boltzpy.Tools.WeightAdjustments import balance_gains
+from boltzpy.Tools.WeightAdjustments import plot_gains

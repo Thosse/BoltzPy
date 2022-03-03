@@ -514,11 +514,16 @@ class HomogeneousRule(BaseRule, bp.CollisionModel):
         attrs.update(bp.CollisionModel.attributes())
         return attrs
 
-    def gain_term(self, relation_set=None):
+    def gain_array(self,
+                   relation_set=None,
+                   initial_state=None):
         if relation_set is None:    # use all collision
             relation_set = slice(None)
+        if initial_state is None:
+            initial_state = self.initial_state
+        assert initial_state.shape == (self.nvels)
         relations = self.collision_relations[relation_set]
-        colvels = self.initial_state[relations]
+        colvels = initial_state[relations]
         gain_term = np.prod(colvels[:, [0, 2]], axis=-1)
         loss_term = np.prod(colvels[:, [1, 3]], axis=-1)
         # We must use the absolute matrix!

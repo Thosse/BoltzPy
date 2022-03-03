@@ -23,7 +23,7 @@ class gain_group:
         # compute gains of each collision group
         self.gains = np.zeros(self.probabilities.shape, dtype=float)
         for k, key in enumerate(self.keys):
-            gain_array = rule.gain_term(grp[key])
+            gain_array = rule.gain_array(grp[key])
             self.gains[k] = rule.cmp_number_density(gain_array)
 
         # store chosen collision groups
