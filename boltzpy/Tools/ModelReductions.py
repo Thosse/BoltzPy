@@ -108,9 +108,9 @@ class GainBasedModelReduction:
 
     def get_reduction(self, idx):
         keys = self.log_keys[:idx]
-        col_grps = [self.grp[key] for key in keys]
+        col_grps = [self.col_grp[key] for key in keys]
         col_rels = np.concatenate(col_grps, axis=0)
-        return col_grps
+        return col_rels
 
 
     def add_collisions(self, key=None, gain_factor=1.0):
@@ -162,6 +162,7 @@ class GainBasedModelReduction:
         return
 
     def plot(self,
+             ax=None,
              figsize=(12.75, 6.25),
              constrained_layout=True,
              class_keys=None,
@@ -176,9 +177,11 @@ class GainBasedModelReduction:
              yscale="linear",
              ymin=1e-6,
              ymax=None):
-        fig = plt.figure(figsize=figsize,
-                         constrained_layout=constrained_layout)
-        ax = fig.add_subplot()
+        show_plot = ax is None
+        if ax is None:
+            fig = plt.figure(figsize=figsize,
+                             constrained_layout=constrained_layout)
+            ax = fig.add_subplot()
         if class_keys is None:
             class_keys = self.class_keys
         # convert gains  to array for easier access
@@ -211,5 +214,6 @@ class GainBasedModelReduction:
         ax.tick_params(axis="both", labelsize=fs_ticks)
         ax.set_xlabel(xlabel, fontsize=fs_label)
         ax.set_ylabel(ylabel, fontsize=fs_label)
-        plt.show()
-
+        if show_plot:
+            plt.show()
+        return ax

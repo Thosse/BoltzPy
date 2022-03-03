@@ -1,1 +1,1 @@
-from boltzpy.Tools.GainBasedModelReduction import GainBasedModelReduction
+from boltzpy.Tools.ModelReductions import GainBasedModelReduction
