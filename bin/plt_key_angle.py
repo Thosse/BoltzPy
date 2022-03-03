@@ -5,9 +5,7 @@ import numpy as np
 import matplotlib
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 matplotlib.rcParams['text.usetex'] = True
-matplotlib.rcParams['text.latex.preamble'] = [
-    r'\usepackage{amsmath}',
-    r'\usepackage{amssymb}']
+matplotlib.rcParams['text.latex.preamble'] = r'\usepackage{amsmath, amssymb}'
 import matplotlib.pyplot as plt
 
 # for c in range(1000000):
@@ -28,8 +26,8 @@ import matplotlib.pyplot as plt
 fig, ax = plt.subplots(1, 1, constrained_layout=True,
                        figsize=(12.75, 6.25))
 fs = 50
-x1 = 5
-x2 = 3
+x1 = 3
+x2 = 5
 h = 2
 vels = np.array([[-x1,0], [x1,0], [x2, h], [-x2,h], [-x1, 0]]) / np.array([[2, 1]])
 ax.plot(vels[:,0], vels[:, 1], "-",  c="black",
