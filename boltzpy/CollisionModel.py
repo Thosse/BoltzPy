@@ -407,10 +407,12 @@ class CollisionModel(bp.BaseModel):
         keys.resize((relations.shape[0], np.prod(keys.shape[1:])))
         return keys
 
-    def key_simplified_angle(self, relations):
+    def key_simplified_angle(self, relations, dtype=float):
         key_spc = self.key_species(relations)[:, 1:3]
         key_angles = self.key_angle(relations)
-        simp_angles = key_angles[:, 0:self.ndim]
+        simp_angles = np.empty((relations.shape[0], self.ndim),
+                               dtype=dtype)
+        simp_angles[...] = key_angles[:, 0:self.ndim]
 
         # for intraspecies collisions in 3D models
         # we must add length and height vectors

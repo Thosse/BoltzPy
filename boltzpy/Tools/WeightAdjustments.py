@@ -159,7 +159,7 @@ class AngularWeightAdjustment(bp.HomogeneousRule):
         # group collisions based on simpülified angles
         simplified_angles = self.key_simplified_angle(self.collision_relations)
         # project simplified_angles to convex hull of reference angles
-        simplified_angles //= simplified_angles[:, -1, None]
+        simplified_angles /= simplified_angles[:, -1, None]
         # Base transfer simplified angles
         # into multiples of the Reference-Angle
         _abt_mat = self.angle_base_transfer_matrix
