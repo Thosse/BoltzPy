@@ -5,7 +5,6 @@ import boltzpy as bp
 import matplotlib.pyplot as plt
 from time import process_time
 from boltzpy.Tools import GainBasedModelReduction
-from boltzpy.Tools import balance_gains
 from boltzpy.Tools import plot_gains
 
 # Example: Gain based weight adjustment
@@ -16,14 +15,15 @@ from boltzpy.Tools import balance_gains
 model = bp.CollisionModel(masses=[2, 3],
                           shapes=[[9, 9],
                                   [9, 9]],
-                          base_delta=1.0
+                          base_delta=0.25,
+                          collision_factors=[5e3]
                           )
 # Choose Mean Velocity and Temperature Parameters
 MAX_MV = 0
-T = 45
+T = 3
 # Verify parameters with model.temp_range()
 print(model.temperature_range(rtol=1e-3,
-                        mean_velocity=MAX_MV))
+                              mean_velocity=MAX_MV))
 
 # use a homogeneous simulation
 # to compute gains based on a reference Maxwellian
@@ -34,14 +34,16 @@ rule = bp.HomogeneousRule(
     temperatures=np.full(model.nspc, T),
     **model.__dict__)
 
+
+
 # balance gains for species and energy transfer
 col_rels = rule.collision_relations
 k_spc = rule.key_species(col_rels)[:, 1:3]
 k_et = rule.key_energy_transfer(col_rels)
 grp = rule.group((k_spc, k_et))
 
-plot_gains(rule,
-           grp=grp)
+# plot_gains(rule,
+#            grp=grp)
 
 # specify gain ratios for each group
 GAINS = {"INTRA": 1.0,
@@ -49,7 +51,7 @@ GAINS = {"INTRA": 1.0,
          "NET": 1}
 
 # create a dictionary with the desired gain ratios
-gain_ratios=dict()
+gain_ratios = dict()
 for key in grp.keys():
     # define s, r, and is_et
     (s, r, is_et) = key
@@ -64,8 +66,46 @@ for key in grp.keys():
 print("Balance Gains!")
 balance_gains(rule, grp, gain_ratios, verbose=True)
 
+# plot_gains(rule,
+#            grp=grp)
+
+
+#################################
+#   Angular Weight Adjustment   #
+#################################
+from boltzpy.Tools import AngularWeightAdjustment
+# apply angular weight adjustment per species pair
+grp = rule.group(k_spc)
+
+rule.initial_state = rule.cmp_initial_state([1, 0])
+abwa = AngularWeightAdjustment(rule, dt=1e-7,
+                               collision_choice=grp[(0, 0)])
+
+agrp = abwa.group(abwa.key_angle(abwa.collision_relations)
+                  )
+for k, v in agrp.items():
+    print(k, abwa.collision_weights[v] / 56992.59540439)
+abwa.execute(verbose=True)
+for k, v in agrp.items():
+    print(k, abwa.collision_weights[v] / 56992.59540439)
 plot_gains(rule,
            grp=grp)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 # fig, axes = plt.subplots(nrows=1, ncols=rule.nspc,
 #                          figsize=(12.75, 5.05),
