@@ -2,107 +2,144 @@ import boltzpy as bp
 import numpy as np
 import matplotlib as mpl
 import matplotlib.pyplot as plt
-from matplotlib import colors
 from time import process_time
 import h5py
 
 
-def balance_gains(homogeneous_rule,
-                  grp,
-                  gain_ratios,
-                  verbose=False,
-                  update_collision_matrix=True):
-    assert isinstance(homogeneous_rule, bp.HomogeneousRule)
-    r = homogeneous_rule
-    ncols = sum([v.shape[0] for v in grp.values()])
-    assert ncols == r.ncols
-    assert isinstance(gain_ratios, dict)
-    assert set(grp.keys()) == set(gain_ratios.keys())
-    # normalize gain_ratios to retain original total gain
-    norm = r.cmp_number_density(r.gain_array())
-    norm /= np.sum(list(gain_ratios.values()))
-    # compute max sring length of keys for printing
-    maxlen = max([len(str(k)) for k in grp.keys()])
-    # Compute and apply weight adjustment factors:
-    factors = dict()
-    for key, rels in grp.items():
-        gain_array = r.gain_array(grp[key])
-        gain = r.cmp_number_density(gain_array)
-        # apply normalized weight adjustment factor
-        factors[key] = gain_ratios[key] * norm / gain
-        r.collision_weights[rels] *= factors[key]
-        if verbose:
-            # print key  : factor aligned as a table
-            print("{0:<{1}}: ".format(str(key), maxlen), factors[key])
+class WeightAdjustment(bp.HomogeneousRule):
+    def __init__(self, **kwargs):
+        bp.HomogeneousRule.__init__(self, **kwargs)
+        return
 
-    if update_collision_matrix:
-        r.update_collisions()
-    return factors
+    def cmp_grp_gains(self,
+                      grp_cols=None,
+                      species=None,
+                      as_array=False,
+                      resolve_spacings=False,
+                      initial_state=None):
+        if grp_cols is None:
+            k_spc = self.key_species(self.collision_relations)
+            grp_cols = self.group(k_spc)
+            del k_spc
+        if species is None:
+            species = self.species
+        species = np.array(species, ndmin=1, copy=False)
+        assert species.ndim == 1
+
+        gains = dict()
+        for key, pos in grp_cols.items():
+            gain_arr = self.gain_array(pos,
+                                       initial_state=initial_state)
+            if resolve_spacings:
+                gain_arr *= self.get_array(self.dv ** self.ndim)
+            if not as_array:
+                gains[key] = self.cmp_number_density(gain_arr,
+                                                     separately=True)
+            else:
+                gains[key] = np.empty(species.size, dtype=object)
+                for s in species:
+                    spc_gain = gain_arr[self.idx_range(s)]
+                    gains[key][s] = spc_gain.reshape(self.shapes[s])
+        return gains
+
+    def balance_gains(self,
+                      grp_cols,
+                      gain_ratios,
+                      initial_state=None,
+                      verbose=True,
+                      update_collision_matrix=True):
+        assert isinstance(gain_ratios, dict)
+        assert set(grp_cols.keys()) == set(gain_ratios.keys())
+
+        # normalize gain_ratios to retain
+        # original total number density gain
+        gains = self.cmp_grp_gains(grp_cols,
+                                   initial_state=initial_state)
+        # use total gain (not specific gain)
+        gains = {key: sum(val) for key, val in gains.items()}
+        norm = sum(gains.values())
+        norm /= sum(gain_ratios.values())
+
+        # compute max string length of keys for printing
+        maxlen = max([len(str(k)) for k in grp_cols.keys()])
+
+        # balance weights
+        factors = dict()
+        for key, pos in grp_cols.items():
+            # apply normalized weight adjustment factor
+            factors[key] = gain_ratios[key] * norm / gains[key]
+            self.collision_weights[pos] *= factors[key]
+            if verbose:
+                # print key  : factor aligned as a table
+                print("{0:<{1}}: ".format(str(key), maxlen), factors[key])
+
+        if update_collision_matrix:
+            self.update_collisions()
+        return factors
+
+    def plot_gains(self,
+                   grp_cols=None,
+                   species=None,
+                   initial_state=None,
+                   file_address=None,
+                   fig=None,
+                   figsize=None,
+                   constrained_layout=True,
+                   vmax=None):
+        assert self.ndim == 2
+        if species is None:
+            species = self.species
+        if grp_cols is None:
+            k_spc = self.key_species(self.collision_relations)
+            grp_cols = self.group(k_spc)
+            del k_spc
+        if initial_state is None:
+            initial_state = self.initial_state
+
+        if file_address is not None:
+            assert isinstance(file_address, str)
+
+        # compute all gains as array
+        gains = self.cmp_grp_gains(grp_cols,
+                                   species,
+                                   as_array=True,
+                                   resolve_spacings=True,
+                                   initial_state=initial_state)
+        if vmax is None:
+            vmax = max(max(np.max(gains[k][s])
+                           for s in species)
+                       for k in gains.keys()
+                       )
+
+        # create Figure, with subfigures
+        if fig is None:
+            fig = plt.figure(figsize=figsize,
+                             constrained_layout=constrained_layout)
+        else:
+            assert isinstance(fig, mpl.figure.Figure)
+        subfigs = fig.subfigures(nrows=len(grp_cols.keys()),
+                                 ncols=1)
+        if not isinstance(subfigs, np.ndarray):
+            subfigs = [subfigs]
+        for k, key in enumerate(grp_cols.keys()):
+            axes = subfigs[k].subplots(nrows=1, ncols=len(species))
+            for s in species:
+                axes[s].imshow(gains[key][s],
+                               cmap='coolwarm',
+                               interpolation="quadric",
+                               origin="lower",
+                               vmin=-vmax,
+                               vmax=vmax)
+                axes[s].set_xticks([])
+                axes[s].set_yticks([])
+        if file_address is not None:
+            plt.savefig(file_address)
+        else:
+            plt.show()
+        return
 
 
-def plot_gains(self,
-               species=None,
-               grp=None,
-               file_address=None,
-               fig=None,
-               figsize=None,
-               constrained_layout=True,
-               vmax=None):
-    assert isinstance(self, bp.HomogeneousRule)
-    if species is None:
-        species = self.species
-
-    if grp is None:
-        k_spc = self.key_species(self.collision_relations)
-        k_et = self.key_energy_transfer(self.collision_relations)
-        grp = self.group((k_spc, k_et))
-        del k_spc, k_et
-
-    if file_address is not None:
-        assert isinstance(file_address, str)
-
-    # compute all gains
-    gains = np.empty((len(grp.keys()), len(species)),
-                     dtype=object)
-    for k, (key, cols) in enumerate(grp.items()):
-        gain_arr = self.gain_array(cols)
-        gain_arr *= self.get_array(self.dv)
-        for s in species:
-            gains[k, s] = gain_arr[self.idx_range(s)]
-            gains[k, s] = gains[k, s].reshape(self.shapes[s])
-    if vmax is None:
-        vmax = max(max(np.max(gains[k,s]) for s in species)
-                   for k in range(len(grp.keys())))
-
-    # create Figure, with subfigures
-    if fig is None:
-        fig = plt.figure(figsize=figsize,
-                         constrained_layout=constrained_layout)
-    else:
-        assert isinstance(fig, mpl.figure.Figure)
-    subfigs = fig.subfigures(nrows=len(grp.keys()),
-                             ncols=1)
-    if not isinstance(subfigs, np.ndarray):
-        subfigs = [subfigs]
-    for k, key in enumerate(grp.keys()):
-        axes = subfigs[k].subplots(nrows=1, ncols=len(species))
-        for s in species:
-            axes[s].imshow(gains[k, s],
-                           cmap='coolwarm',
-                           interpolation="quadric",
-                           origin="lower",
-                           vmin=-vmax,
-                           vmax=vmax)
-            axes[s].set_xticks([])
-            axes[s].set_yticks([])
-    if file_address is not None:
-        plt.savefig(file_address)
-    else:
-        plt.show()
-    return
-
-
-class AngularWeightAdjustment(bp.HomogeneousRule):
+class AngularWeightAdjustment(WeightAdjustment):
     def __init__(self,
                  rule,
                  dt,
@@ -112,7 +149,7 @@ class AngularWeightAdjustment(bp.HomogeneousRule):
                  hdf5_log=None,
                  max_iterations=100000):
         assert isinstance(rule, bp.HomogeneousRule)
-        bp.HomogeneousRule.__init__(self, **rule.__dict__)
+        WeightAdjustment.__init__(self, **rule.__dict__)
         self.rule = rule
         # time step for computation
         assert dt > 0
