@@ -580,6 +580,31 @@ class HomogeneousRule(BaseRule, bp.CollisionModel):
                 "to compensate the source term!".format(i))
         raise ValueError("No equilibrium established")
 
+    #################################
+    #    Compute Folw Parameters    #
+    #################################
+    def cmp_viscosity(self,
+                      dt,
+                      maxiter=100000,
+                      directions=None,
+                      normalize=True,
+                      hdf5_group=None):
+        # Viscosities are always computed for centered maxwellians
+        mean_vel = np.zeros(self.ndim)
+        mom_func = self.mf_stress(mean_vel, directions, orthogonalize=True)
+        # set up source term
+        self.source_term = mom_func * self.initial_state
+        # check, that source term is orthogonal on all moments
+        self.check_integrity()
+        # compute viscosity
+        assert dt > 0 and maxiter > 0
+        inverse_source_term = self.compute(dt, maxiter=maxiter, hdf5_group=hdf5_group)
+        viscosity = np.sum(inverse_source_term[-1] * mom_func)
+
+        if normalize:
+            viscosity = viscosity / np.sum(mom_func**2 * self.initial_state)
+        return viscosity
+
     def check_integrity(self):
         BaseRule.check_integrity(self)
         bp.CollisionModel.check_integrity(self)

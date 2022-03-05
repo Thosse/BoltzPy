@@ -407,6 +407,18 @@ class CollisionModel(bp.BaseModel):
         keys.resize((relations.shape[0], np.prod(keys.shape[1:])))
         return keys
 
+    def key_simplified_angle(self, relations):
+        key_spc = self.key_species(relations)[:, 1:3]
+        key_angles = self.key_angle(relations)
+        simp_angles = key_angles[:, 0:self.ndim]
+
+        # for intraspecies collisions in 3D models
+        # we must add length and height vectors
+        if self.ndim == 3:
+            is_intra = key_spc[:, 0] == key_spc[:, 1]
+            simp_angles[is_intra] += key_angles[is_intra, self.ndim:]
+        return simp_angles
+
     def key_energy_transfer(self, relations, as_bool=True):
         assert relations.ndim == 2
         # find interspecies collisions
@@ -1078,14 +1090,14 @@ class CollisionModel(bp.BaseModel):
     #####################################
     #           Coefficients            #
     #####################################
-    def cmp_viscosity(self,
-                      number_densities,
-                      temperature,
-                      dt,
-                      maxiter=100000,
-                      directions=None,
-                      normalize=True,
-                      hdf5_group=None):
+    def _cmp_viscosity(self,
+                       number_densities,
+                       temperature,
+                       dt,
+                       maxiter=100000,
+                       directions=None,
+                       normalize=True,
+                       hdf5_group=None):
         # Maxwellian must be centered in 0,
         # since this computation relies heavily on symmetry,
         mean_velocities = np.zeros((self.nspc, self.ndim))
