@@ -82,7 +82,9 @@ def plot_gains(self,
         assert isinstance(fig, mpl.figure.Figure)
     subfigs = fig.subfigures(nrows=len(grp.keys()),
                              ncols=1)
-    for k, (key, cols) in enumerate(grp.items()):
+    if not isinstance(subfigs, np.ndarray):
+        subfigs = [subfigs]
+    for k, key in enumerate(grp.keys()):
         axes = subfigs[k].subplots(nrows=1, ncols=len(species))
         for s in species:
             axes[s].imshow(gains[k, s],
@@ -157,7 +159,7 @@ class AngularWeightAdjustment(bp.HomogeneousRule):
         self.collision_weights = np.copy(self.collision_weights)
         self.update_collisions()
         # group collisions based on simpülified angles
-        simplified_angles = self.key_simplified_angle(self.collision_relations)
+        simplified_angles = self.key_simplified_angle(normalize=True)
         # project simplified_angles to convex hull of reference angles
         simplified_angles /= simplified_angles[:, -1, None]
         # Base transfer simplified angles
@@ -166,7 +168,7 @@ class AngularWeightAdjustment(bp.HomogeneousRule):
         simplified_angles = np.einsum("ij, kj -> ki",
                                       _abt_mat,
                                       simplified_angles,)
-        self.grp = self.group(simplified_angles)
+        self.grp_angles = self.group(simplified_angles)
         # compute intitial state and fill log entries
         self.bisect(initial_weights[0], [np.inf, np.inf])
         self.bisect(initial_weights[1])
@@ -184,7 +186,7 @@ class AngularWeightAdjustment(bp.HomogeneousRule):
     def reference_angles(self):
         ref_angle_mat = np.array([[1, 0, 0],
                                   [1, 1, 0],
-                                  [0, 0, 1]])
+                                  [1, 1, 1]])
         if self.ndim == 3:
             return ref_angle_mat
         if self.ndim == 2:
@@ -240,7 +242,7 @@ class AngularWeightAdjustment(bp.HomogeneousRule):
             self.log[key].resize(shape)
         return
 
-    def execute(self, rtol=1e-3, verbose=False, apply_to_rule=True):
+    def execute(self, rtol=1e-2, verbose=True, apply_to_rule=True):
         if verbose:
             print("Apply Angular Weight Adjustment")
         tic = process_time()
@@ -260,7 +262,7 @@ class AngularWeightAdjustment(bp.HomogeneousRule):
         self.resize_log()
 
         if apply_to_rule:
-            cc= self.log["collision_choice"][()]
+            cc = self.log["collision_choice"][()]
             self.rule.collision_weights[cc] = self.collision_weights
         return
 
@@ -294,7 +296,7 @@ class AngularWeightAdjustment(bp.HomogeneousRule):
         reference_weights = np.ones(self.ndim)
         reference_weights[self.ref_idx] = weight_coefficient
         # apply reference weight to collision groups
-        for key, pos in self.grp.items():
+        for key, pos in self.grp_angles.items():
             # interpolate weights based on reference angles
             factor = np.dot(key, reference_weights)
             self.collision_weights[pos] *= factor
