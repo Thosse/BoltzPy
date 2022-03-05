@@ -108,44 +108,29 @@ class AngularWeightAdjustment(bp.HomogeneousRule):
                  dt,
                  collision_choice=None,
                  initial_weights=(0.2, 4.0),
-                 adjusted_reference_angle=None,
+                 ref_angle_idx=None,
                  hdf5_log=None,
-                 maxiter=100000):
+                 max_iterations=100000):
         assert isinstance(rule, bp.HomogeneousRule)
         bp.HomogeneousRule.__init__(self, **rule.__dict__)
         self.rule = rule
+        # time step for computation
         assert dt > 0
         self.dt = dt
+        # log file for bisection history
         if hdf5_log is None:
             self.log = h5py.File(bp.SIMULATION_DIR + "/_tmp_data.hdf5",
                                  mode="w")
         else:
             assert type(hdf5_log) in [h5py.Group, h5py.File]
-        # store original collisions in log
-        self.log["all_orignal_relations"] = self.collision_relations
-        self.log["all_orignal_weights"] = self.collision_weights
-        # log bisection parameters in h5py arrays
-        # all visited weights
-        self.weights = self.log.create_dataset(
-            "weights",
-            shape=maxiter,
-            maxshape=(maxiter,))
-        # directional viscosities for each weight
-        self.viscosities = self.log.create_dataset(
-            "viscosities",
-            shape=(maxiter, 2),
-            maxshape=(maxiter, 2))
-        # the lower and upper bounds at each bisection step
-        self.bounds = self.log.create_dataset(
-            "bounds",
-            shape=(maxiter, 2),
-            maxshape=(maxiter, 2))
-        # last computed iteration step
+        self.setup_log(max_iterations)
+        # index to point at current iteration
         self.iter = 0
-        if adjusted_reference_angle is None:
-            adjusted_reference_angle = self.ndim - 1
-        assert adjusted_reference_angle in range(self.ndim)
-        self.ref_idx = adjusted_reference_angle
+        # index of the reference angle for the bisection
+        if ref_angle_idx is None:
+            ref_angle_idx = self.ndim - 1
+        assert ref_angle_idx in range(self.ndim)
+        self.ref_angle_idx = ref_angle_idx
 
         # choose collisions
         if collision_choice is None:
@@ -203,6 +188,48 @@ class AngularWeightAdjustment(bp.HomogeneousRule):
         assert np.allclose(abt_mat, int_abt_mat)
         return int_abt_mat
 
+    # Log Entries
+    def setup_log(self, max_iterations):
+        # store original collisions in log
+        self.log["all_orignal_relations"] = self.collision_relations
+        self.log["all_orignal_weights"] = self.collision_weights
+        # log bisection parameters in h5py arrays
+        # all visited weights
+        self.log.create_dataset(
+            "weights",
+            shape=max_iterations,
+            maxshape=(max_iterations,))
+        # directional viscosities for each weight
+        self.log.create_dataset(
+            "viscosities",
+            shape=(max_iterations, 2),
+            maxshape=(max_iterations, 2))
+        # the lower and upper bounds at each bisection step
+        self.log.create_dataset(
+            "bounds",
+            shape=(max_iterations, 2),
+            maxshape=(max_iterations, 2))
+        return
+
+    def resize_log(self):
+        for key in ["weights", "viscosities", "bounds"]:
+            shape = list(self.log[key].shape)
+            shape[0] = self.iter
+            self.log[key].resize(shape)
+        return
+
+    @property
+    def weights(self):
+        return self.log["weights"]
+
+    @property
+    def viscosities(self):
+        return self.log["viscosities"]
+
+    @property
+    def bounds(self):
+        return self.log["bounds"]
+
     def rel_errors(self, idx=None):
         if idx is None:
             idx = np.s_[:, :, :]
@@ -234,13 +261,6 @@ class AngularWeightAdjustment(bp.HomogeneousRule):
     @property
     def cur_weight(self):
         return self.weights[self.iter]
-
-    def resize_log(self):
-        for key in ["weights", "viscosities", "bounds"]:
-            shape = list(self.log[key].shape)
-            shape[0] = self.iter
-            self.log[key].resize(shape)
-        return
 
     def execute(self, rtol=1e-2, verbose=True, apply_to_rule=True):
         if verbose:
@@ -294,7 +314,7 @@ class AngularWeightAdjustment(bp.HomogeneousRule):
         self.collision_weights = self.original_weights
         # set up weights of reference angles
         reference_weights = np.ones(self.ndim)
-        reference_weights[self.ref_idx] = weight_coefficient
+        reference_weights[self.ref_angle_idx] = weight_coefficient
         # apply reference weight to collision groups
         for key, pos in self.grp_angles.items():
             # interpolate weights based on reference angles
