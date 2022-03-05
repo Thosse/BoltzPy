@@ -227,20 +227,24 @@ class CollisionModel(bp.BaseModel):
         such that each relations indices are in ascending"""
         return np.sort(relations, axis=-1)
 
-    def key_species(self, relations):
+    def key_species(self, relations=None):
         """"Determines the species involved in each collision.
         Returns the sorted species."""
+        if relations is None:
+            relations = self.collision_relations
         species = self.get_spc(relations)
         return np.sort(species, axis=-1)
 
-    def key_shape(self, relations, use_norm=False):
+    def key_shape(self, relations=None, use_norm=False):
         """"Describes the geometric shape of the collision trapezoid.
 
-        Keep squares of width an height, as the root is slow and no integer."""
+        Keep squares of width an height, as the root is slow and no integer.
+        """
+        if relations is None:
+            relations = self.collision_relations
         # 3D models require two angles: length and height
         # in 2D models both angles are always equal
         # thus the second angle is omitted
-
         keys = np.empty((relations.shape[0], 2, self.ndim),
                         dtype=int)
 
@@ -285,10 +289,12 @@ class CollisionModel(bp.BaseModel):
             keys.resize((relations.shape[0], np.prod(keys.shape[1:])))
         return keys
 
-    def key_center_of_gravity(self, relations, use_norm=False):
+    def key_center_of_gravity(self, relations=None, use_norm=False):
         """"Computes the center of gravity, except for the division by the masses.
         For a key function and fix masses it is equivalent to the center of gravity.
         """
+        if relations is None:
+            relations = self.collision_relations
         # get colvels for center of gravity
         colvels = self.i_vels[relations[:, ::2]]
         # get masses for center of gravity
@@ -301,7 +307,7 @@ class CollisionModel(bp.BaseModel):
         else:
             return np.sort(np.abs(cog), axis=1)
 
-    def key_orbit(self, relations, reduce=True):
+    def key_orbit(self, relations=None, reduce=True):
         """"Determines an unique id for the collisions orbit.
 
         The algorithm
@@ -311,7 +317,8 @@ class CollisionModel(bp.BaseModel):
         """
         # currently, this algorithm only works in square/cubic grids
         assert self.is_cubic_grid
-
+        if relations is None:
+            relations = self.collision_relations
         # 1. compute the orbits of all collisions as colliding velocities
         # get colliding velocities from indices
         colvels = self.i_vels[relations]
@@ -341,7 +348,9 @@ class CollisionModel(bp.BaseModel):
         else:
             return keys
 
-    def key_area(self, relations):
+    def key_area(self, relations=None):
+        if relations is None:
+            relations = self.collision_relations
         (v0, v1, w0, w1) = self.i_vels[relations.transpose()]
         # in 2D cross returns only the z component -> use absolute
         result = np.zeros(relations.shape[:-1] + (2,), dtype=float)
@@ -361,7 +370,9 @@ class CollisionModel(bp.BaseModel):
                           + 2 * np.linalg.norm(v0 - w1, axis=-1))
         return result
 
-    def key_angle(self, relations):
+    def key_angle(self, relations=None):
+        if relations is None:
+            relations = self.collision_relations
         # 3D models require two angles: length and height
         # in 2D models both angles are always equal
         # thus the second angle is omitted
@@ -407,9 +418,14 @@ class CollisionModel(bp.BaseModel):
         keys.resize((relations.shape[0], np.prod(keys.shape[1:])))
         return keys
 
-    def key_simplified_angle(self, relations, dtype=float):
+    def key_simplified_angle(self,
+                             relations=None,
+                             normalize=False):
+        if relations is None:
+            relations = self.collision_relations
         key_spc = self.key_species(relations)[:, 1:3]
         key_angles = self.key_angle(relations)
+        dtype = float if normalize else int
         simp_angles = np.empty((relations.shape[0], self.ndim),
                                dtype=dtype)
         simp_angles[...] = key_angles[:, 0:self.ndim]
@@ -419,9 +435,14 @@ class CollisionModel(bp.BaseModel):
         if self.ndim == 3:
             is_intra = key_spc[:, 0] == key_spc[:, 1]
             simp_angles[is_intra] += key_angles[is_intra, self.ndim:]
+        if normalize:
+            # must add None (add dimension) to get a 2d array again
+            simp_angles /= simp_angles[:, -1, None]
         return simp_angles
 
-    def key_energy_transfer(self, relations, as_bool=True):
+    def key_energy_transfer(self, relations=None, as_bool=True):
+        if relations is None:
+            relations = self.collision_relations
         assert relations.ndim == 2
         # find interspecies collisions
         key_spc = self.key_species(relations)[:, 1:3]
@@ -441,7 +462,9 @@ class CollisionModel(bp.BaseModel):
             )
             return energy_transfer
 
-    def key_is_normality_collision(self, relations, group_by="shape"):
+    def key_is_normality_collision(self,
+                                   relations=None,
+                                   group_by="shape"):
         """Returns 1, for all collisions required for normality (based on shape).
 
         The collisions required for normality are
@@ -455,6 +478,8 @@ class CollisionModel(bp.BaseModel):
             Allows to mark more general groups, like "angles"
             as required for normality.
         """
+        if relations is None:
+            relations = self.collision_relations
         assert relations.ndim == 2
         is_normality_collision = np.zeros((relations.shape[0], 1),
                                           dtype=int)
