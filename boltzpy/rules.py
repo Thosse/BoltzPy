@@ -521,7 +521,7 @@ class HomogeneousRule(BaseRule, bp.CollisionModel):
             relation_set = slice(None)
         if initial_state is None:
             initial_state = self.initial_state
-        assert initial_state.shape == (self.nvels)
+        assert initial_state.shape == (self.nvels,)
         relations = self.collision_relations[relation_set]
         colvels = initial_state[relations]
         gain_term = np.prod(colvels[:, [0, 2]], axis=-1)

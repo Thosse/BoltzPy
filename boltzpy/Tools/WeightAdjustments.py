@@ -7,8 +7,8 @@ import h5py
 
 
 class WeightAdjustment(bp.HomogeneousRule):
-    def __init__(self, **kwargs):
-        bp.HomogeneousRule.__init__(self, **kwargs)
+    def __init__(self, **rule_params):
+        bp.HomogeneousRule.__init__(self, **rule_params)
         return
 
     def cmp_grp_gains(self,
@@ -141,68 +141,45 @@ class WeightAdjustment(bp.HomogeneousRule):
 
 class AngularWeightAdjustment(WeightAdjustment):
     def __init__(self,
-                 rule,
-                 dt,
-                 collision_choice=None,
-                 initial_weights=(0.2, 4.0),
-                 ref_angle_idx=None,
                  hdf5_log=None,
-                 max_iterations=100000):
-        assert isinstance(rule, bp.HomogeneousRule)
-        WeightAdjustment.__init__(self, **rule.__dict__)
-        self.rule = rule
-        # time step for computation
-        assert dt > 0
-        self.dt = dt
+                 **rule_params):
+        WeightAdjustment.__init__(self, **rule_params)
+        # keep track of important simulation parameters
+        # is properly initialized in each execution
+        self.cur_rels_used = np.empty((0,), dtype=int)
+        self.cur_rels_adj = np.empty((0,), dtype=int)
+        self.cur_grp = dict()
+        self.cur_dt = np.inf
+        self.cur_adjustment = -1
+        self.cur_iter = -1
+        self.cur_ref_angle = -1
+
         # log file for bisection history
         if hdf5_log is None:
             self.log = h5py.File(bp.SIMULATION_DIR + "/_tmp_data.hdf5",
                                  mode="w")
         else:
             assert type(hdf5_log) in [h5py.Group, h5py.File]
-        self.setup_log(max_iterations)
-        # index to point at current iteration
-        self.iter = 0
-        # index of the reference angle for the bisection
-        if ref_angle_idx is None:
-            ref_angle_idx = self.ndim - 1
-        assert ref_angle_idx in range(self.ndim)
-        self.ref_angle_idx = ref_angle_idx
+        # store original collisions in h5py log
+        self.log["orignal_relations"] = self.collision_relations
+        self.log["orignal_weights"] = self.collision_weights
+        self.log["adjusted_weights"] = self.collision_weights
 
-        # choose collisions
-        if collision_choice is None:
-            collision_choice = np.arange(self.ncols)
-        self.log["collision_choice"] = collision_choice
-        # use only the specifies subset of collisions
-        self.collision_relations = self.collision_relations[collision_choice]
-        self.collision_weights = self.collision_weights[collision_choice]
-        # dont work directly on the collisions of rule
-        self.collision_relations = np.copy(self.collision_relations)
-        self.collision_weights = np.copy(self.collision_weights)
-        self.update_collisions()
-        # group collisions based on simpülified angles
-        simplified_angles = self.key_simplified_angle(normalize=True)
-        # project simplified_angles to convex hull of reference angles
-        simplified_angles /= simplified_angles[:, -1, None]
-        # Base transfer simplified angles
-        # into multiples of the Reference-Angle
-        _abt_mat = self.angle_base_transfer_matrix
-        simplified_angles = np.einsum("ij, kj -> ki",
-                                      _abt_mat,
-                                      simplified_angles,)
-        self.grp_angles = self.group(simplified_angles)
-        # compute intitial state and fill log entries
-        self.bisect(initial_weights[0], [np.inf, np.inf])
-        self.bisect(initial_weights[1])
-        if np.any(self.bounds[self.iter] == np.inf):
-            print("Bad Inital Values with change of sign")
-        assert self.iter == 2
         return
 
     @property
-    def original_weights(self):
-        choice = self.log["collision_choice"][()]
-        return self.log["all_orignal_weights"][choice]
+    def cur_unused_cols(self):
+        unused = np.array([i for i in range(self.ncols)
+                           if i not in self.cur_cols_used],
+                          dtype=int)
+        return unused
+
+    @property
+    def cur_unadj_cols(self):
+        unused = np.array([i for i in range(self.ncols)
+                           if i not in self.cur_cols_adj],
+                          dtype=int)
+        return unused
 
     @property
     def reference_angles(self):
@@ -218,65 +195,123 @@ class AngularWeightAdjustment(WeightAdjustment):
 
     @property
     def angle_base_transfer_matrix(self):
-        # Base transfer simplified angles
-        # into multiples of the Reference-Angle
+        # Base transfer for simplified angles
+        # Convert into multiples of the Reference-Angles
         abt_mat = np.linalg.inv(self.reference_angles)
         int_abt_mat = np.array(abt_mat, dtype=int)
         assert np.allclose(abt_mat, int_abt_mat)
         return int_abt_mat
 
-    # Log Entries
-    def setup_log(self, max_iterations):
-        # store original collisions in log
-        self.log["all_orignal_relations"] = self.collision_relations
-        self.log["all_orignal_weights"] = self.collision_weights
+    #################################
+    #       Log Related Members     #
+    #################################
+    @property
+    def cur_log(self):
+        return self.log[str(self.cur_adjustment)]
+
+    def _init_adjustment(self,
+                         dt,
+                         cols_adj=None,
+                         cols_used=None,
+                         initial_weights=(0.2, 4.0),
+                         maxiter=100000,
+                         ref_angle_idx=-1):
+        self.cur_adjustment += 1
+        self.cur_iter = -1
+        assert dt > 0
+        self.cur_dt = dt
+
         # log bisection parameters in h5py arrays
-        # all visited weights
-        self.log.create_dataset(
+        # to allow posterior investigations
+        self.log.create_group(str(self.cur_adjustment))
+
+        # by default use and adjust all collisions
+        if cols_adj is None:
+            cols_adj = np.arange(self.ncols)
+        self.cur_cols_adj = cols_adj
+        self.cur_log["cols_adj"] = self.cur_cols_adj
+        if cols_used is None:
+            cols_used = np.arange(self.ncols)
+        self.cur_cols_used = cols_used
+        self.cur_log["cols_used"] = self.cur_cols_used
+        # apply collision choice
+        self.collision_weights = self.log["adjusted_weights"][()]
+        self.collision_weights[self.cur_unused_cols] = 0
+        # log weights (adjusted ones are edited after execution)
+        self.cur_log["original_weights"] = self.collision_weights
+        self.cur_log["adjusted_weights"] = self.collision_weights
+        # group to be adjusted collisions
+        self.cur_grp = self._cmp_grp_angles()
+        self.ref_angle_idx = ref_angle_idx
+
+        # log all visited weights
+        self.cur_log.create_dataset(
             "weights",
-            shape=max_iterations,
-            maxshape=(max_iterations,))
+            shape=maxiter,
+            maxshape=(maxiter,))
+        self.cur_log["weights"][0:2] = initial_weights
         # directional viscosities for each weight
-        self.log.create_dataset(
+        self.cur_log.create_dataset(
             "viscosities",
-            shape=(max_iterations, 2),
-            maxshape=(max_iterations, 2))
+            shape=(maxiter, 2),
+            maxshape=(maxiter, 2))
         # the lower and upper bounds at each bisection step
-        self.log.create_dataset(
+        self.cur_log.create_dataset(
             "bounds",
-            shape=(max_iterations, 2),
-            maxshape=(max_iterations, 2))
+            shape=(maxiter, 2),
+            maxshape=(maxiter, 2))
         return
 
-    def resize_log(self):
+    def log_results(self):
         for key in ["weights", "viscosities", "bounds"]:
-            shape = list(self.log[key].shape)
-            shape[0] = self.iter
-            self.log[key].resize(shape)
+            shape = list(self.cur_log[key].shape)
+            shape[0] = self.cur_iter + 1
+            self.cur_log[key].resize(shape)
+        adj_weights = self.collision_weights[self.cur_cols_adj]
+        self.cur_log["adjusted_weights"][self.cur_cols_adj] = adj_weights
+        self.log["adjusted_weights"][self.cur_cols_adj] = adj_weights
         return
 
     @property
-    def weights(self):
-        return self.log["weights"]
+    def original_collisions(self):
+        return self.log["original_collisions"]
+
+    def original_weights(self, adjustment_idx):
+        if adjustment_idx == -1:
+            return self.log["original_weights"][()]
+        else:
+            sub_log = self.log[str(adjustment_idx)]
+            return sub_log["original_weights"][()]
+
+    def adjusted_weights(self, adjustment_idx):
+        if adjustment_idx == -1:
+            return self.log["adjusted_weights"]
+        else:
+            sub_log = self.log[str(adjustment_idx)]
+            return sub_log["adjusted_weights"]
 
     @property
-    def viscosities(self):
-        return self.log["viscosities"]
+    def cur_weights(self):
+        return self.cur_log["weights"]
 
     @property
-    def bounds(self):
-        return self.log["bounds"]
+    def cur_viscs(self):
+        return self.cur_log["viscosities"]
+
+    @property
+    def cur_bounds(self):
+        return self.cur_log["bounds"]
 
     def rel_errors(self, idx=None):
         if idx is None:
             idx = np.s_[:, :, :]
-        visc = self.log["viscosities"][idx]
+        visc = self.cur_log["viscosities"][idx]
         return np.max(visc, axis=-1) / np.min(visc, axis=-1) - 1
 
     def abs_errors(self, idx=None, absolute=True):
         if idx is None:
             idx = np.s_[:, :, :]
-        visc = self.log["viscosities"][idx]
+        visc = self.cur_log["viscosities"][idx]
         diff = visc[..., 1] - visc[..., 0]
         if absolute:
             return np.abs(diff)
@@ -285,62 +320,98 @@ class AngularWeightAdjustment(WeightAdjustment):
 
     @property
     def cur_rel_err(self):
-        return self.rel_errors(self.iter)
+        return self.rel_errors(self.cur_iter)
 
     @property
     def cur_diff(self):
-        return self.abs_errors(self.iter, absolute=False)
+        return self.abs_errors(self.cur_iter, absolute=False)
 
     @property
     def cur_abs_err(self):
-        return self.abs_errors(self.iter)
+        return self.abs_errors(self.cur_iter)
 
     @property
     def cur_weight(self):
-        return self.weights[self.iter]
+        return self.cur_weights[self.cur_iter]
 
-    def execute(self, rtol=1e-2, verbose=True, apply_to_rule=True):
+    def _cmp_grp_angles(self):
+        simplified_angles = self.key_simplified_angle(normalize=True)
+        # Base transfer simplified angles
+        # into multiples of the Reference-Angle
+        _abt_mat = self.angle_base_transfer_matrix
+        simplified_angles = np.einsum("ij, kj -> ki",
+                                      _abt_mat,
+                                      simplified_angles,)
+        # ignoew used but unadjusted collisions
+        ign = self.cur_unadj_cols
+        simplified_angles[ign] = -1
+        grp_angles = self.group(simplified_angles)
+        ign_key = (-1,) * self.ndim
+        if ign_key in grp_angles.keys():
+            del grp_angles[ign_key]
+        return grp_angles
+
+    def execute(self,
+                dt,
+                cols_adj=None,
+                cols_used=None,
+                initial_weights=(0.2, 4.0),
+                maxiter=100000,
+                ref_angle_idx=-1,
+                rtol=1e-2,
+                verbose=True):
         if verbose:
-            print("Apply Angular Weight Adjustment")
+            print("Initialize Adjustment Parameters and Log-File")
+        self._init_adjustment(dt, cols_adj, cols_used,
+                              initial_weights, maxiter,
+                              ref_angle_idx)
+
+        if verbose:
+            print("Compute Initial Viscosities as Upper/Lower Bounds")
+        assert self.cur_iter == -1
+        self.bisect(self.cur_weights[0], [np.inf, np.inf])
+        self.bisect(self.cur_weights[1])
+        if np.any(self.cur_bounds[self.cur_iter] == np.inf):
+            raise ValueError("Bad Inital Values with no change of sign")
+        assert self.cur_iter == 1
+
+        if verbose:
+            print("Execute Bisection Algorithm")
         tic = process_time()
         while self.cur_rel_err > rtol:
+            self.bisect()
             if verbose:
                 print("\ri = %6d"
                       "  -  w = %0.6e "
                       "  -  err = %0.3e"
-                      % (self.iter, self.cur_weight, self.cur_rel_err),
+                      % (self.cur_iter, self.cur_weight, self.cur_rel_err),
                       end="",
                       flush=True)
-            self.bisect()
         toc = process_time()
         if verbose:
             print("\nTime taken: %0.3f seconds" % (toc - tic))
 
-        self.resize_log()
-
-        if apply_to_rule:
-            cc = self.log["collision_choice"][()]
-            self.rule.collision_weights[cc] = self.collision_weights
+        self.log_results()
         return
 
     def bisect(self, new_weight=None, new_bounds=None):
         if new_weight is None:
-            new_weight = np.sum(self.bounds[self.iter]) / 2
+            new_weight = np.sum(self.cur_bounds[self.cur_iter]) / 2
         # fill new iterations lof entries
-        self.iter += 1
-        self.weights[self.iter] = new_weight
+        self.cur_iter += 1
+        self.cur_weights[self.cur_iter] = new_weight
         self.simplified_angular_weight_adjustment(new_weight)
         new_visc = self.get_viscosities()
-        self.viscosities[self.iter] = new_visc
+        self.cur_viscs[self.cur_iter] = new_visc
 
         if new_bounds is None:
-            new_bounds = self.bounds[self.iter - 1]
+            new_bounds = self.cur_bounds[self.cur_iter - 1]
         assert len(new_bounds) == 2
         if self.cur_diff < 0:
             new_bounds[0] = new_weight
         else:
             new_bounds[1] = new_weight
-        self.bounds[self.iter] = new_bounds
+        self.cur_bounds[self.cur_iter] = new_bounds
         self.log.flush()
         return
 
@@ -348,12 +419,12 @@ class AngularWeightAdjustment(WeightAdjustment):
                                              weight_coefficient,
                                              update_collision_matrix=True):
         # reset collision weights
-        self.collision_weights = self.original_weights
+        self.collision_weights[:] = self.original_weights(self.cur_adjustment)
         # set up weights of reference angles
         reference_weights = np.ones(self.ndim)
         reference_weights[self.ref_angle_idx] = weight_coefficient
         # apply reference weight to collision groups
-        for key, pos in self.grp_angles.items():
+        for key, pos in self.cur_grp.items():
             # interpolate weights based on reference angles
             factor = np.dot(key, reference_weights)
             self.collision_weights[pos] *= factor
@@ -371,6 +442,6 @@ class AngularWeightAdjustment(WeightAdjustment):
             raise AttributeError
         return [self.cmp_viscosity(
                     directions=angle_pair,
-                    dt=self.dt,
+                    dt=self.cur_dt,
                     normalize=normalize)
                 for angle_pair in directions]
