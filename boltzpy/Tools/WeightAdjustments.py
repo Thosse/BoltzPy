@@ -164,6 +164,7 @@ class AngularWeightAdjustment(WeightAdjustment):
         self.log["orignal_relations"] = self.collision_relations
         self.log["orignal_weights"] = self.collision_weights
         self.log["adjusted_weights"] = self.collision_weights
+        self.log["initial_state"] = self.initial_state
 
         return
 
@@ -213,6 +214,7 @@ class AngularWeightAdjustment(WeightAdjustment):
                          dt,
                          cols_adj=None,
                          cols_used=None,
+                         species_used=None,
                          initial_weights=(0.2, 4.0),
                          maxiter=100000,
                          ref_angle_idx=-1):
@@ -243,6 +245,16 @@ class AngularWeightAdjustment(WeightAdjustment):
         # group to be adjusted collisions
         self.cur_grp = self._cmp_grp_angles()
         self.ref_angle_idx = ref_angle_idx
+
+        # remove unused species from initial state
+        if species_used is None:
+            species_used = self.species
+        self.cur_log["species_used"] = species_used
+        self.initial_state[:] = 0
+        for s in species_used:
+            spc_state = self.log["initial_state"][self.idx_range(s)]
+            self.initial_state[self.idx_range(s)] = spc_state
+        self.cur_log["initial_state"] = self.initial_state
 
         # log all visited weights
         self.cur_log.create_dataset(
@@ -351,26 +363,27 @@ class AngularWeightAdjustment(WeightAdjustment):
             del grp_angles[ign_key]
         return grp_angles
 
-    def execute(self,
-                dt,
-                cols_adj=None,
-                cols_used=None,
-                initial_weights=(0.2, 4.0),
-                maxiter=100000,
-                ref_angle_idx=-1,
-                rtol=1e-2,
-                verbose=True):
+    def balance_angles(self,
+                       dt,
+                       cols_adj=None,
+                       cols_used=None,
+                       species_used=None,
+                       initial_weights=(0.2, 4.0),
+                       maxiter=100000,
+                       ref_angle_idx=-1,
+                       rtol=1e-2,
+                       verbose=True):
         if verbose:
             print("Initialize Adjustment Parameters and Log-File")
         self._init_adjustment(dt, cols_adj, cols_used,
-                              initial_weights, maxiter,
-                              ref_angle_idx)
+                              species_used, initial_weights,
+                              maxiter, ref_angle_idx)
 
         if verbose:
             print("Compute Initial Viscosities as Upper/Lower Bounds")
         assert self.cur_iter == -1
-        self.bisect(self.cur_weights[0], [np.inf, np.inf])
-        self.bisect(self.cur_weights[1])
+        self._bisection_step(self.cur_weights[0], [np.inf, np.inf])
+        self._bisection_step(self.cur_weights[1])
         if np.any(self.cur_bounds[self.cur_iter] == np.inf):
             raise ValueError("Bad Inital Values with no change of sign")
         assert self.cur_iter == 1
@@ -379,7 +392,7 @@ class AngularWeightAdjustment(WeightAdjustment):
             print("Execute Bisection Algorithm")
         tic = process_time()
         while self.cur_rel_err > rtol:
-            self.bisect()
+            self._bisection_step()
             if verbose:
                 print("\ri = %6d"
                       "  -  w = %0.6e "
@@ -394,13 +407,13 @@ class AngularWeightAdjustment(WeightAdjustment):
         self.log_results()
         return
 
-    def bisect(self, new_weight=None, new_bounds=None):
+    def _bisection_step(self, new_weight=None, new_bounds=None):
         if new_weight is None:
             new_weight = np.sum(self.cur_bounds[self.cur_iter]) / 2
         # fill new iterations lof entries
         self.cur_iter += 1
         self.cur_weights[self.cur_iter] = new_weight
-        self.simplified_angular_weight_adjustment(new_weight)
+        self._simplified_angular_weight_adjustment(new_weight)
         new_visc = self.get_viscosities()
         self.cur_viscs[self.cur_iter] = new_visc
 
@@ -415,9 +428,9 @@ class AngularWeightAdjustment(WeightAdjustment):
         self.log.flush()
         return
 
-    def simplified_angular_weight_adjustment(self,
-                                             weight_coefficient,
-                                             update_collision_matrix=True):
+    def _simplified_angular_weight_adjustment(self,
+                                              weight_coefficient,
+                                              update_collision_matrix=True):
         # reset collision weights
         self.collision_weights[:] = self.original_weights(self.cur_adjustment)
         # set up weights of reference angles

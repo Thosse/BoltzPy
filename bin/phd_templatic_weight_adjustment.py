@@ -5,18 +5,17 @@ import boltzpy as bp
 import matplotlib.pyplot as plt
 from time import process_time
 from boltzpy.Tools import GainBasedModelReduction
-from boltzpy.Tools import plot_gains
+from boltzpy.Tools import WeightAdjustment
 
 # Example: Gain based weight adjustment
 import boltzpy as bp
-from boltzpy.Tools import balance_gains
 
 # Adjust a 3-Species Mixture
 model = bp.CollisionModel(masses=[2, 3],
                           shapes=[[9, 9],
                                   [9, 9]],
                           base_delta=0.25,
-                          collision_factors=[5e3]
+                          collision_factors=[5e4]
                           )
 # Choose Mean Velocity and Temperature Parameters
 MAX_MV = 0
@@ -25,47 +24,61 @@ T = 3
 print(model.temperature_range(rtol=1e-3,
                               mean_velocity=MAX_MV))
 
-# use a homogeneous simulation
-# to compute gains based on a reference Maxwellian
-rule = bp.HomogeneousRule(
-    number_densities=np.full(model.nspc, 1),
-    mean_velocities=np.full((model.nspc, model.ndim),
-                            MAX_MV),
-    temperatures=np.full(model.nspc, T),
-    **model.__dict__)
-
-
-
-# balance gains for species and energy transfer
-col_rels = rule.collision_relations
-k_spc = rule.key_species(col_rels)[:, 1:3]
-k_et = rule.key_energy_transfer(col_rels)
-grp = rule.group((k_spc, k_et))
-
-# plot_gains(rule,
-#            grp=grp)
-
-# specify gain ratios for each group
-GAINS = {"INTRA": 1.0,
-         "ET": 1,
-         "NET": 1}
-
-# create a dictionary with the desired gain ratios
-gain_ratios = dict()
-for key in grp.keys():
-    # define s, r, and is_et
-    (s, r, is_et) = key
-    if s == r:
-        gain_ratios[key] = GAINS["INTRA"]
-    elif is_et:
-        gain_ratios[key] = GAINS["ET"]
-    else:
-        gain_ratios[key] = GAINS["NET"]
+# # use a homogeneous simulation
+# # to compute gains based on a reference Maxwellian
+# wadj = WeightAdjustment(
+#     number_densities=np.full(model.nspc, 1),
+#     mean_velocities=np.full((model.nspc, model.ndim),
+#                             MAX_MV),
+#     temperatures=np.full(model.nspc, T),
+#     **model.__dict__)
+#
+# # balance gains for species and energy transfer
+# col_rels = wadj.collision_relations
+# k_spc = wadj.key_species()[:, 1:3]
+# k_et = wadj.key_energy_transfer()
+# grp = wadj.group((k_spc, k_et))
+#
+# # specify gain ratios for each group
+# GAINS = {"INTRA": 1.0,
+#          "ET": 1,
+#          "NET": 1}
+#
+# # create a dictionary with the desired gain ratios
+# gain_ratios = dict()
+# for key in grp.keys():
+#     # define s, r, and is_et
+#     (s, r, is_et) = key
+#     if s == r:
+#         gain_ratios[key] = 1.
+#     elif is_et:
+#         gain_ratios[key] = 2
+#     else:
+#         gain_ratios[key] = 2
+#
+#
+# print(wadj.cmp_grp_gains(grp))
+# wadj.plot_gains(grp)
+#
+# wadj.balance_gains(grp, gain_ratios)
+# print(wadj.cmp_grp_gains(grp))
+# wadj.plot_gains(grp)
 
 # apply desired gain_ratios
 print("Balance Gains!")
-balance_gains(rule, grp, gain_ratios, verbose=True)
+# balance_gains(rule, grp, gain_ratios, verbose=True)
 
+# print("Rule Weights, Post Balance")
+# grp = rule.group(rule.key_species(rule.collision_relations)[:, 1:3])
+# for ss, p1 in grp.items():
+#     print("Species = ", ss)
+#     cols = rule.collision_relations[p1]
+#     grp2 = rule.group(rule.key_angle(cols))
+#     for k, p2 in grp2.items():
+#         weights = rule.collision_weights[p1][p2]
+#         print("\t", k, np.unique(weights))
+
+#
 # plot_gains(rule,
 #            grp=grp)
 
@@ -74,22 +87,50 @@ balance_gains(rule, grp, gain_ratios, verbose=True)
 #   Angular Weight Adjustment   #
 #################################
 from boltzpy.Tools import AngularWeightAdjustment
-# apply angular weight adjustment per species pair
-grp = rule.group(k_spc)
 
-rule.initial_state = rule.cmp_initial_state([1, 0])
-abwa = AngularWeightAdjustment(rule, dt=1e-7,
-                               collision_choice=grp[(0, 0)])
+abwa = AngularWeightAdjustment(
+    number_densities=np.full(model.nspc, 1),
+    mean_velocities=np.full((model.nspc, model.ndim),
+                            MAX_MV),
+    temperatures=np.full(model.nspc, T),
+    **model.__dict__)
+initial_State = np.copy(abwa.initial_state)
 
-agrp = abwa.group(abwa.key_angle(abwa.collision_relations)
-                  )
-for k, v in agrp.items():
-    print(k, abwa.collision_weights[v] / 56992.59540439)
-abwa.execute(verbose=True)
-for k, v in agrp.items():
-    print(k, abwa.collision_weights[v] / 56992.59540439)
-plot_gains(rule,
-           grp=grp)
+grp = abwa.group(abwa.key_species()[:, 1:3])
+
+for key in [(0, 0), (1, 1), (0, 1)]:
+    cols_used = grp[key] if key[0] == key[1] else None
+    abwa.balance_angles(dt=1e-7,
+                        cols_adj=grp[key],
+                        cols_used=cols_used,
+                        species_used=key)
+abwa.plot_gains()
+
+print("0 1 ")
+abwa.initial_state[:] = initial_State
+abwa.initial_state[abwa.idx_range(0)] = 0
+print(abwa.get_viscosities())
+
+print("1 0")
+abwa.initial_state[:] = initial_State
+abwa.initial_state[abwa.idx_range(1)] = 0
+print(abwa.get_viscosities())
+
+print("1 0")
+abwa.initial_state[:] = initial_State
+print(abwa.get_viscosities())
+
+# print("Abwa Weights, Post Balance")
+# grp = rule.group(rule.key_species(rule.collision_relations)[:, 1:3])
+# for ss, p1 in grp.items():
+#     print("Species = ", ss)
+#     cols = rule.collision_relations[p1]
+#     grp2 = rule.group(rule.key_angle(cols))
+#     for k, p2 in grp2.items():
+#         weights = rule.collision_weights[p1][p2]
+#         print("\t", k, np.unique(weights))
+# rule.initial_state[:] = 1.0
+
 
 
 
