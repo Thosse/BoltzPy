@@ -3,6 +3,7 @@ import numpy as np
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 from time import process_time
+from boltzpy.Tools.fonts import fs_title, fs_suptitle, fs_label
 import h5py
 
 
@@ -33,8 +34,7 @@ class WeightAdjustment(bp.HomogeneousRule):
             if resolve_spacings:
                 gain_arr *= self.get_array(self.dv ** self.ndim)
             if not as_array:
-                gains[key] = self.cmp_number_density(gain_arr,
-                                                     separately=True)
+                gains[key] = self.cmp_number_density(gain_arr)
             else:
                 gains[key] = np.empty(species.size, dtype=object)
                 for s in species:
@@ -55,8 +55,7 @@ class WeightAdjustment(bp.HomogeneousRule):
         # original total number density gain
         gains = self.cmp_grp_gains(grp_cols,
                                    initial_state=initial_state)
-        # use total gain (not specific gain)
-        gains = {key: sum(val) for key, val in gains.items()}
+        # compute normalization, to retain original total gain
         norm = sum(gains.values())
         norm /= sum(gain_ratios.values())
 
@@ -85,7 +84,12 @@ class WeightAdjustment(bp.HomogeneousRule):
                    fig=None,
                    figsize=None,
                    constrained_layout=True,
-                   vmax=None):
+                   vmax=None,
+                   titles=None,
+                   suptitle=None,
+                   ylabels=None):
+        if titles is None:
+            titles = dict()
         assert self.ndim == 2
         if species is None:
             species = self.species
@@ -99,6 +103,7 @@ class WeightAdjustment(bp.HomogeneousRule):
         if file_address is not None:
             assert isinstance(file_address, str)
 
+
         # compute all gains as array
         gains = self.cmp_grp_gains(grp_cols,
                                    species,
@@ -110,28 +115,42 @@ class WeightAdjustment(bp.HomogeneousRule):
                            for s in species)
                        for k in gains.keys()
                        )
-
+        if figsize is None:
+            width = 12.75
+            height = width / len(grp_cols.keys()) * len(species)
+            figsize = (width, height)
         # create Figure, with subfigures
         if fig is None:
             fig = plt.figure(figsize=figsize,
                              constrained_layout=constrained_layout)
         else:
             assert isinstance(fig, mpl.figure.Figure)
-        subfigs = fig.subfigures(nrows=len(grp_cols.keys()),
-                                 ncols=1)
-        if not isinstance(subfigs, np.ndarray):
-            subfigs = [subfigs]
-        for k, key in enumerate(grp_cols.keys()):
-            axes = subfigs[k].subplots(nrows=1, ncols=len(species))
-            for s in species:
-                axes[s].imshow(gains[key][s],
-                               cmap='coolwarm',
-                               interpolation="quadric",
-                               origin="lower",
-                               vmin=-vmax,
-                               vmax=vmax)
-                axes[s].set_xticks([])
-                axes[s].set_yticks([])
+        axes = fig.subplots(nrows=len(species),
+                            ncols=len(grp_cols.keys()))
+        axes = np.array(axes, ndmin=2, dtype=object)
+
+        if titles is None:
+            titles = dict()
+
+        for s in species:
+            if ylabels is not None:
+                axes[s, 0].set_ylabel(ylabels[s], fontsize=fs_label)
+            for k, key in enumerate(grp_cols.keys()):
+                ax = axes[s,k]
+                ax.imshow(gains[key][s],
+                          cmap='coolwarm',
+                          interpolation="quadric",
+                          origin="lower",
+                          vmin=-vmax,
+                          vmax=vmax)
+                ax.set_xticks([])
+                ax.set_yticks([])
+                if s == 0 and key in titles.keys():
+                    ax.set_title(titles[key], fontsize=fs_title)
+
+        if suptitle is not None:
+            fig.suptitle(suptitle, fontsize=fs_suptitle)
+
         if file_address is not None:
             plt.savefig(file_address)
         else:

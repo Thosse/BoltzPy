@@ -1,13 +1,18 @@
 import h5py
 import os
 import numpy as np
-import boltzpy as bp
+import matplotlib
+matplotlib.use('Qt5Agg')
+matplotlib.rcParams['text.usetex'] = True
+matplotlib.rcParams['text.latex.preamble'] = r'\usepackage{amsmath, amssymb}'
 import matplotlib.pyplot as plt
 from time import process_time
 from boltzpy.Tools import GainBasedModelReduction
 from boltzpy.Tools import WeightAdjustment
 
-# Example: Gain based weight adjustment
+########################
+#   Weight Balancing   #
+########################
 import boltzpy as bp
 
 # Adjust a 3-Species Mixture
@@ -17,84 +22,71 @@ model = bp.CollisionModel(masses=[2, 3],
                           base_delta=0.25,
                           collision_factors=[5e4]
                           )
+
+
 # Choose Mean Velocity and Temperature Parameters
-MAX_MV = 0
+MAX_MV = 0.5
 T = 3
 # Verify parameters with model.temp_range()
-print(model.temperature_range(rtol=1e-3,
-                              mean_velocity=MAX_MV))
+model.temperature_range(rtol=1e-3,
+                        mean_velocity=MAX_MV)
 
-# # use a homogeneous simulation
-# # to compute gains based on a reference Maxwellian
-# wadj = WeightAdjustment(
-#     number_densities=np.full(model.nspc, 1),
-#     mean_velocities=np.full((model.nspc, model.ndim),
-#                             MAX_MV),
-#     temperatures=np.full(model.nspc, T),
-#     **model.__dict__)
-#
+# balance gains for a reference Maxwellian
+# WeightAdjustment inherits from bp.HomogeneousRule
+wadj = WeightAdjustment(
+    number_densities=np.full(model.nspc, 1),
+    mean_velocities=np.zeros((model.nspc, model.ndim)),
+    temperatures=np.full(model.nspc, T),
+    **model.__dict__)
+
 # # balance gains for species and energy transfer
-# col_rels = wadj.collision_relations
-# k_spc = wadj.key_species()[:, 1:3]
-# k_et = wadj.key_energy_transfer()
-# grp = wadj.group((k_spc, k_et))
-#
-# # specify gain ratios for each group
-# GAINS = {"INTRA": 1.0,
-#          "ET": 1,
-#          "NET": 1}
-#
-# # create a dictionary with the desired gain ratios
-# gain_ratios = dict()
-# for key in grp.keys():
-#     # define s, r, and is_et
-#     (s, r, is_et) = key
-#     if s == r:
-#         gain_ratios[key] = 1.
-#     elif is_et:
-#         gain_ratios[key] = 2
-#     else:
-#         gain_ratios[key] = 2
-#
-#
-# print(wadj.cmp_grp_gains(grp))
-# wadj.plot_gains(grp)
-#
-# wadj.balance_gains(grp, gain_ratios)
-# print(wadj.cmp_grp_gains(grp))
-# wadj.plot_gains(grp)
+k_spc = wadj.key_species()[:, 1:3]
+k_et = wadj.key_energy_transfer()
+grp_spc_et = wadj.group((k_spc, k_et))
 
-# apply desired gain_ratios
-print("Balance Gains!")
-# balance_gains(rule, grp, gain_ratios, verbose=True)
+# Ignore in PHD Listings
+titles = {(0,0,0): r"Intraspecies $\mathfrak{C}^{1,1}$",
+          (1,1,0): r"Intraspecies $\mathfrak{C}^{2,2}$",
+          (0,1,0): r"ET Collisions $\mathfrak{C}^{1,2}_{ET}$",
+          (0,1,1): r"NET Collisions $\mathfrak{C}^{1,2}_{NET}$"}
+suptitle="Collision Gains Grouped by Species and Energy Transfer"
+ylabels=("Species 1", "Species 2")
 
-# print("Rule Weights, Post Balance")
-# grp = rule.group(rule.key_species(rule.collision_relations)[:, 1:3])
-# for ss, p1 in grp.items():
-#     print("Species = ", ss)
-#     cols = rule.collision_relations[p1]
-#     grp2 = rule.group(rule.key_angle(cols))
-#     for k, p2 in grp2.items():
-#         weights = rule.collision_weights[p1][p2]
-#         print("\t", k, np.unique(weights))
+# define gain ratios for each group
+gain_ratios = {key: 1.0 for key in grp_spc_et.keys()}
 
-#
-# plot_gains(rule,
-#            grp=grp)
+print("plot current gains")
+wadj.plot_gains(grp_spc_et,
+                titles=titles,
+                suptitle=suptitle,
+                ylabels=ylabels,
+                file_address=bp.SIMULATION_DIR + "/phd_weight_adj_1.pdf")
 
+print("Balance Specific Gains!")
+wadj.balance_gains(grp_spc_et, gain_ratios)
+# apply changes to original model
+model.update_collisions(model.collision_relations,
+                        wadj.collision_weights)
+
+print("plot balanced gains")
+wadj.plot_gains(grp_spc_et,
+                titles=titles,
+                suptitle=suptitle,
+                ylabels=ylabels,
+                file_address=bp.SIMULATION_DIR + "/phd_weight_adj_2.pdf")
 
 #################################
 #   Angular Weight Adjustment   #
 #################################
 from boltzpy.Tools import AngularWeightAdjustment
 
+# methods for angular weight adjustments
+# are encapsulated in a new class
 abwa = AngularWeightAdjustment(
     number_densities=np.full(model.nspc, 1),
-    mean_velocities=np.full((model.nspc, model.ndim),
-                            MAX_MV),
+    mean_velocities=np.zeros((model.nspc, model.ndim)),
     temperatures=np.full(model.nspc, T),
     **model.__dict__)
-initial_State = np.copy(abwa.initial_state)
 
 grp = abwa.group(abwa.key_species()[:, 1:3])
 
@@ -104,21 +96,10 @@ for key in [(0, 0), (1, 1), (0, 1)]:
                         cols_adj=grp[key],
                         cols_used=cols_used,
                         species_used=key)
-abwa.plot_gains()
 
-print("0 1 ")
-abwa.initial_state[:] = initial_State
-abwa.initial_state[abwa.idx_range(0)] = 0
-print(abwa.get_viscosities())
+print("plot balanced gains")
+abwa.plot_gains(grp_spc_et)
 
-print("1 0")
-abwa.initial_state[:] = initial_State
-abwa.initial_state[abwa.idx_range(1)] = 0
-print(abwa.get_viscosities())
-
-print("1 0")
-abwa.initial_state[:] = initial_State
-print(abwa.get_viscosities())
 
 # print("Abwa Weights, Post Balance")
 # grp = rule.group(rule.key_species(rule.collision_relations)[:, 1:3])
@@ -131,7 +112,28 @@ print(abwa.get_viscosities())
 #         print("\t", k, np.unique(weights))
 # rule.initial_state[:] = 1.0
 
+print("plot persistence over altered number densities")
+N_POINTS = 10
+ND_PARAMS = [(1, p) for p in np.linspace(0, 1, N_POINTS)]
+ND_PARAMS += [(p, 1) for p in np.linspace(0, 1, N_POINTS)[1:]][::-1]
 
+VISC_RESULTS = []
+REL_ERRS = []
+for nd in ND_PARAMS:
+    initial_state = abwa.cmp_initial_state(
+        number_densities=nd,
+        mean_velocities=np.full((model.nspc, model.ndim),MAX_MV),
+        temperatures=np.full(model.nspc, T))
+    abwa.initial_state = initial_state
+    VISC_RESULTS.append(abwa.get_viscosities())
+    REL_ERRS.append(max(VISC_RESULTS[-1]) / min(VISC_RESULTS[-1]) - 1)
+    print(nd, " : ", VISC_RESULTS[-1])
+
+VISC_RESULTS = np.array(VISC_RESULTS)
+# plt.plot(VISC_RESULTS[:, 0], c="r")
+# plt.plot(VISC_RESULTS[:, 1], c="b")
+plt.plot(REL_ERRS)
+plt.show()
 
 
 
