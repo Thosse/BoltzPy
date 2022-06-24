@@ -175,11 +175,11 @@ ax.scatter([],[], color=light_cw(900), label="Initialization Success", s=200)
 ax.scatter([],[], color=light_cw(100), label="Initialization Fail", s=200)
 ax.set_aspect('auto')
 ax.set_title("Heuristic Prediction of Initialization Success",
-             fontsize=fs_title)
+             fontsize=fs_suptitle + 4)
 ax.set_xlabel(r"Mean Velocity Parameter $\widetilde{v}_x$", fontsize=fs_label)
-ax.set_ylabel(r"Temperature Parameter $\vartheta$", fontsize=fs_label)
-ax.tick_params(axis="both", labelsize=fs_ticks)
-ax.legend(loc="upper right", fontsize=fs_legend + 4)
+ax.set_ylabel(r"Temperature Parameter $\vartheta$", fontsize=fs_label + 2)
+ax.tick_params(axis="both", labelsize=fs_ticks + 2)
+ax.legend(loc="upper right", fontsize=fs_legend + 8)
 if np.all(model.shapes == 7):
     ax.set_ylim(None, 17)
 else:
@@ -244,9 +244,9 @@ for i_shp, shape in enumerate([[3, 3], [501, 501],
     ax.set_aspect('auto')
     ax.set_title("Heuristic Prediction of Initialization Success",
                  fontsize=fs_title)
-    ax.set_xlabel(r"Mean Velocity Parameter $\widetilde{v}_x$", fontsize=fs_label)
-    ax.set_ylabel(r"Temperature Parameter $\vartheta$", fontsize=fs_label)
-    ax.tick_params(axis="both", labelsize=fs_ticks)
+    ax.set_xlabel(r"Mean Velocity Parameter $\widetilde{v}_x$", fontsize=fs_label + 2)
+    ax.set_ylabel(r"Temperature Parameter $\vartheta$", fontsize=fs_label + 2)
+    ax.tick_params(axis="both", labelsize=fs_ticks + 2)
     if i_shp == 1:
         ax.legend(loc="upper right", fontsize=fs_legend + 4)
 
@@ -256,7 +256,7 @@ for i_shp, shape in enumerate([[3, 3], [501, 501],
                  fontsize=fs_title)
 
 fig.suptitle("Heuristic Results and Matching Maxwellians for Different Grid Shapes",
-             fontsize=fs_suptitle)
+             fontsize=fs_suptitle + 4)
 plt.tight_layout(pad=2)
 plt.savefig(bp.SIMULATION_DIR
             + "/phd_heuristic_newton"

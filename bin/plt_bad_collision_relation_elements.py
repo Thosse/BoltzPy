@@ -8,6 +8,7 @@ matplotlib.rcParams['text.latex.preamble'] = r'\usepackage{amsmath, amssymb}'
 matplotlib.rcParams['legend.title_fontsize'] = 14
 import matplotlib.pyplot as plt
 from fonts import fs_title, fs_legend, fs_label, fs_suptitle, fs_ticks
+fs_label = fs_label + 3
 
 file_name = boltzpy.SIMULATION_DIR + "/plot_bad_collision_relation_elements.pdf"
 
@@ -35,36 +36,36 @@ for i in [0, 1]:
     v = np.array([model.vels[colls[i][0][k]] for k in [0, 1, 2, 3]])
     ax[i].arrow(*v[0], *((v[1] - v[0]) * 0.925),
                 head_width=0.25, lw=3, zorder=0, color="black")
-    pos = (v[0] + v[1]) / 2 - np.array([1.2, 0.6])
+    pos = (v[0] + v[1]) / 2 - np.array([1.2, 0.7])
     ax[i].text(*pos,
-               r"$\mathfrak{v}_{\beta_2} - \mathfrak{v}_{\beta_1}$",
+               r"$\mathfrak{v}_{\beta_1} - \mathfrak{v}_{\beta_0}$",
                fontsize=fs_label)
     ax[i].arrow(*v[2], *((v[3] - v[2]) * 0.925),
                 head_width=0.25, lw=3, zorder=0, color="black")
     pos = (v[3] + v[2]) / 2 - np.array([1.2, -0.4])
     ax[i].text(*pos,
-               r"$\mathfrak{v}_{\beta_4} - \mathfrak{v}_{\beta_3}$",
+               r"$\mathfrak{v}_{\beta_3} - \mathfrak{v}_{\beta_2}$",
                fontsize=fs_label)
     # plot species comparison
     v = np.array([model.vels[colls[i][1][k]] for k in [0, 1, 2, 3]])
     if i == 0:
-        pos = (v[0] + v[1]) / 2 - np.array([1.2, -0.4])
+        pos = (v[0] + v[1]) / 2 - np.array([1.5, -0.4])
         ax[i].text(*pos,
-                   r"$\mathfrak{s}_{\beta_4} = \mathfrak{s}_{\beta_3}$",
+                   r"$\mathfrak{s}_{\beta_3} = \mathfrak{s}_{\beta_2}$",
                    fontsize=fs_label)
         pos = (v[3] + v[2]) / 2 - np.array([1.2, +0.6])
         ax[i].text(*pos,
-                   r"$\mathfrak{s}_{\beta_1} = \mathfrak{s}_{\beta_2}$",
+                   r"$\mathfrak{s}_{\beta_0} = \mathfrak{s}_{\beta_1}$",
                    fontsize=fs_label)
     elif i == 1:
-        pos = (v[0] + v[1]) / 2 - np.array([1.1 + 0.45, 1.1 - 0.45])
+        pos = (v[0] + v[1]) / 2 - np.array([1.5 + 0.45, 1.1 - 0.45])
         ax[i].text(*pos,
-                   r"$\mathfrak{s}_{\beta_1} = \mathfrak{s}_{\beta_2}$",
+                   r"$\mathfrak{s}_{\beta_0} = \mathfrak{s}_{\beta_1}$",
                    rotation=45,
                    fontsize=fs_label)
         pos = v[3] + np.array([-1.8, 0.4])
         ax[i].text(*pos,
-                   r"$\mathfrak{s}_{\beta_4} = \mathfrak{s}_{\beta_3}$",
+                   r"$\mathfrak{s}_{\beta_3} = \mathfrak{s}_{\beta_2}$",
                    rotation=-45,
                    fontsize=fs_label)
 

@@ -1,14 +1,8 @@
-import h5py
-import os
 import numpy as np
 import matplotlib
 matplotlib.use('Qt5Agg')
-matplotlib.rcParams['text.usetex'] = True
-matplotlib.rcParams['text.latex.preamble'] = r'\usepackage{amsmath, amssymb}'
 import matplotlib.pyplot as plt
 from time import process_time
-from boltzpy.Tools import GainBasedModelReduction
-from boltzpy.Tools import WeightAdjustment
 
 ########################
 #   Weight Balancing   #
@@ -25,53 +19,58 @@ model = bp.CollisionModel(masses=[2, 3],
 
 
 # Choose Mean Velocity and Temperature Parameters
-MAX_MV = 0.5
 T = 3
+MV = [0, 0]
 # Verify parameters with model.temp_range()
 model.temperature_range(rtol=1e-3,
-                        mean_velocity=MAX_MV)
+                        mean_velocity=MV)
 
+from boltzpy.Tools import WeightAdjustment
 # balance gains for a reference Maxwellian
 # WeightAdjustment inherits from bp.HomogeneousRule
 wadj = WeightAdjustment(
-    number_densities=np.full(model.nspc, 1),
-    mean_velocities=np.zeros((model.nspc, model.ndim)),
-    temperatures=np.full(model.nspc, T),
+    number_densities=[1, 1],
+    mean_velocities=[MV, MV],
+    temperatures=[T, T],
     **model.__dict__)
 
-# # balance gains for species and energy transfer
+# balance gains for species and energy transfer
 k_spc = wadj.key_species()[:, 1:3]
 k_et = wadj.key_energy_transfer()
 grp_spc_et = wadj.group((k_spc, k_et))
 
-# Ignore in PHD Listings
-titles = {(0,0,0): r"Intraspecies $\mathfrak{C}^{1,1}$",
-          (1,1,0): r"Intraspecies $\mathfrak{C}^{2,2}$",
-          (0,1,0): r"ET Collisions $\mathfrak{C}^{1,2}_{ET}$",
-          (0,1,1): r"NET Collisions $\mathfrak{C}^{1,2}_{NET}$"}
-suptitle="Collision Gains Grouped by Species and Energy Transfer"
+# define ax descriptions
+titles = {(0,0,0): r"Intraspecies "
+                   r"$\mathfrak{C}^{1,1}$",
+          (1,1,0): r"Intraspecies "
+                   r"$\mathfrak{C}^{2,2}$",
+          (0,1,0): r"ET Collisions "
+                   r"$\mathfrak{C}^{1,2}_{ET}$",
+          (0,1,1): r"NET Collisions "
+                   r"$\mathfrak{C}^{1,2}_{NET}$"}
+suptitle="Collision Gains Grouped by " \
+         "Species and Energy Transfer"
 ylabels=("Species 1", "Species 2")
 
-# define gain ratios for each group
-gain_ratios = {key: 1.0 for key in grp_spc_et.keys()}
-
-print("plot current gains")
+# plot current gains
 wadj.plot_gains(grp_spc_et,
                 titles=titles,
                 suptitle=suptitle,
                 ylabels=ylabels,
                 file_address=bp.SIMULATION_DIR + "/phd_weight_adj_1.pdf")
 
-print("Balance Specific Gains!")
-wadj.balance_gains(grp_spc_et, gain_ratios)
+# define gain ratios for each group
+gain_ratios = {key: 1.0 for key in grp_spc_et.keys()}
+# balance specific gains
+wadj.balance_gains(grp_spc_et, gain_ratios, verbose=True)
 # apply changes to original model
 model.update_collisions(model.collision_relations,
                         wadj.collision_weights)
 
-print("plot balanced gains")
+# plot balanced gains
 wadj.plot_gains(grp_spc_et,
                 titles=titles,
-                suptitle=suptitle,
+                suptitle="Balanced " + suptitle,
                 ylabels=ylabels,
                 file_address=bp.SIMULATION_DIR + "/phd_weight_adj_2.pdf")
 
@@ -79,177 +78,275 @@ wadj.plot_gains(grp_spc_et,
 #   Angular Weight Adjustment   #
 #################################
 from boltzpy.Tools import AngularWeightAdjustment
-
 # methods for angular weight adjustments
-# are encapsulated in a new class
+# inherits from WeightAdjustment
 abwa = AngularWeightAdjustment(
-    number_densities=np.full(model.nspc, 1),
-    mean_velocities=np.zeros((model.nspc, model.ndim)),
-    temperatures=np.full(model.nspc, T),
+    number_densities=[1, 1],
+    mean_velocities=[[0, 0], [0,0]],
+    temperatures=[T, T],
     **model.__dict__)
 
-grp = abwa.group(abwa.key_species()[:, 1:3])
+# print current directional viscosities
+abwa.get_viscosities()
 
+# first adjust and use only single species
+# then use all collisions for computation
+# but adjust only the intraspecies collisions
+grp_spc = abwa.group(abwa.key_species()[:, 1:3])
 for key in [(0, 0), (1, 1), (0, 1)]:
-    cols_used = grp[key] if key[0] == key[1] else None
-    abwa.balance_angles(dt=1e-7,
-                        cols_adj=grp[key],
+    cols_used = grp_spc[key] if key[0] == key[1] else None
+    abwa.balance_angles(cols_adj=grp_spc[key],
                         cols_used=cols_used,
-                        species_used=key)
+                        species_used=key,
+                        rtol=1e-2,
+                        verbose=True)
 
-print("plot balanced gains")
-abwa.plot_gains(grp_spc_et)
+# print adjusted directional viscosities
+abwa.get_viscosities()
 
+# apply changes to original model
+model.update_collisions(model.collision_relations,
+                        abwa.collision_weights)
 
-# print("Abwa Weights, Post Balance")
-# grp = rule.group(rule.key_species(rule.collision_relations)[:, 1:3])
-# for ss, p1 in grp.items():
-#     print("Species = ", ss)
-#     cols = rule.collision_relations[p1]
-#     grp2 = rule.group(rule.key_angle(cols))
-#     for k, p2 in grp2.items():
-#         weights = rule.collision_weights[p1][p2]
-#         print("\t", k, np.unique(weights))
-# rule.initial_state[:] = 1.0
+# store adjusted model on disk
+import h5py
+file_adress = bp.SIMULATION_DIR + "/adjusted_model.hdf5"
+with h5py.File(file_adress, mode="w") as file:
+    model.save(file)
 
-print("plot persistence over altered number densities")
-N_POINTS = 10
-ND_PARAMS = [(1, p) for p in np.linspace(0, 1, N_POINTS)]
-ND_PARAMS += [(p, 1) for p in np.linspace(0, 1, N_POINTS)[1:]][::-1]
-
-VISC_RESULTS = []
-REL_ERRS = []
-for nd in ND_PARAMS:
-    initial_state = abwa.cmp_initial_state(
-        number_densities=nd,
-        mean_velocities=np.full((model.nspc, model.ndim),MAX_MV),
-        temperatures=np.full(model.nspc, T))
-    abwa.initial_state = initial_state
-    VISC_RESULTS.append(abwa.get_viscosities())
-    REL_ERRS.append(max(VISC_RESULTS[-1]) / min(VISC_RESULTS[-1]) - 1)
-    print(nd, " : ", VISC_RESULTS[-1])
-
-VISC_RESULTS = np.array(VISC_RESULTS)
-# plt.plot(VISC_RESULTS[:, 0], c="r")
-# plt.plot(VISC_RESULTS[:, 1], c="b")
-plt.plot(REL_ERRS)
-plt.show()
+del abwa
 
 
+# print("plot balanced gains")
+# abwa.plot_gains(grp_spc_et,
+#                 titles=titles,
+#                 suptitle="Balanced " + suptitle,
+#                 ylabels=ylabels,
+#                 file_address=bp.SIMULATION_DIR + "/phd_weight_adj_3.pdf")
+#
+# print("plot persistence over altered number densities")
+# N_POINTS = 10
+# ND_PARAMS = [(1, p) for p in np.linspace(0, 1, N_POINTS)]
+# ND_PARAMS += [(p, 1) for p in np.linspace(0, 1, N_POINTS)[1:]][::-1]
+#
+# VISC_RESULTS = []
+# REL_ERRS = []
+# for nd in ND_PARAMS:
+#     initial_state = abwa.cmp_initial_state(
+#         number_densities=nd,
+#         mean_velocities=np.full((model.nspc, model.ndim),MV),
+#         temperatures=np.full(model.nspc, T))
+#     abwa.initial_state = initial_state
+#     VISC_RESULTS.append(abwa.get_viscosities())
+#     REL_ERRS.append(max(VISC_RESULTS[-1]) / min(VISC_RESULTS[-1]) - 1)
+#     print(nd, " : ", VISC_RESULTS[-1])
+#
+# VISC_RESULTS = np.array(VISC_RESULTS)
+# # plt.plot(VISC_RESULTS[:, 0], c="r")
+# # plt.plot(VISC_RESULTS[:, 1], c="b")
+# plt.plot(REL_ERRS)
+# plt.show()
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-# fig, axes = plt.subplots(nrows=1, ncols=rule.nspc,
-#                          figsize=(12.75, 5.05),
-#                          constrained_layout=True)
-
-# rule.initial_state[...] = 1.0
-# for key, val in grp.items():
-#     gain_arr = rule.gain_term(val)
-#     fig.suptitle(key)
-#     for s in rule.species:
-#         arr = gain_arr[rule.idx_range(s)]
-#         arr = arr.reshape(rule.shapes[s])
-#         axes[s].imshow(arr, cmap='coolwarm',
-#                    interpolation="quadric",
-#                    origin="lower",
-#                    vmax=gain_arr.max() * 1.2,
-#                    vmin=0)
-#     plt.savefig(str(key) + ".png")
-
-# determine a proper temperature range of the model
-# compute per species to compare ranges
-temp_range = {s: model.temperature_range( s=s,
-                                         rtol=1e-3,
-                                         mean_velocity=MAX_MV)
-              for s in model.species}
-print("Temperatures Range of each Grid:\n"
-      "(if range varies too much, change shape)")
-for key, val in temp_range.items():
-    print(key, ":\t", list(val))
-
-# Define reference Temperature for Adjustments
-
-
-
-# path = bp.SIMULATION_DIR + "/" + "phd_templatic_reduction.hdf5"
-tic = process_time()
-# if os.path.exists(path):
-#     print("Load DVM from File...", end="", flush=True)
-#     FILE = h5py.File(path, mode="a")
-#     model = bp.CollisionModel.load(FILE)
-# else:
-#     print("Creating DVM....", end="", flush=True)
-model = bp.CollisionModel(masses=[4, 5, 6],
-                          shapes=[[7, 7],
-                                  [9, 9],
-                                  [9, 9]],
-                          base_delta=0.1
-                          )
-    # FILE = h5py.File(path, mode="w")
-    # model.save(FILE)
-    # FILE.flush()
-print("Done!")
-toc = process_time()
-print("Time taken: %.3f seconds" % (toc-tic))
-
-# Define a reference Mean Velocity
-# should be the a maximum for the simulation
-MAX_MV = 2
-
-# determine a proper temperature range of the model
-# compute per species to compare ranges
-temp_range = {s: model.temperature_range( s=s,
-                                         rtol=1e-3,
-                                         mean_velocity=MAX_MV)
-              for s in model.species}
-print("Temperatures Range of each Grid:\n"
-      "(if range varies too much, change shape)")
-for key, val in temp_range.items():
-    print(key, ":\t", list(val))
-
-# Define reference Temperature for Adjustments
-T = 19
-
-# use a homogeneous simulation to compute gains
-# based on a reference Maxwellian
-rule = bp.HomogeneousRule(
-    number_densities=np.full(model.nspc, 1),
-    mean_velocities=np.full((model.nspc, model.ndim), MAX_MV),
-    temperatures=np.full(model.nspc, T),
-    **model.__dict__)   # use model parameters
-
-# Apply non-gain-based weight adjustments
-pass
-# We reccommend to save the adjusted model on the disc
-
-
-# balance gains for species and energy transfer
-k_spc = rule.key_species(rule.collision_relations)[:, 1:3]
-k_et = rule.key_energy_transfer(rule.collision_relations)
-class_keys = rule.merge_keys(k_spc, k_et)
-
+#################################
+#       Model Reduction         #
+#################################
+# try to balance by species and energy transfer
+class_keys = model.merge_keys(k_spc, k_et)
 # add collisions based on shape
-sub_keys = rule.key_orbit(rule.collision_relations)
-reduction = GainBasedModelReduction(rule, class_keys, sub_keys,
-                                    gain_factor_normality_collisions=1e-2)
+sub_keys = model.key_shape(model.collision_relations)
 
-grp = model.group((k_spc, k_et))
-for k, idx in reduction.log_empty_times.items():
-    print(k, ": ", grp[k].shape[0], " / ", reduction.log_ncols[idx])
+from boltzpy.Tools import GainBasedModelReduction
+# setup (randomized) collision reduction
+gbmr = GainBasedModelReduction(
+    balance_keys=class_keys,
+    selection_keys=sub_keys,
+    force_normality_collisions=True,
+    gain_factor_normality_collisions=0.0,
+    number_densities=[1, 1],
+    mean_velocities=[[0, 0], [0, 0]],
+    temperatures=[T, T],
+    **model.__dict__)
 
-reduction.plot(legend_ncol=3, yscale="log")
+gbmr.plot_reduction(
+    legend_title="Collision Groups",
+    legend_ncol=2,
+    yscale="log",
+    file_address=bp.SIMULATION_DIR + "/phd_col_red.pdf")
+
+
+# print selection indices of vertical lines
+for key, idx in gbmr.log_empty_times.items():
+    print(key, " at ", idx)
+
+print("apply collision selection")
+idx = gbmr.log_empty_times[(0, 0, 0)]
+choice = gbmr.get_selection(idx)
+col_rels = model.collision_relations[choice]
+ncols = col_rels.shape[0]
+model.update_collisions(col_rels,
+                        np.full(ncols, 1e5))
+
+# rebalance weights
+wadj = WeightAdjustment(
+    number_densities=[1, 1],
+    mean_velocities=[MV, MV],
+    temperatures=[T, T],
+    **model.__dict__)
+# group reduced collisions
+k_spc = wadj.key_species()[:, 1:3]
+k_et = wadj.key_energy_transfer()
+grp_spc_et = wadj.group((k_spc, k_et))
+wadj.balance_gains(grp_spc_et, gain_ratios, verbose=True)
+model.update_collisions(model.collision_relations,
+                        wadj.collision_weights)
+
+# rebalance angles
+# Note: This often fails for single species,
+# if the collision set is not rich enough
+# For mixtures we often require a larger range for initial weights
+abwa = AngularWeightAdjustment(
+    cur_dt=1e-7,
+    number_densities=[1, 1],
+    mean_velocities=[[0, 0], [0,0]],
+    temperatures=[T, T],
+    **model.__dict__)
+grp_spc = abwa.group(abwa.key_species()[:, 1:3])
+for key in [(0, 0), (1, 1), (0, 1)]:
+    print("Enforcing Angular invariace for ", key)
+    cols_used = grp_spc[key] if key[0] == key[1] else None
+    abwa.balance_angles(cols_adj=grp_spc[key],
+                        cols_used=cols_used,
+                        species_used=key,
+                        rtol=1e-2,
+                        initial_weights=[0.1, 8.0],
+                        verbose=True)
+model.update_collisions(model.collision_relations,
+                        abwa.collision_weights)
+
+
+
+
+
+
+
+#
+#
+# # fig, axes = plt.subplots(nrows=1, ncols=rule.nspc,
+# #                          figsize=(12.75, 5.05),
+# #                          constrained_layout=True)
+#
+# # rule.initial_state[...] = 1.0
+# # for key, val in grp.items():
+# #     gain_arr = rule.gain_term(val)
+# #     fig.suptitle(key)
+# #     for s in rule.species:
+# #         arr = gain_arr[rule.idx_range(s)]
+# #         arr = arr.reshape(rule.shapes[s])
+# #         axes[s].imshow(arr, cmap='coolwarm',
+# #                    interpolation="quadric",
+# #                    origin="lower",
+# #                    vmax=gain_arr.max() * 1.2,
+# #                    vmin=0)
+# #     plt.savefig(str(key) + ".png")
+#
+# # determine a proper temperature range of the model
+# # compute per species to compare ranges
+# temp_range = {s: model.temperature_range( s=s,
+#                                          rtol=1e-3,
+#                                          mean_velocity=MV)
+#               for s in model.species}
+# print("Temperatures Range of each Grid:\n"
+#       "(if range varies too much, change shape)")
+# for key, val in temp_range.items():
+#     print(key, ":\t", list(val))
+#
+# # Define reference Temperature for Adjustments
+#
+#
+#
+# # path = bp.SIMULATION_DIR + "/" + "phd_templatic_reduction.hdf5"
+# tic = process_time()
+# # if os.path.exists(path):
+# #     print("Load DVM from File...", end="", flush=True)
+# #     FILE = h5py.File(path, mode="a")
+# #     model = bp.CollisionModel.load(FILE)
+# # else:
+# #     print("Creating DVM....", end="", flush=True)
+# model = bp.CollisionModel(masses=[4, 5, 6],
+#                           shapes=[[7, 7],
+#                                   [9, 9],
+#                                   [9, 9]],
+#                           base_delta=0.1
+#                           )
+#     # FILE = h5py.File(path, mode="w")
+#     # model.save(FILE)
+#     # FILE.flush()
+# print("Done!")
+# toc = process_time()
+# print("Time taken: %.3f seconds" % (toc-tic))
+#
+# # Define a reference Mean Velocity
+# # should be the a maximum for the simulation
+# MAX_MV = 2
+#
+# # determine a proper temperature range of the model
+# # compute per species to compare ranges
+# temp_range = {s: model.temperature_range( s=s,
+#                                          rtol=1e-3,
+#                                          mean_velocity=MV)
+#               for s in model.species}
+# print("Temperatures Range of each Grid:\n"
+#       "(if range varies too much, change shape)")
+# for key, val in temp_range.items():
+#     print(key, ":\t", list(val))
+#
+# # Define reference Temperature for Adjustments
+# T = 19
+#
+# # use a homogeneous simulation to compute gains
+# # based on a reference Maxwellian
+# rule = bp.HomogeneousRule(
+#     number_densities=np.full(model.nspc, 1),
+#     mean_velocities=np.full((model.nspc, model.ndim), MV),
+#     temperatures=np.full(model.nspc, T),
+#     **model.__dict__)   # use model parameters
+#
+# # Apply non-gain-based weight adjustments
+# pass
+# # We reccommend to save the adjusted model on the disc
+#
+#
+# # balance gains for species and energy transfer
+# k_spc = rule.key_species(rule.collision_relations)[:, 1:3]
+# k_et = rule.key_energy_transfer(rule.collision_relations)
+# class_keys = rule.merge_keys(k_spc, k_et)
+#
+# # add collisions based on shape
+# sub_keys = rule.key_orbit(rule.collision_relations)
+# reduction = GainBasedModelReduction(rule, class_keys, sub_keys,
+#                                     gain_factor_normality_collisions=1e-2)
+#
+# grp = model.group((k_spc, k_et))
+# for k, idx in reduction.log_empty_times.items():
+#     print(k, ": ", grp[k].shape[0], " / ", reduction.log_ncols[idx])
+#
+# reduction.plot(legend_ncol=3, yscale="log")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 # rule.plot_collisions(rule.collision_relations)
 # spc = rule.key_species(rule.collision_relations)

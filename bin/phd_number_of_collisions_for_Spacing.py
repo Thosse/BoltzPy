@@ -143,8 +143,8 @@ res = {0: FILE[MASS_STR],
        1: FILE[SHAPE_STR]}
 x_vals = {0: SHAPES,
           1: MASSES}
-x_label = {0: r"Grid Widths $n^1_i = n^2_i$",
-           1: r"Mass $m^1$ for $m^2 = " + str(MAX_MASS) + "$"}
+x_label = {0: r"Grid Widths $n^0_i = n^1_i$",
+           1: r"Mass $m^0$ for $m^1 = " + str(MAX_MASS) + "$"}
 color = ["tab:blue", "tab:green"]
 for a in [0, 1]:
     x = x_vals[a][:, 0]
@@ -181,12 +181,12 @@ for a in [0, 1]:
         ax[a].scatter(x, y,  c=color[k])
 ax[0].scatter([], [],  c="gray", label="Supernormal DVM")
 # fig.legend(loc="lower center", cols=3, fontsize=fs_legend)
-lg = fig.legend(loc="lower center", bbox_to_anchor=(0.5, -0.1), ncol=4,
-                fontsize=fs_legend+1
+lg = fig.legend(loc="lower center", bbox_to_anchor=(0.5, -0.19), ncol=2,
+                fontsize=fs_legend+5
                 )
 ax[0].set_title(r"Fixed Masses $m = (25,30)$",
                 fontsize=fs_title)
-ax[1].set_title(r"Fixed Shapes $n^1 = n^2 = (31, 31)$",
+ax[1].set_title(r"Fixed Shapes $(n^s_0, n^s_1) = (31, 31)$",
                 fontsize=fs_title)
 st = fig.suptitle("Number of Collisions and Supernormality for Equal and Mass Adjusted Spacings",
                   fontsize=fs_suptitle)
@@ -206,11 +206,16 @@ model = bp.CollisionModel([2, 3],
                           2.0)
 
 ax = model.plot_collisions(plot_object=ax)
-col_black = np.array(
+black_down = np.array(
     [[6, -6],
      [4,-4],
      [-4, -4],
      [-6, -6],
+     [6, -6]],
+    dtype=float
+)
+
+black_left = np.array([
      [6, -6],
      [6, 6],
      [4, 4],
@@ -218,60 +223,189 @@ col_black = np.array(
      [6, -6]],
     dtype=float
 )
-ax.plot(col_black[:, 0],
-        col_black[:, 1],
-        color="black",
-        label="Existing Collisions,\nAll Velocities On Grid")
-red_shift = col_black + np.array([[-12, 12]])
-ax.plot(red_shift[:, 0], red_shift[:, 1],
-        color="red",
-        linewidth=2,
-        linestyle="dotted",
-        # dashes=(20, 15)
-        )
-red_rotate = np.array(
-    [[6, -6],
+
+black_right = np.array([
      [-6, -6],
-     [-4, -8],
-     [4, -8],
-     [6, -6],
-     [18, -6],
-     [16, -8],
-     [8, -8],
-     [6, -6],
-     [18, -6],
-     [16, -4],
-     [8, -4],
-     [6, -6],
-     [6, 6],
-     [8, 4],
-     [8, -4],
-     [6, -6],
-     [8, -8],
-     [8, -16],
-     [6, -18],
-     [6, -6],
-     [4, -8],
-     [4, -16],
-     [6, -18],
-     [6, -6],
-     ],
+     [-6, 6],
+     [-4, 4],
+     [-4, -4],
+     [-6, -6]],
     dtype=float
 )
-ax.plot(red_rotate[:, 0], red_rotate[:, 1],
+
+
+black_up = np.array(
+    [[6, 6],
+     [4, 4],
+     [-4, 4],
+     [-6, 6],
+     [6, 6]],
+    dtype=float
+)
+
+ax.plot([], [],
+        color="black",
+        label="All Velocities On Grid")
+ax.plot([], [],
         color="red",
         linewidth=2,
         linestyle="dotted",
-        label="Missing Collisions,\nSome Velocities Off Grid"
+        label="Some Velocities Off Grid"
         )
+# red_shift = col_black + np.array([[-12, 12]])
+# ax.plot(red_shift[:, 0], red_shift[:, 1],
+#         color="red",
+#         linewidth=2,
+#         linestyle="dotted",
+#         # dashes=(20, 15)
+#         )
+# red_rotate = np.array(
+#     [[6, -6],
+#      [-6, -6],
+#      [-4, -8],
+#      [4, -8],
+#      [6, -6],
+#      [18, -6],
+#      [16, -8],
+#      [8, -8],
+#      [6, -6],
+#      [18, -6],
+#      [16, -4],
+#      [8, -4],
+#      [6, -6],
+#      [6, 6],
+#      [8, 4],
+#      [8, -4],
+#      [6, -6],
+#      [8, -8],
+#      [8, -16],
+#      [6, -18],
+#      [6, -6],
+#      [4, -8],
+#      [4, -16],
+#      [6, -18],
+#      [6, -6],
+#      ],
+#     dtype=float
+# )
+# ax.plot(red_rotate[:, 0], red_rotate[:, 1],
+#         color="red",
+#         linewidth=2,
+#         linestyle="dotted",
+#         label="Some Velocities Off Grid"
+#         )
+# plot red collisions first
+for D in [[-12, 0], [12, 0],
+          [-12, 12], [0, 12], [12, 12],
+          [-12, 24], [12, 24],
+          [-12, -12], [0, -12], [12, -12]]:
+    ax.plot(black_down[:, 0] + D[0],
+            black_down[:, 1] + D[1],
+            color="red",
+            linewidth=0.5,
+            linestyle="dotted",
+            label="_ignore"
+            )
+for D in [[-12, 0], [12, 0],
+          [-12, 12], [0, 12], [12, 12],
+          [-12, -24], [12, -24],
+          [-12, -12], [0, -12], [12, -12]]:
+    ax.plot(black_up[:, 0] + D[0],
+            black_up[:, 1] + D[1],
+            color="red",
+            linewidth=0.5,
+            linestyle="dotted",
+            label="_ignore"
+            )
+for D in [[-12, 0], [12, 0],
+         [-24, 12], [-12, 12], [0, 12], [12, 12],
+         [-24, -12], [-12, -12], [0, -12], [12, -12]]:
+    ax.plot(black_left[:, 0] + D[0],
+            black_left[:, 1] + D[1],
+            color="red",
+            linewidth=0.5,
+            linestyle="dotted",
+            label="_ignore"
+            )
+for D in [[-12, 0], [12, 0],
+         [-24, 12], [-12, 12], [0, 12], [12, 12],
+         [-24, -12], [-12, -12], [0, -12], [12, -12]]:
+    ax.plot(black_right[:, 0] - D[0],
+            black_right[:, 1] - D[1],
+            color="red",
+            linewidth=0.5,
+            linestyle="dotted",
+            label="_ignore"
+            )
+lw_black=2
+# plot black collisions afterwards -> over red ones
+ax.plot(black_down[:, 0],
+        black_down[:, 1],
+        lw=lw_black,
+        label="_ignore",
+        color="black")
+ax.plot(black_down[:, 0],
+        black_down[:, 1] + 24,
+        lw=lw_black,
+        label="_ignore",
+        color="black")
+ax.plot(black_left[:, 0],
+        black_left[:, 1],
+        lw=lw_black,
+        label="_ignore",
+        color="black")
+ax.plot(black_left[:, 0] - 24,
+        black_left[:, 1],
+        lw=lw_black,
+        label="_ignore",
+        color="black")
+ax.plot(black_right[:, 0],
+        black_right[:, 1],
+        lw=lw_black,
+        label="_ignore",
+        color="black")
+ax.plot(black_right[:, 0] + 24,
+        black_right[:, 1],
+        lw=lw_black,
+        label="_ignore",
+        color="black")
+ax.plot(black_up[:, 0],
+        black_up[:, 1],
+        lw=lw_black,
+        label="_ignore",
+        color="black")
+ax.plot(black_up[:, 0],
+        black_up[:, 1] - 24,
+        lw=lw_black,
+        label="_ignore",
+        color="black")
 ax.set_xticks([])
 ax.set_yticks([])
 ax.set_aspect('equal')
-ax.set_title(r"Missing Local Symmetries in a Mixture with Mass-Adjusted Spacings",
-             fontsize=fs_title)
-ax.legend(loc="upper right",
-          fontsize=fs_legend)
+st = fig.suptitle(r"Missing Translational Symmetries in a Mixture with Mass-Adjusted Spacings",
+                  fontsize=fs_suptitle,
+                  x=0.67)
+lg1 = plt.legend(loc="upper left",
+                 title="Depicted Collisions:",
+                 title_fontsize=fs_legend_title+5,
+                 bbox_to_anchor=(1.04, 0.5),
+                 fontsize=fs_legend+5)
 
-plt.tight_layout()
-plt.savefig(bp.SIMULATION_DIR + "/phd_local_symmetries_mixture.pdf")
+# add second legend
+lg_grid1 = plt.scatter([], [], marker="o", s=100, c="tab:blue")
+lg_grid2 = plt.scatter([], [], marker="x", s=100, c="tab:orange")
+lg2 = plt.legend([lg_grid1, lg_grid2],
+                 [r"$\mathfrak{V}^0$", r"$\mathfrak{V}^1$"],
+                 loc="upper left",
+                 title="Velocity Grids:",
+                 title_fontsize=fs_legend_title + 5,
+                 bbox_to_anchor=(1.04, 0.95),
+                 fontsize=fs_legend + 5
+                 )
+ax.add_artist(lg1)
+ax.add_artist(lg2)
+# plt.tight_layout()
+plt.savefig(bp.SIMULATION_DIR + "/phd_local_symmetries_mixture.pdf",
+            bbox_extra_artists=(st, lg1, lg2),
+            bbox_inches='tight')
 # plt.show()

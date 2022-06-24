@@ -85,16 +85,16 @@ titles = ["Reduced Velocity Space", "Merged Velocity Spaces"]
 
 # circular space
 grid_points = models[0].vels.transpose()
-ax[0].scatter(*grid_points, c="lightgray")
+ax[0].scatter(*grid_points, c="lightgray", s= 50)
 norms = np.linalg.norm(grid_points, axis=0)
 grid_points = grid_points[:, norms <= 8]
-ax[0].scatter(*grid_points)
+ax[0].scatter(*grid_points, s=125)
 
 # merged space
 colors = ["tab:blue", "tab:green"]
 for s in [0,1]:
     grid_points = models[1].subgrids(s).pG.transpose()
-    ax[1].scatter(*grid_points, c=colors[s], zorder=5)
+    ax[1].scatter(*grid_points, c=colors[s], zorder=5, s=125)
 
 for i in [0, 1]:
     # set tick values on axes, None = auto choice of matplotlib

@@ -105,14 +105,14 @@ fig.suptitle(r"Energy Transferring Collisions for Bad Masses "
              + r"$m = " + str(tuple(masses)) + "$",
              fontsize=fs_suptitle)
 plt.subplots_adjust(top=0.85)
-ax[0].set_title(r"$n^1 = " + str(tuple(plot_models[0].shapes[0]))
+ax[0].set_title(r"$n^0 = " + str(tuple(plot_models[0].shapes[0]))
                 + ",\:"
-                + r"n^2= " + str(tuple(plot_models[0].shapes[1]))
+                + r"n^1= " + str(tuple(plot_models[0].shapes[1]))
                 + r"$",
                 fontsize=fs_title)
-ax[1].set_title(r"$n^1 = " + str(tuple(plot_models[1].shapes[0]))
+ax[1].set_title(r"$n^0 = " + str(tuple(plot_models[1].shapes[0]))
                 + ",\:"
-                + r"n^2= " + str(tuple(plot_models[1].shapes[1]))
+                + r"n^1= " + str(tuple(plot_models[1].shapes[1]))
                 + r"$",
                 fontsize=fs_title)
 plt.savefig(EXP_NAME + "_grids.pdf",
@@ -211,9 +211,9 @@ ax1.tick_params(axis="both", labelsize=fs_ticks)
 ax1.set_xlim(right=longest_relaxation_time)
 
 # plot left figure (original weights, with references
-labels = [r"Mixture $\mathfrak{S} = \{1,2\}$",
-          r"$\mathfrak{S}=\{1\}$, $n^1= (7, 7)$",
-          r"$\mathfrak{S}=\{2\}$, $n^2= (11, 11)$"]
+labels = [r"Mixture $\mathfrak{S} = \{0,1\}$",
+          r"$\mathfrak{S}=\{0\}$, $n^0= (7, 7)$",
+          r"$\mathfrak{S}=\{1\}$, $n^1= (11, 11)$"]
 print("Create Plot")
 for i_r in range(len(rules)):
     raw = FILE["unedited"][str(i_r)][()]
@@ -352,9 +352,9 @@ for ax in [ax1, ax2]:
                 **lw)
 
 # plot left figure (original weights for ET, all others * 10)
-label_left = [r"Mixture $\mathfrak{S} = \{1,2\}$",
-              r"$\mathfrak{S}=\{1\}$, $n^1= (7, 7)$",
-              r"$\mathfrak{S}=\{2\}$, $n^2= (11, 11)$"]
+label_left = [r"Mixture $\mathfrak{S} = \{0, 1\}$",
+              r"$\mathfrak{S}=\{0\}$, $n^0= (7, 7)$",
+              r"$\mathfrak{S}=\{1\}$, $n^1= (11, 11)$"]
 for i_r in range(len(rules)):
     raw = FILE["All but ET"][str(i_r)][()]
     res = np.sum((raw - raw[-1])**2, axis=-1)
@@ -467,9 +467,9 @@ for ax in [ax1, ax2]:
     #               linewidth=0.4)
 
 # plot left figure (original weights for ET, all others * 10)
-label_left = [r"Mixture $\mathfrak{S} = \{1,2\}$",
-              r"$\mathfrak{S}=\{1\}$, $n^1= (7, 7)$",
-              r"$\mathfrak{S}=\{2\}$, $n^2= (11, 11)$"]
+label_left = [r"Mixture $\mathfrak{S} = \{0,1\}$",
+              r"$\mathfrak{S}=\{0\}$, $n^0= (7, 7)$",
+              r"$\mathfrak{S}=\{1\}$, $n^1= (11, 11)$"]
 for i_r in range(len(rules)):
     r = rules[i_r]
     equi = FILE["specific_equlibria"]["unedited"][str(i_r)]
@@ -525,7 +525,7 @@ mom_func = [r.cmp_number_density for r in rules]
 r = rules[0]
 grp = r.group(r.key_species(r.collision_relations)[:, 1:3])
 is_rels = grp[(0, 1)]
-BASE_WEIGHT = mom_func[0](r.gain_term(is_rels))
+BASE_WEIGHT = mom_func[0](r.gain_array(is_rels))
 
 print("Compute new gain based weights by species")
 for i_r, r in enumerate(rules):
@@ -533,7 +533,7 @@ for i_r, r in enumerate(rules):
     grp = r.group(r.key_species(r.collision_relations)[:, 1:3])
     for g, rels in grp.items():
         # compute gain term
-        gains = mom_func[i_r](r.gain_term(rels))
+        gains = mom_func[i_r](r.gain_array(rels))
         new_weight = BASE_WEIGHT / gains
         print(g, new_weight)
         r.collision_weights[rels] = new_weight
@@ -599,7 +599,7 @@ fig, (ax1, ax2) = plt.subplots(1, 2, constrained_layout=True,
 
 ax1.set_title("Gain-Adjusted Collision Weights",
               fontsize=fs_title)
-ax2.set_title(r"Gain-Adjustment and Additionally \\ Increased Energy-Transfer by $\gamma^{1,2}_{ET} = 10$",
+ax2.set_title(r"Gain-Adjustment and Additionally \\ Increased Energy-Transfer by $\gamma^{0,1}_{ET} = 10$",
               fontsize=fs_title)
 ax1.set_ylabel(r"$\mathcal{L}^2$-Distance to Equilibrium",
                fontsize=fs_label)
@@ -622,9 +622,9 @@ for ax in [ax1, ax2]:
                 **lw)
 
 # plot left figure (gain adjusted weights)
-label_left = [r"Mixture $\mathfrak{S} = \{1,2\}$",
-              r"$\mathfrak{S}=\{1\}$, $n^1= (7, 7)$",
-              r"$\mathfrak{S}=\{2\}$, $n^2= (11, 11)$"]
+label_left = [r"Mixture $\mathfrak{S} = \{0, 1\}$",
+              r"$\mathfrak{S}=\{0\}$, $n^0= (7, 7)$",
+              r"$\mathfrak{S}=\{1\}$, $n^1= (11, 11)$"]
 for i_r in range(len(rules)):
     raw = FILE["gain"][str(i_r)][()]
     res = np.sum((raw - raw[-1])**2, axis=-1)
@@ -777,7 +777,7 @@ mom_func = [r.cmp_number_density for r in rules]
 r = rules[1]
 grp = r.group(r.key_species(r.collision_relations)[:, 1:3])
 is_rels = grp[(0, 1)]
-BASE_WEIGHT = mom_func[1](r.gain_term(is_rels))
+BASE_WEIGHT = mom_func[1](r.gain_array(is_rels))
 
 print("Compute new gain based weights by species and increase ET weights * 10")
 for i_r, r in enumerate(rules):
@@ -785,7 +785,7 @@ for i_r, r in enumerate(rules):
     grp = r.group(r.key_species(r.collision_relations)[:, 1:3])
     for g, rels in grp.items():
         # compute gain term
-        gains = mom_func[i_r](r.gain_term(rels))
+        gains = mom_func[i_r](r.gain_array(rels))
         new_weight = BASE_WEIGHT / gains
         print(g, new_weight)
         r.collision_weights[rels] *= new_weight
@@ -862,9 +862,9 @@ label_left = [r"Mixture, original spacings",
               r"Mixture, reduced $\Delta_\mathbb{R}$",
               r"Mixture, reduced $\Delta_\mathbb{R}$,"
               + "\nonly old ET collisions",
-              r"$\mathfrak{S}=\{1\}$, $n^1= (9, 9)$"
+              r"$\mathfrak{S}=\{0\}$, $n^0= (9, 9)$"
               + "\nwith reduced " + r"$\Delta_\mathbb{R}$",
-              r"$\mathfrak{S}=\{2\}$, $n^2= (13, 13)$"
+              r"$\mathfrak{S}=\{1\}$, $n^1= (13, 13)$"
               + "\nwith reduced " + r"$\Delta_\mathbb{R}$"]
 # keep linestyle for both mixtures
 new_linestyles = 2*linestyles[:1] + linestyles
@@ -984,14 +984,14 @@ mom_func = [r.cmp_number_density for r in rules]
 r = rules[0]
 grp = r.group(r.key_species(r.collision_relations)[:, 1:3])
 is_rels = grp[(0, 1)]
-BASE_WEIGHT = mom_func[0](r.gain_term(is_rels))
+BASE_WEIGHT = mom_func[0](r.gain_array(is_rels))
 print("Compute new gain based weights by species")
 for i_r, r in enumerate(rules):
     print("Rule ", i_r, ":")
     grp = r.group(r.key_species(r.collision_relations)[:, 1:3])
     for g, rels in grp.items():
         # compute gain term
-        gains = mom_func[i_r](r.gain_term(rels))
+        gains = mom_func[i_r](r.gain_array(rels))
         new_weight = BASE_WEIGHT / gains
         print(g, new_weight)
         r.collision_weights[rels] *= new_weight
@@ -1055,9 +1055,9 @@ for ax in [ax1, ax2]:
 
 
 # plot left figure (gain adjusted weights)
-label_left = [r"Mixture $\mathfrak{S} = \{1,2\}$",
-              r"$\mathfrak{S}=\{1\}$, $n^1= (7, 7)$",
-              r"$\mathfrak{S}=\{2\}$, $n^2= (11, 11)$"]
+label_left = [r"Mixture $\mathfrak{S} = \{0,1\}$",
+              r"$\mathfrak{S}=\{0\}$, $n^0= (7, 7)$",
+              r"$\mathfrak{S}=\{1\}$, $n^1= (11, 11)$"]
 
 for i_r in range(len(rules)):
     raw = FILE["masses"][str(i_r)]

@@ -72,7 +72,7 @@ axes[1].plot([-100, +100], [+300, -300], **plane_style)
 
 # set up legend
 axes[0].plot([], [], lw=1, color=0.8 * np.ones(3), label="All NET/ET Collisions")
-fig.legend(fontsize=fs_legend + 2,
+fig.legend(fontsize=fs_legend + 5,
            loc="lower center",
            ncol=3)
 plt.subplots_adjust(left=0.05,

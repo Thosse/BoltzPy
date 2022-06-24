@@ -23,10 +23,10 @@ def plot(masses, vels0, vels1, ax=None):
     # plot the velocities
     ax.scatter(*(vels0.transpose()),
                **{"marker": 'o', "alpha": 0.5, "s": 100},
-               label=r"$m^1=" + str(masses[0]) + r"$"
+               label=r"$m^0=" + str(masses[0]) + r"$"
     )
     ax.scatter(*(vels1.transpose()), **{"marker": 'x', "alpha": 0.9, "s": 150},
-               label=r"$m^2=" + str(masses[1]) + r"$"
+               label=r"$m^1=" + str(masses[1]) + r"$"
     )
     # add a legend that states the masses
     ax.legend(title="Masses:",

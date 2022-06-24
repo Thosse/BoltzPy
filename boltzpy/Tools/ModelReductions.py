@@ -5,9 +5,14 @@ import matplotlib.pyplot as plt
 from time import process_time
 from boltzpy.Tools.fonts import fs_title, fs_legend, fs_label, fs_suptitle, fs_ticks
 
+# Use default color cycle from matplotlib
+_prop_cycle = plt.rcParams['axes.prop_cycle']
+_colors = _prop_cycle.by_key()['color']
 
-class gain_group:
+
+class GainGroup:
     def __init__(self, rule, class_key, grp):
+        assert isinstance(rule, bp.HomogeneousRule)
         self.class_key = class_key
         self.grp = grp
         self.keys = [key for key in grp.keys()
@@ -20,7 +25,11 @@ class gain_group:
             self.probabilities[k] = np.max(weights)
         self.probabilities /= self.probabilities.sum()
 
-        # compute gains of each collision group
+        # compute gains of each collision group,
+        # use uniform weights for balancing
+        ori_weights = np.copy(rule.collision_weights)
+        rule.collision_weights[:] = 1.0
+        rule.update_collisions(weights= rule.collision_weights)
         self.gains = np.zeros(self.probabilities.shape, dtype=float)
         for k, key in enumerate(self.keys):
             gain_array = rule.gain_array(grp[key])
@@ -31,6 +40,8 @@ class gain_group:
         # store gain of current collision relations
         self.current_gain = 0.0
         self.unused_grps = self.probabilities.size
+        # restore original weights of rule
+        rule.collision_weights[:] = ori_weights
         return
 
     @property
@@ -61,25 +72,29 @@ class gain_group:
             self.probabilities /= self.probabilities.sum()
         return self.keys[index]
 
-class GainBasedModelReduction:
-    def __init__(self, rule, class_keys, sub_keys, execute=True,
+
+class GainBasedModelReduction(bp.HomogeneousRule):
+    def __init__(self,
+                 balance_keys,
+                 selection_keys,
+                 execute=True,
                  force_normality_collisions=True,
-                 gain_factor_normality_collisions=1.0):
-        assert isinstance(rule, bp.HomogeneousRule)
-        self.rule = rule
-        for k in [class_keys, sub_keys]:
+                 gain_factor_normality_collisions=1.0,
+                 **rule_params):
+        bp.HomogeneousRule.__init__(self, **rule_params)
+        for k in [balance_keys, selection_keys]:
             assert k.ndim == 2
             assert k.dtype == int
-        assert class_keys.shape[0] == sub_keys.shape[0]
-        self.len_class = class_keys.shape[1]
-        self.len_sub = sub_keys.shape[0]
-        self.keys = rule.merge_keys(class_keys, sub_keys)
-        self.col_grp = rule.group(self.keys)
+        assert balance_keys.shape[0] == selection_keys.shape[0]
+        self.len_class = balance_keys.shape[1]
+        self.len_sub = selection_keys.shape[0]
+        self.keys = self.merge_keys(balance_keys, selection_keys)
+        self.col_grp = self.group(self.keys)
 
         # construct array of gain groups
-        self.unique_keys = rule.filter(class_keys, class_keys)
+        self.unique_keys = self.filter(balance_keys, balance_keys)
         self.unique_keys = [tuple(key) for key in self.unique_keys]
-        self.gain_groups = [gain_group(rule, key, self.col_grp)
+        self.gain_groups = [GainGroup(self, key, self.col_grp)
                             for key in self.unique_keys]
         self.gain_groups = np.array(self.gain_groups)
 
@@ -88,9 +103,10 @@ class GainBasedModelReduction:
         self.log_gains = [[0 for k in self.unique_keys]]
         self.log_ncols = [0]
         self.log_empty_times = {key: -1 for key in self.unique_keys}
-        self.execute(
-            force_normality_collisions=force_normality_collisions,
-            gain_factor_normality_collisions=gain_factor_normality_collisions)
+        if execute:
+            self.execute(
+                force_normality_collisions=force_normality_collisions,
+                gain_factor_normality_collisions=gain_factor_normality_collisions)
         return
 
     @property
@@ -106,19 +122,18 @@ class GainBasedModelReduction:
         idx = np.argmin([gg.current_gain for gg in usable_groups])
         return usable_groups[idx]
 
-    def get_reduction(self, idx):
+    def get_selection(self, idx):
         keys = self.log_keys[:idx]
         col_grps = [self.col_grp[key] for key in keys]
         col_rels = np.concatenate(col_grps, axis=0)
         return col_rels
-
 
     def add_collisions(self, key=None, gain_factor=1.0):
         if key is None:
             gg = self.next_gain_group()
             key = gg.choose(gain_factor=gain_factor)
             if gg.unused_grps == 0:
-                self.log_empty_times[gg.class_key] = len(self.log_keys)
+                self.log_empty_times[gg.class_key] = len(self.log_keys) - 1
         else:
             # find gain group that contains the key
             key = tuple(key)
@@ -141,19 +156,19 @@ class GainBasedModelReduction:
         tic = process_time()
         if force_normality_collisions:
             print("Add Normality Collisions...", end="", flush=True)
-            col_rels = self.rule.collision_relations
-            is_required = self.rule.key_is_normality_collision(col_rels)
+            col_rels = self.collision_relations
+            is_required = self.key_is_normality_collision(col_rels)
             required_keys = self.keys[np.where(is_required)[0]]
-            required_keys = self.rule.filter(required_keys, required_keys)
+            required_keys = self.filter(required_keys, required_keys)
             for key in required_keys:
                 self.add_collisions(key,
                                     gain_factor=gain_factor_normality_collisions)
             print("Done!")
 
         print("Add Collisions to Balance Gains...", end="", flush=True)
-        while self.log_ncols[-1] != self.rule.ncols:
+        while self.log_ncols[-1] != self.ncols:
             print("\rCollisions = %7d / %7d              "
-                  % (self.log_ncols[-1], self.rule.ncols),
+                  % (self.log_ncols[-1], self.ncols),
                   flush=True,
                   end="")
             self.add_collisions()
@@ -161,27 +176,29 @@ class GainBasedModelReduction:
         print("\nTime taken: %.3f seconds" % (toc-tic))
         return
 
-    def plot(self,
-             ax=None,
-             figsize=(12.75, 6.25),
-             constrained_layout=True,
-             class_keys=None,
-             legend_ncol=1,
-             lw=2,
-             lw_vlines=0.5,
-             ls="solid",
-             xlabel="Number of Collisions",
-             ylabel="Individual Gains",
-             title="Gain Based Model Reduction",
-             xscale="linear",
-             yscale="linear",
-             ymin=1e-6,
-             ymax=None):
-        show_plot = ax is None
-        if ax is None:
-            fig = plt.figure(figsize=figsize,
-                             constrained_layout=constrained_layout)
-            ax = fig.add_subplot()
+    def plot_reduction(
+            self,
+            figsize=(12.75, 6.25),
+            constrained_layout=True,
+            file_address=None,
+            class_keys=None,
+            legend_ncol=1,
+            legend_title=None,
+            lw=2,
+            lw_vlines=0.5,
+            ls="solid",
+            xlabel="Number of Collisions",
+            ylabel="Individual Gains",
+            title="Weight- and Gain-Based Collision Reduction",
+            xscale="linear",
+            yscale="linear",
+            ymin=1e-6,
+            ymax=None):
+        fig = plt.figure(figsize=figsize,
+                         constrained_layout=constrained_layout)
+        ax = fig.add_subplot()
+        if file_address is not None:
+            assert isinstance(file_address, str)
         if class_keys is None:
             class_keys = self.class_keys
         # convert gains  to array for easier access
@@ -190,22 +207,29 @@ class GainBasedModelReduction:
             ymax = 1.1 * gains[-1].max()
         # plot individual gains
         for k, key in enumerate(class_keys):
+            color = _colors[k]
             ax.plot(self.log_ncols,
                     gains[:, k],
+                    c=color,
                     ls=ls,
                     lw=lw,
                     label=key)
-        ax.set_ylim(ymin, ymax)
-        # add vlines to mark good reductions
-        for key, idx in self.log_empty_times.items():
-            ax.vlines(self.log_ncols[idx-1],
+            # add vlines to mark good reductions
+            last_idx = self.log_empty_times[key]
+            last_ncols = self.log_ncols[last_idx]
+            ax.vlines(last_ncols,
                       ymin, ymax,
-                      lw=lw,
-                      colors="lightgray",
+                      lw=lw_vlines,
+                      ls="dotted",
+                      colors=color,
                       zorder=-1)
+        ax.set_ylim(ymin, ymax)
         ax.set_xscale(xscale)
         ax.set_yscale(yscale)
-        leg = plt.legend(fontsize=fs_legend, ncol=legend_ncol)
+        leg = plt.legend(title=legend_title,
+                         title_fontsize=fs_legend,
+                         fontsize=fs_legend,
+                         ncol=legend_ncol)
         # set the linewidth of each legend object
         for legobj in leg.legendHandles:
             legobj.set_linewidth(3.0)
@@ -214,6 +238,9 @@ class GainBasedModelReduction:
         ax.tick_params(axis="both", labelsize=fs_ticks)
         ax.set_xlabel(xlabel, fontsize=fs_label)
         ax.set_ylabel(ylabel, fontsize=fs_label)
-        if show_plot:
+
+        if file_address is not None:
+            plt.savefig(file_address)
+        else:
             plt.show()
-        return ax
+        return

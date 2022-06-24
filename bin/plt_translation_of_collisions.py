@@ -82,7 +82,7 @@ plt.clf()
 #################################################################################
 #               Equivalence Classes plot                                        #
 #################################################################################
-fig = plt.Figure(figsize=(6, 6.5))
+fig = plt.Figure(figsize=(9, 6.5))
 ax = fig.add_subplot()
 # Right Plot
 offset = np.full(2, .1)
@@ -92,19 +92,19 @@ partitions = model_2.group(key_distance,
                            as_dict=False)
 
 for point, dist in zip(model_2.subgrids(0).iG, key_distance):
-    ax.annotate(s='', xy=point - 0.15*dist, xytext=point - 0.85*dist,
+    ax.annotate(text='', xy=point - 0.15*dist, xytext=point - 0.85*dist,
                  arrowprops=dict(arrowstyle='<->', linewidth=2, color="gray"))
 
 for point in model_2.subgrids(1).iG:
     point = point - offset
-    ax.text(point[0], point[1], "1",
+    ax.text(point[0], point[1], "0",
              bbox={"boxstyle": "circle", "color": "orange"},
              fontsize=13)
 
 for p, prt in enumerate(partitions):
     for point in prt:
         point = point - offset
-        ax.text(point[0], point[1], str(p + 1),
+        ax.text(point[0], point[1], str(p ),
                  bbox={"boxstyle": "circle", "color": "lightsteelblue"},
                  fontsize=13)
 #
@@ -114,23 +114,28 @@ ax.set_xticks([])
 ax.set_yticks([])
 ax.set_xlim(-5, 5)
 ax.set_ylim(-5, 5)
-ax.set_title(r"Equivalence Classes $\faktor{\mathfrak{V}^s}{dist^r}$",
+st = fig.suptitle(r"Equivalence Classes $\faktor{\mathfrak{V}^s}{dist^r}$",
           # r"$\faktor{\mathfrak{V}^1}{dist_2}$"
           # r" and $\faktor{\mathfrak{V}^2}{dist_1}$",
           fontsize=fs_title,
-          pad=15)
+          x=0.65)
 ax.set_aspect('equal')
 ax.scatter([], [],
             color="lightsteelblue",
             s=300,
-            label=r"$\left\lvert \faktor{\mathfrak{V}^1}{dist^2} \right\rvert = 4$")
+            label=r"$\left\lvert \faktor{\mathfrak{V}^0}{dist^1} \right\rvert = 4$")
 ax.scatter([], [],
             color="orange",
             s=300,
-            label=r"$\left\lvert \faktor{\mathfrak{V}^2}{dist^1} \right\rvert = 1$")
-fig.legend(loc="lower center",
-           ncol=2,
-           fontsize=fs_legend)
+            label=r"$\left\lvert \faktor{\mathfrak{V}^1}{dist^0} \right\rvert = 1$")
+leg = ax.legend(bbox_to_anchor=(1.04,1),
+                loc="upper left",
+                title="Equivalence Classes",
+                fontsize=fs_legend,
+                title_fontsize=fs_legend)
+
 plt.subplots_adjust(bottom=0.0)
-plt.tight_layout()
-fig.savefig(bp.SIMULATION_DIR + "/plt_velocity_equivalence_classes.pdf")
+fig.savefig(bp.SIMULATION_DIR + "/plt_velocity_equivalence_classes.pdf",
+            bbox_extra_artists=(leg, st),
+            bbox_inches='tight'
+)

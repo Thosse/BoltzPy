@@ -79,7 +79,7 @@ for kind in ["Continuous", "Discrete"]:
     cbar.ax.tick_params(axis="both", labelsize=fs_ticks)
     f_name = "$f$" if kind == "Continuous" else r"$\mathfrak{f}$"
     fig.suptitle("Symmetry and Antisymmetry Planes for Different "
-                 + kind + " Functions " + f_name,
+                 + kind + " Functions",
                  fontsize=fs_suptitle)
 
     # add hyperplanes

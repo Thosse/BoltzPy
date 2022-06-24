@@ -1,6 +1,7 @@
 import boltzpy as bp
 import numpy as np
 import matplotlib as mpl
+mpl.use('Qt5Agg')
 import matplotlib.pyplot as plt
 from time import process_time
 from boltzpy.Tools.fonts import fs_title, fs_suptitle, fs_label
@@ -146,7 +147,7 @@ class WeightAdjustment(bp.HomogeneousRule):
                 ax.set_xticks([])
                 ax.set_yticks([])
                 if s == 0 and key in titles.keys():
-                    ax.set_title(titles[key], fontsize=fs_title)
+                    ax.set_title(titles[key], fontsize=fs_title-2)
 
         if suptitle is not None:
             fig.suptitle(suptitle, fontsize=fs_suptitle)
@@ -160,6 +161,7 @@ class WeightAdjustment(bp.HomogeneousRule):
 
 class AngularWeightAdjustment(WeightAdjustment):
     def __init__(self,
+                 cur_dt=1e-7,
                  hdf5_log=None,
                  **rule_params):
         WeightAdjustment.__init__(self, **rule_params)
@@ -168,7 +170,7 @@ class AngularWeightAdjustment(WeightAdjustment):
         self.cur_rels_used = np.empty((0,), dtype=int)
         self.cur_rels_adj = np.empty((0,), dtype=int)
         self.cur_grp = dict()
-        self.cur_dt = np.inf
+        self.cur_dt = cur_dt
         self.cur_adjustment = -1
         self.cur_iter = -1
         self.cur_ref_angle = -1
@@ -230,7 +232,7 @@ class AngularWeightAdjustment(WeightAdjustment):
         return self.log[str(self.cur_adjustment)]
 
     def _init_adjustment(self,
-                         dt,
+                         cur_dt=None,
                          cols_adj=None,
                          cols_used=None,
                          species_used=None,
@@ -239,8 +241,9 @@ class AngularWeightAdjustment(WeightAdjustment):
                          ref_angle_idx=-1):
         self.cur_adjustment += 1
         self.cur_iter = -1
-        assert dt > 0
-        self.cur_dt = dt
+        if cur_dt is not None:
+            self.cur_dt = cur_dt
+        assert self.cur_dt > 0
 
         # log bisection parameters in h5py arrays
         # to allow posterior investigations
@@ -383,18 +386,18 @@ class AngularWeightAdjustment(WeightAdjustment):
         return grp_angles
 
     def balance_angles(self,
-                       dt,
+                       cur_dt=None,
                        cols_adj=None,
                        cols_used=None,
                        species_used=None,
                        initial_weights=(0.2, 4.0),
-                       maxiter=100000,
+                       maxiter=100,
                        ref_angle_idx=-1,
                        rtol=1e-2,
                        verbose=True):
         if verbose:
             print("Initialize Adjustment Parameters and Log-File")
-        self._init_adjustment(dt, cols_adj, cols_used,
+        self._init_adjustment(cur_dt, cols_adj, cols_used,
                               species_used, initial_weights,
                               maxiter, ref_angle_idx)
 
@@ -404,6 +407,8 @@ class AngularWeightAdjustment(WeightAdjustment):
         self._bisection_step(self.cur_weights[0], [np.inf, np.inf])
         self._bisection_step(self.cur_weights[1])
         if np.any(self.cur_bounds[self.cur_iter] == np.inf):
+            print("Initial Viscosities;",
+                  self.cur_log["viscosities"][:2])
             raise ValueError("Bad Inital Values with no change of sign")
         assert self.cur_iter == 1
 
@@ -419,6 +424,9 @@ class AngularWeightAdjustment(WeightAdjustment):
                       % (self.cur_iter, self.cur_weight, self.cur_rel_err),
                       end="",
                       flush=True)
+            if self.cur_iter > maxiter:
+                print("Warning! Could not enforce invariance below tolerance!")
+                break
         toc = process_time()
         if verbose:
             print("\nTime taken: %0.3f seconds" % (toc - tic))

@@ -62,13 +62,13 @@ print("setup figure and axes")
 fig, axes = plt.subplots(1, 2, constrained_layout=True,
                          figsize=(12.75, 6.25),
                          sharey=True, sharex=True)
-fig.suptitle(r"Interspecies Collisions for Different Masses $(m^1, m^2)$ in $(31, 31)$ shaped Grids",
+fig.suptitle(r"Interspecies Collisions for Different Masses $(m^0, m^1)$ in $(31, 31)$ shaped Grids",
              fontsize=fs_suptitle)
-axes[0].set_title(r"$(\Delta_\mathbb{Z}^1, \Delta_\mathbb{Z}^2) = (2m^2, 2m^1)$",
+axes[0].set_title(r"$(\Delta_\mathbb{N}^0, \Delta_\mathbb{N}^1) = (2m^1, 2m^0)$",
                   fontsize=fs_title)
-axes[1].set_title(r"$(\Delta_\mathbb{Z}^1, \Delta_\mathbb{Z}^2) = (2, 2)$",
+axes[1].set_title(r"$(\Delta_\mathbb{N}^0, \Delta_\mathbb{N}^1) = (2, 2)$",
                   fontsize=fs_title)
-axes[0].set_ylabel(r"Number of Interspecies Collisions $\left\lvert \mathfrak{C}^{1,2} \right\rvert $",
+axes[0].set_ylabel(r"Number of Interspecies Collisions $\left\lvert \mathfrak{C}^{0,1} \right\rvert $",
                    fontsize=fs_label)
 for a, ax in enumerate(axes):
     mode = ["_neq", "_eq"][a]
@@ -82,13 +82,13 @@ for a, ax in enumerate(axes):
            width=BAR_WIDTH,
            bottom=0.0,
            color="tab:orange",
-           label="Non Energy\nTransferring\nCollisions")
+           label="NET Collisions")
     ax.bar(x=masses,
            bottom=net,
            width=BAR_WIDTH,
            height=et,
            color="tab:green",
-           label="Energy\nTransferring\nCollisions")
+           label="ET Collisions")
     # # create twin axis, for second plot
     # # plot percentage et / net here
     # twax = ax.twinx()
@@ -97,11 +97,11 @@ for a, ax in enumerate(axes):
     #           percentage,
     #           label="Energy Transferring Collisions")
     # twax.set_ylim(bottom=0.0, top=1.0)
-    ax.set_xlabel("Mass $m^1$, for fixed $m^2=30$", fontsize=fs_label)
+    ax.set_xlabel("Mass $m^0$, for fixed $m^1=30$", fontsize=fs_label)
     ax.set_xlim(left=0.5, right=masses.max() + 0.5)
     ax.set_xticks(masses[4::5])
     ax.tick_params(axis="both", labelsize=fs_ticks)
-axes[1].legend(fontsize=fs_legend,
+axes[1].legend(fontsize=fs_legend + 3,
                title_fontsize=fs_legend_title)
 t = axes[0].yaxis.get_offset_text()
 t.set_size(fs_label)

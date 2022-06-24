@@ -2,9 +2,7 @@ import boltzpy as bp
 import numpy as np
 import matplotlib
 matplotlib.rcParams['text.usetex'] = True
-matplotlib.rcParams['text.latex.preamble'] = [
-    r'\usepackage{amsmath}',
-    r'\usepackage{amssymb}']
+matplotlib.rcParams['text.latex.preamble'] = r'\usepackage{amsmath, amssymb}'
 import matplotlib.pyplot as plt
 from fonts import fs_title, fs_legend, fs_label, fs_suptitle, fs_ticks
 
@@ -106,23 +104,26 @@ model.plot_styles[0]["s"] = 250
 model.plot_styles[1]["s"] = 250
 # plot removed collisions
 for col in removed_colls:
-    colvel = model.vels[np.tile(col, 2)]
+    colvel = model.vels[[col[0], col[1], col[2], col[3], col[0]]]
     ax[0].plot(colvel[:, 0], colvel[:, 1], "--", c="red",
-               dashes=(8, 18), lw=0.5)
+               dashes=(6, 14), lw=3)
 
 # plot remaining collisions
 for i, k in enumerate([(0, 0, 0, 0), (0, 0, 1, 1)]):
     model.plot_collisions(grp_colls[k], plot_object=ax[i])
     ax[i].set_xticks([])
     ax[i].set_yticks([])
-ax[0].set_title("Reduced Intraspecies Collisions $\mathfrak{C}_{\gamma > 0}^{s,s}$ ",
+ax[0].set_title(r"Reduced Intraspecies Collisions $\mathfrak{C}_{\gamma > 0}^{s,s}$ ",
                 # "for $s \in \{1,2\}$",
                 fontsize=fs_title)
-ax[1].set_title("Complete Interspecies Collisions $\mathfrak{C}_{\gamma > 0}^{1,2}$",
+ax[1].set_title(r"Complete Interspecies Collisions $\mathfrak{C}_{\gamma > 0}^{0,1}$",
                 fontsize=fs_title)
-
+# for i in range(ax.size):
+#     ax[i].spines['top'].set_visible(False)
+#     ax[i].spines['right'].set_visible(False)
+#     ax[i].spines['bottom'].set_visible(False)
+#     ax[i].spines['left'].set_visible(False)
 plt.savefig(bp.SIMULATION_DIR + "/plot_normal_dvm_2.pdf")
-plt.show()
 
 #######################################################################
 #       Plot extreme numral/not semi supernormal DVM
@@ -144,11 +145,14 @@ model.plot_collisions(grp_colls[(0,0,1,1)], plot_object=ax[1])
 for i in [0,1]:
     ax[i].set_xticks([])
     ax[i].set_yticks([])
-ax[0].set_title("Removed Intraspecies Collisions $\mathfrak{C}_{\gamma > 0}^{s,s}$ ",
+ax[0].set_title(r"All Intraspecies Collisions $\mathfrak{C}_{\gamma > 0}^{s,s}$ Removed",
                 # "for $s \in \{1,2\}$",
                 fontsize=fs_title)
-ax[1].set_title("Complete Interspecies Collisions $\mathfrak{C}_{\gamma > 0}^{1,2}$",
+ax[1].set_title(r"Complete Interspecies Collisions $\mathfrak{C}_{\gamma > 0}^{0,1}$",
                 fontsize=fs_title)
-
+# for i in range(ax.size):
+#     ax[i].spines['top'].set_visible(False)
+#     ax[i].spines['right'].set_visible(False)
+#     ax[i].spines['bottom'].set_visible(False)
+#     ax[i].spines['left'].set_visible(False)
 plt.savefig(bp.SIMULATION_DIR + "/plot_normal_dvm_1.pdf")
-plt.show()
